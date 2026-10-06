@@ -12,6 +12,8 @@
 - `can_merge_selected(doc)` / `merge_selected(doc)`：Layer › Merge Layers（多选时的 ⌘E）：选中图层中可见的那些合并成一个，放在最上面那个的位置并沿用它的名字（其中有背景图层时合并进背景图层）；结果的不透明度、填充、混合模式复位，蒙版并入像素；隐藏的选中图层保持不动。至少两个选中图层可见时可用。
 - `delete_selected(doc)`：删除所有选中图层；会删光所有图层时拒绝。之后最低被删图层下面的那个（没有时最低的剩余图层）成为活动图层。
 - `toggle_selected_visibility(doc)`：Layer › Hide Layers / Show Layers：隐藏所有选中图层；全部已隐藏时改为全部显示。返回现在是否可见。
+- `can_reverse(doc)` / `reverse_selected(doc)`：Layer › Arrange › Reverse：两个以上同一组里的选中图层（组连同内容）互换位置，顺序反过来；包含背景图层或不在同一组时不可用。
+- `can_merge_group(doc)` / `merge_group(doc)`：当前图层是非空组时的 ⌘E（Merge Group）：组里的图层合并成一个像素图层，占据组的位置并沿用组的 id、名字、可见性、不透明度、填充、蒙版、颜色标签和混合模式（穿透变为 Normal），合并前后画面不变。
 - 图层组：
   - `can_group(doc)` / `group_selected(doc)`：Layer › Group Layers（⌘G）：选中的图层（连同其中的内容；已在另一个选中组里的不重复算）放进一个新的「Group N」，组放在最上面那个选中图层原来的位置和所在的组里；选中背景图层时不可用。新组被选中。
   - `ungroup(doc)`：Layer › Ungroup Layers（⇧⌘G）：当前组消失，它的直接子图层进入它原来所在的组，并全部被选中。
@@ -36,9 +38,8 @@
 ### 顺序
 
 - 图层列表自底向上，背景图层只能在最底层。
-- `arrange_target(doc, arrange)`：Layer › Arrange 会把活动图层移到的索引；不会移动时为 `None`。Bring to Front 移到最上，Bring Forward 上移一层，Send Backward 下移一层，Send to Back 移到最下；有背景图层时「最下」是背景图层之上。背景图层本身不能移动。
+- `arrange_target(doc, arrange)` / `arrange(doc, arrange)`：Layer › Arrange 四项只在当前图层所在的组里（同级图层之间）移动，组连同其中的内容一起移动（用 `move_block`），所以置顶是到组内最上面而不是整个文档最上面；背景图层不动，也不会有图层越过它。
 - `arrange(doc, arrange)`：执行上述移动，返回是否移动。
-- `move_layer(doc, from, to)`：把索引 `from` 的图层移到最终索引 `to`（Layers 面板拖动用）。`from == to`、越界、移动背景图层、或把图层放到背景图层下面时返回 `false` 且不改动。
 
 ### 改名
 
@@ -73,6 +74,8 @@
 
 ## 测试覆盖
 
+- `arranging_stays_within_the_group_and_reverse`：组内置顶只到组内最上面；组后移时带着内容越过下面的图层；顶层图层前移；Reverse 把组和两个图层的顺序反过来且组的内容不变。
+- `merging_a_group`：合并组后只剩一个同 id、同名的像素图层，画面与合并前完全相同。
 - `deleting_only_the_group_keeps_its_layers`、`duplicating_a_group_copies_its_layers`：只删组时图层留下并移出组；复制组得到「Group 1 copy」及其中图层的副本，复制到其它文档同样带上组里的图层。
 - `grouping_ungrouping_and_moving_blocks`：⌘G 把不相邻的两层放进新组（位置、父子关系、选中）；组展开时新图层插在组内最上面；把组外的图层移到组内最上面；组不能移到自身里或背景下面；取消编组后结构复原并选中原子图层；删除组连同内容。
 - `selected_layers_merge_delete_and_hide`：两个图层合并成上面那个，名字和位置正确、不透明像素叠加，未选的图层不动；隐藏/显示选中图层；删除选中图层后活动图层正确，最后一个图层不能删。
@@ -80,7 +83,7 @@
 - `duplicates_are_named_like_photoshop`：「copy」「copy 2」命名；⌘J 作用于背景图层得到「Layer 2」这样的普通图层。
 - `via_copy_and_cut_move_the_selection_in_place`：选区复制到「Layer N」并沿用不透明度、保留选区；剪切后原图层对应像素变透明。
 - `arrange_keeps_the_background_at_the_bottom`：Send to Back 停在背景之上，背景不能上移。
-- `dragging_and_renaming`：`move_layer` 的允许与拒绝情况；改名去空白、拒绝空名和同名。
+- `dragging_and_renaming`（拖动用 `move_block`）：`move_layer` 的允许与拒绝情况；改名去空白、拒绝空名和同名。
 - `masks_hide_reveal_and_apply`：背景图层不能加蒙版；Hide All 隐藏图层，停用后显示；在蒙版上填白重新显示、图层像素不变；应用 50% 灰的蒙版后 alpha 为 128；从选区建 Hide Selection 蒙版；删除蒙版。
 - `merge_down_keeps_the_lower_layer`：50% 红色合并到白色背景得到 `[255, 128, 128, 255]`，结果仍是背景图层。
 - `merge_visible_leaves_hidden_layers`：隐藏图层保留，可见图层合并到背景图层。

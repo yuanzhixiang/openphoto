@@ -85,6 +85,7 @@
 | DeselectLayers | Select › Deselect Layers：不选任何图层 | 无 |
 | Align(how) | Layer › Align › Top Edges…Right Edges（`op_core::align::align`），记录如「Align Left Edges」；移动工具选项栏的对齐按钮也执行它 | 无 |
 | Distribute(how) | Layer › Distribute › Top Edges…Vertically（`op_core::align::distribute`），记录如「Distribute Vertical Centers」 | 无 |
+| ArrangeReverse | Layer › Arrange › Reverse（`layer_ops::reverse_selected`），记录「Reverse」 | 无 |
 | GroupLayers | Layer › Group Layers：选中的图层编组（`layer_ops::group_selected`），记录「Group Layers」；选中背景图层时不可用 | ⌘G |
 | UngroupLayers | Layer › Ungroup Layers：取消当前组（`layer_ops::ungroup`），记录「Ungroup Layers」；当前图层是组时可用 | ⇧⌘G |
 | NewGroup | Layer › New › Group...：打开 New Group 对话框 | 无 |
@@ -162,7 +163,7 @@
 - ToggleLayerVisibility、DuplicateLayer、LayerViaCopy：当前文档有选中图层时可用；LayerViaCut 还要求有选区。
 - Crop、PasteInto、PasteOutside：当前文档有选区时可用。MaskRevealAll、MaskHideAll：当前图层可以加蒙版时可用；MaskRevealSelection、MaskHideSelection 还要求有选区；MaskDelete、MaskApply、MaskToggle：当前图层有蒙版时可用。TransformAgain：有当前文档且本次运行中做过变换时可用。LastFilter：有当前文档且本次运行中用过滤镜时可用。
 - LayerFromBackground：文档有背景图层时可用。DeleteHiddenLayers：既有隐藏图层也有可见图层时可用。
-- Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：选中多个图层时为 Merge Layers（`layer_ops::merge_selected`，记录「Merge Layers」，菜单标签随之改为「Merge Layers」），其中至少两个可见时可用；只选一个时为 Merge Down，当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
+- Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：当前图层是非空组时为 Merge Group（`layer_ops::merge_group`，记录「Merge Group」，菜单标签「Merge Group」）；选中多个图层时为 Merge Layers（`layer_ops::merge_selected`，记录「Merge Layers」，菜单标签随之改为「Merge Layers」），其中至少两个可见时可用；只选一个时为 Merge Down，当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
 - Deselect、SelectInverse、Modify 五项、Grow、Similar：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
 - 其余命令：有当前文档时可用。Paste 不检查剪贴板里有没有内容（读取系统剪贴板里的图片代价较高，不适合每帧检查），剪贴板为空时执行 Paste 什么也不做。
 
