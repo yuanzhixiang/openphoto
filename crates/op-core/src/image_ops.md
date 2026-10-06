@@ -8,7 +8,14 @@
 
 ### 图像大小（重采样）
 
-- `Resample`：`Bicubic`（默认，标签「Bicubic (smooth gradients)」）、`Bilinear`、`NearestNeighbor`（「Nearest Neighbor (hard edges)」）。
+- `Resample`：Photoshop 2026 菜单里的八种方法，顺序与标签一致（`ALL`、`label`、`separator_after`）：
+  - `Automatic`（默认）：缩小时用 Bicubic Sharper，放大时用 Bicubic Smoother（`resolve`）。
+  - `PreserveDetails`、`PreserveDetails2`：Lanczos 3（半径 3）。Photoshop 的保留细节（2.0 用机器学习）有降噪等处理，这里只近似为 Lanczos。
+  - `BicubicSmoother`：Mitchell–Netravali（B = C = 1/3），更柔和。
+  - `BicubicSharper`：a = −0.75 的三次卷积，更锐利。
+  - `Bicubic`：a = −0.5 的三次卷积。
+  - `NearestNeighbor`、`Bilinear`。
+  测试 `resample_methods`：每种方法都保持纯色不变；Automatic 的选择；同一阶跃放大后的过冲 Sharper > Bicubic > Smoother，双线性不过冲。
 - `resize(doc, width, height, method)`：把每个图层和选区缩放到新尺寸（宽高必须大于 0）。先横向、再纵向分离重采样：目标像素中心对应源坐标 `(i + 0.5) / 比例 − 0.5`；双三次用 a = −0.5 的三次卷积核（半径 2），双线性用三角核（半径 1），权重归一化；缩小时核按比例加宽，每个源像素都参与（面积正确的缩小）；邻近取最近的源像素。颜色在预乘 alpha 下计算，结果限制在 0–255（双三次会过冲）；alpha 小于 0.5 的像素为全透明。选区的选择程度按同样的方法重采样。图层有画布外的像素时（`resize_with_outside`），画布连同周围的像素一起按同一比例缩放，并放回按比例缩放后的位置（Photoshop 2026 实测，见下方测试）。
 
 ### 旋转与翻转
