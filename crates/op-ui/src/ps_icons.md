@@ -6,7 +6,7 @@
 
 ## 对外接口
 
-- `Icon`：Home、Move（四向箭头）、Caret（V 形下拉箭头）、Share、Bell、Search、Lightbulb、Workspace，对齐与分布的八个图标（AlignLeft、AlignHorizontalCenter、AlignRight、DistributeVertically、AlignTop、AlignVerticalCenter、AlignBottom、DistributeHorizontally），More（三个圆点），Gear（齿轮，右下带白色小三角）。
+- `Icon`：Home、Move（四向箭头）、Caret（V 形下拉箭头）、Share、Bell、Search、Lightbulb、Workspace，对齐与分布的八个图标（AlignLeft、AlignHorizontalCenter、AlignRight、DistributeVertically、AlignTop、AlignVerticalCenter、AlignBottom、DistributeHorizontally），More（三个圆点），Gear（齿轮，右下带白色小三角），CollapseToolbar（工具栏折叠条的粗「»」）、CollapseRight / CollapseLeft（面板列与图标列折叠条的细线「»」「«」），History、Comments（图标列的两个按钮）。
 - `paint(painter, center, icon, color, background)`：以 `center` 为中心画图标。`background` 是图标后面的底色，用于齿轮的中心孔。
 
 ## 坐标约定
@@ -19,5 +19,5 @@
 
 ## 已知限制
 
-- 只描了移动工具选项栏和右侧按钮用到的图标；其它工具的选项栏和工具栏仍用 Phosphor 图标。
+- 只描了选项栏外框、移动工具选项、折叠条和图标列用到的图标；工具栏底部的图形直接画在 `toolbar.rs` 里；其它工具的选项栏和工具栏的工具图标仍用 Phosphor 图标。
 - 头像是占位的纯色圆，不是 Photoshop 的账户头像。

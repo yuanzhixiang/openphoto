@@ -24,7 +24,7 @@
 
 ## 尺寸
 
-- `size`：窗口框架尺寸按 Photoshop 1:1 量取（pt）：标题栏 29、选项栏 33、工具栏 42、状态栏 16、图标列 44、面板列 321。其余（工具按钮 38、面板标签栏 42、输入框高 26、图层行高 60）仍是按参考截图像素量取的值。
+- `size`：窗口框架尺寸按 Photoshop 1:1 量取（pt）：标题栏 29、选项栏 33、工具栏 42、状态栏 16、图标列 43、面板列 322、面板标签栏 28（含下方 1 pt 线）。其余（输入框高 26、图层行高 60）仍是按参考截图像素量取的值。
 - `UI_SCALE = 0.675`：通过 egui `zoom_factor` 把参考截图像素缩放到 Photoshop 的实际大小。该值由「参考截图 2000 px 宽对应 Photoshop 窗口 1349 pt」算出。
 - `pt(x)`：把在 Photoshop 里按 1:1 量到的点数换算成 egui 单位（`x / UI_SCALE`），新界面一律用它。
 
@@ -34,6 +34,7 @@
 - 字体文件随应用打包，字节数据以 `SOURCE_SANS_REGULAR`、`SOURCE_SANS_SEMIBOLD` 公开，文字工具也用它们栅格化文字。
 - 比例字体族首选 Source Sans 3 Regular；另有名为 `semibold` 的字体族（Source Sans 3 Semibold），用于标签和标题。
 - Phosphor 图标字体作为回退字体加在比例字体族末尾，所以图标可以直接写在文字里。
+- 分隔与折叠条颜色（Photoshop 2026 实测）：3 pt 分隔条和折叠条的线 `DIVIDER_DARK` `#383838`、分隔条中间的线 `DIVIDER_LIGHT` `#474747`、折叠条底色 `COLLAPSE_BAR` `#424242`、折叠箭头 `COLLAPSE_CHEVRON` `#c8c8c8`；面板标签文字 `TAB_TEXT_ACTIVE` `#f0f0f0`、`TAB_TEXT` `#b0b0b0`。
 - 选项栏颜色（Photoshop 2026 实测）：底色 `OPTIONS_BAR` `#535353`、分隔线 `OPTIONS_SEPARATOR` `#3e3e3e`、图标 `OPTIONS_ICON` `#dddddd`、铃铛 `OPTIONS_BELL` `#b9b9b9`、禁用图标 `OPTIONS_ICON_DISABLED` `#989898`、标签文字 `TEXT_BRIGHT` `#f0f0f0`；复选框 `CHECKBOX` `#d4d4d4` 与对勾 `CHECK_MARK` `#323232`；下拉框边框 `DROPDOWN_BORDER` `#666666`（悬停 `DROPDOWN_BORDER_HOVER` `#808080`）。
 - Phosphor Bold 单独注册为字体族 `phosphor-bold`，`tool_icon(size)` 返回它，只用于工具栏和工具列表的图标。
 
