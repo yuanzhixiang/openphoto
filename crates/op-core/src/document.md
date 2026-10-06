@@ -57,7 +57,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 
 - 从底到顶遍历 `visible` 为真的图层；`opacity * fill` 小于等于 0 的图层整层跳过。
 - 遍历图层已分配的 tile，未分配的 tile 视为透明直接跳过。
-- 每个像素按直通 alpha 的 source-over 公式混合：源 alpha 为像素 alpha × `opacity` × `fill`；`out_a = sa + da·(1 − sa)`，`out_c = (sc·sa + dc·da·(1 − sa)) / out_a`。源 alpha 为 0 的像素跳过。
+- 每个像素按图层的混合模式合成（`blend::composite`，算法见 `blend.md`）：源 alpha 为像素 alpha × `opacity` × `fill`，结果为直通 alpha。源 alpha 为 0 的像素跳过。
 - 混合在 gamma 编码（sRGB）空间进行，与 Photoshop 的默认设置一致（理由见 `README.md`）。
 - 累积使用 `f32` 缓冲区，最终每个分量 clamp 到 0..=1 后按 `×255 + 0.5` 截断量化为 `u8`。
 - 结果中没有任何图层覆盖的像素为 `[0, 0, 0, 0]`。
@@ -81,7 +81,6 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 
 ## 已知限制
 
-- 合成只实现 Normal 混合；其他混合模式（以及 `Dissolve`）都按 Normal 处理。
 - 合成完全在 CPU 上进行，每次都整幅重算，不做脏区增量合成。
 - 合成不区分 `opacity` 与 `fill`，两者相乘作为图层 alpha。
 - Canvas Size 只支持像素尺寸变化，不做重采样（那属于 Image Size）。
