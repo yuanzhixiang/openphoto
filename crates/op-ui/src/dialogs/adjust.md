@@ -18,7 +18,10 @@
 | Box Blur | Radius (pixels)（1–2000，1） |
 | Unsharp Mask | Amount (%)（1–500，50）、Radius (pixels)（0.1–1000.0，1.0）、Threshold (levels)（0–255，0） |
 | Add Noise | Amount (%)（0.10–400.00，12.50）、Distribution（Uniform / Gaussian，Uniform）、Monochromatic（不勾选） |
-| Median、Minimum、Maximum | Radius (pixels)（1–500，1） |
+| Median | Radius (pixels)（1–500，1） |
+| Minimum、Maximum | Radius (pixels)（0.2–500.0，1.0）、Preserve（Squareness / Roundness，Squareness） |
+| Motion Blur | Angle (°)（−360–360，0）、Distance (pixels)（1–2000，10） |
+| Emboss | Angle (°)（−180–180，135）、Height (pixels)（1–10，3）、Amount (%)（1–500，100） |
 | High Pass | Radius (pixels)（0.1–1000.0，10.0） |
 | Offset | Horizontal (pixels right)、Vertical (pixels down)（−30000–30000，0）、Undefined Areas（Set to Transparent / Repeat Edge Pixels / Wrap Around，Set to Transparent） |
 | Mosaic | Cell Size (square)（2–200，10） |
