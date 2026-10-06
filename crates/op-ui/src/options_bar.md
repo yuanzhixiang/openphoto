@@ -32,6 +32,7 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
   - 「Show Sampling Ring」复选框：勾选但置灰（取样环尚未实现）。
   值保存在 `AppState::eyedropper`。
 - **渐变工具**（经典渐变）：渐变色样（110 × 26，当前前景色到背景色，勾选 Reverse 时反过来）与下拉箭头（没有效果）；五个类型按钮（Linear、Radial、Angle、Reflected、Diamond，悬停提示为「Linear Gradient」等）；「Mode:」全部混合模式；「Opacity:」百分比；Reverse 复选框。值保存在 `AppState::gradient`。
+- **形状工具**：置灰的模式下拉（Shape）、「Fill:」色块（当前前景色）、「Stroke:」色块（白底红斜线，表示无描边）；多边形还有多边形图标与边数（3–100，默认 5），直线还有「Weight:」粗细（1–1000 px，默认 1 px）。边数与粗细保存在 `AppState::shape`。
 - **魔棒**：四个选区运算按钮、Tolerance（0–255，默认 32）、Anti-alias（默认开）、Contiguous（默认开）、Sample All Layers（默认关）、「Select and Mask...」按钮（没有效果）。值保存在 `AppState::wand`。
 - **画笔、铅笔、橡皮擦**：
   - 笔刷预设按钮：白色圆点，下方是当前大小数字，旁边一个下拉箭头。点击弹出 Size 滑块（1–5000 px，对数刻度）和 Hardness 滑块（铅笔没有）。

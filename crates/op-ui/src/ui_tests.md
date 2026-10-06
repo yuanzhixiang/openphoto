@@ -42,6 +42,7 @@
   - O 减淡让暗灰背景变亮并记录「Dodge Tool」；S 仿制图章未设取样点时弹出提示，⌥单击红色方块后在别处单击画出红色；Y 历史记录画笔把该处恢复为打开时的颜色。
   - 红色图层上用 Hide Selection 建蒙版，选区处露出背景，记录「Add Layer Mask」（生成 `layer_mask` 截图）；在蒙版上填黑隐藏更多而图层像素仍为红；停用蒙版后全部显示；Apply 后蒙版消失、对应像素变透明。
   - 有选区时按 Q 进入快速蒙版，记录「Quick Mask」，标题含「(Quick Mask/8」，选区外显示为红色；用画笔在选区中涂黑后再按 Q，得到排除该处的选区（生成 `quick_mask` 截图）。
+  - U 选中矩形工具，拖动生成「Rectangle 1」并记录「Rectangle Tool」；⇧U 切到椭圆，按住 ⌥ 拖动以按下处为中心生成「Ellipse 1」（生成 `shapes` 截图）。
 - `active_canvas_pixel(harness, x, y)` 读取显示用的画布像素（含快速蒙版的红色）；`alt_click(harness, pos)` 模拟一次 ⌥单击。
 - `run_command(harness, command)` 直接执行一个命令（用于没有快捷键的菜单项）；`double_click(harness, pos)` 模拟一次双击；`drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标；`layer_pixel(harness, layer, x, y)` 读取某个图层（自底向上的序号）的像素。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。
