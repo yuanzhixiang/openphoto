@@ -45,7 +45,8 @@
 - `fill`：填充不透明度，语义上只作用于像素本身，不作用于图层样式。
 - `blend_mode`
 - `is_background`：「背景」图层标记。按 Photoshop 语义，背景图层锁定、不透明、总在最底层。
-- `lock_transparency`、`lock_pixels`、`lock_position`：三种锁定。
+- `lock_transparency`、`lock_pixels`、`lock_position`、`lock_nesting`（防止自动嵌套进出画板和框架）：四种单项锁定。
+- `lock_all`：全部锁定。它是独立的标志而不是把四个单项都打开，所以关掉它时单项锁定恢复原样（Photoshop 2026 实测：先锁位置，再点「全部锁定」两次，位置锁仍在）。PSD 里也是单独的位（见 `op-io` 的 `psd.md`）。
 - `kind`：图层内容。
 - `mask`：图层蒙版（`Option<LayerMask>`），新建图层时没有。
 - `color`：颜色标签（`LayerColor`），新建图层时为 `None`。
@@ -70,7 +71,15 @@ New Layer 对话框「Fill with ‹mode›-neutral color」用的中性色：在
 
 `Layer::raster(id, name, image)` 构造一个普通栅格图层：可见、`opacity` 与 `fill` 均为 1.0、Normal 混合、非背景、无任何锁定。
 
-`is_locked()`：当图层是背景图层，或开启了 `lock_pixels` 或 `lock_position` 时返回 `true`。`lock_transparency` 不计入；它在 Photoshop 中属于部分锁定。
+`is_locked()`：当图层是背景图层，或像素、位置被锁定时返回 `true`。透明锁定不计入；它在 Photoshop 中属于部分锁定。
+
+有效锁定（编辑操作一律用这几个方法，不直接读字段，否则会漏掉「全部锁定」）：
+
+- `transparency_locked()` = `lock_transparency || lock_all`
+- `pixels_locked()` = `lock_pixels || lock_all`
+- `position_locked()` = `lock_position || lock_all`
+
+`locks()` / `set_locks(Locks)` 一次读写五个标志。`Locks { transparency, pixels, position, nesting, all }` 是 Lock Layers 对话框和 `layer_ops` 使用的值类型。
 
 ## 行为规则
 
@@ -88,7 +97,7 @@ New Layer 对话框「Fill with ‹mode›-neutral color」用的中性色：在
 
 - 只有栅格图层，没有图层组、调整图层、文字图层、形状图层或智能对象。
 - 没有图层蒙版、剪贴蒙版和图层样式（因此 `fill` 与 `opacity` 在效果上相同）。
-- 锁定标志只是属性，本 crate 内没有编辑操作去检查它们。
+- 防止自动嵌套（`lock_nesting`）只保存状态：还没有画板和框架，它不影响任何操作。
 
 ## 测试覆盖
 

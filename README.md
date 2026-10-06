@@ -18,7 +18,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 ### P0
 
 1. **已有界面的像素级校准**：Image Size（Photoshop 左侧还有预览图）、Fill、Trim、各调整对话框（Threshold、Posterize、Levels、Hue/Saturation、Exposure）与滤镜对话框（Photoshop 的滤镜对话框带预览缩略图和缩放按钮，这里没有）和 Layers 面板的改名输入框、拖动指示线是按 Photoshop 的结构排列的，尚未逐像素比对；窗口框架（标题栏、选项栏、工具栏、图标列、面板列的外框尺寸，文档标签栏、滚动条、状态栏）、History 面板和 Color Picker 已经按 Photoshop 1:1 量取。还没有逐像素比对的是：除移动工具外各工具的选项栏内容（选项栏外框与移动工具已逐像素对齐）、工具栏图标的具体字形（Phosphor Bold 只是近似，按钮位置与尺寸已对齐）、Properties 面板 Canvas 之后的分区（面板列的折叠条、组高度、标签栏、Color、Properties、Layers 面板、图标列、工具栏底部已逐像素对齐）、Canvas Size 对话框。
-2. **界面字体**：Photoshop 面板使用 Adobe Clean（Adobe 专有字体，不能内置，面板继续用 Source Sans 3 近似），对话框使用 macOS 系统字体；本应用已能在运行时加载系统字体（`theme::dialog`），New Layer、Duplicate Layer 对话框已改用，其余对话框还没有切换并重新校准。
+2. **界面字体**：Photoshop 面板使用 Adobe Clean（Adobe 专有字体，不能内置，面板继续用 Source Sans 3 近似），对话框使用 macOS 系统字体；本应用已能在运行时加载系统字体（`theme::dialog`），New Layer、Duplicate Layer 对话框已改用，其余对话框还没有切换并重新校准。注意并非所有对话框都用系统字体：Lock Layers 的标签和按钮用的是面板字体 Adobe Clean（只有标题栏是系统字体），重新校准时要先按字宽判断字体。
 
 ### P1
 
@@ -26,7 +26,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
     - 画布外像素的余项：图层已经可以超出画布（移动、粘贴、Canvas Size、Reveal All、PSD 读写都保留画布外像素），自由变换也连同画布外像素一起变换，但图像旋转与翻转、Image Size、合并图层仍只处理画布内的像素。
     - 对话框：New Layer 对话框的「Use previous layer to create clipping mask」（依赖剪贴蒙版）；Duplicate Layer 的 Artboard（依赖画板）。New Layer（⇧⌘N）、Layer from Background...、Duplicate Layer... 对话框、Rename Layer...（就地改名）与 Flatten Image 的「Discard hidden layers?」询问已实现。
     - 图层组余项：组的图层蒙版的界面、⌥ 单击箭头展开全部子组、Layers 面板自动滚动到选中的图层。（图层组的数据结构、合成与穿透模式、⌘G / ⇧⌘G、New Group 对话框、删除组的询问、复制组、面板显示与折叠、拖进拖出组、组整体移动/对齐/自由变换、PSD 读写组已实现。）
-    - Lock Layers...（⌘/）、Link Layers 与 Select Linked Layers；多选后的自由变换、拖动多行排序。（Layers 面板 ⌘/⇧ 多选、Merge Layers、Select › All Layers / Deselect Layers、多图层移动、删除、隐藏，以及 Align / Distribute 已实现。）
+    - Link Layers 与 Select Linked Layers；多选后的自由变换、拖动多行排序；锁定图层组时组内图层随之锁定。（Layers 面板 ⌘/⇧ 多选、Merge Layers、Select › All Layers / Deselect Layers、多图层移动、删除、隐藏，Align / Distribute，以及 Lock Layers... 对话框、⌘/ 全部锁定、五个锁定按钮与 PSD 的 `lspf` 读写已实现。）
     - Layers 面板中把图层拖到「新建」按钮上复制、拖到垃圾桶上删除。
 4. **图像尺寸与方向**：Image Size 对话框的预览图、Fit To 预设、百分比/英寸等单位、Automatic/Preserve Details/Bicubic Smoother/Sharper 等重采样方式、打开 Resample 时改分辨率联动像素尺寸、Scale Styles；Image Rotation › Arbitrary...（任意角度）、Reveal All。
 5. **裁剪工具**：裁剪框超出画布时扩展画布、旋转与拉直、比例预设与叠加方式、关闭「删除裁剪的像素」、拖动框内移动图像（Photoshop 的默认方式）、切换工具时的「是否裁剪」询问、透视裁剪工具。

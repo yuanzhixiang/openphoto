@@ -33,11 +33,15 @@
 
 ### 背景图层
 
-- `layer_from_background(doc)`：把背景图层改为普通图层「Layer 0」，并解除三个锁定，之后可以有透明像素、可以移动和调整顺序。没有背景图层时返回 `false`。
+- `layer_from_background(doc)`：把背景图层改为普通图层「Layer 0」，并解除全部锁定，之后可以有透明像素、可以移动和调整顺序。没有背景图层时返回 `false`。
 
 ### 顺序
 
 - 图层列表自底向上，背景图层只能在最底层。
+- 锁定（背景图层不参与，只选中背景时三个函数都什么也不做）：
+  - `selected_locks(doc)`：Lock Layers 对话框的初始状态。每一项只有在所有选中的图层都开启时才算开启；只选中背景（或没有选中）时为 `None`，此时 Layer › Lock Layers... 不可用。
+  - `set_selected_locks(doc, locks)`：把五个锁定标志设到每个选中的图层上，返回是否有变化。
+  - `toggle_lock_all(doc)`：⌘/。选中的图层并非全部「全部锁定」时，给它们打开 `lock_all`（单项保持原样）；全部都已「全部锁定」时，清除所有锁定（包括单项，与面板按钮不同）。返回现在是否锁定；只选中背景时为 `None`。以上都在 Photoshop 2026 中实测。
 - `arrange_target(doc, arrange)` / `arrange(doc, arrange)`：Layer › Arrange 四项只在当前图层所在的组里（同级图层之间）移动，组连同其中的内容一起移动（用 `move_block`），所以置顶是到组内最上面而不是整个文档最上面；背景图层不动，也不会有图层越过它。
 - `arrange(doc, arrange)`：执行上述移动，返回是否移动。
 
@@ -89,3 +93,5 @@
 - `merge_visible_leaves_hidden_layers`：隐藏图层保留，可见图层合并到背景图层。
 - `flatten_fills_transparency_with_white`：隐藏图层被丢弃，透明处变白。
 - `delete_hidden_keeps_visible_layers`：删除隐藏图层并修正活动图层。
+- `lock_layers_sets_every_selected_layer_but_the_background`：只选背景时无可锁定的图层；对话框的勾选是所有选中图层的交集；设置作用于选中的非背景图层；重复设置无变化。
+- `lock_all_is_a_flag_of_its_own`：⌘/ 打开「全部锁定」但不改单项，使像素与透明受保护；再按一次清除所有锁定。

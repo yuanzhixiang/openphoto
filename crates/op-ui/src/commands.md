@@ -90,6 +90,8 @@
 | UngroupLayers | Layer › Ungroup Layers：取消当前组（`layer_ops::ungroup`），记录「Ungroup Layers」；当前图层是组时可用 | ⇧⌘G |
 | NewGroup | Layer › New › Group...：打开 New Group 对话框 | 无 |
 | NewGroupFromLayers | Layer › New › Group from Layers...：打开 New Group from Layers 对话框；可用条件同 GroupLayers | 无 |
+| LockLayers | Layer › Lock Layers...：打开 Lock Layers 对话框（`dialogs/lock_layers.md`），确认后把锁定设到选中的非背景图层上，记录「Lock Layers」；只选中背景时不可用。菜单项显示 ⌘/，但按 ⌘/ 运行的是 ToggleLockAll，只有从菜单选择才打开对话框（macOS 上由菜单事件发生时是否是按键事件区分，见 `app_kit::handling_key_press`），与 Photoshop 一致 | ⌘/（仅显示） |
+| ToggleLockAll | ⌘/：选中的图层未全部「全部锁定」时打开全部锁定，记录「Lock Layer」；已全部锁定时清除所有锁定，记录「Unlock Layer」（`layer_ops::toggle_lock_all`）。只选中背景时弹出「The command “Set” is not currently available.」；这时菜单项不可用，⌘/ 由 egui 收到（`from_shortcuts_beside_menu`）。不在菜单中 | ⌘/ |
 | RenameLayer | Layer › Rename Layer...：在 Layers 面板里就地改名当前图层（与 Photoshop 2026 一样没有对话框）；当前图层是背景图层时不可用 | 无 |
 | Fill | Edit › Fill... | ⇧F5 |
 | FillForeground | 无（Photoshop 的隐藏快捷键） | ⌥⌫ |

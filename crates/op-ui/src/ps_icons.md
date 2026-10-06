@@ -6,6 +6,7 @@
 
 ## 对外接口
 
+- `paint_scaled(painter, center, icon, color, background, scale)`：按比例缩放后绘制（坐标与线宽都乘 `scale`）；`paint` 即 `scale = 1`。Lock Layers 对话框用约 0.45–0.5 倍的锁定图标。
 - `Icon`：Home、Move（四向箭头）、Caret（V 形下拉箭头）、Share、Bell、Search、Lightbulb、Workspace，对齐与分布的八个图标（AlignLeft、AlignHorizontalCenter、AlignRight、DistributeVertically、AlignTop、AlignVerticalCenter、AlignBottom、DistributeHorizontally），More（三个圆点），Gear（齿轮，右下带白色小三角），CollapseToolbar（工具栏折叠条的粗「»」）、CollapseRight / CollapseLeft（面板列与图标列折叠条的细线「»」「«」），History、Comments（图标列的两个按钮），以及 Layers 面板的过滤按钮（FilterPixel 等五个）、锁定按钮（LockTransparent、LockPixels、LockPosition、LockArtboards、LockAll）、眼睛 Eye、背景图层锁 LayerLock 和底部栏的八个按钮图标。
 - `paint(painter, center, icon, color, background)`：以 `center` 为中心画图标。`background` 是图标后面的底色，用于齿轮的中心孔。
 
