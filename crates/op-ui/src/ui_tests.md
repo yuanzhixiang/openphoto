@@ -51,4 +51,5 @@
   - F8 打开 Info，再打开 Navigator 与 Histogram，三个面板互不重叠（生成 `floating_panels` 截图）；悬停时记录指针的文档坐标；`center_on` 改变视图；再按 F8 关闭 Info。
 - `active_canvas_pixel(harness, x, y)` 读取显示用的画布像素（含快速蒙版的红色）；`alt_click(harness, pos)` 模拟一次 ⌥单击。
 - `run_command(harness, command)` 直接执行一个命令（用于没有快捷键的菜单项）；`double_click(harness, pos)` 模拟一次双击；`drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标；`layer_pixel(harness, layer, x, y)` 读取某个图层（自底向上的序号）的像素。
+- 布局回归测试 `layout_matches_photoshop_2026`（不忽略，随 `cargo test` 运行）：渲染默认工作区（参考文档、移动工具、白色前景），在 `PHOTOSHOP_PIXELS` 表里约 40 个点上比较灰度与 Photoshop 2026 的 2x 截图（容差 6）。这些点都选在实测的 1 pt 边上：折叠条与分隔条的线、面板组间隔、标签栏底线、图标列与工具栏的分隔条、选项栏分隔线、Home 图标、色块边框、Color 面板的区域边缘、Properties 的框与输入框、面板菜单图标等，所以任何一处布局移动 1 pt 都会失败，并列出所有不一致的点。重新校准某处布局后，要从新的 Photoshop 截图更新这张表。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。
