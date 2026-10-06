@@ -136,3 +136,10 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `canvas_size_keeps_hidden_pixels_except_on_the_background`：缩小画布后普通图层的内容范围伸到画布外，背景图层没有画布外像素；再扩大回来，隐藏的像素重新出现。
 - `layer_at_finds_the_topmost_visible_pixel`：上层有像素处选中上层，透明处落到背景，隐藏上层后落到背景，画布外为 `None`。
 - `composite_half_opacity_over_white`：50% 不透明度黑色图层叠在白色背景上得到 `[128, 128, 128, 255]`，验证 gamma 空间混合与量化规则。
+
+## 有效锁定
+
+图层组的锁定作用于组里的所有图层（Photoshop 2026 实测：组 Lock all 后，组内图层的 `allLocked` 等也报告为 true）。编辑操作一律用 `Document` 上考虑祖先组的方法判断，而不是只看图层自身：
+
+- `transparency_locked(id)`、`pixels_locked(id)`、`position_locked(id)`：图层自身或任一所在组有对应的锁定（各自的 `Layer::*_locked`，包括 Lock all）。
+- `in_locked_group(id)`：所在的某个组开启了 Lock all。这样的图层不能删除、不能改混合模式与不透明度、不能加图层样式（Layers 面板中锁定行、混合模式、不透明度、fx 与垃圾桶都置灰）。

@@ -20,6 +20,7 @@
   - `can_group(doc)` / `group_selected(doc)`：Layer › Group Layers（⌘G）：选中的图层（连同其中的内容；已在另一个选中组里的不重复算）放进一个新的「Group N」，组放在最上面那个选中图层原来的位置和所在的组里；选中背景图层时不可用。新组被选中。
   - `ungroup(doc)`：Layer › Ungroup Layers（⇧⌘G）：当前组消失，它的直接子图层进入它原来所在的组，并全部被选中。
   - `new_group(doc)`：一个空的「Group N」，插入规则同 `Document::insert_above_active`，并被选中。
+  - `can_move_blocks(doc, ids, gap)` / `move_blocks(doc, ids, gap)`：拖动多个选中的行：这些图层（各连同其中的内容，嵌套在其中另一个里的不重复算）按原来的上下顺序一起移到 `gap`，父组规则同 `move_block`。已经相邻的一组移到自己的边上视为没有变化。`move_block` 就是只有一个图层的情况。
   - `can_move_block(doc, id, gap)` / `move_block(doc, id, gap)`：把图层连同其中的内容移到 `gap`（`layers` 中移动前的位置，介于 `gap - 1` 与 `gap` 之间）。新的父组：`gap` 正上方是一个组、正下方是它里面的图层时，就是这个组（放在组内最上面）；否则与正上方的图层同组；在最上面时不在任何组里。背景图层不能动，不能放到背景下面，组不能放进自己里面。Layers 面板拖动排序用它。
   - `delete_selected` 删除组时连同组里的内容一起删除（Photoshop「Group and Contents」）。`delete_selected_keep_contents`：「Group Only」，选中的组消失、其中的图层留在组原来的位置（进入组的父组），其它选中图层照常删除。`deleting_groups_with_contents(doc)`：选中图层中第一个非空组的名字，界面据此先询问。
   - 复制出的图层保留链接编号，即与原图层链接的图层也与副本链接（Photoshop 2026 实测）；复制到其它文档时清除链接。
@@ -102,3 +103,5 @@
 - `lock_all_is_a_flag_of_its_own`：⌘/ 打开「全部锁定」但不改单项，使像素与透明受保护；再按一次清除所有锁定。
 - `copies_of_copies_count_on`：副本的副本按 Photoshop 的编号规则命名。
 - `duplicating_several_layers_puts_the_copies_on_top`：多选复制的位置、名字、选中状态与 Photoshop 一致；单选时副本在原图层正上方。
+- `moving_several_blocks_together`：两个不相邻的图层一起移到最上面、移到背景正上方；原地移动、移到背景下面、移动背景都不允许。
+- `a_locked_group_locks_its_layers`：组锁定位置时组内图层不能移动但能绘画；组 Lock all 时组内图层不能绘画、移动或删除（`delete_selected` 拒绝删除锁定组内的图层）。
