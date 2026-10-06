@@ -45,7 +45,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 15. **蒙版**：图层蒙版（包括 Edit › Paste Special › Paste Into ⌥⇧⌘V 与 Paste Outside）、矢量蒙版、剪贴蒙版（⌥⌘G）、快速蒙版（Q）、Select and Mask（⌥⌘R）、存储/载入选区。
 16. **图层样式**：Blending Options、斜面和浮雕、描边、内阴影、内发光、光泽、颜色/渐变/图案叠加、外发光、投影。
 17. **填充图层与调整图层**：Layer › New Fill Layer、New Adjustment Layer。
-18. **选择菜单其余项**：Color Range、Focus Area、Modify（Border、Smooth、Expand、Contract、Feather）、Grow、Similar、Transform Selection；选框工具的 Fixed Ratio / Fixed Size 样式。
+18. **选择菜单其余项**：Color Range、Focus Area、Transform Selection、All Layers/Deselect Layers/Find Layers/Isolate Layers；Modify 的「Apply effect at canvas bounds」用于 Smooth 与 Feather；选框工具的 Fixed Ratio / Fixed Size 样式。
 19. **颜色模式与位深**：Image › Mode 的灰度、位图、双色调、索引颜色、CMYK、Lab、多通道，16/32 位每通道；Color Settings、Assign/Convert to Profile；CMYK 与 Photoshop 一致的数值（需要 ICC 色彩管理）。
 20. **Color Picker 余项**：「Add to Swatches」的命名对话框、Color Libraries、CMYK 色域外警告、打开拾色器期间在文档上吸取颜色。
 21. **History 面板余项**：快照、从状态新建文档、历史记录画笔源、按操作类型显示不同图标、History Options。
