@@ -40,6 +40,7 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
 - **油漆桶**：Fill（Foreground，置灰）、Mode（全部混合模式）、Opacity、Tolerance（0–255）、Anti-alias、Contiguous、All Layers，都会生效。
 - **移动工具**：Auto-Select 复选框加「Layer」字段、Show Transform Controls 复选框。只有外观，状态不保存。
 - **抓手、缩放工具**：「100%」和「Fit Screen」两个按钮，作用于当前文档。
+- **自由变换进行中**（不论当前工具）：「W:」「H:」两个只读百分比字段、分隔线、角度图标与只读角度字段；右侧原本的 Share、Search 等按钮换成取消（⦸，「Cancel transform (Esc)」）和确认（✓，「Commit transform (Return)」）两个按钮。
 - **其它工具**：不显示工具选项。
 
 ## 已知限制

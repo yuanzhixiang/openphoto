@@ -50,6 +50,10 @@
 - 松开时按渐变选项把前景色到背景色的渐变画在当前图层上（`op_core::gradient::gradient`），记录「Gradient」；起止点相同时什么也不做；图层隐藏或像素锁定时弹出 Photoshop 的提示。
 - 进行中的拖动保存在 `DocState::gradient_drag`。
 
+## 自由变换
+
+文档处于自由变换时，画布上的按下、拖动、Enter、Esc 都交给 `free_transform::input`（见 `free_transform.md`），不交给当前工具；光标由 `free_transform::cursor` 决定；在选区蚂蚁线之后绘制变换框；不显示画笔轮廓。确认后把映射记为 `AppState::last_transform`。
+
 ## 魔棒
 
 - 单击：按魔棒选项（`op_core::fill::magic_wand`，与油漆桶同一区域规则）得到区域，与当前选区按组合方式合并（有选区时 Shift 添加、⌥ 减去、两者同时按为交叉，与选框相同），记录「Magic Wand」。点在文档外时什么也不做。

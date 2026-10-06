@@ -72,6 +72,13 @@
 | FillForeground | 无（Photoshop 的隐藏快捷键） | ⌥⌫ |
 | FillBackground | 无（Photoshop 的隐藏快捷键） | ⌘⌫ |
 | Clear | Edit › Clear | ⌫ / Delete |
+| FreeTransform | Edit › Free Transform | ⌘T |
+| TransformAgain | Edit › Transform › Again | ⇧⌘T |
+| TransformRotate180 | Edit › Transform › Rotate 180° | 无 |
+| TransformRotate90Clockwise | Edit › Transform › Rotate 90° Clockwise | 无 |
+| TransformRotate90CounterClockwise | Edit › Transform › Rotate 90° Counter Clockwise | 无 |
+| TransformFlipHorizontal | Edit › Transform › Flip Horizontal | 无 |
+| TransformFlipVertical | Edit › Transform › Flip Vertical | 无 |
 | Cut | Edit › Cut | ⌘X |
 | Copy | Edit › Copy | ⌘C |
 | CopyMerged | Edit › Copy Merged | ⇧⌘C |
@@ -99,7 +106,7 @@
 - DeleteLayer：当前文档的图层多于 1 个时可用。
 - CloseOthers：打开的文档多于 1 个时可用。
 - ToggleLayerVisibility、DuplicateLayer、LayerViaCopy：当前文档有选中图层时可用；LayerViaCut 还要求有选区。
-- Crop：当前文档有选区时可用。LastFilter：有当前文档且本次运行中用过滤镜时可用。
+- Crop：当前文档有选区时可用。TransformAgain：有当前文档且本次运行中做过变换时可用。LastFilter：有当前文档且本次运行中用过滤镜时可用。
 - LayerFromBackground：文档有背景图层时可用。DeleteHiddenLayers：既有隐藏图层也有可见图层时可用。
 - Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
 - Deselect、SelectInverse：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
@@ -115,6 +122,13 @@
 ## 选区命令的历史记录
 
 Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别为「Select All」「Deselect」「Reselect」「Select Inverse」，与 Photoshop 一致。
+
+## 变换命令
+
+- FreeTransform：开始自由变换（`free_transform.md`）；不能变换时弹出提示。
+- Transform 的五个固定变换：以 `transform::bounds` 的范围中心为基准做 `FixedTransform` 映射，记录对应名称（如「Flip Horizontal」），并记为 `last_transform`。
+- TransformAgain：把 `last_transform` 的映射再应用一次，记录「Transform Again」。
+- 失败时弹出 Photoshop 的提示。
 
 ## 画布命令
 

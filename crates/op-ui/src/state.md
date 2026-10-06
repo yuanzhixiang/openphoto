@@ -29,6 +29,8 @@
 - `forward_events`：要注入 egui 下一帧输入的事件（菜单的 Cut/Copy/Paste 转交给输入框时使用，见 `commands.md`）。
 - `trim_dialog`：Trim 对话框，打开期间为 `Some`。
 - `adjust_dialog`：调整或滤镜对话框（见 `dialogs/adjust.md`），打开期间为 `Some`。
+- `last_transform`：上次应用的变换映射，供 Edit › Transform › Again 使用；只在本次运行中保留，所有文档共用。
+- `transforming()`：当前文档正在自由变换时为真；此时 `modal_open()` 也为真。
 - `last_filter`：上次成功应用的滤镜及其设置，供 Filter › Last Filter 使用；只在本次运行中保留，所有文档共用。
 - `modal_open()`：Canvas Size、Fill、Trim、调整对话框、Color Picker、「Save changes?」确认或错误提示打开时为真，此时命令与单键快捷键都不执行。
 
@@ -45,6 +47,7 @@
 - 移动：`move_drag` 是进行中的移动和拖动起点（文档像素）。
 - 绘画：`stroke` 是进行中的笔画和它的工具；`last_paint_point` 是上一笔结束的位置，用于 Shift+单击画直线。
 - `gradient_drag`：渐变工具拖动中的起点与当前点（文档像素）。
+- `free_transform`：自由变换会话（见 `free_transform.md`）。
 - `lasso`：正在绘制的套索轨迹（文档像素坐标的点、组合方式、是否为多边形套索）。
 - `sample_average(x, y, size, all_layers)`：吸管取样，见 `document_view.md`。
 - `renaming`：Layers 面板中正在改名的图层和输入中的文字（见 `panels/layers.md`）。
