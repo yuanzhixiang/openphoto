@@ -71,3 +71,4 @@
 - `small_uxp_adjustment_dialogs_apply`：依次用 Vibrance、Posterize、Exposure、Black & White 的第一个输入框输入并应用，再用 Photo Filter 的默认值应用，结果都等于核心算法。
 - `equalize_asks_about_the_selection`：见 `dialogs/equalize.md`。
 - `more_filters_from_the_menu`：Blur、Blur More、Sharpen、Sharpen More、Find Edges 直接执行并成为 Last Filter；Motion Blur、Emboss 的对话框以默认值应用。
+- `distort_filters_from_the_menu`：四个扭曲滤镜的对话框以默认值应用并成为 Last Filter。

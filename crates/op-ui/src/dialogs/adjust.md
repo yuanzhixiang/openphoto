@@ -22,6 +22,10 @@
 | Minimum、Maximum | Radius (pixels)（0.2–500.0，1.0）、Preserve（Squareness / Roundness，Squareness） |
 | Motion Blur | Angle (°)（−360–360，0）、Distance (pixels)（1–2000，10） |
 | Emboss | Angle (°)（−180–180，135）、Height (pixels)（1–10，3）、Amount (%)（1–500，100） |
+| Twirl | Angle (°)（−999–999，50） |
+| Pinch | Amount (%)（−100–100，50） |
+| Spherize | Amount (%)（−100–100，100）、Mode（Normal / Horizontal only / Vertical only，Normal） |
+| Polar Coordinates | Options（Rectangular to Polar / Polar to Rectangular，Rectangular to Polar） |
 | High Pass | Radius (pixels)（0.1–1000.0，10.0） |
 | Offset | Horizontal (pixels right)、Vertical (pixels down)（−30000–30000，0）、Undefined Areas（Set to Transparent / Repeat Edge Pixels / Wrap Around，Set to Transparent） |
 | Mosaic | Cell Size (square)（2–200，10） |

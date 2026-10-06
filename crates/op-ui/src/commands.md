@@ -261,3 +261,4 @@ Cut、Copy、CopyMerged、Paste、PasteInPlace 由 `actions::clipboard` 执行�
 - Layer from Background、Duplicate Layer 在 Photoshop 中会先弹出对话框，这里直接执行；Flatten Image 在有隐藏图层时 Photoshop 会询问是否丢弃，这里直接丢弃。
 - Equalize：有选区时不直接执行，先弹出 Equalize 询问框（`dialogs/equalize.md`）。
 - Filter › Blur › Blur、Blur More，Sharpen › Sharpen、Sharpen More，Stylize › Find Edges：与 Average、Solarize 一样直接执行（检查同调整），记录同名历史并成为 Last Filter。Motion Blur...、Emboss... 打开滤镜对话框（`dialogs/adjust.md`）。
+- Filter › Distort › Twirl...、Pinch...、Spherize...、Polar Coordinates... 打开滤镜对话框。
