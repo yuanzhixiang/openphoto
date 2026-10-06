@@ -22,15 +22,19 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
   - 其他任何值（包括 2 以及大于 2 的非法值）：偏移 `diff`。
 - 居中时尺寸差为奇数的取舍：放大时多出的那 1 像素加在右侧/底部（例如宽度 +3，左边加 1、右边加 2）；缩小时由于向负无穷取整，多裁掉的那 1 像素来自左侧/顶部（例如宽度 −3，左边裁 2、右边裁 1）。
 
+### `Guide`
+
+参考线：`vertical`（垂直还是水平）与 `position`（文档像素，可以在画布外）。
+
 ### `Snapshot`
 
-文档中可撤销的部分：`width`、`height`、`resolution`、`layers`、`active_layer`、`selection`、`last_selection`。字段私有，只能通过 `Document::snapshot()` 创建、`Document::restore()` 使用。克隆代价低，因为图层里的 tile 通过 `Arc` 共享。
+文档中可撤销的部分：`width`、`height`、`resolution`、`layers`、`active_layer`、`selection`、`last_selection`、`guides`。字段私有，只能通过 `Document::snapshot()` 创建、`Document::restore()` 使用。克隆代价低，因为图层里的 tile 通过 `Arc` 共享。
 
 `title`、`id`、`color_mode`、`bit_depth` 和 `revision` 不在快照中，撤销/重做不会改变它们。
 
 ### `Document`
 
-公开字段：`id`、`title`、`width`、`height`、`resolution`（ppi）、`color_mode`、`bit_depth`、`layers`（自底向上）、`active_layer`。私有字段 `revision`。
+公开字段：`id`、`title`、`width`、`height`、`resolution`（ppi）、`color_mode`、`bit_depth`、`layers`（自底向上）、`active_layer`、`guides`（参考线，与编辑一样可撤销，Photoshop 也是如此）。私有字段 `revision`。
 
 - `new_with_background(title, width, height, background)`：File > New。生成单一背景图层（名为 `"Background"`、`is_background = true`），用 `background` 颜色填满，并设为活动图层。分辨率 72 ppi，RGB，8 位。
 - `from_rgba8(title, width, height, pixels)`：从紧密排列的 RGBA8 缓冲区打开一个扁平位图，得到单一图层并设为活动图层，规则与 Photoshop 打开图片时一致：所有像素的 alpha 都是 255 时，是名为 `"Background"` 的背景图层（`is_background = true`）；只要有一个像素的 alpha 小于 255，就是名为 `"Layer 0"` 的普通图层，文档因此没有背景图层。其余元数据同上（72 ppi、RGB、8 位）。
@@ -41,6 +45,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `snapshot()` / `restore(snapshot)`：生成 / 恢复快照。`restore` 会覆盖宽高、分辨率、图层与活动图层，并调用 `mark_dirty()`。
 - `resize_canvas(width, height, anchor, fill)`：Image > Canvas Size。
 - `transform_canvas(width, height, image, selection)`：把画布换成 `width`×`height`：每个图层的图像经过 `image` 函数、当前选区和可 Reselect 的选区经过 `selection` 函数，然后更新尺寸、选区修订号并 `mark_dirty()`。Crop、Trim、Image Rotation 和画布翻转都通过它实现（见 `image_ops.md`）。不记录历史。
+- `map_guides(f)`：用 `f` 变换每条参考线（裁剪、扩展画布、缩放、旋转、翻转时调用）。`resize_canvas` 自己按锚点偏移参考线。
 - `has_background()`：是否存在背景图层。它决定 Canvas Size 中「画布扩展颜色」是否有意义：没有背景图层时，所有扩展区域都是透明的。
 - `layer(id)` / `layer_mut(id)`：按 ID 线性查找图层。
 - `composite_rgba8()`：合成为紧密排列的直通 RGBA8 缓冲区，长度为 `width * height * 4`。
