@@ -100,4 +100,4 @@
 
 ## 错误提示
 
-`AppState::alert` 有内容时显示模态对话框，只有一个「OK」按钮。打开文件失败、导出失败时使用。
+`AppState::alert` 有内容时用 macOS 样式的提示框显示它（`dialogs/alert.md`：应用图标、粗体消息、整宽的 OK），Enter、Esc 或 OK 关闭。打开文件失败、导出失败和各种「Could not ...」提示都用它。`AppState::flatten_prompt` 是 Flatten Image 的询问框，同样用 `dialogs::alert` 显示。

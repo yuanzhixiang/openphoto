@@ -80,7 +80,8 @@
 | SendToBack | Layer › Arrange › Send to Back | ⇧⌘[ |
 | MergeDown | Layer › Merge Down | ⌘E |
 | MergeVisible | Layer › Merge Visible | ⇧⌘E |
-| FlattenImage | Layer › Flatten Image | 无 |
+| FlattenImage | Layer › Flatten Image：有隐藏图层时先用 macOS 提示框问「Discard hidden layers?」（警告图标、「Don’t show again」复选框、Cancel 与 OK），OK 后拼合（丢弃隐藏图层）并记录「Flatten Image」；勾选「Don’t show again」后本次运行不再询问 | 无 |
+| RenameLayer | Layer › Rename Layer...：在 Layers 面板里就地改名当前图层（与 Photoshop 2026 一样没有对话框）；当前图层是背景图层时不可用 | 无 |
 | Fill | Edit › Fill... | ⇧F5 |
 | FillForeground | 无（Photoshop 的隐藏快捷键） | ⌥⌫ |
 | FillBackground | 无（Photoshop 的隐藏快捷键） | ⌘⌫ |

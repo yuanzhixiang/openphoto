@@ -24,7 +24,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 
 3. **图层操作**：
     - 画布外像素的余项：图层已经可以超出画布（移动、粘贴、Canvas Size、Reveal All、PSD 读写都保留画布外像素），自由变换也连同画布外像素一起变换，但图像旋转与翻转、Image Size、合并图层仍只处理画布内的像素。
-    - 对话框：Rename Layer...（Photoshop 2026 中它在 Layers 面板里就地改名）；Flatten Image 时询问是否丢弃隐藏图层；New Layer 对话框的「Use previous layer to create clipping mask」（依赖剪贴蒙版）；Duplicate Layer 的 Artboard（依赖画板）。New Layer（⇧⌘N）、Layer from Background...、Duplicate Layer... 对话框已实现。
+    - 对话框：New Layer 对话框的「Use previous layer to create clipping mask」（依赖剪贴蒙版）；Duplicate Layer 的 Artboard（依赖画板）。New Layer（⇧⌘N）、Layer from Background...、Duplicate Layer... 对话框、Rename Layer...（就地改名）与 Flatten Image 的「Discard hidden layers?」询问已实现。
     - Group Layers（⌘G）、Ungroup Layers（⇧⌘G）与图层组。
     - Layers 面板多选（以及多选后的 Merge Layers）、Select › All Layers（⌥⌘A）、Arrange › Reverse、Lock Layers...（⌘/）、Link Layers。
     - Layers 面板中把图层拖到「新建」按钮上复制、拖到垃圾桶上删除。

@@ -33,6 +33,7 @@
 - `color_picker`：Color Picker 会话，打开期间为 `Some`，包含对话框和 `PickerTarget`（确定后写入前景色、背景色、Canvas Size 的扩展颜色，还是 Fill 对话框的 Color...）。`open_color_picker(target)` 以 Photoshop 的标题打开前景或背景色拾色器。
 - `swatches`：Swatches 面板的色板列表，初始为固定的 36 个颜色，Color Picker 的「Add to Swatches」会往末尾追加。只在本次运行中保留。
 - `alert`：待显示的错误信息。
+- `flatten_prompt`：Flatten Image 的「Discard hidden layers?」询问框（显示期间算作模态对话框）；`skip_flatten_prompt`：其中勾选了「Don’t show again」，本次运行不再询问。
 - 关闭与退出：`close_queue` 是等待关闭的文档；`save_prompt` 是正在询问「Save changes?」的文档；`quit_after_close` 表示队列处理完后要退出；`quit_approved` 表示可以关闭窗口了（见 `actions.md`「关闭」）。
 - `clipboard`：Cut/Copy/Paste 用的剪贴板（见 `clipboard.md`）。默认不连接系统剪贴板（无窗口测试不应改动用户的剪贴板），`OpenPhotoApp::new` 启动时换成连接系统剪贴板的版本。
 - `typing`：上一帧是否有输入框获得键盘焦点，每帧执行命令前更新。决定菜单的 Cut/Copy/Paste 作用于输入框还是文档。
