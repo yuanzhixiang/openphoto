@@ -37,6 +37,11 @@ Edit › Fill、Edit › Clear 和油漆桶工具对当前图层像素的修改�
 - `magic_wand(doc, x, y, options)`：魔棒单击得到的选区，区域规则与油漆桶完全相同（取样、容差、连续、消除锯齿），只是不填充。单击点在画布外、或不取所有图层时没有活动图层，返回 `None`。
 - 测试 `magic_wand_selects_the_clicked_area`：点黑色方块得到方块的范围，点白色得到方块以外的区域，画布外为 `None`。
 
+## 扩大选取与选取相似（`grow`）
+
+- `grow(doc, options, contiguous)`：Select › Grow（`contiguous` 为真）与 Select › Similar。取当前选区中选择程度 ≥ 128 的像素在各通道（RGBA）上的最小、最大值，再向两边放宽魔棒的容差；Grow 从这些像素出发，按四邻域扩展到落在范围内的相连像素；Similar 选取整幅图像中所有落在范围内的像素。按魔棒的消除锯齿选项处理边缘，结果与原选区合并（相加）。取样与魔棒相同（当前图层或所有图层）。没有选区时返回 `None`。
+- 测试 `grow_and_similar`：Grow 只扩到相连的同色方块，Similar 包括另一个方块但不包括中间的白色；没有选区时为 `None`。
+
 ## 已知限制
 
 - 填充内容只有纯色；Content-Aware、Pattern、History 没有实现。

@@ -89,6 +89,13 @@
 | Deselect | Select › Deselect | ⌘D |
 | Reselect | Select › Reselect | ⇧⌘D |
 | SelectInverse | Select › Inverse | ⇧⌘I |
+| ModifyBorder | Select › Modify › Border... | 无 |
+| ModifySmooth | Select › Modify › Smooth... | 无 |
+| ModifyExpand | Select › Modify › Expand... | 无 |
+| ModifyContract | Select › Modify › Contract... | 无 |
+| ModifyFeather | Select › Modify › Feather... | ⇧F6 |
+| Grow | Select › Grow | 无 |
+| Similar | Select › Similar | 无 |
 | ZoomIn | View › Zoom In | ⌘+（同时接受 ⌘=） |
 | ZoomOut | View › Zoom Out | ⌘- |
 | FitOnScreen | View › Fit on Screen | ⌘0 |
@@ -121,7 +128,7 @@
 - Crop：当前文档有选区时可用。TransformAgain：有当前文档且本次运行中做过变换时可用。LastFilter：有当前文档且本次运行中用过滤镜时可用。
 - LayerFromBackground：文档有背景图层时可用。DeleteHiddenLayers：既有隐藏图层也有可见图层时可用。
 - Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
-- Deselect、SelectInverse：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
+- Deselect、SelectInverse、Modify 五项、Grow、Similar：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
 - 其余命令：有当前文档时可用。Paste 不检查剪贴板里有没有内容（读取系统剪贴板里的图片代价较高，不适合每帧检查），剪贴板为空时执行 Paste 什么也不做。
 
 ## 填充与清除
@@ -132,6 +139,9 @@
 - ⌥⌫、⌘⌫、⌫ 不是菜单快捷键：macOS 上由 `from_shortcuts_beside_menu`、其它平台由 `from_shortcuts` 在 egui 里识别。正在输入框里输入文字时不处理这些键，以免影响删除文字。
 
 ## 选区命令的历史记录
+
+Modify 五项打开对应对话框（`dialogs/modify_selection.md`）；Grow、Similar 按魔棒选项（`AppState::wand` 的容差、消除锯齿、所有图层）立即扩大选区，记录「Grow」「Similar」。
+
 
 Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别为「Select All」「Deselect」「Reselect」「Select Inverse」，与 Photoshop 一致。
 

@@ -11,6 +11,7 @@
 - `tool_slots`：工具栏每一格当前显示的工具（该组最近用过的那个），初始为各组第一个。`select_tool(t)` 同时设置当前工具和它所在格显示的工具。
 - `foreground` / `background`：前景色默认 `#14a5dc`，背景色白色。
 - `view`：视图开关（`ViewOptions`，见 `rulers.md`）。
+- `modify_dialog`：Select › Modify 对话框，打开期间为 `Some`。
 - `new_guide_dialog`：New Guide 对话框，打开期间为 `Some`。
 - `marquee`：选框工具选项：组合方式、羽化（像素）、消除锯齿（默认开启，与 Photoshop 一致）、样式。前三项在创建选区时生效，样式中的 Fixed Ratio / Fixed Size 目前没有效果。
 - `brush` / `pencil` / `eraser`：各绘画工具的 `PaintOptions`（大小 px、硬度、不透明度、流量），与 Photoshop 一样每个工具单独保存。默认值：画笔与橡皮擦 30 px、硬度 0%、不透明度和流量 100%；铅笔 1 px。`paint_options(tool)` 取当前绘画工具的设置。`size_step(size)` 是 `[`、`]` 的步长（小于 10 为 1，10–50 为 5，50–100 为 10，100–200 为 25，200–300 为 50，再往上为 100），大小范围 1–5000。
@@ -35,7 +36,7 @@
 - `last_transform`：上次应用的变换映射，供 Edit › Transform › Again 使用；只在本次运行中保留，所有文档共用。
 - `transforming()`：当前文档正在自由变换时为真；此时 `modal_open()` 也为真。
 - `last_filter`：上次成功应用的滤镜及其设置，供 Filter › Last Filter 使用；只在本次运行中保留，所有文档共用。
-- `modal_open()`：Canvas Size、Image Size、New Guide、Fill、Trim、调整对话框、Color Picker、「Save changes?」确认或错误提示打开时为真，此时命令与单键快捷键都不执行。
+- `modal_open()`：Canvas Size、Image Size、New Guide、Modify、Fill、Trim、调整对话框、Color Picker、「Save changes?」确认或错误提示打开时为真，此时命令与单键快捷键都不执行。
 
 ## DocState
 

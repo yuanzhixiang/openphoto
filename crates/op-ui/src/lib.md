@@ -75,6 +75,10 @@
 
 确定时：Resample 打开且像素尺寸变化时用所选方法重采样（`image_ops::resize`）；分辨率变化时更新文档分辨率；有任何变化时记录「Image Size」。
 
+## Modify 对话框的接入
+
+确定时对当前选区执行对应的运算（`ModifyKind::apply`），替换选区并记录运算名称。没有选区时什么也不做。
+
 ## New Guide 对话框的接入
 
 确定时把参考线加入当前文档，记录「New Guide」。
