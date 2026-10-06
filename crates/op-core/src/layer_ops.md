@@ -54,6 +54,8 @@
 
 ### 合并
 
+合并（Merge Down、Merge Layers、Merge Group、Merge Visible）连同画布外的像素一起合并并保留在结果里（Photoshop 2026 实测）：在扩大到覆盖所有像素的临时画布上合成，再放回原位。结果落在背景图层上时只保留画布内的部分。
+
 - `can_merge_down(doc)`：活动图层不是最底层，且它和下面一层都可见。
 - `merge_down(doc)`：Layer › Merge Down（⌘E）。把活动图层按它的混合模式、不透明度和 Fill 合成到下面一层的像素上（下面一层的像素按 Normal、100% 参与合成），结果保留下面一层的名字和属性，活动图层被删除，下面一层成为活动图层。
 - `can_merge_visible(doc)`：可见图层多于一个。

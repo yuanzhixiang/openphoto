@@ -9,12 +9,12 @@
 ### 图像大小（重采样）
 
 - `Resample`：`Bicubic`（默认，标签「Bicubic (smooth gradients)」）、`Bilinear`、`NearestNeighbor`（「Nearest Neighbor (hard edges)」）。
-- `resize(doc, width, height, method)`：把每个图层和选区缩放到新尺寸（宽高必须大于 0）。先横向、再纵向分离重采样：目标像素中心对应源坐标 `(i + 0.5) / 比例 − 0.5`；双三次用 a = −0.5 的三次卷积核（半径 2），双线性用三角核（半径 1），权重归一化；缩小时核按比例加宽，每个源像素都参与（面积正确的缩小）；邻近取最近的源像素。颜色在预乘 alpha 下计算，结果限制在 0–255（双三次会过冲）；alpha 小于 0.5 的像素为全透明。选区的选择程度按同样的方法重采样。
+- `resize(doc, width, height, method)`：把每个图层和选区缩放到新尺寸（宽高必须大于 0）。先横向、再纵向分离重采样：目标像素中心对应源坐标 `(i + 0.5) / 比例 − 0.5`；双三次用 a = −0.5 的三次卷积核（半径 2），双线性用三角核（半径 1），权重归一化；缩小时核按比例加宽，每个源像素都参与（面积正确的缩小）；邻近取最近的源像素。颜色在预乘 alpha 下计算，结果限制在 0–255（双三次会过冲）；alpha 小于 0.5 的像素为全透明。选区的选择程度按同样的方法重采样。图层有画布外的像素时（`resize_with_outside`），画布连同周围的像素一起按同一比例缩放，并放回按比例缩放后的位置（Photoshop 2026 实测，见下方测试）。
 
 ### 旋转与翻转
 
 - `Orientation`：`Rotate180`、`Rotate90Clockwise`、`Rotate90CounterClockwise`、`FlipHorizontal`、`FlipVertical`。`history_name()` 给出 Photoshop 的历史名称：旋转都是「Rotate Canvas」，翻转为「Flip Canvas Horizontal」/「Flip Canvas Vertical」。
-- `reorient(doc, orientation)`：逐像素重映射，无插值、无损。90° 旋转交换宽高。顺时针 90° 时原图左上角到右上角；逆时针 90° 时原图左上角到左下角；180° 时左上角到右下角。选区按同样的方式变换。
+- `reorient(doc, orientation)`：逐像素重映射，无插值、无损。90° 旋转交换宽高。顺时针 90° 时原图左上角到右上角；逆时针 90° 时原图左上角到左下角；180° 时左上角到右下角。选区按同样的方式变换。图层有画布外的像素时，这些像素按同一映射（以画布为准，整数坐标可以为负）一起转动或翻转，而不是丢掉。
 
 ### 裁剪
 
@@ -42,7 +42,6 @@
 
 - 没有 Image Rotation › Arbitrary...（任意角度，需要重采样）。
 - 裁剪总是删掉新画布外的像素（`clipped`，相当于 Photoshop 开启「Delete Cropped Pixels」）；Photoshop 裁剪工具可以关闭它而保留画布外像素。
-- 图像旋转、画布翻转（`remapped`）和 Image Size 的重采样只处理画布内的像素，图层上画布外的像素会丢失；Photoshop 会连同它们一起旋转、缩放。
 - `remapped` 会把整幅图像展开成缓冲区，内存占用为图像尺寸 × 4 字节，与图层稀疏程度无关。
 
 ## 测试覆盖
@@ -52,3 +51,4 @@
 - `crop_keeps_the_selected_area`：裁到选区后尺寸、像素与选区位置正确；没有选区时不裁剪。
 - `resize_scales_layers_and_selection`：4×2 中左半红色缩小一半后左像素以红为主、右像素接近白，选区跟随；邻近放大保持硬边；双线性放大在边缘混色。
 - `trim_removes_borders_of_the_corner_color`：按左上角颜色裁剪四边、按右下角颜色只裁上边；不透明背景上按透明像素裁剪不改动。
+- `pixels_outside_the_canvas_follow_merges_rotation_and_image_size`：100×100 文档里一半在左边外的方块与另一块合并，再顺时针旋转、缩小一半、水平翻转，每一步的图层范围（含画布外）都与 Photoshop 2026 实测相同：(−20, 10, 60, 60) → (40, −20, 90, 60) → (20, −10, 45, 30) → (5, −10, 30, 30)。
