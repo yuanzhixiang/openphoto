@@ -27,6 +27,11 @@
 | FlipCanvasVertical | Image › Image Rotation › Flip Canvas Vertical | 无 |
 | Crop | Image › Crop | 无 |
 | Trim | Image › Trim... | 无 |
+| Invert | Image › Adjustments › Invert | ⌘I |
+| Desaturate | Image › Adjustments › Desaturate | ⇧⌘U |
+| Equalize | Image › Adjustments › Equalize | 无 |
+| Threshold | Image › Adjustments › Threshold... | 无 |
+| Posterize | Image › Adjustments › Posterize... | 无 |
 | NewLayer | Layer › New › Layer | ⇧⌘N |
 | DeleteLayer | Layer › Delete › Layer | 无 |
 | ToggleLayerVisibility | Layer › Hide Layers / Show Layers | ⌘, |
@@ -94,6 +99,11 @@ Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别�
 - Image Rotation 五项：旋转或翻转整个文档（`image_ops::reorient`），旋转记录「Rotate Canvas」，翻转记录「Flip Canvas Horizontal」/「Flip Canvas Vertical」。
 - Crop：裁剪到选区外接矩形（`image_ops::crop_to_selection`），记录「Crop」。
 - Trim：打开 Trim 对话框（见 `dialogs/trim.md`）。
+
+## 调整命令
+
+- Invert、Desaturate、Equalize：立即对当前图层（选区内）应用（`op-core` 的 `adjust.md`），记录同名历史；图层隐藏或像素锁定时弹出 Photoshop 的提示（例如「Could not complete the Invert command because the target layer is hidden.」）。
+- Threshold、Posterize：先做同样的检查，失败时弹出提示；通过后计算当前图层选区内的亮度直方图、保存文档快照，打开对话框（见 `dialogs/adjust.md`，预览流程见 `lib.md`）。
 
 ## 图层命令
 

@@ -28,5 +28,6 @@
   - ⌘J 在背景图层上得到「Layer 1」、在普通图层上得到「Layer 1 copy」；⌘[ 后移一层并记录「Layer Order」；⌘E 向下合并；⇧⌘E 合并所有可见图层。
   - Layers 面板中拖动最上面一行到中间，顺序改变并记录「Layer Order」；拖到背景图层下面无效；双击名称输入新名字后 Enter，记录「Rename Layer」；点击背景图层的锁图标，背景变为「Layer 0」。
   - 顺时针旋转 90° 后宽高互换并记录「Rotate Canvas」；没有选区时 Crop 不可用，有选区时裁剪到选区；白底上画红色块后用 Trim（默认按左上角颜色）裁到红色块。
+  - ⌘I 反相（#141414 → #ebebeb）并记录「Invert」；打开 Threshold 后文档立即预览为白色，Esc 取消后恢复，历史不变；Posterize 按 Enter 用默认 4 级应用并记录「Posterize」。
 - `run_command(harness, command)` 直接执行一个命令（用于没有快捷键的菜单项）；`double_click(harness, pos)` 模拟一次双击；`drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标；`layer_pixel(harness, layer, x, y)` 读取某个图层（自底向上的序号）的像素。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。
