@@ -46,6 +46,7 @@
 - `blend_mode`
 - `is_background`：「背景」图层标记。按 Photoshop 语义，背景图层锁定、不透明、总在最底层。
 - `lock_transparency`、`lock_pixels`、`lock_position`、`lock_nesting`（防止自动嵌套进出画板和框架）：四种单项锁定。
+- `link`：链接编号（`Option<u32>`）。编号相同的图层链接在一起；没有别的图层同号的编号等于没链接，所以删除或取消链接后不需要整理（见 `link.md`）。
 - `lock_all`：全部锁定。它是独立的标志而不是把四个单项都打开，所以关掉它时单项锁定恢复原样（Photoshop 2026 实测：先锁位置，再点「全部锁定」两次，位置锁仍在）。PSD 里也是单独的位（见 `op-io` 的 `psd.md`）。
 - `kind`：图层内容。
 - `mask`：图层蒙版（`Option<LayerMask>`），新建图层时没有。

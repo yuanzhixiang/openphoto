@@ -20,6 +20,7 @@
   - `new_group(doc)`：一个空的「Group N」，插入规则同 `Document::insert_above_active`，并被选中。
   - `can_move_block(doc, id, gap)` / `move_block(doc, id, gap)`：把图层连同其中的内容移到 `gap`（`layers` 中移动前的位置，介于 `gap - 1` 与 `gap` 之间）。新的父组：`gap` 正上方是一个组、正下方是它里面的图层时，就是这个组（放在组内最上面）；否则与正上方的图层同组；在最上面时不在任何组里。背景图层不能动，不能放到背景下面，组不能放进自己里面。Layers 面板拖动排序用它。
   - `delete_selected` 删除组时连同组里的内容一起删除（Photoshop「Group and Contents」）。`delete_selected_keep_contents`：「Group Only」，选中的组消失、其中的图层留在组原来的位置（进入组的父组），其它选中图层照常删除。`deleting_groups_with_contents(doc)`：选中图层中第一个非空组的名字，界面据此先询问。
+  - 复制出的图层保留链接编号，即与原图层链接的图层也与副本链接（Photoshop 2026 实测）；复制到其它文档时清除链接。
   - 复制（Duplicate Layer、⌘J、复制到其它文档）作用于组时，连同组里的所有图层一起复制（`cloned_block`：换成新 id，块内的父子关系随之对应），放在原组正上方（其它文档中按 `Document::insertion_point`）。
 - `duplicate_name(doc)`：Duplicate Layer 对话框「As」的默认值（与 `duplicate` 的命名规则相同）。
 - `duplicate_named(doc, name)`：复制到同一文档，名称为 `name`。
