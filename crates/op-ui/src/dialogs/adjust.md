@@ -8,6 +8,7 @@
 
 ## 数据输入
 
+- `AdjustDialog::new(kind, histogram, before)`；`colors` 字段为 Gradient Map 的两种颜色（打开时设为前景色与背景色）。
 - `AdjustDialog::new(kind, histogram, before)`：`kind` 为对话框种类；`histogram` 是打开时活动图层选区内的直方图（Threshold 用亮度，Levels 用 R/G/B 合并）；`before` 是打开时的文档快照。
 - 每个设置是一个「参数」：标签、范围、默认值、小数位数，以及类型——数值（输入框 + 滑块）、选项（单选按钮，值为选中项的序号）、复选（值为 0 或 1）。输入框中的文字按小数位数格式化。调整的默认值与范围同 Photoshop；滤镜的默认值尚未与 Photoshop 核对：
 
@@ -18,6 +19,12 @@
 | Levels | 输入黑场（0–253，0）、gamma（0.01–9.99，1.00）、输入白场（2–255，255）、输出黑场（0–255，0）、输出白场（0–255，255） |
 | Hue/Saturation | Hue（−180–180，0）、Saturation（−100–100，0）、Lightness（−100–100，0） |
 | Exposure | Exposure（−20.00–20.00，0.00）、Offset（−0.5000–0.5000，0.0000）、Gamma Correction（0.01–9.99，1.00） |
+| Brightness/Contrast | Brightness（−150–150，0）、Contrast（−50–100，0） |
+| Color Balance | Cyan — Red、Magenta — Green、Yellow — Blue（−100–100，0，只作用于中间调）、Preserve Luminosity（勾选） |
+| Black and White | Reds、Yellows、Greens、Cyans、Blues、Magentas（%，−200–300，默认 40、60、40、60、20、80） |
+| Vibrance | Vibrance、Saturation（−100–100，0） |
+| Photo Filter | Filter（Photoshop 的 20 种预设：Warming Filter (85) 等，默认 Warming Filter (85)）、Density（1–100%，25）、Preserve Luminosity（勾选） |
+| Gradient Map | Reverse（不勾选；渐变为打开时的前景色到背景色） |
 | Gaussian Blur | Radius (pixels)（0.1–1000.0，1.0） |
 | Box Blur | Radius (pixels)（1–2000，1） |
 | Unsharp Mask | Amount (%)（1–500，50）、Radius (pixels)（0.1–1000.0，1.0）、Threshold (levels)（0–255，0） |
@@ -36,7 +43,7 @@
 - Threshold（400 × 232）：「Threshold Level:」与输入框；下方 258 × 100 的直方图（深灰底，每个值一条竖线，高度按最大计数归一化）；直方图下方一个三角标记。
 - Posterize（330 × 132）：「Levels:」与输入框。
 - Levels（400 × 330）：「Channel: RGB」（固定文字）；「Input Levels:」直方图，下方三个三角标记（黑色 = 输入黑场、灰色 = gamma、白色 = 输入白场）及对应的三个输入框（左、中、右）；「Output Levels:」黑到白的渐变条，下方两个三角标记（黑、白）及两个输入框。
-- 其余对话框（Hue/Saturation、Exposure 与全部滤镜）宽 400，按参数依次排列：数值参数一行（标签在左、输入框在右，下方一条细轨道和三角标记，占 52）；选项参数为标签加其下每项一行的单选按钮（每行 24）；复选参数为一个复选框（占 28）。高度为 36 + 各行高度 + 20，至少 150。
+- 其余对话框（Hue/Saturation、Exposure 与全部滤镜）宽 400，按参数依次排列：数值参数一行（标签在左、输入框在右，下方一条细轨道和三角标记，占 52）；选项参数不超过 4 项时为标签加其下每项一行的单选按钮（每行 24），超过 4 项时为标签右侧 200 宽的下拉框（占 36）；复选参数为一个复选框（占 28）。高度为 36 + 各行高度 + 20，至少 150。
 - 打开时第一个输入框获得焦点并全选。
 
 ## 交互

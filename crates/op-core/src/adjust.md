@@ -15,8 +15,15 @@
   - `Levels { input_black, input_white, gamma, output_black, output_white }`：作用于 RGB 复合通道（三个通道相同）。`t = clamp((v − 输入黑场) / (输入白场 − 输入黑场), 0, 1)`，`t = t^(1/gamma)`，结果为 `输出黑场 + t × (输出白场 − 输出黑场)`，四舍五入。输入白场不大于黑场时按黑场 + 1 计算。
   - `HueSaturation { hue, saturation, lightness }`：只有全图（Master）范围。先转为 HSL：色相加 `hue` 度，饱和度乘以 `1 + saturation / 100` 后限制在 0–1；转回 RGB 后，`lightness` 为正时每个通道向白色混合 `v + (1 − v) × k`，为负时向黑色混合 `v × (1 + k)`（`k = lightness / 100`）。这是对 Photoshop 算法的近似，饱和度部分的结果与 Photoshop 不完全相同。
   - `Exposure { exposure, offset, gamma }`：在线性光下计算：sRGB 值转线性后乘以 `2^exposure`、加 `offset`，负值截为 0，再取 `^(1/gamma)`，转回 sRGB。
-  - Levels 与 Exposure 先算出 256 项查找表再逐像素查表。
-- `Adjustment::name()`：菜单与历史名称（「Invert」「Desaturate」「Threshold」「Posterize」「Equalize」「Levels」「Hue/Saturation」「Exposure」）。
+  - `BrightnessContrast { brightness, contrast }`（−150–150、−50–100）：近似 Photoshop 的非旧版行为、不截断：亮度把每个通道 `t = v^(2^(−brightness/100))`；对比度为正时向 S 曲线 `3t² − 2t³` 混合 `contrast/100`，为负时向 0.5 收缩 `(1 + contrast/100)` 倍。
+  - `ColorBalance { midtones, preserve_luminosity }`：只调中间调。每个通道加 `值/100 × 0.4 × 4v(1 − v)`（青–红、洋红–绿、黄–蓝依次作用于 R、G、B）；Preserve Luminosity 时三个通道再一起平移，使亮度回到原值。
+  - `BlackWhite { weights }`：红、黄、绿、青、蓝、洋红六个权重（百分比）。灰度 = 最小通道 + (中间通道 − 最小) × 次色权重 + (最大 − 中间) × 主色权重；主色是最大的通道（红/绿/蓝），次色是最大两个通道合成的颜色（黄/青/洋红）。Photoshop 的默认预设为 40、60、40、60、20、80。
+  - `Vibrance { vibrance, saturation }`：在 HSL 中饱和度先乘 `1 + vibrance × (1 − s)`（对低饱和颜色作用更大），再乘 `1 + saturation/100`。
+  - `PhotoFilter { color, density, preserve_luminosity }`：每个通道向「乘以滤镜色」的结果混合 `density%`；Preserve Luminosity 同上。
+  - `GradientMap { from, to }`：按像素亮度在两种颜色之间线性插值。
+  - `AutoTone`、`AutoColor`：每个通道各自去掉最暗、最亮 0.1% 后拉伸到 0–255（Photoshop 的 Auto Color 还会中和中间调，这里没有）；`AutoContrast`：三个通道合并统计、按同一范围拉伸，颜色关系不变。直方图取当前图层选区内、alpha 不为 0 的像素。
+  - Levels、Exposure、Brightness/Contrast 先算出 256 项查找表再逐像素查表。
+- `Adjustment::name()`：菜单与历史名称（「Invert」「Desaturate」「Threshold」「Posterize」「Equalize」「Levels」「Hue/Saturation」「Exposure」「Brightness/Contrast」「Color Balance」「Black & White」「Vibrance」「Photo Filter」「Gradient Map」「Auto Tone」「Auto Contrast」「Auto Color」）。
 - `channel_histogram(doc)`：活动图层选区内、alpha 不为 0 的像素的 R、G、B 值合并统计的直方图（Equalize 与 Levels 对话框使用）。
 - `mask_gray(rgb)`：颜色画在图层蒙版上的灰度（亮度，三个通道相同）。
 - `luminosity(px)`：亮度 `(299 R + 587 G + 114 B) / 1000`，四舍五入到 0–255（Rec. 601 权重）。
@@ -32,7 +39,7 @@
 
 ## 已知限制
 
-- 只实现了上面八种调整；其余调整见 `README.md` 的差距列表。
+- Color Balance 只有中间调；Brightness/Contrast、Color Balance、Vibrance 的算法是近似，数值与 Photoshop 不同；其余调整见 `README.md` 的差距列表。
 - Levels 没有单独的 R/G/B 通道；Hue/Saturation 没有分颜色范围的编辑和 Colorize。
 - Equalize 不提供 Photoshop 在有选区时弹出的选项，总是按选区内的直方图只处理选区。
 
@@ -41,5 +48,7 @@
 - `invert_desaturate_threshold_posterize`：各调整对 (200, 100, 0) 等像素的结果，包括 Threshold 恰好在亮度 119 两侧的边界。
 - `equalize_stretches_the_range`：只有 100 和 200 两个值时分别映射到 128 和 255。
 - `levels_hue_saturation_and_exposure`：Levels 的黑白场拉伸与 gamma 2（128 → 181）；红色色相 +120° 变绿、饱和度 −100 加亮度 +50 得到 191 灰；曝光 +1 档把 128 变为 176。
+- `color_adjustments`：亮度提高中间调、对比度拉开；Black & White 默认预设下纯红为 102、纯黄为 153；黑到红的渐变映射；中间调偏红且保持亮度；Vibrance 提高低饱和颜色；蓝色滤镜 50% 把 200 灰变为 (100, 100, 200)。
+- `auto_tone_stretches_each_channel`：两个像素时各通道拉伸到 0 与 255。
 - `only_the_selection_changes`：选区外的像素不变。
 - `hidden_layers_are_refused`：隐藏图层返回错误及 Photoshop 的提示文字。
