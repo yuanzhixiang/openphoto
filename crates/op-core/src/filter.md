@@ -21,14 +21,18 @@
   - `Blur`：3 × 3 核 [[0,1,0],[1,4,1],[0,1,0]] / 8；`BlurMore`：[[1,2,1],[2,2,2],[1,2,1]] / 14；`Sharpen`：中心 2、上下左右 −¼；`SharpenMore`：中心 3、八邻 −¼。均由脉冲实测，与 Photoshop 逐级相同。
   - `FindEdges`：每个通道 `255 − √(gx² + gy²)`，gx、gy 为不归一化的 Sobel 核（与 Photoshop 相差不超过 1 级）。
   - `MotionBlur { angle, distance }`：沿角度方向每隔 1 像素取 `distance + 1` 个点（从 `−ceil(distance/2)` 起），各以双线性分摊，平均后作为卷积核（脉冲响应即这些点，读取方向相反）。水平时与 Photoshop 逐级相同；斜向是近似（内部相差约 12 级，图像边缘处 Photoshop 的边界处理不同，差得更多）。
-  - `Emboss { angle, height, amount }`：每个通道 `128 + (I(p + s) − I(p − s)) × amount%`，`s = (height/2)·(cos a, −sin a)`，双线性取样。水平、竖直时与 Photoshop 一致；斜向时 Photoshop 的取样更集中，存在误差（探测图平均 0.2–0.4 级，最大 31 级）。
+  - `Emboss { angle, height, amount }`（高度 1–100 像素）：每个通道 `128 + (I(p + s) − I(p − s)) × amount%`，`s = (height/2)·(cos a, −sin a)`，双线性取样。水平、竖直时与 Photoshop 一致；斜向时 Photoshop 的取样更集中，存在误差（探测图平均 0.2–0.4 级，最大 31 级）。
+  - `Fragment`：四个分别向四个对角方向偏移 4 像素的副本取平均（与 Photoshop 相差不超过 1 级）。
+  - `Custom { kernel, scale, offset }`：5 × 5 卷积核（从上到下逐行，−999–999），加权和除以 `scale`（为 0 时按 1）再加 `offset`，四舍五入后限制在 0–255。只处理颜色通道（与 Photoshop 相差不超过 1 级）。
+  - `SurfaceBlur { radius, threshold }`（半径 1–100，阈值 2–255）：每个通道取 (2r + 1)² 方框内的加权平均，邻点权重 `max(0, 1 − |邻值 − 原值| / (2.5 × threshold))`，所以与原值相差超过 2.5 倍阈值的邻点不参与，边缘得以保留（与 Photoshop 相差不超过 1 级）。
+  - `DustAndScratches { radius, threshold }`（半径 1–500，阈值 0–255）：先求每个通道 (2r + 1)² 方框内的中位数；任一通道与中位数相差超过阈值的像素整体换成中位数，其余保持原样（与 Photoshop 相差不超过 1 级）。
   - 扭曲（Distort）滤镜都是「逆映射 + 双线性取样」：每个像素取它从哪里映射来的位置的颜色（`distort_source`），映射在 Photoshop 2026 上用坐标图（R、G 编码 x、y）测得。Twirl、Pinch、Spherize 只作用于贴着图像四边的椭圆内，距离 `t` 以椭圆半径为 1：
     - `Twirl { angle }`：转角 `angle × (1 − t)²`（中心最大，边缘为 0）。
     - `Pinch { amount }`：取样距离 `t + amount% × h(t)`，`h` 为实测的 21 点表（`PINCH_SHIFT`，与数量成正比，正值向内收）。
     - `Spherize { amount, mode }`：正值取样距离 `t + a × ((2/π)·asin t − t)`，负值 `t + |a| × (sin(πt/2) − t)`；Horizontal only / Vertical only 只沿一个方向。
     - `PolarCoordinates { to_polar }`：Rectangular to Polar 把绕中心的角度（从正上方逆时针）映射到 x、到中心的距离映射到 y；Polar to Rectangular 反之（角度取 `(x + 1)/w` 一圈）。
     - 与 Photoshop 的平均差：Twirl 0.5 级、Pinch 0.2 级、Spherize 1.2–1.7 级、Polar 0.03–0.7 级；孤立的单像素亮点在亚像素坐标差异下会差得较多。
-- `Filter::name()`：菜单与历史名称（「Gaussian Blur」「Box Blur」「Average」「Unsharp Mask」「Add Noise」「Median」「Minimum」「Maximum」「High Pass」「Offset」「Mosaic」「Solarize」「Blur」「Blur More」「Sharpen」「Sharpen More」「Find Edges」「Motion Blur」「Emboss」「Twirl」「Pinch」「Spherize」「Polar Coordinates」）。
+- `Filter::name()`：菜单与历史名称（「Gaussian Blur」「Box Blur」「Average」「Unsharp Mask」「Add Noise」「Median」「Minimum」「Maximum」「High Pass」「Offset」「Mosaic」「Solarize」「Blur」「Blur More」「Sharpen」「Sharpen More」「Find Edges」「Motion Blur」「Emboss」「Twirl」「Pinch」「Spherize」「Polar Coordinates」「Fragment」「Custom」「Surface Blur」「Dust & Scratches」）。
 - `apply(doc, filter, background)`：先做与调整相同的检查（`adjust::check`：没有图层、图层隐藏、像素锁定时返回 `FillError`），再应用。`background` 是 Offset 在背景图层上使用的背景色。
 
 ## 行为规则
@@ -51,5 +55,5 @@
 - `offset_wraps_or_fills_with_the_background`：绕回与用背景色填充。
 - `mosaic_and_noise`：Mosaic 一格取平均；Add Noise 重复执行结果相同，单色噪点保持灰色。
 - `transparent_pixels_do_not_bleed_color`：透明图层上的红点模糊后仍是红色，alpha 变为 85。
-- `photoshop::filters_match_photoshop`：26 组滤镜对照 Photoshop 的输出（`fixtures/filter`），每组限定最大误差。
+- `photoshop::filters_match_photoshop`：33 组滤镜对照 Photoshop 的输出（含 Fragment、Custom 两组、Surface Blur 两组、Dust & Scratches 两组）（`fixtures/filter`），每组限定最大误差。
 - `distortions_match_photoshop`：Twirl、Pinch、Spherize（含负值与 Vertical only）、Polar Coordinates 两个方向对照 Photoshop，按平均差断言。

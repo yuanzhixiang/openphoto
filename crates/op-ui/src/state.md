@@ -45,6 +45,7 @@
 - `last_transform`：上次应用的变换映射，供 Edit › Transform › Again 使用；只在本次运行中保留，所有文档共用。
 - `transforming()`：当前文档正在自由变换时为真；此时 `modal_open()` 也为真。
 - `last_filter`：上次成功应用的滤镜及其设置，供 Filter › Last Filter 使用；只在本次运行中保留，所有文档共用。
+- `filter_settings`：每种滤镜对话框上次按 OK 时输入框里的设置（按 `AdjustKind` 存），下次打开同一对话框时放回；只在本次运行中保留，所有文档共用。
 - `modal_open()`：Canvas Size、Image Size、New、New Guide、Modify、Fill、Trim、调整对话框、Color Picker、「Save changes?」确认或错误提示打开时为真，此时命令与单键快捷键都不执行。
 
 ## DocState

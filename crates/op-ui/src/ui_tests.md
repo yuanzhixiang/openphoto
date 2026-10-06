@@ -70,5 +70,7 @@
 - `channel_mixer_and_selective_color_apply`：Channel Mixer 的红色输出改为 50% 红；Selective Color 选 Yellows、Cyan 100、Absolute，结果等于核心算法。
 - `small_uxp_adjustment_dialogs_apply`：依次用 Vibrance、Posterize、Exposure、Black & White 的第一个输入框输入并应用，再用 Photo Filter 的默认值应用，结果都等于核心算法。
 - `equalize_asks_about_the_selection`：见 `dialogs/equalize.md`。
-- `more_filters_from_the_menu`：Blur、Blur More、Sharpen、Sharpen More、Find Edges 直接执行并成为 Last Filter；Motion Blur、Emboss 的对话框以默认值应用。
+- `more_filters_from_the_menu`：Blur、Blur More、Sharpen、Sharpen More、Find Edges 直接执行并成为 Last Filter；Motion Blur、Emboss、Surface Blur、Dust & Scratches 的对话框以默认值应用（若对话框的 OK 置灰，Enter 不会应用，测试即失败）。
+- `filter_dialogs_remember_their_last_values`：Gaussian Blur 输入 4 后应用，再次打开时从 4 开始；另一种滤镜（Box Blur）仍是自己的默认值。
+- `screenshot_filter_dialogs`（`#[ignore]`）：截取 Gaussian Blur、Add Noise、Offset、Unsharp Mask、Motion Blur、Minimum、Emboss、Surface Blur、Dust & Scratches、Mosaic、Box Blur 的经典对话框，用于与 Photoshop 并排比对。
 - `distort_filters_from_the_menu`：四个扭曲滤镜的对话框以默认值应用并成为 Last Filter。
