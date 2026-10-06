@@ -262,5 +262,5 @@ Cut、Copy、CopyMerged、Paste、PasteInPlace 由 `actions::clipboard` 执行�
 - Equalize：有选区时不直接执行，先弹出 Equalize 询问框（`dialogs/equalize.md`）。
 - Filter › Blur › Blur、Blur More，Sharpen › Sharpen、Sharpen More，Stylize › Find Edges：与 Average、Solarize 一样直接执行（检查同调整），记录同名历史并成为 Last Filter。Motion Blur...、Emboss... 打开滤镜对话框（`dialogs/adjust.md`）。
 - Filter › Distort › Twirl...、Pinch...、Spherize...、Polar Coordinates... 打开滤镜对话框。
-- Filter › Blur › Surface Blur...、Noise › Dust & Scratches... 打开滤镜对话框；Pixelate › Fragment 直接执行（同 Blur），记录「Fragment」并成为 Last Filter。
+- Filter › Blur › Surface Blur...、Noise › Dust & Scratches... 打开滤镜对话框；Pixelate › Fragment 直接执行（同 Blur），记录「Fragment」并成为 Last Filter。Other › Custom... 打开 Custom 滤镜对话框（`dialogs/custom_filter.md`），记录「Custom」。
 - 打开滤镜对话框时，若 `AppState::filter_settings` 里有该对话框上次按 OK 时的设置，先用 `restore` 放回（Photoshop 的滤镜对话框记住上次的值；见 `dialogs/adjust.md`）。

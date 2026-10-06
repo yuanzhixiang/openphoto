@@ -2,7 +2,7 @@
 
 ## 组件职责
 
-带设置的调整与滤镜对话框：Image › Adjustments 下带对话框的调整，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Surface Blur...、Motion Blur...、Unsharp Mask...、Add Noise...、Dust & Scratches...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...、Emboss...、Twirl...、Pinch...、Spherize...、Polar Coordinates...。Levels...、Curves...、Brightness/Contrast...、Color Balance...、Hue/Saturation...、Channel Mixer...、Selective Color...、Vibrance...、Posterize...、Exposure...、Photo Filter...、Black & White...、Threshold...、Gradient Map... 已按 Photoshop 2026 重做（即全部带对话框的调整），布局与设置在各自的模块里（`levels.md`、`curves.md`、`brightness_contrast.md`、`color_balance.md`、`hue_saturation.md`、`channel_mixer.md`、`selective_color.md`、`vibrance.md`、`exposure.md`、`photo_filter.md`、`black_white.md`、`threshold.md`、`gradient_map.md`），本模块只为它们画窗口框与标题、转交 OK/Cancel 并处理预览。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
+带设置的调整与滤镜对话框：Image › Adjustments 下带对话框的调整，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Surface Blur...、Motion Blur...、Unsharp Mask...、Add Noise...、Dust & Scratches...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...、Emboss...、Twirl...、Pinch...、Spherize...、Polar Coordinates...、Custom...。Levels...、Curves...、Brightness/Contrast...、Color Balance...、Hue/Saturation...、Channel Mixer...、Selective Color...、Vibrance...、Posterize...、Exposure...、Photo Filter...、Black & White...、Threshold...、Gradient Map... 已按 Photoshop 2026 重做（即全部带对话框的调整），布局与设置在各自的模块里（`levels.md`、`curves.md`、`brightness_contrast.md`、`color_balance.md`、`hue_saturation.md`、`channel_mixer.md`、`selective_color.md`、`vibrance.md`、`exposure.md`、`photo_filter.md`、`black_white.md`、`threshold.md`、`gradient_map.md`），本模块只为它们画窗口框与标题、转交 OK/Cancel 并处理预览。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
 
 对话框的结果是 `Effect`：`Adjustment(Adjustment)` 或 `Filter(Filter)`。`Effect::name()` 是历史名称，`Effect::apply(doc, background)` 调用对应的 `op-core` 函数。
 
@@ -31,7 +31,7 @@
 | Surface Blur | Radius (pixels)（1–100，5）、Threshold (levels)（2–255，15） |
 | Dust & Scratches | Radius (pixels)（1–500，1）、Threshold (levels)（0–255，0） |
 
-- 滤镜对话框记住上次按 OK 时的设置（Photoshop 的行为）：`settings()` 返回输入框里的文字，`lib.rs` 在应用时按 `Kind` 存进 `AppState::filter_settings`，`commands.rs` 下次打开同一对话框时用 `restore(values)` 放回（个数不符时忽略）。Cancel 不记住。只在本次运行内有效，不写入偏好。调整对话框（`Custom`）每次打开都是默认值，`settings()` 返回 `None`。
+- 滤镜对话框记住上次按 OK 时的设置（Photoshop 的行为）：`settings()` 返回输入框里的文字，`lib.rs` 在应用时按 `Kind` 存进 `AppState::filter_settings`，`commands.rs` 下次打开同一对话框时用 `restore(values)` 放回（个数不符时忽略）。Cancel 不记住。只在本次运行内有效，不写入偏好。调整对话框（`Custom` 的各调整变体）每次打开都是默认值，`settings()` 返回 `None`；Custom 滤镜（`Custom::Kernel`）同样记住，内容见 `custom_filter.md`。
 - Preview 默认勾选。
 
 ## 布局与视觉
@@ -58,6 +58,7 @@ Gaussian Blur、Box Blur、Surface Blur、Motion Blur、Unsharp Mask、Add Noise
 
 - `AdjustDialog` 对这些对话框持有各自的状态（`Custom` 的各变体），`effect()` 取自它们，`show` 用它们的尺寸并调用它们的 `ui`；窗口框与标题栏仍是 `common::frame`（标题用 AppKit 13 pt 粗体）。
 - 它们返回 `uxp::Button`：OK → `Outcome::Apply`，Cancel → `Outcome::Cancel`，Brightness/Contrast 的 Auto → 按直方图算出 Auto 的取值（见 `brightness_contrast.md`）。
+- Custom 滤镜（`Custom::Kernel`，见 `custom_filter.md`）：宿主先画预览框与缩放控件（`wants_pane()` 对它为真），再画网格；它的 Load...、Save... 请求由宿主用系统文件对话框完成（`load_kernel` / `save_kernel`）。
 - `set_channel_histograms(h)`：打开 Levels、Curves 时由 `commands.rs` 传入红绿蓝三个通道的直方图。
 - `set_colorize_hue(hue)`：打开 Hue/Saturation 时由 `commands.rs` 传入前景色的色相，作为 Colorize 的初始色相（Photoshop 的行为）。
 
@@ -75,5 +76,5 @@ Gaussian Blur、Box Blur、Surface Blur、Motion Blur、Unsharp Mask、Add Noise
 - `defaults_match_photoshop`：Levels、Exposure、Hue/Saturation 的默认调整。
 - `filters_read_choices_and_checkboxes`：Add Noise 的分布与单色、Offset 的空白区域选项映射到对应的滤镜参数。
 - `fields_show_values_as_photoshop_does`：Gaussian Blur、Unsharp Mask 的半径显示「1.0」，Add Noise 显示「12.5」，Minimum、Maximum 显示「1」。
-- `every_filter_dialog_has_an_effect`：每种滤镜对话框的默认值都能得到滤镜（漏掉映射会让 OK 置灰）。
+- `every_filter_dialog_has_an_effect`：每种用参数表的滤镜对话框的默认值都能得到滤镜（漏掉映射会让 OK 置灰）。
 - `ui_tests.rs` 的 `filter_dialogs_remember_their_last_values`、`more_filters_from_the_menu` 与截图测试覆盖记忆、从菜单打开并应用、以及布局。
