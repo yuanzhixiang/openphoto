@@ -28,7 +28,6 @@
 | `eframe` | 0.36 | 关闭默认特性，只启用 `wgpu`、`default_fonts`、`accesskit`：只用 wgpu 渲染（不编译 glow 后端），不启用持久化等其它默认特性 |
 | `egui` | 0.36 | 与 eframe 同版本 |
 | `egui-wgpu` | 0.36 | 画布通过它的 paint callback 嵌入 UI，与 egui 共享 wgpu 设备 |
-| `egui_dock` | 0.21 | 文档标签页停靠，需与 egui 0.36 匹配 |
 | `egui-phosphor` | 0.14 | 图标字体 |
 | `wgpu` | 30 | 与 egui-wgpu 0.36 使用的 wgpu 主版本一致 |
 | `bytemuck` | 1（`derive`） | GPU uniform 结构体的 `Pod` 转换 |
@@ -38,7 +37,7 @@
 | `thiserror` | 2 | 错误类型 |
 | `log` / `env_logger` | 0.4 / 0.11 | 日志门面与实现 |
 
-egui 生态（`eframe`、`egui`、`egui-wgpu`、`egui_dock`、`egui-phosphor`）与 `wgpu` 的版本必须相互匹配，否则会出现两份不兼容的类型；`op-render` 通过 `egui_wgpu::wgpu` 重导出使用 wgpu，而不是直接依赖 `wgpu`。
+egui 生态（`eframe`、`egui`、`egui-wgpu`、`egui-phosphor`）与 `wgpu` 的版本必须相互匹配，否则会出现两份不兼容的类型；`op-render` 通过 `egui_wgpu::wgpu` 重导出使用 wgpu，而不是直接依赖 `wgpu`。
 
 ### 开发构建优化（`[profile.dev]`）
 
@@ -54,7 +53,7 @@ egui 生态（`eframe`、`egui`、`egui-wgpu`、`egui_dock`、`egui-phosphor`）
 ## 与其它模块的关系
 
 - `rust-toolchain.toml` 固定实际使用的编译器版本，必须不低于此处的 `rust-version`。
-- `Cargo.lock` 被提交到仓库（`.gitignore` 未忽略它），锁定的版本当前为 eframe/egui-wgpu 0.36.2、egui_dock 0.21.1、wgpu 30.0.1。
+- `Cargo.lock` 被提交到仓库（`.gitignore` 未忽略它），锁定的版本当前为 eframe/egui-wgpu 0.36.2、wgpu 30.0.1。
 
 ## 已知限制
 

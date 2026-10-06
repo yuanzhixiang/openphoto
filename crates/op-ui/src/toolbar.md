@@ -6,6 +6,9 @@
 
 ## 布局（自上而下）
 
+工具栏宽 42 pt，右侧 3 pt 是紧挨画布的深色边 `#393939`，工具按钮在其余宽度里居中。
+
+
 1. 顶部的折叠箭头「>>」和一条点状拖拽手柄，只有外观。
 2. 工具按钮，顺序与 Photoshop 默认工具栏一致：Move、Rectangular Marquee、Lasso、Object Selection、Crop、Frame、Eyedropper、Spot Healing Brush、Brush、Clone Stamp、History Brush、Eraser、Paint Bucket、Blur、Dodge、Pen、Horizontal Type、Path Selection、Rectangle、Hand、Zoom。在 Crop、Eyedropper、Pen、Hand 前留出小间隔，表示分组。
 3. Edit Toolbar（「…」）按钮，只有外观。

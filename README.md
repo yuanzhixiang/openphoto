@@ -17,7 +17,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 
 ### P0
 
-1. **已有界面的像素级校准**：选项栏、工具栏、文档标签、状态栏、右侧面板列、图标列以及 Canvas Size 对话框，最初是按一张参考截图换算尺寸的，还没有和 Photoshop 1:1 截图逐像素比对。History 面板和 Color Picker 已经按 Photoshop 1:1 量取。
+1. **已有界面的像素级校准**：窗口框架（标题栏、选项栏、工具栏、图标列、面板列的外框尺寸，文档标签栏、滚动条、状态栏）、History 面板和 Color Picker 已经按 Photoshop 1:1 量取。还没有逐像素比对的是：选项栏内容、工具栏的工具按钮与图标（Photoshop 的图标更大、为实心风格）、右侧各面板（Color、Properties、Layers）内部的元素位置和各面板组的高度、Canvas Size 对话框。
 2. **界面字体**：Photoshop 面板使用 Adobe Clean，对话框使用 macOS 系统字体；OpenPhoto 全部使用 Source Sans 3，字形和字宽不同。
 3. **显示色彩管理**：Photoshop 把文档颜色和界面中的颜色按显示器配置文件转换后显示；OpenPhoto 直接输出 sRGB 数值，同样的颜色看起来更饱和。
 4. **混合模式合成**：图层混合模式可以选择，但合成时只按 Normal 计算，其余 26 种模式（Dissolve、Multiply、Screen、Overlay 等）没有效果。

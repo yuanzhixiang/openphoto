@@ -6,7 +6,7 @@
 
 ## AppState
 
-- `docs` / `active_doc`：打开的文档与当前文档。当前文档由 `lib.rs` 根据 dock 焦点每帧更新。
+- `docs` / `doc_order` / `active_doc`：打开的文档、标签顺序与当前文档。`add_document` 把文档加到最后并设为当前文档；`close_document` 关闭文档，关闭的是当前文档时，它左边的文档（没有则第一个）成为当前文档。
 - `tool`：当前工具，默认是矩形选框（与 Photoshop 新装后的默认一致）。
 - `foreground` / `background`：前景色默认 `#14a5dc`，背景色白色。
 - `marquee`：选框工具选项（选区运算模式、羽化、消除锯齿、样式），目前只用于选项栏显示与编辑，没有接到选区功能上。
@@ -21,6 +21,7 @@
 ## DocState
 
 - `doc`：`op_core::Document`。
+- `untagged`：文档没有嵌入色彩配置文件（标签标题里显示「#」）。打开的文件为真，新建的文档为假。
 - `history`：该文档的 `op_core::History`。第一条状态名为「Open」（打开文件）或「New」（新建）。
 - `view`：视图状态，见下文。
 - 合成缓存：`canvas_image()` 返回当前合成结果，只在文档 `revision` 变化时重新合成。
