@@ -61,6 +61,10 @@
 - 没有 Paste Into / Paste Outside（需要图层蒙版）。
 - 不支持粘贴文字（Photoshop 会创建文字图层）和矢量路径。
 
+## 图层组
+
+当前图层是组时，拷贝、剪切返回 `ClipError::Group`。
+
 ## 测试覆盖
 
 - `copy_takes_the_selection_bounds`：复制选区外接矩形内的像素和位置；没有选区时复制整个图层。

@@ -46,6 +46,10 @@ Edit › Transform 的固定变换：`Rotate180`、`Rotate90Clockwise`、`Rotate
 - 没有斜切、扭曲、透视、变形（Skew、Distort、Perspective、Warp）。
 - 范围为奇数宽高时旋转 90° 会产生半像素偏移（重采样后边缘略微模糊）。
 
+## 图层组
+
+当前图层是组时（没有选区），`bounds` 为组里所有像素图层的像素范围的并集，`transform` 对其中每个像素图层施加同一个变换；有选区时返回 `Empty`。
+
 ## 测试覆盖
 
 - `affine_math`：`around` 的映射与逆映射、旋转方向、不可逆矩阵。

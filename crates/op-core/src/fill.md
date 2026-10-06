@@ -52,6 +52,10 @@ Edit › Fill、Edit › Clear 和油漆桶工具对当前图层像素的修改�
 - 所有操作都遍历整个文档，没有按选区边界裁剪，大文档上较慢。
 - 消除锯齿只是一圈 50% 的边缘，与 Photoshop 的抗锯齿效果不完全相同。
 
+## 图层组
+
+当前图层是组时，Fill、油漆桶、调整（`adjust::check`）和滤镜返回 `FillError::Group`，提示「Could not complete the {命令} command because the target layer is a group.」。Photoshop 在这种情况下直接把这些菜单项置灰（Invert 已核对），界面层应据此禁用命令。魔棒、Grow/Similar 在当前图层是组且不取样所有图层时没有结果。
+
 ## 测试覆盖
 
 - `fill_respects_selection_opacity_and_mode`：选区内按 50% 不透明度填充，选区外不变；Multiply 模式的结果。

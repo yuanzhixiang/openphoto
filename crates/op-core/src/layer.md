@@ -12,6 +12,9 @@
 
 ### `BlendMode`
 
+`PassThrough`（「Pass Through」）只用于组：组里的图层直接与组下方的内容混合，就像没有分组一样；组按一个整体合成时它等同于 Normal。
+
+
 - 收录 Photoshop 全部 27 种图层混合模式，枚举顺序与 Photoshop 混合模式菜单一致，默认值为 `Normal`。
 - `GROUPS`：按 Photoshop 菜单分成 6 组，组与组之间画分隔线：
   1. `Normal`、`Dissolve`
@@ -23,6 +26,12 @@
 - `label()`：菜单显示的英文名，与 Photoshop 措辞一致，例如 `LinearDodge` 显示为 `"Linear Dodge (Add)"`。
 
 ### `LayerKind`
+
+- `Raster(TiledImage)`：像素图层。
+- `Group { collapsed }`：图层组（文件夹）。组本身没有像素；它里面的图层在 `Document::layers` 中紧挨着排在它下面，各自的 `parent` 指向组的 id（与 PSD 的存储方式相同：组记录在上、其中的图层在下）。`collapsed` 表示在 Layers 面板中折叠。
+- `Layer::group(id, name)` 新建一个组，混合模式为 `PassThrough`。`is_group()`；`image()` / `image_mut()` 返回像素图层的图像，组为 `None`——所有处理像素的代码都通过它们取图像，必须明确处理组的情况。
+
+（原 `LayerKind` 说明）
 
 图层内容类型。目前只有 `Raster(TiledImage)`：栅格图层，图像尺寸与文档一致。
 
@@ -40,6 +49,7 @@
 - `kind`：图层内容。
 - `mask`：图层蒙版（`Option<LayerMask>`），新建图层时没有。
 - `color`：颜色标签（`LayerColor`），新建图层时为 `None`。
+- `parent`：所在的组，不在组里时为 `None`。
 
 ### `LayerColor`
 

@@ -59,6 +59,10 @@
 - 画笔模式只有 Normal；橡皮擦只有 Brush 模式（没有 Pencil、Block 模式）。
 - 每个笔印都会触发整个文档重新合成和上传，大文档上绘画较慢。
 
+## 图层组
+
+当前图层是组且目标是像素时，开始笔画返回 `StrokeError::Group`（「Could not use the {工具} because the target layer is a group.」）；组的蒙版仍可以绘画。
+
 ## 测试覆盖
 
 - `hard_brush_paints_full_color_in_its_core`、`pencil_is_aliased`：硬边画笔中心为完整颜色；铅笔只有完全透明和完全不透明。

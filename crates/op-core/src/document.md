@@ -75,6 +75,13 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - 所有图层改写完成后更新文档宽高并调用 `mark_dirty()`。
 - 本方法不记录历史；由调用方在之后调用 `History::record`。
 
+### 图层组
+
+- `descendants(id)`：组里（任意深度）的图层。`pixel_layers(ids)`：把其中的组换成组里的像素图层，按图层顺序、去重。
+- `is_shown(id)`：图层本身及它所在的每一层组都可见。移动、自由变换、Auto-Select（`layer_at`）都按它判断可见性。
+- 合成（`composite_layers_rgba8`）按组递归：同一层级的图层按顺序处理；组为 Pass Through、不透明度（含填充）100% 且没有蒙版时，组里的图层直接合成到下方；否则先把组里的图层合成到一张透明缓冲，再按组的混合模式（Pass Through 当作 Normal）、不透明度和蒙版整体混合上去。隐藏的组不参与。只给出部分图层时（合并），父组不在其中的图层当作顶层。
+- `edit_target` 对组返回 `None`（组没有像素可编辑）。Canvas Size 等画布变换跳过组的像素（组没有），但会处理组的蒙版。
+
 ### 合成
 
 - 从底到顶遍历 `visible` 为真的图层；`opacity * fill` 小于等于 0 的图层整层跳过。
@@ -122,6 +129,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `transparent_bitmap_opens_as_regular_layer`：含半透明像素时打开为「Layer 0」普通图层，文档没有背景图层，该图层为活动图层。
 - `resize_canvas_centered`：2×2 白色背景居中扩展到 4×5、扩展色黑色，验证新尺寸、四周为黑、原图位于 (1,1)–(2,2)，且高度差为奇数时多出的一行在底部（第 3 行为黑）。
 - `resize_canvas_keeps_layers_transparent`：左上锚点扩展到 3×3 时，非背景图层的扩展区域保持透明，原像素位置不变。
+- `groups_composite_their_layers`：组里的黑色图层在穿透模式下直接显示；隐藏组后其中的图层不显示、`is_shown` 为假、Auto-Select 落到背景；组不透明度 50% 时整体混合为灰色；`descendants`、`pixel_layers` 正确。
 - `layer_multi_selection`：单击、⇧ 范围、⌘ 移出活动图层后最后一个成为活动图层、⌘ 加入背景、直接设活动图层回到单选、All Layers 不含背景、Deselect Layers。
 - `canvas_size_keeps_hidden_pixels_except_on_the_background`：缩小画布后普通图层的内容范围伸到画布外，背景图层没有画布外像素；再扩大回来，隐藏的像素重新出现。
 - `layer_at_finds_the_topmost_visible_pixel`：上层有像素处选中上层，透明处落到背景，隐藏上层后落到背景，画布外为 `None`。

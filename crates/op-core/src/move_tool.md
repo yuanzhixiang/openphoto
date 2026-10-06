@@ -28,6 +28,10 @@
 
 没有像素选区时，除活动图层外，其它选中且可以移动的图层（可见、不是背景、没有锁定位置或像素）一起移动同样的位移；背景等不能移动的选中图层留在原地。有像素选区时只移动活动图层的选中像素（与 Photoshop 一致）。
 
+## 图层组
+
+没有像素选区时，选中的组带着组里的所有像素图层一起移动（`Document::pixel_layers`）；当前图层是空组且没有别的可移动图层时返回 `Locked`。有像素选区而当前图层是组时返回 `MoveError::Group`（「Could not use the move tool because the target layer is a group.」）。可见性按 `Document::is_shown` 判断（所在的组隐藏也算隐藏）。
+
 ## 测试覆盖
 
 - `selected_layers_move_together`：选中两个普通图层和背景图层，移动后两个普通图层都移动，背景不动。
