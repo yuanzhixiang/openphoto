@@ -25,6 +25,7 @@
 | Redo | Edit › Redo | ⇧⌘Z |
 | ToggleLastState | Edit › Toggle Last State | ⌥⌘Z |
 | CanvasSize | Image › Canvas Size... | ⌥⌘C |
+| ImageSize | Image › Image Size... | ⌥⌘I |
 | Rotate180 | Image › Image Rotation › 180° | 无 |
 | Rotate90Clockwise | Image › Image Rotation › 90° Clockwise | 无 |
 | Rotate90CounterClockwise | Image › Image Rotation › 90° Counter Clockwise | 无 |
@@ -135,6 +136,7 @@ Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别�
 - Image Rotation 五项：旋转或翻转整个文档（`image_ops::reorient`），旋转记录「Rotate Canvas」，翻转记录「Flip Canvas Horizontal」/「Flip Canvas Vertical」。
 - Crop：裁剪到选区外接矩形（`image_ops::crop_to_selection`），记录「Crop」。
 - Trim：打开 Trim 对话框（见 `dialogs/trim.md`）。
+- ImageSize：以当前文档的宽、高、分辨率打开 Image Size 对话框（见 `dialogs/image_size.md`）。
 
 ## 调整命令
 

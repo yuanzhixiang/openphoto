@@ -31,7 +31,7 @@
    - 中间：有文档时，上面是文档标签栏，下面是当前文档的视图；没有文档时只有粘贴板底色。
    这些面板都不使用 egui 自带的分隔线，边框由各区域按 Photoshop 自己绘制。
 5. 确定当前文档：当前文档已不存在时，改为最后一个标签（见 `doc_tabs.rs` 的 `ensure_active`）。
-6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、Fill 对话框、Trim 对话框、调整对话框、「Save changes?」确认、Color Picker（画在前两者之上）、macOS 菜单状态同步、错误提示对话框。
+6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、Image Size 对话框、Fill 对话框、Trim 对话框、调整对话框、「Save changes?」确认、Color Picker（画在前两者之上）、macOS 菜单状态同步、错误提示对话框。
 
 ## 关闭窗口与退出
 
@@ -70,6 +70,10 @@
 - Cancel / Esc：有预览时恢复快照。
 - OK / Enter：先恢复快照，再正式应用（`Effect::apply`，滤镜需要的背景色取当前背景色）并记录调整或滤镜的名称（如「Levels」「Gaussian Blur」）；应用的是滤镜时，把它记为 `last_filter`。失败时弹出提示。
 - 当前文档在对话框打开期间消失时，直接丢弃对话框。
+
+## Image Size 对话框的接入
+
+确定时：Resample 打开且像素尺寸变化时用所选方法重采样（`image_ops::resize`）；分辨率变化时更新文档分辨率；有任何变化时记录「Image Size」。
 
 ## Trim 对话框的接入
 

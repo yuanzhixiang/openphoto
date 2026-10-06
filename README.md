@@ -17,7 +17,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 
 ### P0
 
-1. **已有界面的像素级校准**：Fill、Trim、各调整对话框（Threshold、Posterize、Levels、Hue/Saturation、Exposure）与滤镜对话框（Photoshop 的滤镜对话框带预览缩略图和缩放按钮，这里没有）和 Layers 面板的改名输入框、拖动指示线是按 Photoshop 的结构排列的，尚未逐像素比对；窗口框架（标题栏、选项栏、工具栏、图标列、面板列的外框尺寸，文档标签栏、滚动条、状态栏）、History 面板和 Color Picker 已经按 Photoshop 1:1 量取。还没有逐像素比对的是：选项栏内容、工具栏的工具按钮与图标（Photoshop 的图标更大、为实心风格）、右侧各面板（Color、Properties、Layers）内部的元素位置和各面板组的高度、Canvas Size 对话框。
+1. **已有界面的像素级校准**：Image Size（Photoshop 左侧还有预览图）、Fill、Trim、各调整对话框（Threshold、Posterize、Levels、Hue/Saturation、Exposure）与滤镜对话框（Photoshop 的滤镜对话框带预览缩略图和缩放按钮，这里没有）和 Layers 面板的改名输入框、拖动指示线是按 Photoshop 的结构排列的，尚未逐像素比对；窗口框架（标题栏、选项栏、工具栏、图标列、面板列的外框尺寸，文档标签栏、滚动条、状态栏）、History 面板和 Color Picker 已经按 Photoshop 1:1 量取。还没有逐像素比对的是：选项栏内容、工具栏的工具按钮与图标（Photoshop 的图标更大、为实心风格）、右侧各面板（Color、Properties、Layers）内部的元素位置和各面板组的高度、Canvas Size 对话框。
 2. **界面字体**：Photoshop 面板使用 Adobe Clean，对话框使用 macOS 系统字体；OpenPhoto 全部使用 Source Sans 3，字形和字宽不同。
 
 ### P1
@@ -28,7 +28,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
     - Group Layers（⌘G）、Ungroup Layers（⇧⌘G）与图层组。
     - Layers 面板多选（以及多选后的 Merge Layers）、Select › All Layers（⌥⌘A）、Arrange › Reverse、Lock Layers...（⌘/）、Link Layers。
     - Layers 面板中把图层拖到「新建」按钮上复制、拖到垃圾桶上删除。
-4. **图像尺寸与方向**：Image › Image Size...（⌥⌘I，含重采样）、Image Rotation › Arbitrary...（任意角度）、Reveal All。
+4. **图像尺寸与方向**：Image Size 对话框的预览图、Fit To 预设、百分比/英寸等单位、Automatic/Preserve Details/Bicubic Smoother/Sharper 等重采样方式、打开 Resample 时改分辨率联动像素尺寸、Scale Styles；Image Rotation › Arbitrary...（任意角度）、Reveal All。
 5. **裁剪工具**：裁剪框超出画布时扩展画布、旋转与拉直、比例预设与叠加方式、关闭「删除裁剪的像素」、拖动框内移动图像（Photoshop 的默认方式）、切换工具时的「是否裁剪」询问、透视裁剪工具。
 6. **变换**：斜切、扭曲、透视、变形（Skew、Distort、Perspective、Warp 及 Split Warp）；自由变换选项栏的数值输入、参考点、插值方式；右键菜单与 ⌘ 拖动角点的自由扭曲；Transform Selection；变换框外观与 Photoshop 的逐像素比对。
 7. **调整**：Image › Adjustments 的 Brightness/Contrast、Curves（⌘M）、Color Balance（⌘B）、Black & White（⌥⇧⌘B）、Vibrance、Photo Filter、Channel Mixer、Color Lookup、Gradient Map、Selective Color、Shadows/Highlights、HDR Toning、Replace Color、Match Color；Auto Tone/Contrast/Color；Levels 的单通道（R/G/B）、预设、自动与吸管；Hue/Saturation 的分颜色范围编辑、Colorize 与预设；Exposure 的预设与吸管；各调整对话框记住上次的值；Equalize 在有选区时的「只均化选区 / 按选区均化整幅图像」询问。

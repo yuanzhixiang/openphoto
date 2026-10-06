@@ -27,12 +27,13 @@
 - `clipboard`：Cut/Copy/Paste 用的剪贴板（见 `clipboard.md`）。默认不连接系统剪贴板（无窗口测试不应改动用户的剪贴板），`OpenPhotoApp::new` 启动时换成连接系统剪贴板的版本。
 - `typing`：上一帧是否有输入框获得键盘焦点，每帧执行命令前更新。决定菜单的 Cut/Copy/Paste 作用于输入框还是文档。
 - `forward_events`：要注入 egui 下一帧输入的事件（菜单的 Cut/Copy/Paste 转交给输入框时使用，见 `commands.md`）。
+- `image_size_dialog`：Image Size 对话框，打开期间为 `Some`。
 - `trim_dialog`：Trim 对话框，打开期间为 `Some`。
 - `adjust_dialog`：调整或滤镜对话框（见 `dialogs/adjust.md`），打开期间为 `Some`。
 - `last_transform`：上次应用的变换映射，供 Edit › Transform › Again 使用；只在本次运行中保留，所有文档共用。
 - `transforming()`：当前文档正在自由变换时为真；此时 `modal_open()` 也为真。
 - `last_filter`：上次成功应用的滤镜及其设置，供 Filter › Last Filter 使用；只在本次运行中保留，所有文档共用。
-- `modal_open()`：Canvas Size、Fill、Trim、调整对话框、Color Picker、「Save changes?」确认或错误提示打开时为真，此时命令与单键快捷键都不执行。
+- `modal_open()`：Canvas Size、Image Size、Fill、Trim、调整对话框、Color Picker、「Save changes?」确认或错误提示打开时为真，此时命令与单键快捷键都不执行。
 
 ## DocState
 

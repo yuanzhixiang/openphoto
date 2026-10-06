@@ -1,10 +1,15 @@
-# image_ops.rs：画布变换（旋转、翻转、裁剪、修整）
+# image_ops.rs：画布变换（图像大小、旋转、翻转、裁剪、修整）
 
 ## 职责
 
-实现 Image 菜单中改变整个画布的操作：Image Rotation 的固定角度旋转与画布翻转、Crop、Trim。所有操作同时作用于每个图层和选区（包括可以 Reselect 的上一个选区），通过 `Document::transform_canvas` 完成，不记录历史。
+实现 Image 菜单中改变整个画布的操作：Image Size 的重采样、Image Rotation 的固定角度旋转与画布翻转、Crop、Trim。所有操作同时作用于每个图层和选区（包括可以 Reselect 的上一个选区），通过 `Document::transform_canvas` 完成，不记录历史。
 
 ## 对外接口与规则
+
+### 图像大小（重采样）
+
+- `Resample`：`Bicubic`（默认，标签「Bicubic (smooth gradients)」）、`Bilinear`、`NearestNeighbor`（「Nearest Neighbor (hard edges)」）。
+- `resize(doc, width, height, method)`：把每个图层和选区缩放到新尺寸（宽高必须大于 0）。先横向、再纵向分离重采样：目标像素中心对应源坐标 `(i + 0.5) / 比例 − 0.5`；双三次用 a = −0.5 的三次卷积核（半径 2），双线性用三角核（半径 1），权重归一化；缩小时核按比例加宽，每个源像素都参与（面积正确的缩小）；邻近取最近的源像素。颜色在预乘 alpha 下计算，结果限制在 0–255（双三次会过冲）；alpha 小于 0.5 的像素为全透明。选区的选择程度按同样的方法重采样。
 
 ### 旋转与翻转
 
@@ -34,4 +39,5 @@
 - `rotations_and_flips_move_the_corners`：五种变换后角上像素的位置与尺寸。
 - `the_selection_turns_with_the_canvas`：顺时针旋转后选区移到右上角。
 - `crop_keeps_the_selected_area`：裁到选区后尺寸、像素与选区位置正确；没有选区时不裁剪。
+- `resize_scales_layers_and_selection`：4×2 中左半红色缩小一半后左像素以红为主、右像素接近白，选区跟随；邻近放大保持硬边；双线性放大在边缘混色。
 - `trim_removes_borders_of_the_corner_color`：按左上角颜色裁剪四边、按右下角颜色只裁上边；不透明背景上按透明像素裁剪不改动。
