@@ -12,6 +12,8 @@
 - `foreground` / `background`：前景色默认 `#14a5dc`，背景色白色。
 - `marquee`：选框工具选项：组合方式、羽化（像素）、消除锯齿（默认开启，与 Photoshop 一致）、样式。前三项在创建选区时生效，样式中的 Fixed Ratio / Fixed Size 目前没有效果。
 - `brush` / `pencil` / `eraser`：各绘画工具的 `PaintOptions`（大小 px、硬度、不透明度、流量），与 Photoshop 一样每个工具单独保存。默认值：画笔与橡皮擦 30 px、硬度 0%、不透明度和流量 100%；铅笔 1 px。`paint_options(tool)` 取当前绘画工具的设置。`size_step(size)` 是 `[`、`]` 的步长（小于 10 为 1，10–50 为 5，50–100 为 10，100–200 为 25，200–300 为 50，再往上为 100），大小范围 1–5000。
+- `eyedropper`：吸管选项（取样大小 `size`，1 表示 Point Sample；`all_layers`）。`EyedropperOptions::SIZES` 是 Photoshop 的七个取样大小。
+- `wand`：魔棒选项：组合方式与区域规则（`op_core::fill::BucketOptions` 的容差、消除锯齿、连续、所有图层，默认值同油漆桶）。
 - `editing_background` 与 `picker_hsb`：Color 面板正在编辑前景还是背景，以及缓存的 HSB。缓存 HSB 是为了在灰色（饱和度为 0）时色相不跳回 0。
 - `history_open`、`history_panel`：History 弹出面板是否打开，以及它的标签与高度。
 - `fill_dialog`：Fill 对话框，打开期间为 `Some`。
@@ -41,6 +43,8 @@
 - 图层缩略图：`layer_thumbnail()` 按图层缓存，文档 `revision` 变化后重新生成；最近邻缩小。
 - 移动：`move_drag` 是进行中的移动和拖动起点（文档像素）。
 - 绘画：`stroke` 是进行中的笔画和它的工具；`last_paint_point` 是上一笔结束的位置，用于 Shift+单击画直线。
+- `lasso`：正在绘制的套索轨迹（文档像素坐标的点、组合方式、是否为多边形套索）。
+- `sample_average(x, y, size, all_layers)`：吸管取样，见 `document_view.md`。
 - `renaming`：Layers 面板中正在改名的图层和输入中的文字（见 `panels/layers.md`）。
 - 选框拖动：`marquee_drag` 保存拖动中的起点、当前点（文档像素）、组合方式，以及 Shift/⌥ 是否已用于选择组合方式。
 - 蚂蚁线轮廓：`selection_outline()` 按选区版本号缓存轮廓线段。

@@ -32,6 +32,11 @@ Edit › Fill、Edit › Clear 和油漆桶工具对当前图层像素的修改�
 - 消除锯齿：区域外紧邻区域的一圈像素按 50% 选中。
 - 区域再与当前选区相乘，然后按填充设置填充前景色。单击点在文档外时不做任何事（返回 `Ok(false)`）。
 
+## 魔棒（`magic_wand`）
+
+- `magic_wand(doc, x, y, options)`：魔棒单击得到的选区，区域规则与油漆桶完全相同（取样、容差、连续、消除锯齿），只是不填充。单击点在画布外、或不取所有图层时没有活动图层，返回 `None`。
+- 测试 `magic_wand_selects_the_clicked_area`：点黑色方块得到方块的范围，点白色得到方块以外的区域，画布外为 `None`。
+
 ## 已知限制
 
 - 填充内容只有纯色；Content-Aware、Pattern、History 没有实现。

@@ -10,6 +10,7 @@
 - `Rect`：文档像素坐标的矩形，构造时自动整理成左上到右下，右下边界不包含在内，可以超出文档。宽或高小于 1 像素时为空。
 - `Selection::all(w, h)`：全选。
 - `Selection::rect(w, h, rect)`：矩形选区，边界四舍五入到整像素，超出文档的部分被裁掉。
+- `Selection::polygon(w, h, points, anti_alias)`：闭合多边形（套索工具）的内部，自相交时按奇偶规则。开启抗锯齿时每个像素取 4 条采样行，按每条行上内部区间与像素的精确水平重叠累计覆盖率；关闭时像素中心在内部才选中。少于 3 个点时为空选区。
 - `Selection::ellipse(w, h, rect, anti_alias)`：`rect` 的内切椭圆。开启抗锯齿时，边缘像素按 4×4 超采样的覆盖率部分选中；关闭时，像素中心在椭圆内才选中。
 - `Selection::from_mask(w, h, mask, anti_alias)`：从 0/255 蒙版创建（油漆桶的填充区域）。开启抗锯齿时，紧邻选中区域外侧的像素按 50% 选中。
 - `get(x, y)`：某像素的选中程度（文档外为 0）。
@@ -38,6 +39,7 @@
 - `rect_and_bounds`：矩形边界取整与超出文档时的裁剪。
 - `combine_ops`：四种组合方式，以及没有现有选区时的减去。
 - `inverse_and_all`：反选与全选。
+- `polygons_fill_their_inside`：直角边为 4 的三角形抗锯齿覆盖率总和约为 8 个像素；不抗锯齿时只有 0 和 255；少于 3 个点为空。
 - `ellipse_anti_aliasing`：不抗锯齿时只有 0 和 255，抗锯齿时有中间值。
 - `feather_softens_edges`：羽化后内部仍接近全选，边缘为中间值，远处接近 0。
 - `outline_of_rect`：矩形选区的轮廓正好是四条边。
