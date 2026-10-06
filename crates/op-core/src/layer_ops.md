@@ -41,6 +41,16 @@
 
 合并都通过 `Document::composite_layers_rgba8` 计算，规则与文档合成一致（见 `document.md`）。
 
+### 图层蒙版
+
+- `NewMask`：`RevealAll`、`HideAll`、`RevealSelection`、`HideSelection`（Layer › Layer Mask 的前四项）。
+- `can_add_mask(doc)`：当前图层存在、不是背景图层、还没有蒙版。
+- `add_mask(doc, kind)`：给当前图层加蒙版——全白、全黑、选区（选择程度即蒙版值）或反选区；选区类需要有选区（选区保留）。之后编辑目标切换到蒙版（`mask_target = true`），与 Photoshop 一致。
+- `delete_mask(doc)`：删除蒙版而不应用，编辑目标回到像素。
+- `apply_mask(doc)`：启用的蒙版乘进图层的 alpha（四舍五入），然后删除蒙版；停用的蒙版直接删除。编辑目标回到像素。
+- `toggle_mask(doc)`：停用/启用，返回新状态；没有蒙版时为 `None`。
+- 合并：Merge Down 与 Merge Visible 的结果已经包含了各图层蒙版的效果，结果图层不再带蒙版；复制图层时蒙版随之复制。
+
 ## 已知限制
 
 - 合并下面一层带非 Normal 混合模式或不透明度时，Photoshop 的结果与这里的近似（先按 Normal 100% 合成，再沿用下面一层的属性）可能不同。
@@ -53,6 +63,7 @@
 - `via_copy_and_cut_move_the_selection_in_place`：选区复制到「Layer N」并沿用不透明度、保留选区；剪切后原图层对应像素变透明。
 - `arrange_keeps_the_background_at_the_bottom`：Send to Back 停在背景之上，背景不能上移。
 - `dragging_and_renaming`：`move_layer` 的允许与拒绝情况；改名去空白、拒绝空名和同名。
+- `masks_hide_reveal_and_apply`：背景图层不能加蒙版；Hide All 隐藏图层，停用后显示；在蒙版上填白重新显示、图层像素不变；应用 50% 灰的蒙版后 alpha 为 128；从选区建 Hide Selection 蒙版；删除蒙版。
 - `merge_down_keeps_the_lower_layer`：50% 红色合并到白色背景得到 `[255, 128, 128, 255]`，结果仍是背景图层。
 - `merge_visible_leaves_hidden_layers`：隐藏图层保留，可见图层合并到背景图层。
 - `flatten_fills_transparency_with_white`：隐藏图层被丢弃，透明处变白。

@@ -40,6 +40,7 @@
   - ⌘R 显示标尺；从上标尺拖到画布内得到水平参考线并记录「New Guide」；⌘' 显示网格（生成 `rulers` 截图）；移动工具把参考线往下拖并记录「Move Guide」；拖回标尺删除并记录「Delete Guide」，⌘Z 恢复；⌥⌘; 锁定参考线。
   - 没有选区时 Expand 不可用；100..140 的选区扩展 5 后为 95..145，记录「Expand」（生成 `expand_selection` 截图）；⇧F6 打开 Feather；纯色文档上 Similar 选中整幅图像。
   - O 减淡让暗灰背景变亮并记录「Dodge Tool」；S 仿制图章未设取样点时弹出提示，⌥单击红色方块后在别处单击画出红色；Y 历史记录画笔把该处恢复为打开时的颜色。
+  - 红色图层上用 Hide Selection 建蒙版，选区处露出背景，记录「Add Layer Mask」（生成 `layer_mask` 截图）；在蒙版上填黑隐藏更多而图层像素仍为红；停用蒙版后全部显示；Apply 后蒙版消失、对应像素变透明。
 - `alt_click(harness, pos)` 模拟一次 ⌥单击。
 - `run_command(harness, command)` 直接执行一个命令（用于没有快捷键的菜单项）；`double_click(harness, pos)` 模拟一次双击；`drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标；`layer_pixel(harness, layer, x, y)` 读取某个图层（自底向上的序号）的像素。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。

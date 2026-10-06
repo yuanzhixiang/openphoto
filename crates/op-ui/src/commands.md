@@ -85,6 +85,15 @@
 | CopyMerged | Edit › Copy Merged | ⇧⌘C |
 | Paste | Edit › Paste | ⌘V |
 | PasteInPlace | Edit › Paste Special › Paste in Place | ⇧⌘V |
+| PasteInto | Edit › Paste Special › Paste Into | ⌥⇧⌘V |
+| PasteOutside | Edit › Paste Special › Paste Outside | 无 |
+| MaskRevealAll | Layer › Layer Mask › Reveal All | 无 |
+| MaskHideAll | Layer › Layer Mask › Hide All | 无 |
+| MaskRevealSelection | Layer › Layer Mask › Reveal Selection | 无 |
+| MaskHideSelection | Layer › Layer Mask › Hide Selection | 无 |
+| MaskDelete | Layer › Layer Mask › Delete | 无 |
+| MaskApply | Layer › Layer Mask › Apply | 无 |
+| MaskToggle | Layer › Layer Mask › Disable / Enable | 无 |
 | SelectAll | Select › All | ⌘A |
 | Deselect | Select › Deselect | ⌘D |
 | Reselect | Select › Reselect | ⇧⌘D |
@@ -125,7 +134,7 @@
 - DeleteLayer：当前文档的图层多于 1 个时可用。
 - CloseOthers：打开的文档多于 1 个时可用。
 - ToggleLayerVisibility、DuplicateLayer、LayerViaCopy：当前文档有选中图层时可用；LayerViaCut 还要求有选区。
-- Crop：当前文档有选区时可用。TransformAgain：有当前文档且本次运行中做过变换时可用。LastFilter：有当前文档且本次运行中用过滤镜时可用。
+- Crop、PasteInto、PasteOutside：当前文档有选区时可用。MaskRevealAll、MaskHideAll：当前图层可以加蒙版时可用；MaskRevealSelection、MaskHideSelection 还要求有选区；MaskDelete、MaskApply、MaskToggle：当前图层有蒙版时可用。TransformAgain：有当前文档且本次运行中做过变换时可用。LastFilter：有当前文档且本次运行中用过滤镜时可用。
 - LayerFromBackground：文档有背景图层时可用。DeleteHiddenLayers：既有隐藏图层也有可见图层时可用。
 - Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
 - Deselect、SelectInverse、Modify 五项、Grow、Similar：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
@@ -180,6 +189,9 @@ Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别�
 
 ## 图层命令
 
+图层蒙版命令调用 `layer_ops` 的蒙版函数，分别记录「Add Layer Mask」「Delete Layer Mask」「Apply Layer Mask」「Disable Layer Mask」/「Enable Layer Mask」。
+
+
 像素与顺序规则见 `op-core` 的 `layer_ops.md`。成功后记录的历史名称：Duplicate Layer →「Duplicate Layer」，Layer Via Copy / Cut →「Layer Via Copy」/「Layer Via Cut」，Layer from Background →「Layer From Background」，Delete › Hidden Layers →「Delete Hidden Layers」，Arrange 四项 →「Layer Order」，Merge Down / Merge Visible / Flatten Image → 同名。Layer Via Copy / Cut 失败时弹出 Photoshop 的提示（例如选区内只有透明像素时「Could not complete the Layer Via Copy command because the selected area is empty.」）。
 
 菜单快捷键里的 `[`、`]` 在传给 muda 时写成符号本身（muda 不认识 egui 的 `OpenBracket` / `CloseBracket` 名称）。
@@ -192,6 +204,7 @@ Cut、Copy、CopyMerged、Paste、PasteInPlace 由 `actions::clipboard` 执行�
 - 否则对当前文档执行（像素规则见 `op-core` 的 `clipboard.md`）：
   - Copy / Copy Merged：复制成功后放进剪贴板（见 `clipboard.md`），不记录历史。
   - Cut：复制并清除，记录「Cut」。
+  - Paste Into / Paste Outside：内容居中放在选区外接矩形的中心，粘贴为新图层后按原选区加蒙版（Into 显示选区内、Outside 显示选区外），取消选区，记录「Paste Into」/「Paste Outside」。
   - Paste / Paste in Place：从剪贴板取出内容，按当前视图的可见区域（`document_view::visible_rect`）计算位置，粘贴为新图层，记录「Paste」。剪贴板为空时什么也不做。
   - 失败时弹出 Photoshop 的提示，例如「Could not complete the Copy command because the selected area is empty.」。
 

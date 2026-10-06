@@ -44,8 +44,11 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `revision()` / `mark_dirty()`：读取 / 递增修订号。修订号在每次像素或图层属性变化时递增，渲染层与图层缩略图缓存据此判断是否需要刷新。
 - `snapshot()` / `restore(snapshot)`：生成 / 恢复快照。`restore` 会覆盖宽高、分辨率、图层与活动图层，并调用 `mark_dirty()`。
 - `resize_canvas(width, height, anchor, fill)`：Image > Canvas Size。
-- `transform_canvas(width, height, image, selection)`：把画布换成 `width`×`height`：每个图层的图像经过 `image` 函数、当前选区和可 Reselect 的选区经过 `selection` 函数，然后更新尺寸、选区修订号并 `mark_dirty()`。Crop、Trim、Image Rotation 和画布翻转都通过它实现（见 `image_ops.md`）。不记录历史。
+- `transform_canvas(width, height, image, selection)`：把画布换成 `width`×`height`：每个图层的图像和图层蒙版都经过 `image` 函数、当前选区和可 Reselect 的选区经过 `selection` 函数，然后更新尺寸、选区修订号并 `mark_dirty()`。Crop、Trim、Image Rotation 和画布翻转都通过它实现（见 `image_ops.md`）。不记录历史。
 - `map_guides(f)`：用 `f` 变换每条参考线（裁剪、扩展画布、缩放、旋转、翻转时调用）。`resize_canvas` 自己按锚点偏移参考线。
+- `mask_target`：编辑目标是当前图层的蒙版（在 Layers 面板点了蒙版缩略图）还是像素。不在快照里，撤销不会改变它。
+- `editing_mask()`：`mask_target` 为真且当前图层确实有蒙版。
+- `edit_target()`：像素编辑（绘画、填充、渐变）的目标 `EditTarget`：要写入的图像（图层像素或蒙版）、是否是蒙版（颜色要换成灰度）、是否要保持 alpha（背景图层、锁定透明像素，或蒙版）。
 - `has_background()`：是否存在背景图层。它决定 Canvas Size 中「画布扩展颜色」是否有意义：没有背景图层时，所有扩展区域都是透明的。
 - `layer(id)` / `layer_mut(id)`：按 ID 线性查找图层。
 - `composite_rgba8()`：合成为紧密排列的直通 RGBA8 缓冲区，长度为 `width * height * 4`。
@@ -55,7 +58,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 
 ### 画布尺寸调整
 
-- 按 `Anchor` 规则分别计算 x、y 偏移，然后对每个图层调用 `TiledImage::with_canvas`。
+- 按 `Anchor` 规则分别计算 x、y 偏移，然后对每个图层调用 `TiledImage::with_canvas`。图层蒙版同样移动，新增区域填白（显示）。
 - 背景图层的扩展区域用 `fill` 的 RGB 填充，alpha 强制为 255（无论 `fill` 本身的 alpha 是多少），保持背景图层不透明。
 - 非背景图层的扩展区域填充为全透明。
 - 缩小画布时超出新画布的像素被直接裁掉，不会保留在画布外。
@@ -66,7 +69,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 
 - 从底到顶遍历 `visible` 为真的图层；`opacity * fill` 小于等于 0 的图层整层跳过。
 - 遍历图层已分配的 tile，未分配的 tile 视为透明直接跳过。
-- 每个像素按图层的混合模式合成（`blend::composite`，算法见 `blend.md`）：源 alpha 为像素 alpha × `opacity` × `fill`，结果为直通 alpha。源 alpha 为 0 的像素跳过。
+- 每个像素按图层的混合模式合成（`blend::composite`，算法见 `blend.md`）：源 alpha 为像素 alpha × `opacity` × `fill` ×（启用的蒙版值 / 255），结果为直通 alpha。源 alpha 为 0 的像素跳过。蒙版与图层使用相同的 tile 网格，按 tile 读取；蒙版缺少某个 tile 时该 tile 视为完全隐藏。
 - 混合在 gamma 编码（sRGB）空间进行，与 Photoshop 的默认设置一致（理由见 `README.md`）。
 - 累积使用 `f32` 缓冲区，最终每个分量 clamp 到 0..=1 后按 `×255 + 0.5` 截断量化为 `u8`。
 - 结果中没有任何图层覆盖的像素为 `[0, 0, 0, 0]`。

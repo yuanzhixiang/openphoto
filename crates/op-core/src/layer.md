@@ -38,6 +38,16 @@
 - `is_background`：「背景」图层标记。按 Photoshop 语义，背景图层锁定、不透明、总在最底层。
 - `lock_transparency`、`lock_pixels`、`lock_position`：三种锁定。
 - `kind`：图层内容。
+- `mask`：图层蒙版（`Option<LayerMask>`），新建图层时没有。
+
+### `LayerMask`
+
+图层蒙版：白色显示图层、黑色隐藏、灰色部分显示。以不透明的灰度 `TiledImage` 保存（每个颜色通道都是蒙版值，alpha 恒为 255），所以纯白或纯黑的蒙版整幅只共享一个 tile。
+
+- `enabled`：Layer › Layer Mask › Disable 关闭时为假，蒙版保留但合成时忽略。
+- `filled(w, h, value)`：单一值的蒙版（255 显示全部，0 隐藏全部）。
+- `from_values(w, h, f)`：按每个像素的值构建（例如选区的选择程度）。
+- `value(x, y)`：某像素的蒙版值（图像外为 0）。
 
 `Layer::raster(id, name, image)` 构造一个普通栅格图层：可见、`opacity` 与 `fill` 均为 1.0、Normal 混合、非背景、无任何锁定。
 

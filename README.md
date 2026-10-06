@@ -42,7 +42,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 
 13. **文字**：横排/直排文字工具、Character 与 Paragraph 面板、Type 菜单（抗锯齿、转为形状、变形文字、栅格化等）。
 14. **路径与形状**：钢笔/自由钢笔/弯度钢笔、锚点工具、路径选择/直接选择、Paths 面板；矩形、椭圆、三角形、多边形、直线、自定形状工具与形状图层、Combine Shapes。
-15. **蒙版**：图层蒙版（包括 Edit › Paste Special › Paste Into ⌥⇧⌘V 与 Paste Outside）、矢量蒙版、剪贴蒙版（⌥⌘G）、快速蒙版（Q）、Select and Mask（⌥⌘R）、存储/载入选区。
+15. **蒙版**：从透明度建蒙版（From Transparency）、蒙版与图层的链接（移动或变换图层时蒙版跟随）、⌥单击查看蒙版、蒙版属性面板（密度、羽化）、在蒙版上应用滤镜与调整；矢量蒙版、剪贴蒙版（⌥⌘G）、快速蒙版（Q）、Select and Mask（⌥⌘R）、存储/载入选区。
 16. **图层样式**：Blending Options、斜面和浮雕、描边、内阴影、内发光、光泽、颜色/渐变/图案叠加、外发光、投影。
 17. **填充图层与调整图层**：Layer › New Fill Layer、New Adjustment Layer。
 18. **选择菜单其余项**：Color Range、Focus Area、Transform Selection、All Layers/Deselect Layers/Find Layers/Isolate Layers；Modify 的「Apply effect at canvas bounds」用于 Smooth 与 Feather；选框工具的 Fixed Ratio / Fixed Size 样式。

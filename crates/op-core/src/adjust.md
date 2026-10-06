@@ -18,6 +18,7 @@
   - Levels 与 Exposure 先算出 256 项查找表再逐像素查表。
 - `Adjustment::name()`：菜单与历史名称（「Invert」「Desaturate」「Threshold」「Posterize」「Equalize」「Levels」「Hue/Saturation」「Exposure」）。
 - `channel_histogram(doc)`：活动图层选区内、alpha 不为 0 的像素的 R、G、B 值合并统计的直方图（Equalize 与 Levels 对话框使用）。
+- `mask_gray(rgb)`：颜色画在图层蒙版上的灰度（亮度，三个通道相同）。
 - `luminosity(px)`：亮度 `(299 R + 587 G + 114 B) / 1000`，四舍五入到 0–255（Rec. 601 权重）。
 - `luminosity_histogram(doc)`：活动图层选区内、alpha 不为 0 的像素的亮度直方图（Threshold 对话框显示它）。
 - `check(doc)`：调整前的检查，失败时返回 `FillError`（没有图层、图层隐藏、像素锁定），提示文字与 Fill 相同格式，例如「Could not complete the Invert command because the target layer is hidden.」。
