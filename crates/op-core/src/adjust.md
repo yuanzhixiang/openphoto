@@ -23,12 +23,12 @@
     - Colorize：取像素的 HSL 亮度，按 Master 亮度调整，再用 Master 的色相（0–360）与饱和度（0–100）组成颜色。
     - 结果与 Photoshop 相差：Master 不超过 4 级，Colorize 3 级，颜色范围 4 级（渐变边上）。
     - `HueSaturation::master(h, s, l)` 构造只有 Master 的设置；`HueSaturation::apply(px)` 作用于一个像素（对话框的 Before - After 色带也用它）。
-  - `Exposure {  - `Exposure { exposure, offset, gamma }`：在线性光下计算：sRGB 值转线性后乘以 `2^exposure`、加 `offset`，负值截为 0，再取 `^(1/gamma)`，转回 sRGB。
+  - `Exposure {  - `Exposure { exposure, offset, gamma }`：在 gamma 2.2 的线性光下计算（不是 sRGB 曲线，与 Photoshop 一致）：`v^2.2` 乘以 `2^exposure`、加 `offset`，负值截为 0，再取 `^(1/gamma)`，最后 `^(1/2.2)`。与 Photoshop 相差不超过 2 级。
   - `BrightnessContrast { brightness, contrast, legacy }`（−150–150、−50–100）：默认算法直接用 Photoshop 2026 的曲线：`data/brightness_contrast.bin` 存有 Photoshop 对每个亮度值（301 条）和每个对比度值（151 条）各自输出的 256 级表，按「先亮度、后对比度」复合（与 Photoshop 组合结果相差不超过 1 级）。这些曲线没有找到闭式（亮度的起始斜率为 `2^(b/110)`，正负亮度互为反函数）。`legacy`（Use Legacy）：亮度平移 `v + b`；对比度为正时以 128 为中心拉伸 `100/(100 − c)` 倍（100 时为阈值 128），为负时压缩 `(100 + c)/100` 倍，偏移量四舍五入（半数远离中心）；对比度为负时先对比度后亮度，为正时先亮度后对比度（与 Photoshop 的结果吻合）。
   - `ColorBalance { shadows, midtones, highlights, preserve_luminosity }`：每个通道一条曲线（Photoshop 的 Color Balance 是逐通道的查找表，包括 Preserve Luminosity），形如 Levels：阴影为负时输入黑场 = −值；高光为正时输入白场 = 255 − 值；gamma 为 `2^(G/100)`（经 `levels_gamma`）。不保持亮度时 `G = 中间调 + (阴影 + 高光)/2`；保持亮度时，三个轴的阴影先减去其最大值、高光减去其最小值、中间调减去 (最大 + 最小)/2，且只有中间调影响 gamma。与 Photoshop 2026 的 80 组随机设置相差不超过 3 级。
-  - `BlackWhite { weights }`  - `BlackWhite { weights }`：红、黄、绿、青、蓝、洋红六个权重（百分比）。灰度 = 最小通道 + (中间通道 − 最小) × 次色权重 + (最大 − 中间) × 主色权重；主色是最大的通道（红/绿/蓝），次色是最大两个通道合成的颜色（黄/青/洋红）。Photoshop 的默认预设为 40、60、40、60、20、80。
-  - `Vibrance { vibrance, saturation }`：在 HSL 中饱和度先乘 `1 + vibrance × (1 − s)`（对低饱和颜色作用更大），再乘 `1 + saturation/100`。
-  - `PhotoFilter { color, density, preserve_luminosity }`：每个通道向「乘以滤镜色」的结果混合 `density%`；Preserve Luminosity 同上。
+  - `BlackWhite { weights, tint }`：红、黄、绿、青、蓝、洋红六个权重（百分比）。灰度 = 最小通道 + (中间通道 − 最小) × 次色权重 + (最大 − 中间) × 主色权重；主色是最大的通道（红/绿/蓝），次色是最大两个通道合成的颜色（黄/青/洋红）。与 Photoshop 逐级相同（默认预设 40、60、40、60、20、80）。`tint` 为 Tint 颜色时，以「颜色」混合把它设到这个灰度上（`set_lum`：按 0.3 R + 0.59 G + 0.11 B 的亮度平移，再用 ClipColor 收回 0–1），与 Photoshop 相差不超过 2 级。
+  - `Vibrance { vibrance, saturation }`：Vibrance 为近似：在 HSL 中饱和度乘 `1 + vibrance × (1 − s)`（对低饱和颜色作用更大；Photoshop 还会保护肤色，未还原）。Saturation 与 Photoshop 一致（相差不超过 2 级）：在 sRGB 线性光中各通道以灰 `0.2878 R + 0.7122 G`（蓝的权重为 0，与 Photoshop 的实测一致）为中心缩放 `1 + saturation/100` 倍。
+  - `PhotoFilter { color, density, preserve_luminosity }`：在 D50 的 XYZ 中（线性 sRGB 经 `SRGB_TO_XYZ_D50`）把 X、Y、Z 分别乘以 `1 − 密度 + 密度 × 滤镜色的对应分量 / 白的分量`，再转回 sRGB——Photoshop 正是这样（拟合出的变换矩阵的本征向量即这组原色），与 Photoshop 相差不超过 1 级。Preserve Luminosity 时再用 `set_lum` 把结果的亮度设回原像素的亮度（相差不超过 6 级）。
   - `GradientMap { from, to }`：按像素亮度在两种颜色之间线性插值。
   - `AutoTone`、`AutoColor`：每个通道各自去掉最暗、最亮 0.1% 后拉伸到 0–255（Photoshop 的 Auto Color 还会中和中间调，这里没有）；`AutoContrast`：三个通道合并统计、按同一范围拉伸，颜色关系不变。直方图取当前图层选区内、alpha 不为 0 的像素。
   - `Curves { points, counts }`：RGB 复合、红、绿、蓝通道各最多 16 个（输入, 输出）点（`Adjustment::curves(points)` 只设复合通道，`curves_per_channel([..; 4])` 四个通道，空列表表示该通道不变）；先各通道自己的曲线，再复合曲线。`curve_table(points)` 生成查找表：按输入排序、去掉重复输入后做自然三次样条（两端二阶导为 0），第一个点之前、最后一个点之后保持平直，结果限制在 0–255、四舍五入；与 Photoshop 2026 的 12 组曲线逐级相同。没有点时为恒等，只有一个点时为常数。
@@ -53,7 +53,7 @@
 
 ## 已知限制
 
-- Vibrance 的算法是近似（Photoshop 的 Vibrance 带有肤色保护，Saturation 部分保持亮度，均未还原）；Photo Filter、Gradient Map 尚未与 Photoshop 核对。
+- Vibrance 滑块本身是近似（Photoshop 的 Vibrance 带有肤色保护，未还原）；Gradient Map 尚未与 Photoshop 核对。
 - Equalize 不提供 Photoshop 在有选区时弹出的选项，总是按选区内的直方图只处理选区。
 
 ## 数据来源
@@ -78,3 +78,4 @@ Brightness/Contrast 的表与 `fixtures/adjust/` 下的对照数据都由脚本�
   - `color_balance_matches_photoshop`：80 组随机三色调设置（含 Preserve Luminosity），每级误差不超过 3。
 - `channel_histograms`：三个通道的直方图与合并直方图。
 - `photoshop::channel_mixer_matches_photoshop`、`photoshop::selective_color_matches_photoshop`：三组通道混合（含单色）与七组可选颜色设置对照 Photoshop。
+- `photoshop::black_white_photo_filter_and_exposure_match_photoshop`：Black & White（含两组 Tint）、四组 Photo Filter、四组 Exposure、三组 Vibrance 的 Saturation 对照 Photoshop。
