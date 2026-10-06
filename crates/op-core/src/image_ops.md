@@ -43,6 +43,8 @@
 
 ## Reveal All
 
+`crop_extended(doc, (x0, y0, x1, y1), delete_cropped, background)`：裁剪工具的裁剪。范围可以超出画布：画布在那里扩大，背景图层的新区域填 `background`，其它图层透明（`place_canvas`）。`delete_cropped`（Delete Cropped Pixels）时删除新画布外的像素；否则保留在图层上，并且背景图层变成普通图层「Layer 0」（解除锁定）以保留它的画布外像素。空范围返回 `false`。测试 `crop_tool_crops_past_the_canvas_and_can_keep_pixels`。
+
 `rotate_arbitrary(doc, degrees, background)`：Image › Image Rotation › Arbitrary...（Rotate Canvas）。整个文档绕中心旋转 `degrees`（正数顺时针）。画布扩大到旋转后图像的外接矩形并向上取整：200 × 100 转 30° 为 224 × 187，再转 −45° 为 291 × 291（Photoshop 2026 实测）。逐像素双线性重采样（预乘 alpha）；背景图层的新角落填 `background`（背景色）并截到画布内，其它图层的新角落透明，转出画布的像素保留在图层上；蒙版的新角落为显示（255）；选区随之旋转。360° 的整数倍什么也不做并返回 `false`。测试 `rotate_arbitrary_like_photoshop`：90° 时宽高互换、中心右侧的点转到中心下方；30° 与 −45° 的尺寸；背景角落为背景色、中心仍为原色。
 
 `reveal_all(doc, background)`：Image › Reveal All。用 `Document::content_bounds` 求出画布与所有图层像素（包括画布外的）的并集，把画布扩大到这个范围（`place_canvas`，旧画布放在相应偏移处），背景图层的扩展区域填 `background`（背景色）。没有任何像素在画布外时什么也不做并返回 `false`。测试 `reveal_all_grows_the_canvas_to_the_hidden_pixels` 覆盖：左边外和右下外的像素都出现在新画布上，背景扩展为背景色，第二次调用返回 `false`。

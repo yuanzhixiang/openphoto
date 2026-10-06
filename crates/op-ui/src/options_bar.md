@@ -57,7 +57,7 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
   - 分隔线后是「•••」（More options，只有外观）、分隔线、齿轮（Set additional options，右下带白色小三角，只有外观）。
   两个复选框都默认关闭，值保存在 `AppState::move_options` 并生效，行为见 `document_view.md`「移动工具」。
 - **抓手、缩放工具**：「100%」和「Fit Screen」两个按钮，作用于当前文档。
-- **裁剪工具**：「W:」「H:」两个只读字段（裁剪框的像素尺寸，中间是交换图标）、Clear 按钮（框恢复为整个画布）、分隔线后勾选且置灰的「Delete Cropped Pixels」；右侧原本的 Share、Search 等按钮换成取消（⦸，「Cancel current crop operation (Esc)」）和确认（✓，「Commit current crop operation (Return)」）。
+- **裁剪工具**（`crop_bar`，绝对定位，坐标为距选项栏左边的 pt，Photoshop 2026 实测，与截图相差 1–2 px）：比例菜单 (110–201，显示「W x H x Reso...」或预设名)；W 输入框 (205–272.5)；交换按钮（实心双箭头，中心 290.25）；H 输入框 (310–376)；W x H x Resolution 类时分隔线 380、分辨率框 (385–439.5)、单位下拉「px/in / px/cm」(442.5–496.5)、分隔线 500.5；Clear (506–552.5，`#454545` 底 `#666666` 边)；Straighten 图标（中心 574）与文字（x 592）；分隔线 649.5；叠加菜单（网格图标，中心 670.75：六种叠加、Auto/Always/Never Show Overlay、Cycle Overlay、置灰的 Cycle Orientation）；齿轮菜单（中心 705：Use Classic Mode、Show Cropped Area、Auto Center Preview、Enable Crop Shield、Opacity、Auto Adjust Opacity）；分隔线 726.5；「Delete Cropped Pixels」复选框 (735)；「Fill:」(870.5) 与下拉 (892–1023.5，Background (default)，Generative Expand 与 Content-Aware Fill 置灰)；ⓘ (1042)；复位 (1070.5，框没变时置灰)；框改变后出现取消 ⦸ (1103.75) 与确认 ✓ (1138.5)。Ratio 类没有分辨率框，Clear 及其后的元素左移 121 pt。这一栏比 1350 pt 的窗口宽，所以右侧的 Share 等应用按钮整体右移（Share 在 1166.5，头像被窗口裁掉一半），与 Photoshop 一致。
 - **自由变换进行中**（不论当前工具）：「W:」「H:」两个只读百分比字段、分隔线、角度图标与只读角度字段；右侧原本的 Share、Search 等按钮换成取消（⦸，「Cancel transform (Esc)」）和确认（✓，「Commit transform (Return)」）两个按钮。
 - **其它工具**：不显示工具选项。
 
