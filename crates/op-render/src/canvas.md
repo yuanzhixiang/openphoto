@@ -104,3 +104,7 @@
 ## 裁剪遮挡（`Shield`）
 
 `CanvasView::shield` 为 `Some` 时，片元着色器把文档坐标转到遮挡框自己的坐标系（中心、半宽高、顺时针角度，为旋转的裁剪框预留），框外的颜色与遮挡色按不透明度在**线性光**中混合后再转回 sRGB：先把两者从 sRGB 转成线性值，`mix`，再转回。这与 Photoshop 2026 的裁剪遮挡一致（75% 的 `#282828` 盖在白色上为 141）。uniform 增加三个 vec4：`shield_box`（中心 xy、半宽高 zw）、`shield_color`（rgb 与角度）、`shield_params`（不透明度、是否启用）。
+
+## 图像转动（`rotation`）
+
+`CanvasView::rotation` 为 `Some((pivot, angle))` 时，屏幕点先按视图换算成「框空间」点 b，再绕 `pivot` 顺时针转 `angle` 得到要采样的图像点 d（`d = pivot + R(angle)(b − pivot)`），所以图像看上去转了 −angle。遮挡框在框空间里判断。裁剪工具转动图像时使用。

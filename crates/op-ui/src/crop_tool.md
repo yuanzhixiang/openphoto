@@ -6,7 +6,8 @@
 
 ## 状态
 
-- 裁剪框保存在 `DocState::crop`（`CropBox`：文档像素坐标的矩形 `rect`，以及进行中的拖动 `CropDrag`：抓住的控制点、按下时指针的**屏幕**位置与当时的框）。
+- 裁剪框保存在 `DocState::crop`（`CropBox`）：`rect` 在「框空间」里——把图像绕自身中心转 −`angle` 后的坐标，框在其中是正的（`angle` 为 0 时就是文档像素坐标）；`angle` 是框在图像上转过的角度（顺时针弧度）；进行中的拖动 `CropDrag`：抓住的控制点、按下时指针的**屏幕**位置、当时的框与角度，以及拖动的种类（`CropDragKind`：框、旋转、拉直）。
+- 画布按框空间显示：`rotation` 把（图像中心, `angle`）交给画布着色器，图像转着显示在正立的框下面（Photoshop 非 Classic 模式的样子），其余裁剪代码都在框空间里工作。
 - 当前工具是裁剪工具、而文档还没有裁剪框时，框自动覆盖整个画布（与 Photoshop 选中裁剪工具时一致）。切换到其它工具时裁剪框被丢弃（Photoshop 此时会询问是否裁剪；这里直接放弃）。
 - `AppState::crop_options`（`CropOptions`），默认值与 Photoshop 2026 一致：预设 W x H x Resolution（三个框为空，即自由裁剪）、分辨率单位 px/in、勾选 Delete Cropped Pixels、Fill 为 Background (default)、叠加 Rule of Thirds 且 Always Show Overlay、不用 Classic Mode、Show Cropped Area 与 Auto Center Preview 打开、Crop Shield 打开、颜色 Match Canvas、不透明度 75%、Auto Adjust Opacity 打开。
 
@@ -25,9 +26,10 @@
 - 控制点：四角与四边中点，屏幕上 10 pt 以内可抓取。拖动改变对应的边；有比例时角点保持比例（按变化较大的方向，对角固定），边保持比例时另一方向以中线为轴；没有比例时按住 Shift 拖动角点保持开始时的比例；按住 ⌥ 以中心为基准。
 - **非 Classic Mode（默认，Auto Center Preview 打开）**：框始终保持在视图正中，图像在框下移动（Photoshop 2026 实测）。拖动控制点时，对边固定在图像上，所以框边相对图像移动的距离是指针移动的两倍；框内拖动是平移图像（框相对图像反向移动）；视图随时把框的中心放回窗口中心（`center_on_box`）。复位、取消、确认后也重新居中。
 - **Classic Mode**：框内拖动移动框，控制点按指针移动，视图不动。
-- 框外拖动：从按下处开始画一个新框。拖动结束时框的宽或高小于 1 像素：恢复为拖动前的框。
+- 框外拖动：绕框的中心转动图像（Photoshop 的行为），顺时针拖动使图像顺时针转、框在图像上的角度减小；按住 Shift 以 15° 为步长；转动时框的中心停在图像的同一点上（`set_angle`）。光标为 Alias。拖动结束时框的宽或高小于 1 像素：恢复为拖动前的框。
+- Straighten：选项栏的 Straighten 按钮（图标或文字）打开拉直模式（按钮有底色），下一次拖动画一条线，松开后图像转到让这条线水平（更接近竖直时为竖直），框变为当前比例（没有比例时为画布比例）在转过的图像里能放下的最大居中框（`fitted_turned`），然后退出拉直模式；Esc 也退出。
 - 框可以超出画布：确认时画布在那里扩大（Fill 为 Background 时背景图层的新区域填背景色，其它图层透明）。
-- 确认：Enter、在框内双击，或选项栏的 ✓：框四舍五入到整像素后 `crop_extended`（Delete Cropped Pixels 决定画布外的像素是否删除；不删除时背景图层变成「Layer 0」以保留它们）；有 `output_size` 时再用 Automatic 方法重采样到该尺寸，并设置分辨率；记录「Crop」。之后框覆盖新的画布。
+- 确认：Enter、在框内双击，或选项栏的 ✓：框有角度时先用 `rotate_arbitrary` 把图像转 −`angle`（背景色填新角落、画布扩大，框随画布中心平移），再把框四舍五入到整像素后 `crop_extended`（Delete Cropped Pixels 决定画布外的像素是否删除；不删除时背景图层变成「Layer 0」以保留它们）；有 `output_size` 时再用 Automatic 方法重采样到该尺寸，并设置分辨率；记录「Crop」。之后框覆盖新的画布。
 - 取消：Esc，或选项栏的 ⦸：框恢复为整个画布。
 - 有输入框获得键盘焦点时，Enter 和 Esc 不作用于裁剪框。
 - 光标：控制点上为对应方向的双向箭头；框内为移动光标；框外为十字。
@@ -41,7 +43,7 @@
 
 ## 已知限制
 
-- 没有旋转裁剪框、拉直（Straighten 按钮还没有动作）、Fill 的 Generative Expand 与 Content-Aware Fill（置灰）、自定义遮挡颜色、Auto Adjust Opacity 的效果、Front Image 与存储预设、透视裁剪工具。
+- Classic Mode 下转动时也是图像在转（Photoshop 的 Classic Mode 是框在转）。转动或拉直期间，选区、参考线等其它画布叠加仍按未转动的图像绘制。没有 Fill 的 Generative Expand 与 Content-Aware Fill（置灰）、自定义遮挡颜色、Auto Adjust Opacity 的效果、Front Image 与存储预设、透视裁剪工具。
 - Photoshop 裁剪时在 Layers 面板里出现临时的「Crop Preview」图层、标签页标题带「Crop Preview」，这里没有。
 - 切换工具时不询问是否裁剪。
 
@@ -52,3 +54,4 @@
 - `ui_tests::crop_tool_crops_to_the_box`：默认模式下右下角拖进 (234, 311) 得到 266 × 189 的框且框保持居中；Classic Mode 下同样的拖动得到 500 × 500；Enter 裁剪并记录「Crop」；换工具丢弃框。
 - `ui_tests::crop_shield_presets_and_growing_the_canvas`：1:1 得到居中的 300 × 300；白色图像框外渲染为 141、框内为 255；框超出右边时画布扩大，新区域为背景色。
 - `ui_tests::screenshot_crop_tool`（忽略）：与 Photoshop 截图对比用。
+- `ui_tests::crop_rotation_and_straighten`：框外按住 Shift 顺时针转四分之一圈，角度为 −90°；Esc 复位；10° 的拉直线使角度为 10°、框缩小并退出拉直模式；确认后画布约为框的大小，四角都不是背景色（框在图像内）。
