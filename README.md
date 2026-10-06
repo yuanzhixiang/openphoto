@@ -27,7 +27,6 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
     - 对话框：New Layer 对话框的「Use previous layer to create clipping mask」（依赖剪贴蒙版）；Duplicate Layer 的 Artboard（依赖画板）。New Layer（⇧⌘N）、Layer from Background...、Duplicate Layer... 对话框、Rename Layer...（就地改名）与 Flatten Image 的「Discard hidden layers?」询问已实现。
     - 图层组余项：组的图层蒙版的界面、⌥ 单击箭头展开全部子组、Layers 面板自动滚动到选中的图层。（图层组的数据结构、合成与穿透模式、⌘G / ⇧⌘G、New Group 对话框、删除组的询问、复制组、面板显示与折叠、拖进拖出组、组整体移动/对齐/自由变换、PSD 读写组已实现。）
     - 多选后的自由变换（链接的图层也要一起变换）、对齐时带上链接的图层、按住 ⇧ 单击链接图标临时停用链接；拖动多行排序；锁定图层组时组内图层随之锁定。（Layers 面板 ⌘/⇧ 多选、Merge Layers、Select › All Layers / Deselect Layers、多图层移动、删除、隐藏，Align / Distribute，Lock Layers... 对话框、⌘/ 全部锁定、五个锁定按钮与 PSD 的 `lspf` 读写，以及 Link Layers / Unlink Layers / Select Linked Layers、链接图层随移动工具一起移动、PSD 的链接读写已实现。）
-    - Layers 面板中把图层拖到「新建」按钮上复制、拖到垃圾桶上删除。
 4. **图像尺寸与方向**：Image Size 对话框的预览图、Fit To 预设、百分比/英寸等单位、Automatic/Preserve Details/Bicubic Smoother/Sharper 等重采样方式、打开 Resample 时改分辨率联动像素尺寸、Scale Styles；Image Rotation › Arbitrary...（任意角度）、Reveal All。
 5. **裁剪工具**：裁剪框超出画布时扩展画布、旋转与拉直、比例预设与叠加方式、关闭「删除裁剪的像素」、拖动框内移动图像（Photoshop 的默认方式）、切换工具时的「是否裁剪」询问、透视裁剪工具。
 6. **变换**：斜切、扭曲、透视、变形（Skew、Distort、Perspective、Warp 及 Split Warp）；自由变换选项栏的数值输入、参考点、插值方式；右键菜单与 ⌘ 拖动角点的自由扭曲；Transform Selection；变换框外观与 Photoshop 的逐像素比对。

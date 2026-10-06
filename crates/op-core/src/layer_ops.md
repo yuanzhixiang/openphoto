@@ -8,6 +8,8 @@
 
 ### 复制
 
+- 副本的名字（`copy_name`，Photoshop 2026 实测）：一般是「原名 copy」，已存在时依次为「原名 copy 2」「原名 copy 3」……；原名本身以「 copy」或「 copy N」结尾时不再追加 copy，而是从 2（或 N+1）起找空闲编号：「A copy」→「A copy 2」，「E copy 7」→「E copy 8」；「Gcopy」不算（→「Gcopy copy」）。
+- `duplicate_selected(doc)`：把选中的图层拖到 Layers 面板的「新建图层」按钮上。只选中一个时同 `duplicate`；选中多个时每个（组连同内容）各复制一份，按原来的上下顺序作为一组插在最上面那个选中图层的正上方（父组同它），然后选中所有副本，活动图层的副本为活动图层（Photoshop 2026 实测：选中 A 和 Background copy 拖上去，得到最上面的「A copy」和其下的「Background copy 2」）。
 - `duplicate(doc)`：Layer › Duplicate Layer。在活动图层正上方插入一个完全相同的图层（像素、可见性、不透明度、Fill、混合模式、锁定都相同）并设为活动图层，返回新 ID；没有活动图层时返回 `None`。名称为「原名 copy」，已存在时依次为「原名 copy 2」「原名 copy 3」……，与 Photoshop 一致。背景图层的副本是普通图层。
 - `can_merge_selected(doc)` / `merge_selected(doc)`：Layer › Merge Layers（多选时的 ⌘E）：选中图层中可见的那些合并成一个，放在最上面那个的位置并沿用它的名字（其中有背景图层时合并进背景图层）；结果的不透明度、填充、混合模式复位，蒙版并入像素；隐藏的选中图层保持不动。至少两个选中图层可见时可用。
 - `delete_selected(doc)`：删除所有选中图层；会删光所有图层时拒绝。之后最低被删图层下面的那个（没有时最低的剩余图层）成为活动图层。
@@ -96,3 +98,5 @@
 - `delete_hidden_keeps_visible_layers`：删除隐藏图层并修正活动图层。
 - `lock_layers_sets_every_selected_layer_but_the_background`：只选背景时无可锁定的图层；对话框的勾选是所有选中图层的交集；设置作用于选中的非背景图层；重复设置无变化。
 - `lock_all_is_a_flag_of_its_own`：⌘/ 打开「全部锁定」但不改单项，使像素与透明受保护；再按一次清除所有锁定。
+- `copies_of_copies_count_on`：副本的副本按 Photoshop 的编号规则命名。
+- `duplicating_several_layers_puts_the_copies_on_top`：多选复制的位置、名字、选中状态与 Photoshop 一致；单选时副本在原图层正上方。
