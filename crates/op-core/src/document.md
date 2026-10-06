@@ -24,7 +24,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 
 ### `Snapshot`
 
-文档中可撤销的部分：`width`、`height`、`resolution`、`layers`、`active_layer`。字段私有，只能通过 `Document::snapshot()` 创建、`Document::restore()` 使用。克隆代价低，因为图层里的 tile 通过 `Arc` 共享。
+文档中可撤销的部分：`width`、`height`、`resolution`、`layers`、`active_layer`、`selection`、`last_selection`。字段私有，只能通过 `Document::snapshot()` 创建、`Document::restore()` 使用。克隆代价低，因为图层里的 tile 通过 `Arc` 共享。
 
 `title`、`id`、`color_mode`、`bit_depth` 和 `revision` 不在快照中，撤销/重做不会改变它们。
 
@@ -85,8 +85,17 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - 合成不区分 `opacity` 与 `fill`，两者相乘作为图层 alpha。
 - Canvas Size 只支持像素尺寸变化，不做重采样（那属于 Image Size）。
 
+## 选区
+
+- 文档保存当前选区 `selection`（`None` 表示没有选区，此时编辑作用于整个文档）和上一次取消的选区 `last_selection`（用于 Select › Reselect）。两者都在快照里，所以选区变化可以撤销，与 Photoshop 一致。
+- `set_selection(s)`：替换选区；空选区视为没有选区。取消选区（设为 `None`）时，原选区被记为 `last_selection`。
+- `reselect()`：恢复上一次取消的选区；`can_reselect()` 在没有选区且有可恢复的选区时为真。
+- `selection_revision()`：选区每次变化（包括撤销恢复和画布尺寸变化）都会递增，界面据此缓存蚂蚁线轮廓。选区变化不改变像素，不触发重新合成。
+- `resize_canvas` 同时平移选区和 `last_selection`。
+
 ## 测试覆盖
 
+- `selection_deselect_reselect_and_undo`：取消选区后可以重新选择，恢复快照会恢复快照里的选区，空选区视为没有选区。
 - `opaque_bitmap_opens_as_background`：完全不透明的像素打开为背景图层。
 - `transparent_bitmap_opens_as_regular_layer`：含半透明像素时打开为「Layer 0」普通图层，文档没有背景图层，该图层为活动图层。
 - `resize_canvas_centered`：2×2 白色背景居中扩展到 4×5、扩展色黑色，验证新尺寸、四周为黑、原图位于 (1,1)–(2,2)，且高度差为奇数时多出的一行在底部（第 3 行为黑）。

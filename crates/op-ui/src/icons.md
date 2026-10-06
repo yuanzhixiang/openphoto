@@ -6,28 +6,6 @@
 
 ## 工具图标
 
-| 工具 | Phosphor 图标 |
-|---|---|
-| Move | `ARROWS_OUT_CARDINAL` |
-| Rectangular Marquee | `SELECTION` |
-| Lasso | `LASSO` |
-| Object Selection | `SELECTION_PLUS` |
-| Crop | `CROP` |
-| Frame | `FRAME_CORNERS` |
-| Eyedropper | `EYEDROPPER` |
-| Spot Healing Brush | `BANDAIDS` |
-| Brush | `PAINT_BRUSH` |
-| Clone Stamp | `STAMP` |
-| History Brush | `PAINT_BRUSH_BROAD` |
-| Eraser | `ERASER` |
-| Paint Bucket | `PAINT_BUCKET` |
-| Blur | `DROP` |
-| Dodge | `DROP_HALF` |
-| Pen | `PEN_NIB` |
-| Horizontal Type | `TEXT_T` |
-| Path Selection | `NAVIGATION_ARROW` |
-| Rectangle | `RECTANGLE` |
-| Hand | `HAND` |
-| Zoom | `MAGNIFYING_GLASS` |
+`tool()` 为 `op-tools` 中的全部 68 个工具各指定一个 Phosphor 图标，挑选形状最接近 Photoshop 图标的，例如 Rectangular Marquee 为 `SELECTION`、Elliptical Marquee 为 `CIRCLE_DASHED`、Magic Wand 为 `MAGIC_WAND`、Pencil 为 `PENCIL`、Gradient 为 `GRADIENT`、Rotate View 为 `ARROW_CLOCKWISE`。部分同组工具共用一个图标（例如三种橡皮擦都是 `ERASER`）。
 
-图标是从 Phosphor 里挑形状最接近 Photoshop 图标的，外观与 Photoshop 不完全相同。
+图标外观与 Photoshop 不同：Photoshop 的工具图标更大、多为实心风格。

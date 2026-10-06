@@ -10,7 +10,7 @@
 
 
 1. 顶部的折叠箭头「>>」和一条点状拖拽手柄，只有外观。
-2. 工具按钮，顺序与 Photoshop 默认工具栏一致：Move、Rectangular Marquee、Lasso、Object Selection、Crop、Frame、Eyedropper、Spot Healing Brush、Brush、Clone Stamp、History Brush、Eraser、Paint Bucket、Blur、Dodge、Pen、Horizontal Type、Path Selection、Rectangle、Hand、Zoom。在 Crop、Eyedropper、Pen、Hand 前留出小间隔，表示分组。
+2. 工具按钮，每个按钮是一组工具（分组与顺序见 `crates/op-tools/src/lib.md`），显示这组里最近用过的工具（初始为组内第一个）。在 Crop、Eyedropper、Pen、Hand 所在的格前留出小间隔。
 3. Edit Toolbar（「…」）按钮，只有外观。
 4. 前景色/背景色色块。
 5. Quick Mask 和 Change Screen Mode 按钮，只有外观。
@@ -18,8 +18,10 @@
 ## 工具按钮
 
 - 38 参考像素见方，当前工具有 `#383838` 深色底，悬停变浅。
-- 有同组工具的按钮右下角画一个小三角（Hand、Zoom、Frame 没有）。目前点击小三角不会展开同组工具。
+- 组里有多个工具时，按钮右下角画一个小三角。
 - 悬停提示为「工具名 (快捷键)」，例如「Move Tool (V)」。
+- 左键点击：选中按钮显示的工具。
+- 右键点击：在按钮右侧弹出这组工具的列表，每行是图标、名称和快捷键，当前显示的工具前有小方块标记，悬停行高亮为强调色；点击某行选中该工具，并让这一格从此显示它。
 - 图标使用 Phosphor 图标，对应关系见 `icons.md`。
 
 ## 前景色/背景色
@@ -31,5 +33,5 @@
 
 ## 已知限制
 
-- 不能展开同组工具（例如从 Rectangular Marquee 切到 Elliptical Marquee）。
+- Photoshop 里按住按钮不放也会弹出工具列表，这里只支持右键。
 - 工具栏不能折叠成双列，也不能拖动。

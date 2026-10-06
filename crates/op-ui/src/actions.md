@@ -28,11 +28,10 @@
 ## 单键快捷键（`handle_tool_keys`）
 
 - 模态对话框打开时、或文本输入框获得焦点时不处理。
-- 只响应不带 ⌘/Ctrl/Alt 的按下事件，忽略按键重复。
+- 只响应不带 ⌘/Ctrl/Alt 的按下事件（可以带 Shift），忽略按键重复。
 - D：恢复默认颜色（前景黑、背景白）；X：交换前景色与背景色。
-- 其它字母：按 `op_tools::Tool::from_shortcut` 切换工具，对应关系与 Photoshop 一致（V M L W C K I J B S Y E G O P T A U H Z）。
+- 其它字母：按 `op_tools::tool_for_key` 选择工具（规则见 `crates/op-tools/src/lib.md`），并让工具栏那一格显示所选工具。Shift+字母在同组工具间循环，与 Photoshop 一致。
 
 ## 已知限制
 
-- Photoshop 里按住 Shift 加字母键可以在同组工具间循环，这里没有。
 - 不处理 Q（快速蒙版）、F（屏幕模式）、R（旋转视图）等尚未实现功能的快捷键。

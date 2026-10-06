@@ -13,6 +13,7 @@
 - **Edit**：Undo、Redo、Toggle Last State。macOS 会自动往名为「Edit」的菜单里追加 Writing Tools、AutoFill、Start Dictation、Emoji & Symbols，Photoshop 里也有这些项。
 - **Image**：条目、分组和顺序与 Photoshop 一致（Mode ›、Adjustments ›、Auto Tone、Auto Contrast、Auto Color、Image Size...、Canvas Size...、Image Rotation ›、Crop、Trim...、Reveal All、Duplicate...、Apply Image...、Calculations...、Variables ›、Apply Data Set...、Trap...、Analysis ›），只少了 Photoshop 的 Generative Upscale...。除 Canvas Size... 外全部置灰。
 - **Layer**：New › Layer；Delete › Layer；Hide Layers。
+- **Select**：All、Deselect、Reselect、Inverse；其余项与 Photoshop 相同但置灰（All Layers、Deselect Layers、Find Layers、Isolate Layers、Color Range...、Focus Area...、Subject、Sky、Select and Mask...、Modify ›、Grow、Similar、Transform Selection、Edit in Quick Mask Mode、Load Selection...、Save Selection...）。
 - **View**：Zoom In、Zoom Out、Fit on Screen、100%。
 - **Window**：History。同时被设为 macOS 的窗口菜单，系统会在里面列出窗口。
 - **Help**：OpenPhoto Help（置灰）。
@@ -37,4 +38,4 @@
 ## 已知限制
 
 - Image 菜单中 Generative Upscale... 没有列出。
-- Photoshop 菜单里的大部分功能项（Select、Filter、Type、Plugins 菜单等）没有列出。
+- Type、Filter、Plugins 菜单没有列出；File、Edit、Layer、View、Window 菜单只列出了部分项。

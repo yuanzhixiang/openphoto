@@ -14,5 +14,9 @@
 
 ## 测试
 
-- 普通测试（`cargo test` 会运行）：验证交互与状态，例如打开 Color Picker 后模态状态生效、Esc 取消且不改动颜色。
+- 普通测试（`cargo test` 会运行）：验证交互与状态：
+  - 点击工具栏前景色块打开 Color Picker，Esc 取消且不改动颜色。
+  - 用矩形选框拖动得到对应范围的选区并记录历史，Shift 拖动添加选区，单击取消选区；⇧⌘D 重新选择、⌘A 全选、⌘D 取消选择。
+  - ⇧M 切换到椭圆选框，之后按 M 仍选中椭圆选框（格的记忆）。
+- `drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。

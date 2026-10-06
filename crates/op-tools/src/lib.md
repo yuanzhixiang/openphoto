@@ -2,61 +2,59 @@
 
 ## 职责
 
-定义工具栏上的工具清单、显示名称、单键快捷键和分组标记。crate 注释把这里定位为工具行为（指针事件 → 文档编辑）的归属地，UI 只负责把画布坐标下的事件转发过来；目前本 crate 只包含工具的静态定义，不包含任何工具行为。
+定义 Photoshop 2026 工具栏中的全部工具、它们在工具栏中的分组、显示名称和单键快捷键。工具的行为在 `op-ui` 中实现；这里只有静态定义和按键选择工具的规则。本 crate 没有依赖。
 
 ## 对外接口
 
 ### `Tool`
 
-21 个工具，与 Photoshop 默认工具栏一致：`Move`、`RectangularMarquee`、`Lasso`、`ObjectSelection`、`Crop`、`Frame`、`Eyedropper`、`SpotHealingBrush`、`Brush`、`CloneStamp`、`HistoryBrush`、`Eraser`、`PaintBucket`、`Blur`、`Dodge`、`Pen`、`HorizontalType`、`PathSelection`、`Rectangle`、`Hand`、`Zoom`。
+68 个工具，涵盖 Photoshop 工具栏及各组弹出菜单里的全部工具，例如 `Move`、`Artboard`、`RectangularMarquee`、`EllipticalMarquee`、`SingleRowMarquee`、`SingleColumnMarquee`、`Lasso`、`PolygonalLasso`……`Hand`、`RotateView`、`Zoom`。
 
 ### `TOOLBAR`
 
-工具栏顺序，与 Photoshop 默认工具栏一致，内容与上面的枚举顺序相同。它是一个扁平列表，本身不携带分组信息。
+工具栏从上到下的各个「格」，每一格是共用一个按钮的一组工具，组内顺序与 Photoshop 弹出菜单一致：
 
-### `Tool::name()`
+| 格 | 工具组 |
+|---|---|
+| 1 | Move、Artboard |
+| 2 | Rectangular / Elliptical / Single Row / Single Column Marquee |
+| 3 | Lasso、Polygonal Lasso、Magnetic Lasso |
+| 4 | Object Selection、Quick Selection、Magic Wand |
+| 5 | Crop、Perspective Crop、Slice、Slice Select |
+| 6 | Frame |
+| 7 | Eyedropper、Color Sampler、Ruler、Note、Count |
+| 8 | Spot Healing Brush、Remove、Healing Brush、Patch、Content-Aware Move、Red Eye |
+| 9 | Brush、Pencil、Color Replacement、Mixer Brush |
+| 10 | Clone Stamp、Pattern Stamp |
+| 11 | History Brush、Art History Brush |
+| 12 | Eraser、Background Eraser、Magic Eraser |
+| 13 | Gradient、Paint Bucket |
+| 14 | Blur、Sharpen、Smudge |
+| 15 | Dodge、Burn、Sponge |
+| 16 | Pen、Freeform Pen、Curvature Pen、Add / Delete Anchor Point、Convert Point |
+| 17 | Horizontal / Vertical Type、Vertical / Horizontal Type Mask |
+| 18 | Path Selection、Direct Selection |
+| 19 | Rectangle、Ellipse、Triangle、Polygon、Line、Custom Shape |
+| 20 | Hand、Rotate View |
+| 21 | Zoom |
 
-工具提示等处显示的英文全名，与 Photoshop 一致，例如 `"Rectangular Marquee Tool"`、`"Spot Healing Brush Tool"`。
+### `Tool::name()`、`Tool::shortcut()`、`Tool::slot()`
 
-### `Tool::shortcut()`
+- `name()`：与 Photoshop 相同的英文全名，例如 `"Elliptical Marquee Tool"`。
+- `shortcut()`：与 Photoshop 一致的单键快捷键。同组工具共用组的字母（V、M、L、W、C、K、I、J、B、S、Y、E、G、O、P、T、A、U、H、Z），Rotate View 单独用 R。Single Row/Column Marquee、Blur 组、Add/Delete Anchor Point、Convert Point 没有快捷键。
+- `slot()`：工具所在的格。
 
-单键快捷键（大写字母），与 Photoshop 默认快捷键一致：
+### `tool_for_key(key, shift, active, current)`
 
-| 工具 | 键 | 工具 | 键 |
-| --- | --- | --- | --- |
-| Move | V | Eraser | E |
-| RectangularMarquee | M | PaintBucket | G |
-| Lasso | L | Blur | 无 |
-| ObjectSelection | W | Dodge | O |
-| Crop | C | Pen | P |
-| Frame | K | HorizontalType | T |
-| Eyedropper | I | PathSelection | A |
-| SpotHealingBrush | J | Rectangle | U |
-| Brush | B | Hand | H |
-| CloneStamp | S | Zoom | Z |
-| HistoryBrush | Y | | |
+按下字母键时选择哪个工具，规则与 Photoshop 一致：
 
-`Blur` 没有快捷键，与 Photoshop 一致。在 Photoshop 中用 Shift+同一键在同组工具间循环，这里不包含这种循环。
-
-### `Tool::from_shortcut(c)`
-
-把字符转为大写后，按 `TOOLBAR` 顺序找到第一个快捷键匹配的工具；没有匹配时返回 `None`。大小写不敏感。由于每个快捷键只对应一个工具，结果是唯一的。
-
-### `Tool::has_group()`
-
-是否在工具图标右下角画小三角，表示该位置在 Photoshop 中还收纳着同组的其他工具。`Hand`、`Zoom`、`Frame` 返回 `false`，其余工具返回 `true`。
-
-## 与其它模块的关系
-
-- 不依赖 `op-core` 中的任何类型（`Cargo.toml` 声明了依赖但代码未使用）。
-- `op-ui` 的工具栏按 `TOOLBAR` 绘制并用 `has_group()` 决定是否画三角；键盘处理用 `from_shortcut` 切换当前工具；选项栏与文档视图根据当前 `Tool` 决定显示内容。
-
-## 已知限制
-
-- 所有工具都只有定义，没有实现编辑行为。
-- 同组工具（例如 Lasso 组中的多边形套索）没有被定义，工具栏只显示每组的默认工具，`has_group()` 的小三角只是视觉提示。
-- 不支持 Shift+快捷键在同组工具间循环，也不支持自定义快捷键。
+- `current(slot)` 是每一格当前显示的工具（Photoshop 记住每组最近用过的那个）。
+- 不按 Shift：选中该字母所在格当前显示的工具；如果它不使用这个字母，则选中组内第一个使用这个字母的工具。
+- 按 Shift，且当前工具就在这一格：按组内顺序循环到下一个使用这个字母的工具，没有快捷键的工具被跳过。
+- 按 Shift 但当前工具在别的格：与不按 Shift 相同。
+- 一格内只有一个工具使用该字母时（例如 R、H）直接选中它。
 
 ## 测试覆盖
 
-本 crate 没有单元测试。
+- `every_tool_appears_once`：68 个工具在工具栏中各出现一次。
+- `keys_select_the_group_and_shift_cycles`：M、⇧M 循环（跳过单行/单列选框）、格记忆、从其它格按 ⇧M、R 与 H 的处理、未使用的字母。

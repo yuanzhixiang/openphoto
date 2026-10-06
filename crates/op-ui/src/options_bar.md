@@ -19,18 +19,18 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
 
 ## 各工具的选项
 
-- **矩形选框、套索**：
+- **四种选框工具、三种套索工具**：
   - 四个选区运算按钮（New / Add to / Subtract from / Intersect with selection），可切换，选中的有深色底。
   - Feather：数值框，0–1000 px，最多 1 位小数，显示为 `0 px`。
-  - Anti-alias：复选框，矩形选框时置灰，与 Photoshop 一致。
+  - Anti-alias：复选框，矩形、单行、单列选框时置灰（它们没有曲线边缘），与 Photoshop 一致；默认勾选。
   - Style：Normal / Fixed Ratio / Fixed Size。
   - Width / Height：只有 Style 不是 Normal 时才可用，中间是交换宽高的图标。
   - 「Select and Mask...」按钮。
-  这些值保存在 `AppState::marquee`，目前还没有接到选区功能上；「Select and Mask...」点击没有功能。
+  这些值保存在 `AppState::marquee`。组合方式、Feather、Anti-alias 在用选框创建选区时生效（见 `document_view.md`）；Style、Width/Height 和「Select and Mask...」目前没有效果；套索工具还不能绘制选区。
 - **移动工具**：Auto-Select 复选框加「Layer」字段、Show Transform Controls 复选框。只有外观，状态不保存。
 - **抓手、缩放工具**：「100%」和「Fit Screen」两个按钮，作用于当前文档。
 - **其它工具**：不显示工具选项。
 
 ## 已知限制
 
-除抓手和缩放工具的两个按钮外，选项栏的设置目前都没有实际效果。其余工具的选项栏内容尚未与 Photoshop 对齐。
+除选框工具的组合方式、羽化、消除锯齿，以及抓手和缩放工具的两个按钮外，选项栏的设置目前都没有实际效果。其余工具的选项栏内容尚未与 Photoshop 对齐。

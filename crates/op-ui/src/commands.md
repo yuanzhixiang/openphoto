@@ -23,6 +23,10 @@
 | NewLayer | Layer › New › Layer | ⇧⌘N |
 | DeleteLayer | Layer › Delete › Layer | 无 |
 | ToggleLayerVisibility | Layer › Hide Layers / Show Layers | ⌘, |
+| SelectAll | Select › All | ⌘A |
+| Deselect | Select › Deselect | ⌘D |
+| Reselect | Select › Reselect | ⇧⌘D |
+| SelectInverse | Select › Inverse | ⇧⌘I |
 | ZoomIn | View › Zoom In | ⌘+（同时接受 ⌘=） |
 | ZoomOut | View › Zoom Out | ⌘- |
 | FitOnScreen | View › Fit on Screen | ⌘0 |
@@ -39,6 +43,11 @@
 - DeleteLayer：当前文档的图层多于 1 个时可用。
 - CloseOthers：打开的文档多于 1 个时可用。
 - ToggleLayerVisibility：当前文档有选中图层时可用。
+- Deselect、SelectInverse：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
+
+## 选区命令的历史记录
+
+Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别为「Select All」「Deselect」「Reselect」「Select Inverse」，与 Photoshop 一致。
 - 其余命令：有当前文档时可用。
 
 `run()` 执行前会再检查一次 `enabled`，不可用的命令直接忽略。

@@ -8,8 +8,9 @@
 
 - `docs` / `doc_order` / `active_doc`：打开的文档、标签顺序与当前文档。`add_document` 把文档加到最后并设为当前文档；`close_document` 关闭文档，关闭的是当前文档时，它左边的文档（没有则第一个）成为当前文档。
 - `tool`：当前工具，默认是矩形选框（与 Photoshop 新装后的默认一致）。
+- `tool_slots`：工具栏每一格当前显示的工具（该组最近用过的那个），初始为各组第一个。`select_tool(t)` 同时设置当前工具和它所在格显示的工具。
 - `foreground` / `background`：前景色默认 `#14a5dc`，背景色白色。
-- `marquee`：选框工具选项（选区运算模式、羽化、消除锯齿、样式），目前只用于选项栏显示与编辑，没有接到选区功能上。
+- `marquee`：选框工具选项：组合方式、羽化（像素）、消除锯齿（默认开启，与 Photoshop 一致）、样式。前三项在创建选区时生效，样式中的 Fixed Ratio / Fixed Size 目前没有效果。
 - `editing_background` 与 `picker_hsb`：Color 面板正在编辑前景还是背景，以及缓存的 HSB。缓存 HSB 是为了在灰色（饱和度为 0）时色相不跳回 0。
 - `history_open`、`history_panel`：History 弹出面板是否打开，以及它的标签与高度。
 - `canvas_size_dialog`：Canvas Size 对话框，打开期间为 `Some`。
@@ -26,6 +27,8 @@
 - `view`：视图状态，见下文。
 - 合成缓存：`canvas_image()` 返回当前合成结果，只在文档 `revision` 变化时重新合成。
 - 图层缩略图：`layer_thumbnail()` 按图层缓存，文档 `revision` 变化后重新生成；最近邻缩小。
+- 选框拖动：`marquee_drag` 保存拖动中的起点、当前点（文档像素）、组合方式，以及 Shift/⌥ 是否已用于选择组合方式。
+- 蚂蚁线轮廓：`selection_outline()` 按选区版本号缓存轮廓线段。
 - 快照缩略图：创建 `DocState` 时生成一次文档初始状态的缩略图（最长边 96 px，最近邻），供 History 面板顶部的快照行使用，之后不再更新（快照代表打开时的文档）。
 
 ### 历史记录的接入规则
