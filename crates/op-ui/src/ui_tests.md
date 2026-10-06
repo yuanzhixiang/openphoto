@@ -56,6 +56,8 @@
 - `duplicate_layer_and_layer_from_background_dialogs`：见 `dialogs/duplicate_layer.md`。
 - `double_clicking_the_background_asks_for_a_name`：双击背景图层名称弹出 Layer from Background 版本的 New Layer 对话框，Esc 后背景图层不变。
 - `flatten_asks_before_discarding_hidden_layers`、`rename_layer_and_alerts`：见 `dialogs/alert.md`。
+- `layers_multi_selection`：单击 + ⌘ 单击选中两层，⌘E 合并为「Merge Layers」；⇧ 单击选范围，⌘, 隐藏、再按显示；⌥⌘A 选中所有非背景图层，底部删除按钮全部删除；Deselect Layers 后没有选中图层。
+- `align_buttons_line_up_selected_layers`：只有一个图层时对齐不可用；⌥⌘A 选中三个带方块的图层后，点选项栏第一个对齐按钮，三者左边对齐并记录「Align Left Edges」；Distribute Vertical Centers 记录对应历史。
 - `layers_panel_footer_and_lock_buttons`：点 Layers 底部的「新建图层」按钮（距右边 58.25 pt）得到「Layer 1」；点锁定透明像素和锁定位置两个按钮，两个标记打开、记录「Lock Change」；背景图层的锁定按钮点击无效；选中 Layer 1 后点删除按钮（距右边 30.25 pt）删除它，记录「Delete Layer」。
 - 布局回归测试 `layout_matches_photoshop_2026`（不忽略，随 `cargo test` 运行）：渲染默认工作区（参考文档、移动工具、白色前景），在 `PHOTOSHOP_PIXELS` 表里约 60 个点上比较灰度与 Photoshop 2026 的 2x 截图（容差 6）。这些点都选在实测的 1 pt 边上：折叠条与分隔条的线、面板组间隔、标签栏底线、图标列与工具栏的分隔条、选项栏分隔线、Home 图标、色块边框、Color 面板的区域边缘、Properties 的框与输入框、面板菜单图标等，所以任何一处布局移动 1 pt 都会失败，并列出所有不一致的点。重新校准某处布局后，要从新的 Photoshop 截图更新这张表。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。

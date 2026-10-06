@@ -53,7 +53,7 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
 - **移动工具**（按 Photoshop 2026 逐像素对齐）：
   - 「Auto-Select:」复选框，后接「Layer」下拉（55 pt 宽，目前只有 Layer 一项，没有 Group）。
   - 分隔线后是「Show Transform Controls」复选框。
-  - 分隔线后两组对齐与分布按钮：Align left edges、Align horizontal centers、Align right edges、Distribute vertically，分隔线，Align top edges、Align vertical centers、Align bottom edges、Distribute horizontally。它们画成 Photoshop 禁用时的 `#989898`，没有功能（Photoshop 里要选中两个以上图层才可用，本应用还不支持多选图层）。
+  - 分隔线后两组对齐与分布按钮：Align left edges、Align horizontal centers、Align right edges、Distribute vertically，分隔线，Align top edges、Align vertical centers、Align bottom edges、Distribute horizontally。它们与 Photoshop 一样在条件满足时可用：对齐需要两个以上可移动的选中图层（或有像素选区），分布需要三个以上；不可用时画成 Photoshop 禁用时的 `#989898`。点击执行对应的 `Command::Align` / `Command::Distribute`（第一组第四个是 Distribute Vertically 等间距，第二组第四个是 Distribute Horizontally）。
   - 分隔线后是「•••」（More options，只有外观）、分隔线、齿轮（Set additional options，右下带白色小三角，只有外观）。
   两个复选框都默认关闭，值保存在 `AppState::move_options` 并生效，行为见 `document_view.md`「移动工具」。
 - **抓手、缩放工具**：「100%」和「Fit Screen」两个按钮，作用于当前文档。

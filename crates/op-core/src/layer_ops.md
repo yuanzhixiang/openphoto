@@ -9,6 +9,9 @@
 ### 复制
 
 - `duplicate(doc)`：Layer › Duplicate Layer。在活动图层正上方插入一个完全相同的图层（像素、可见性、不透明度、Fill、混合模式、锁定都相同）并设为活动图层，返回新 ID；没有活动图层时返回 `None`。名称为「原名 copy」，已存在时依次为「原名 copy 2」「原名 copy 3」……，与 Photoshop 一致。背景图层的副本是普通图层。
+- `can_merge_selected(doc)` / `merge_selected(doc)`：Layer › Merge Layers（多选时的 ⌘E）：选中图层中可见的那些合并成一个，放在最上面那个的位置并沿用它的名字（其中有背景图层时合并进背景图层）；结果的不透明度、填充、混合模式复位，蒙版并入像素；隐藏的选中图层保持不动。至少两个选中图层可见时可用。
+- `delete_selected(doc)`：删除所有选中图层；会删光所有图层时拒绝。之后最低被删图层下面的那个（没有时最低的剩余图层）成为活动图层。
+- `toggle_selected_visibility(doc)`：Layer › Hide Layers / Show Layers：隐藏所有选中图层；全部已隐藏时改为全部显示。返回现在是否可见。
 - `duplicate_name(doc)`：Duplicate Layer 对话框「As」的默认值（与 `duplicate` 的命名规则相同）。
 - `duplicate_named(doc, name)`：复制到同一文档，名称为 `name`。
 - `duplicate_into(source, target, name)`：把 `source` 的活动图层复制到另一个文档 `target`：像素位置不变（`with_canvas` 平移 0，超出 `target` 画布的像素保留在画布外），图层蒙版扩展（显示）或裁到新画布，背景图层的副本是普通图层；插在 `target` 活动图层上方并设为活动图层。
@@ -63,6 +66,7 @@
 
 ## 测试覆盖
 
+- `selected_layers_merge_delete_and_hide`：两个图层合并成上面那个，名字和位置正确、不透明像素叠加，未选的图层不动；隐藏/显示选中图层；删除选中图层后活动图层正确，最后一个图层不能删。
 - `duplicate_layer_dialog_targets`：默认名「Background copy」；同文档改名复制；复制到更小的文档时位置不变、超出部分保留在画布外并成为活动图层；复制到新文档时尺寸、标题和唯一图层正确。
 - `duplicates_are_named_like_photoshop`：「copy」「copy 2」命名；⌘J 作用于背景图层得到「Layer 2」这样的普通图层。
 - `via_copy_and_cut_move_the_selection_in_place`：选区复制到「Layer N」并沿用不透明度、保留选区；剪切后原图层对应像素变透明。

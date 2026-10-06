@@ -56,6 +56,10 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `layer(id)` / `layer_mut(id)`：按 ID 线性查找图层。
 - `content_bounds()`：画布与所有图层像素（包括画布外的）的并集外框，Reveal All 用它。
 - `place_canvas(width, height, dx, dy, fill)`：换成新尺寸的画布，旧画布放在 (`dx`, `dy`)；Canvas Size 与 Reveal All 共用，规则见下文「画布尺寸调整」。
+- 图层多选（Layers 面板的 ⌘/⇧ 单击）：私有字段 `selected_layers` 只在包含活动图层时有效，所以任何代码直接改 `active_layer` 都会自然回到单选，不会留下错乱的选中状态；不在快照里，与 Photoshop 一样不记录历史。
+  - `selected_layers()`：选中的图层，自底向上；多选不包含活动图层时就是 `[活动图层]`，没有活动图层时为空。`is_layer_selected(id)`。
+  - `select_layer(id)`：单击，只选中它。`toggle_layer_selection(id)`：⌘ 单击，加入（并成为活动图层）或移出（移出活动图层时最后一个选中的成为活动图层；只剩一个时不移出）。`select_layer_range(id)`：⇧ 单击，选中活动图层到 `id` 之间（按图层顺序）的全部图层，`id` 成为活动图层。
+  - `select_all_layers()`：Select › All Layers，选中除背景外的所有图层（没有时返回 false）。`deselect_layers()`：Select › Deselect Layers，一个都不选。
 - `layer_at(x, y)`：移动工具 Auto-Select 用。从上往下找第一个在 (x, y) 处显示出像素的图层：图层可见、不透明度与填充不为 0、像素 alpha 大于 0，且没有被启用的图层蒙版以 0 值遮住。坐标在画布外或没有这样的图层时为 `None`。
 - `composite_rgba8()`：合成为紧密排列的直通 RGBA8 缓冲区，长度为 `width * height * 4`。
 - `composite_layers_rgba8(layers)`：按同样的规则只合成给定的图层列表（自底向上，尺寸与文档一致），供合并图层使用；`composite_rgba8` 就是对文档全部图层调用它。
@@ -118,6 +122,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `transparent_bitmap_opens_as_regular_layer`：含半透明像素时打开为「Layer 0」普通图层，文档没有背景图层，该图层为活动图层。
 - `resize_canvas_centered`：2×2 白色背景居中扩展到 4×5、扩展色黑色，验证新尺寸、四周为黑、原图位于 (1,1)–(2,2)，且高度差为奇数时多出的一行在底部（第 3 行为黑）。
 - `resize_canvas_keeps_layers_transparent`：左上锚点扩展到 3×3 时，非背景图层的扩展区域保持透明，原像素位置不变。
+- `layer_multi_selection`：单击、⇧ 范围、⌘ 移出活动图层后最后一个成为活动图层、⌘ 加入背景、直接设活动图层回到单选、All Layers 不含背景、Deselect Layers。
 - `canvas_size_keeps_hidden_pixels_except_on_the_background`：缩小画布后普通图层的内容范围伸到画布外，背景图层没有画布外像素；再扩大回来，隐藏的像素重新出现。
 - `layer_at_finds_the_topmost_visible_pixel`：上层有像素处选中上层，透明处落到背景，隐藏上层后落到背景，画布外为 `None`。
 - `composite_half_opacity_over_white`：50% 不透明度黑色图层叠在白色背景上得到 `[128, 128, 128, 255]`，验证 gamma 空间混合与量化规则。

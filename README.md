@@ -26,7 +26,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
     - 画布外像素的余项：图层已经可以超出画布（移动、粘贴、Canvas Size、Reveal All、PSD 读写都保留画布外像素），自由变换也连同画布外像素一起变换，但图像旋转与翻转、Image Size、合并图层仍只处理画布内的像素。
     - 对话框：New Layer 对话框的「Use previous layer to create clipping mask」（依赖剪贴蒙版）；Duplicate Layer 的 Artboard（依赖画板）。New Layer（⇧⌘N）、Layer from Background...、Duplicate Layer... 对话框、Rename Layer...（就地改名）与 Flatten Image 的「Discard hidden layers?」询问已实现。
     - Group Layers（⌘G）、Ungroup Layers（⇧⌘G）与图层组。
-    - Layers 面板多选（以及多选后的 Merge Layers）、Select › All Layers（⌥⌘A）、Arrange › Reverse、Lock Layers...（⌘/）、Link Layers。
+    - Arrange › Reverse、Lock Layers...（⌘/）、Link Layers 与 Select Linked Layers；多选后的自由变换、拖动多行排序。（Layers 面板 ⌘/⇧ 多选、Merge Layers、Select › All Layers / Deselect Layers、多图层移动、删除、隐藏，以及 Align / Distribute 已实现。）
     - Layers 面板中把图层拖到「新建」按钮上复制、拖到垃圾桶上删除。
 4. **图像尺寸与方向**：Image Size 对话框的预览图、Fit To 预设、百分比/英寸等单位、Automatic/Preserve Details/Bicubic Smoother/Sharper 等重采样方式、打开 Resample 时改分辨率联动像素尺寸、Scale Styles；Image Rotation › Arbitrary...（任意角度）、Reveal All。
 5. **裁剪工具**：裁剪框超出画布时扩展画布、旋转与拉直、比例预设与叠加方式、关闭「删除裁剪的像素」、拖动框内移动图像（Photoshop 的默认方式）、切换工具时的「是否裁剪」询问、透视裁剪工具。

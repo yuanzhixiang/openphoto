@@ -81,6 +81,10 @@
 | MergeDown | Layer › Merge Down | ⌘E |
 | MergeVisible | Layer › Merge Visible | ⇧⌘E |
 | FlattenImage | Layer › Flatten Image：有隐藏图层时先用 macOS 提示框问「Discard hidden layers?」（警告图标、「Don’t show again」复选框、Cancel 与 OK），OK 后拼合（丢弃隐藏图层）并记录「Flatten Image」；勾选「Don’t show again」后本次运行不再询问 | 无 |
+| SelectAllLayers | Select › All Layers：选中除背景外的所有图层 | ⌥⌘A |
+| DeselectLayers | Select › Deselect Layers：不选任何图层 | 无 |
+| Align(how) | Layer › Align › Top Edges…Right Edges（`op_core::align::align`），记录如「Align Left Edges」；移动工具选项栏的对齐按钮也执行它 | 无 |
+| Distribute(how) | Layer › Distribute › Top Edges…Vertically（`op_core::align::distribute`），记录如「Distribute Vertical Centers」 | 无 |
 | RenameLayer | Layer › Rename Layer...：在 Layers 面板里就地改名当前图层（与 Photoshop 2026 一样没有对话框）；当前图层是背景图层时不可用 | 无 |
 | Fill | Edit › Fill... | ⇧F5 |
 | FillForeground | 无（Photoshop 的隐藏快捷键） | ⌥⌫ |
@@ -150,10 +154,11 @@
 - Undo、ToggleLastState：当前文档能撤销时可用；Redo：能重做时可用。
 - DeleteLayer：当前文档的图层多于 1 个时可用。
 - CloseOthers：打开的文档多于 1 个时可用。
+- ToggleLayerVisibility 作用于所有选中图层（全部隐藏时显示，菜单标签相应为 Show Layers / Hide Layers）；DeleteLayer 删除所有选中图层，选中的不是全部图层时可用；Align 要求 `can_align`，Distribute 要求 `can_distribute`；SelectAllLayers 要求有非背景图层，DeselectLayers 要求有活动图层。
 - ToggleLayerVisibility、DuplicateLayer、LayerViaCopy：当前文档有选中图层时可用；LayerViaCut 还要求有选区。
 - Crop、PasteInto、PasteOutside：当前文档有选区时可用。MaskRevealAll、MaskHideAll：当前图层可以加蒙版时可用；MaskRevealSelection、MaskHideSelection 还要求有选区；MaskDelete、MaskApply、MaskToggle：当前图层有蒙版时可用。TransformAgain：有当前文档且本次运行中做过变换时可用。LastFilter：有当前文档且本次运行中用过滤镜时可用。
 - LayerFromBackground：文档有背景图层时可用。DeleteHiddenLayers：既有隐藏图层也有可见图层时可用。
-- Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
+- Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：选中多个图层时为 Merge Layers（`layer_ops::merge_selected`，记录「Merge Layers」，菜单标签随之改为「Merge Layers」），其中至少两个可见时可用；只选一个时为 Merge Down，当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
 - Deselect、SelectInverse、Modify 五项、Grow、Similar：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
 - 其余命令：有当前文档时可用。Paste 不检查剪贴板里有没有内容（读取系统剪贴板里的图片代价较高，不适合每帧检查），剪贴板为空时执行 Paste 什么也不做。
 
