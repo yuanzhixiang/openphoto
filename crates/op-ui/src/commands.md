@@ -23,6 +23,18 @@
 | NewLayer | Layer › New › Layer | ⇧⌘N |
 | DeleteLayer | Layer › Delete › Layer | 无 |
 | ToggleLayerVisibility | Layer › Hide Layers / Show Layers | ⌘, |
+| LayerFromBackground | Layer › New › Layer from Background | 无 |
+| LayerViaCopy | Layer › New › Layer Via Copy | ⌘J |
+| LayerViaCut | Layer › New › Layer Via Cut | ⇧⌘J |
+| DuplicateLayer | Layer › Duplicate Layer | 无 |
+| DeleteHiddenLayers | Layer › Delete › Hidden Layers | 无 |
+| BringToFront | Layer › Arrange › Bring to Front | ⇧⌘] |
+| BringForward | Layer › Arrange › Bring Forward | ⌘] |
+| SendBackward | Layer › Arrange › Send Backward | ⌘[ |
+| SendToBack | Layer › Arrange › Send to Back | ⇧⌘[ |
+| MergeDown | Layer › Merge Down | ⌘E |
+| MergeVisible | Layer › Merge Visible | ⇧⌘E |
+| FlattenImage | Layer › Flatten Image | 无 |
 | Fill | Edit › Fill... | ⇧F5 |
 | FillForeground | 无（Photoshop 的隐藏快捷键） | ⌥⌫ |
 | FillBackground | 无（Photoshop 的隐藏快捷键） | ⌘⌫ |
@@ -52,7 +64,9 @@
 - Undo、ToggleLastState：当前文档能撤销时可用；Redo：能重做时可用。
 - DeleteLayer：当前文档的图层多于 1 个时可用。
 - CloseOthers：打开的文档多于 1 个时可用。
-- ToggleLayerVisibility：当前文档有选中图层时可用。
+- ToggleLayerVisibility、DuplicateLayer、LayerViaCopy：当前文档有选中图层时可用；LayerViaCut 还要求有选区。
+- LayerFromBackground：文档有背景图层时可用。DeleteHiddenLayers：既有隐藏图层也有可见图层时可用。
+- Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
 - Deselect、SelectInverse：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
 - 其余命令：有当前文档时可用。Paste 不检查剪贴板里有没有内容（读取系统剪贴板里的图片代价较高，不适合每帧检查），剪贴板为空时执行 Paste 什么也不做。
 
@@ -66,6 +80,12 @@
 ## 选区命令的历史记录
 
 Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别为「Select All」「Deselect」「Reselect」「Select Inverse」，与 Photoshop 一致。
+
+## 图层命令
+
+像素与顺序规则见 `op-core` 的 `layer_ops.md`。成功后记录的历史名称：Duplicate Layer →「Duplicate Layer」，Layer Via Copy / Cut →「Layer Via Copy」/「Layer Via Cut」，Layer from Background →「Layer From Background」，Delete › Hidden Layers →「Delete Hidden Layers」，Arrange 四项 →「Layer Order」，Merge Down / Merge Visible / Flatten Image → 同名。Layer Via Copy / Cut 失败时弹出 Photoshop 的提示（例如选区内只有透明像素时「Could not complete the Layer Via Copy command because the selected area is empty.」）。
+
+菜单快捷键里的 `[`、`]` 在传给 muda 时写成符号本身（muda 不认识 egui 的 `OpenBracket` / `CloseBracket` 名称）。
 
 ## 剪贴板
 
@@ -91,4 +111,4 @@ Cut、Copy、CopyMerged、Paste、PasteInPlace 由 `actions::clipboard` 执行�
 - 没有原生菜单的平台上，系统剪贴板只有图片时 ⌘V 收不到任何事件（见上文），只能通过菜单粘贴。
 
 - Photoshop 的 Layer › New › Layer... 会弹出「New Layer」对话框；这里直接创建图层，所以菜单项文字不带省略号。
-- Delete Layer 在 Photoshop 里还可以在 Layers 面板选中图层后按 Delete 键触发；这里目前只能通过菜单和 Layers 面板的垃圾桶按钮。
+- Layer from Background、Duplicate Layer 在 Photoshop 中会先弹出对话框，这里直接执行；Flatten Image 在有隐藏图层时 Photoshop 会询问是否丢弃，这里直接丢弃。

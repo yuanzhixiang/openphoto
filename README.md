@@ -24,13 +24,10 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 
 3. **图层操作**：
     - 图层可以超出画布：目前图层与画布同样大，移动到画布外、以及粘贴时超出画布的像素会丢失。
-    - Layer › Duplicate Layer...、Rename Layer...（以及双击图层名重命名）。
-    - Layer › New › Layer from Background...（以及双击背景图层转为普通图层）、Layer Via Copy（⌘J）、Layer Via Cut（⇧⌘J）。
-    - 在 Layers 面板拖动调整图层顺序；Layer › Arrange（Bring to Front 等）。
-    - Merge Layers（⌘E）、Merge Visible（⇧⌘E）、Flatten Image。
+    - 对话框：「New Layer」（⇧⌘N、Layer from Background...、双击背景图层时弹出）、「Duplicate Layer」（含目标文档）、Rename Layer...；Flatten Image 时询问是否丢弃隐藏图层。
     - Group Layers（⌘G）、Ungroup Layers（⇧⌘G）与图层组。
-    - Layers 面板多选、Select › All Layers（⌥⌘A）、Delete › Hidden Layers。
-    - 「Layer...」新建图层对话框（⇧⌘N 在 Photoshop 中会先弹出这个对话框）。
+    - Layers 面板多选（以及多选后的 Merge Layers）、Select › All Layers（⌥⌘A）、Arrange › Reverse、Lock Layers...（⌘/）、Link Layers。
+    - Layers 面板中把图层拖到「新建」按钮上复制、拖到垃圾桶上删除。
 4. **图像尺寸与方向**：Image › Image Size...（⌥⌘I，含重采样）、Image Rotation（180°、90° 顺/逆时针、任意角度、水平/垂直翻转画布）、Crop、Trim...、Reveal All。
 5. **裁剪工具**：裁剪框的拖动、比例约束、确认/取消。
 6. **变换**：Edit › Free Transform（⌘T）、Transform 子菜单（缩放、旋转、斜切、扭曲、透视、翻转、旋转 90°/180°）。

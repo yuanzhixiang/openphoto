@@ -6,7 +6,7 @@
 
 ## 约定
 
-- `harness(files)`：以 Photoshop 默认窗口大小（1350×800 pt）启动应用，不安装 macOS 原生菜单（`OpenPhotoApp::new_headless`）。因为没有原生菜单，⌘ 快捷键由 egui 处理（见 `commands.md`）。
+- `harness(files)`：以 Photoshop 默认窗口大小（1350×800 pt）启动应用，不安装 macOS 原生菜单（`OpenPhotoApp::new_headless`）。因为没有原生菜单，⌘ 快捷键由 egui 处理（见 `commands.md`）。每步推进 1/60 秒（kittest 默认是 1/4 秒），与真实帧间隔一致，双击才能落在 egui 的 0.3 秒双击判定内。
 - 像素密度设为每 pt 2 个物理像素，与拍摄 Photoshop 参考截图的 Retina 屏一致，所以 100% 缩放的画布大小也一致。
 - `shot(harness, name)`：把当前画面写到 `target/ui-shots/{name}.png`（2700×1600），同时写一份缩小到每 pt 1 像素的 `{name}_1x.png`（1350×800），与 Photoshop 窗口的 1:1 截图坐标完全对应，可以直接裁剪比较。
 - `reference_document(harness)`：关闭所有文档，打开一个与 Photoshop 参考截图中相同尺寸和文件名的文档（734×811，未嵌入配置文件），用于对比截图。
@@ -25,5 +25,7 @@
   - 油漆桶单击填充整片连通区域，记录「Paint Bucket」。
   - 移动工具拖动图层上的色块，方向键和 Shift+方向键微移，分别记录「Move」和「Nudge」；没有选区时拖动背景图层弹出锁定提示。
   - 选区填红后 ⌘C、粘贴（以 egui-winit 实际送出的 `Event::Paste` 模拟 ⌘V）：得到「Layer 1」，叠在原位置，选区被取消，记录「Paste」；在新图层上 ⌘X 剪掉一半，记录「Cut」；复制只有透明像素的区域时弹出「selected area is empty」提示。
-- `drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标；`layer_pixel(harness, layer, x, y)` 读取某个图层（自底向上的序号）的像素。
+  - ⌘J 在背景图层上得到「Layer 1」、在普通图层上得到「Layer 1 copy」；⌘[ 后移一层并记录「Layer Order」；⌘E 向下合并；⇧⌘E 合并所有可见图层。
+  - Layers 面板中拖动最上面一行到中间，顺序改变并记录「Layer Order」；拖到背景图层下面无效；双击名称输入新名字后 Enter，记录「Rename Layer」；点击背景图层的锁图标，背景变为「Layer 0」。
+- `double_click(harness, pos)` 模拟一次双击；`drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标；`layer_pixel(harness, layer, x, y)` 读取某个图层（自底向上的序号）的像素。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。

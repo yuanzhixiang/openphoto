@@ -43,6 +43,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `has_background()`：是否存在背景图层。它决定 Canvas Size 中「画布扩展颜色」是否有意义：没有背景图层时，所有扩展区域都是透明的。
 - `layer(id)` / `layer_mut(id)`：按 ID 线性查找图层。
 - `composite_rgba8()`：合成为紧密排列的直通 RGBA8 缓冲区，长度为 `width * height * 4`。
+- `composite_layers_rgba8(layers)`：按同样的规则只合成给定的图层列表（自底向上，尺寸与文档一致），供合并图层使用；`composite_rgba8` 就是对文档全部图层调用它。
 
 ## 行为规则
 
