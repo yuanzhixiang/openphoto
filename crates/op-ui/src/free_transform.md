@@ -17,6 +17,14 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
 - 有输入框获得键盘焦点时，Enter 和 Esc 不作用于变换。
 - 会话期间 `AppState::transforming()` 为真，`modal_open()` 也为真：菜单命令与单键工具快捷键都不生效，与 Photoshop 一致。
 
+## 变形（Warp）
+
+- Edit › Transform › Warp、右键菜单的 Warp、选项栏的变形切换按钮进入 Warp 模式（`set_mode`）：网格从平整网格开始，再经过框当前的映射，所以之前的缩放旋转保留。
+- 拖动：按在边界的控制点上（8 pt 以内）移动该控制点；按在曲面上时拉动那一点（`WarpMesh::pull`），曲面跟着弯；曲面外按下没有作用。
+- 外观（Photoshop 2026）：蓝色 `#5b8be6` 的曲面边界（1.5 pt）与三等分处的曲线（0.75 pt），边界上的 12 个控制点为蓝色圆点，角点更大。
+- 预览用 `transform::warp`；确认记录「Warp」（Photoshop 2026 实测），网格没动过时视为取消；不参与 Transform Again。
+- 选项栏变为变形栏（见 `options_bar.md`）。
+
 ## Transform Selection
 
 Select › Transform Selection（`start_selection`，有选区时可用）：同样的变换框围住选区，但只移动选区的轮廓（`transform::transform_selection`），像素不动；确认记录「Transform Selection」，不更新 Transform Again。测试 `ui_tests::transform_selection_moves_only_the_outline`。
@@ -55,7 +63,7 @@ Select › Transform Selection（`start_selection`，有选区时可用）：同
 ## 已知限制
 
 - 选项栏的数值只读，不能输入；没有参考点位置选择、插值方式选择。
-- 没有变形（Warp 与 Split Warp）、Content-Aware Scale、Puppet Warp。鼠标的缩放与旋转仍以中心为轴（参考点只影响选项栏的数值修改与 X/Y）；参考点不能在画布上拖动。
+- 变形没有 Split、网格大小、预设样式（Arc、Flag 等）与 Bend；从变形切回自由变换后，自由变换的拖动不再叠加到变形上。没有 Content-Aware Scale、Puppet Warp。鼠标的缩放与旋转仍以中心为轴（参考点只影响选项栏的数值修改与 X/Y）；参考点不能在画布上拖动。
 
 ## 测试覆盖
 
@@ -67,3 +75,4 @@ Select › Transform Selection（`start_selection`，有选区时可用）：同
 - `ui_tests::transform_distort_from_the_menu`：Edit › Transform › Distort 后拖右下角，确认记录「Free Transform」，远角变红而左上角不动，Transform Again 可用。
 - `options_bar_numbers_pivot_on_the_reference_point`：参考点在左上时 W 50% 保持左上角不动；绕中心转 90° 中心不动；45° 水平斜切让左上角左移。
 - `ui_tests::transform_bar_takes_typed_numbers`：在 W 框输入 50 回车，W、H 都变为 50% 且仍在变换中；角度输入 90 后中心不动。
+- `ui_tests::warp_pulls_the_surface`：Edit › Transform › Warp 后把右下控制点拖出 30 像素、把曲面中部上拉，确认记录「Warp」，拉伸的角有了像素。

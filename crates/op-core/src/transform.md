@@ -78,3 +78,9 @@ Edit › Transform 的固定变换：`Rotate180`、`Rotate90Clockwise`、`Rotate
 ## 只变换选区
 
 `selection_bounds(doc)` 为选区的范围；`transform_selection(doc, m)` 只按映射移动选区（双线性重采样选择程度），像素不动，没有选区时返回 `false`。`transform` 移动选中像素时也用同一个 `turned_selection`。测试 `transforming_the_selection_only`。
+
+## 变形（Warp）
+
+- `WarpMesh`：盖在框上的双三次 Bézier 曲面，4 × 4 个控制点（从左上起逐行）。`flat(范围)` 为平整的网格（控制点在三等分处）；`at(u, v)` 为曲面上的点；`pull((u, v), d)` 让曲面上 (u, v) 处的点正好移动 `d`：每个控制点按它在该点的 Bernstein 权重分担（权重 ÷ 权重平方和），这就是 Photoshop 在网格内拖动时的效果。
+- `warp(doc, 范围, 网格, 背景色, 插值)`：把范围切成 24 × 24 个小格、每格两个三角形，目标像素找到所在的三角形（三角形按落点放进 64 × 64 的格子索引里），用重心坐标换回范围里的源点再采样。与仿射、投影变换共用 `resample_targets`（移动目标图层或选中像素、处理画布外像素与背景图层）。
+- 测试 `warp_mesh_and_pull`（平整网格就是框；拉动的点正好跟随；角点移动少得多）、`warping_the_layer`（平整网格不改变图像；拉动中部后中部的像素移动）。
