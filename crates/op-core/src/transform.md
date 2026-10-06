@@ -74,3 +74,7 @@ Edit › Transform 的固定变换：`Rotate180`、`Rotate90Clockwise`、`Rotate
 ## 插值（`Interpolation`）
 
 自由变换选项栏的六种：Nearest Neighbor、Bilinear、Bicubic（默认，Keys a = −0.5）、Bicubic Smoother（Mitchell–Netravali）、Bicubic Sharper（a = −0.75）、Bicubic Automatic（按 Bicubic）。`transform_with(doc, m, background, how)` 按所选方法采样（预乘颜色，三次核的过冲被限制在有效范围内）；`transform` 用 Bicubic；选区的遮罩总是双线性。`Affine::skew(h, v)` 为水平、竖直斜切。测试 `interpolation_methods`：放大 2 倍时邻近保持硬边、双线性有过渡、各方法中间都是实心。
+
+## 只变换选区
+
+`selection_bounds(doc)` 为选区的范围；`transform_selection(doc, m)` 只按映射移动选区（双线性重采样选择程度），像素不动，没有选区时返回 `false`。`transform` 移动选中像素时也用同一个 `turned_selection`。测试 `transforming_the_selection_only`。

@@ -27,6 +27,7 @@
 | CanvasSize | Image › Canvas Size... | ⌥⌘C |
 | ImageSize | Image › Image Size... | ⌥⌘I |
 | Rotate180 | Image › Image Rotation › 180° | 无 |
+| TransformSelection | Select › Transform Selection：用变换框只变换选区轮廓（`free_transform.md`）；有选区时可用 | 无 |
 | RotateArbitrary | Image › Image Rotation › Arbitrary...：打开 Rotate Canvas 对话框（`dialogs/rotate_canvas.md`） | 无 |
 | Rotate90Clockwise | Image › Image Rotation › 90° Clockwise | 无 |
 | Rotate90CounterClockwise | Image › Image Rotation › 90° Counter Clockwise | 无 |

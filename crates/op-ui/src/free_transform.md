@@ -17,6 +17,10 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
 - 有输入框获得键盘焦点时，Enter 和 Esc 不作用于变换。
 - 会话期间 `AppState::transforming()` 为真，`modal_open()` 也为真：菜单命令与单键工具快捷键都不生效，与 Photoshop 一致。
 
+## Transform Selection
+
+Select › Transform Selection（`start_selection`，有选区时可用）：同样的变换框围住选区，但只移动选区的轮廓（`transform::transform_selection`），像素不动；确认记录「Transform Selection」，不更新 Transform Again。测试 `ui_tests::transform_selection_moves_only_the_outline`。
+
 ## 交互（与 Photoshop 一致）
 
 - 按下时判定抓住的部位（屏幕坐标）：距 8 个控制点（四角与四边中点）8 pt 以内为缩放；在框内为移动；框外为旋转。
