@@ -79,6 +79,10 @@
 
 确定时对当前选区执行对应的运算（`ModifyKind::apply`），替换选区并记录运算名称。没有选区时什么也不做。
 
+## New 对话框的接入
+
+确定时调用 `actions::create_document`。
+
 ## New Guide 对话框的接入
 
 确定时把参考线加入当前文档，记录「New Guide」。

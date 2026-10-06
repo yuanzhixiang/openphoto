@@ -12,6 +12,7 @@
 - `foreground` / `background`：前景色默认 `#14a5dc`，背景色白色。
 - `view`：视图开关（`ViewOptions`，见 `rulers.md`）。
 - `modify_dialog`：Select › Modify 对话框，打开期间为 `Some`。
+- `new_document_dialog`：New 对话框，打开期间为 `Some`。
 - `new_guide_dialog`：New Guide 对话框，打开期间为 `Some`。
 - `marquee`：选框工具选项：组合方式、羽化（像素）、消除锯齿（默认开启，与 Photoshop 一致）、样式。前三项在创建选区时生效，样式中的 Fixed Ratio / Fixed Size 目前没有效果。
 - `dodge`、`burn`、`sponge`、`blur`、`sharpen`、`clone_stamp`、`history_brush`：修饰工具各自的 `PaintOptions`（默认 30 px、硬度 0%；减淡/加深的不透明度即 Exposure 50%，模糊/锐化的不透明度即 Strength 50%，海绵的流量 50%）。`retouch`（`RetouchOptions`）：减淡与加深各自的 Range（默认 Midtones）、海绵是否 Saturate（默认否）、仿制图章 Aligned（默认是）。`paint_options(tool)` 也返回这些工具的设置。
@@ -40,7 +41,7 @@
 - `last_transform`：上次应用的变换映射，供 Edit › Transform › Again 使用；只在本次运行中保留，所有文档共用。
 - `transforming()`：当前文档正在自由变换时为真；此时 `modal_open()` 也为真。
 - `last_filter`：上次成功应用的滤镜及其设置，供 Filter › Last Filter 使用；只在本次运行中保留，所有文档共用。
-- `modal_open()`：Canvas Size、Image Size、New Guide、Modify、Fill、Trim、调整对话框、Color Picker、「Save changes?」确认或错误提示打开时为真，此时命令与单键快捷键都不执行。
+- `modal_open()`：Canvas Size、Image Size、New、New Guide、Modify、Fill、Trim、调整对话框、Color Picker、「Save changes?」确认或错误提示打开时为真，此时命令与单键快捷键都不执行。
 
 ## DocState
 
