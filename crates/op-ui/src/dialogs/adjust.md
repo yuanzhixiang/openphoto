@@ -2,7 +2,7 @@
 
 ## 组件职责
 
-带设置的调整与滤镜对话框：Image › Adjustments 的 Threshold...、Posterize...、Levels...、Hue/Saturation...、Exposure...，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Unsharp Mask...、Add Noise...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...。Levels...、Curves...、Brightness/Contrast...、Color Balance...、Hue/Saturation... 已按 Photoshop 2026 重做，布局与设置在各自的模块里（`levels.md`、`curves.md`、`brightness_contrast.md`、`color_balance.md`、`hue_saturation.md`），本模块只为它们画窗口框与标题、转交 OK/Cancel 并处理预览。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
+带设置的调整与滤镜对话框：Image › Adjustments 的 Threshold...、Posterize...、Levels...、Hue/Saturation...、Exposure...，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Unsharp Mask...、Add Noise...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...。Levels...、Curves...、Brightness/Contrast...、Color Balance...、Hue/Saturation...、Channel Mixer...、Selective Color... 已按 Photoshop 2026 重做，布局与设置在各自的模块里（`levels.md`、`curves.md`、`brightness_contrast.md`、`color_balance.md`、`hue_saturation.md`、`channel_mixer.md`、`selective_color.md`），本模块只为它们画窗口框与标题、转交 OK/Cancel 并处理预览。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
 
 对话框的结果是 `Effect`：`Adjustment(Adjustment)` 或 `Filter(Filter)`。`Effect::name()` 是历史名称，`Effect::apply(doc, background)` 调用对应的 `op-core` 函数。
 
@@ -43,7 +43,7 @@
 
 ## 重做的对话框（`Custom`）
 
-- `AdjustDialog` 对这五种对话框持有各自的状态（`Custom::Levels`、`Curves`、`BrightnessContrast`、`ColorBalance`、`HueSaturation`），`effect()` 取自它们，`show` 用它们的尺寸并调用它们的 `ui`；窗口框与标题栏仍是 `common::frame`（标题用 AppKit 13 pt 粗体）。
+- `AdjustDialog` 对这七种对话框持有各自的状态（`Custom::Levels`、`Curves`、`BrightnessContrast`、`ColorBalance`、`HueSaturation`、`ChannelMixer`、`SelectiveColor`），`effect()` 取自它们，`show` 用它们的尺寸并调用它们的 `ui`；窗口框与标题栏仍是 `common::frame`（标题用 AppKit 13 pt 粗体）。
 - 它们返回 `uxp::Button`：OK → `Outcome::Apply`，Cancel → `Outcome::Cancel`，Brightness/Contrast 的 Auto → 按直方图算出 Auto 的取值（见 `brightness_contrast.md`）。
 - `set_channel_histograms(h)`：打开 Levels、Curves 时由 `commands.rs` 传入红绿蓝三个通道的直方图。
 - `set_colorize_hue(hue)`：打开 Hue/Saturation 时由 `commands.rs` 传入前景色的色相，作为 Colorize 的初始色相（Photoshop 的行为）。

@@ -32,8 +32,10 @@
   - `GradientMap { from, to }`：按像素亮度在两种颜色之间线性插值。
   - `AutoTone`、`AutoColor`：每个通道各自去掉最暗、最亮 0.1% 后拉伸到 0–255（Photoshop 的 Auto Color 还会中和中间调，这里没有）；`AutoContrast`：三个通道合并统计、按同一范围拉伸，颜色关系不变。直方图取当前图层选区内、alpha 不为 0 的像素。
   - `Curves { points, counts }`：RGB 复合、红、绿、蓝通道各最多 16 个（输入, 输出）点（`Adjustment::curves(points)` 只设复合通道，`curves_per_channel([..; 4])` 四个通道，空列表表示该通道不变）；先各通道自己的曲线，再复合曲线。`curve_table(points)` 生成查找表：按输入排序、去掉重复输入后做自然三次样条（两端二阶导为 0），第一个点之前、最后一个点之后保持平直，结果限制在 0–255、四舍五入；与 Photoshop 2026 的 12 组曲线逐级相同。没有点时为恒等，只有一个点时为常数。
+  - `ChannelMixer { rows, monochrome }`：每个输出通道（Monochrome 时为三个通道相同的灰）= (R × 红% + G × 绿% + B × 蓝%) / 100 + 常数% × 2.55，半数进位并限制在 0–255。与 Photoshop 2026 相差不超过 1 级。
+  - `SelectiveColor { colors, absolute }`：九个范围（Reds、Yellows、Greens、Cyans、Blues、Magentas、Whites、Neutrals、Blacks）各有 C、M、Y、K（−100–100%）。每个范围对像素有一个权重：Reds/Greens/Blues 为该通道单独最大时最大值与中间值之差；Cyans/Magentas/Yellows 为红/绿/蓝单独最小时中间值与最小值之差；Whites 为 `2·(min − 50%)`，Blacks 为 `2·(50% − max)`（不小于 0）；Neutrals 为 `1 − (|max − 50%| + |min − 50%|)`。每个通道的墨量 `ink = 1 − v`（C 对红、M 对绿、Y 对蓝）按每个范围变化 `权重 × clamp(d, −ink, 1 − ink)`，其中 `d = 量 + K × (1 + 量)`，Relative 时 d 再乘以 ink；各范围的变化相加（不是依次作用）。与 Photoshop 2026 的十余组设置（含多范围、Absolute）相差不超过 1 级。
   - Levels、Exposure、Brightness/Contrast、Color Balance、Curves、Equalize 与 Auto 系列先算出三个通道的 256 项查找表（`Adjustment::tables()`）再逐像素查表。
-- `Adjustment::name()`：菜单与历史名称（「Invert」「Desaturate」「Threshold」「Posterize」「Equalize」「Levels」「Hue/Saturation」「Exposure」「Brightness/Contrast」「Color Balance」「Black & White」「Vibrance」「Photo Filter」「Gradient Map」「Auto Tone」「Auto Contrast」「Auto Color」「Curves」）。
+- `Adjustment::name()`：菜单与历史名称（「Invert」「Desaturate」「Threshold」「Posterize」「Equalize」「Levels」「Hue/Saturation」「Exposure」「Brightness/Contrast」「Color Balance」「Black & White」「Vibrance」「Photo Filter」「Gradient Map」「Auto Tone」「Auto Contrast」「Auto Color」「Curves」「Channel Mixer」「Selective Color」）。
 - `rgb_histograms(doc)`：活动图层选区内、alpha 不为 0 的像素的红、绿、蓝三个直方图（Levels、Curves 对话框）。
 - `channel_histogram(doc)`：活动图层选区内、alpha 不为 0 的像素的 R、G、B 值合并统计的直方图（Equalize 与 Levels 对话框使用）。
 - `hsl_color(h, s, l)`、`hue_of(rgb)`：HSL 与 RGB 之间的换算（Colorize 的颜色、前景色的色相）。
@@ -75,3 +77,4 @@ Brightness/Contrast 的表与 `fixtures/adjust/` 下的对照数据都由脚本�
   - `brightness_contrast_matches_photoshop`：七组组合与十一组 Use Legacy。
   - `color_balance_matches_photoshop`：80 组随机三色调设置（含 Preserve Luminosity），每级误差不超过 3。
 - `channel_histograms`：三个通道的直方图与合并直方图。
+- `photoshop::channel_mixer_matches_photoshop`、`photoshop::selective_color_matches_photoshop`：三组通道混合（含单色）与七组可选颜色设置对照 Photoshop。
