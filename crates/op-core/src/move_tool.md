@@ -21,10 +21,13 @@
 
 ## 已知限制
 
-- 图层与画布同样大小，移出画布的像素会丢失；Photoshop 的图层可以超出画布，移回来时内容还在。
+- 移出画布的像素保留在图层上（`with_canvas` 平移，或用 `set_pixel_at` 放下选中的像素），移回来时内容还在，与 Photoshop 一致；背景图层例外，它的像素只在画布内，移出去的部分被丢弃。
 - 有选区时每一步都遍历整个图层。
 
 ## 测试覆盖
+
+- `pixels_moved_off_the_canvas_come_back`：把点移到画布左边外 5 px，画布内看不到它，图层上 (−5, 2) 处还在；再移回来恢复原位。
+- `selected_pixels_moved_off_the_canvas_are_kept_except_on_the_background`：普通图层上把选中像素移到画布上方外仍保留；背景图层上移出去的部分被丢弃。
 
 - `moves_whole_layer_from_its_start`：多次 `apply` 都相对开始位置计算。
 - `moves_only_selected_pixels`：只移动选区内的像素，选区外不动，选区随之移动。

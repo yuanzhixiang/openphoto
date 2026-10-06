@@ -23,7 +23,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 ### P1
 
 3. **图层操作**：
-    - 图层可以超出画布：目前图层与画布同样大，移动到画布外、以及粘贴时超出画布的像素会丢失。
+    - 画布外像素的余项：图层已经可以超出画布（移动、粘贴、Canvas Size、Reveal All、PSD 读写都保留画布外像素），但自由变换、图像旋转与翻转、Image Size、合并图层仍只处理画布内的像素；自由变换的框也只框住画布内的部分。
     - 对话框：「New Layer」（⇧⌘N、Layer from Background...、双击背景图层时弹出）、「Duplicate Layer」（含目标文档）、Rename Layer...；Flatten Image 时询问是否丢弃隐藏图层。
     - Group Layers（⌘G）、Ungroup Layers（⇧⌘G）与图层组。
     - Layers 面板多选（以及多选后的 Merge Layers）、Select › All Layers（⌥⌘A）、Arrange › Reverse、Lock Layers...（⌘/）、Link Layers。

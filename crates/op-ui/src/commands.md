@@ -33,6 +33,7 @@
 | FlipCanvasVertical | Image › Image Rotation › Flip Canvas Vertical | 无 |
 | Crop | Image › Crop | 无 |
 | Trim | Image › Trim... | 无 |
+| RevealAll | Image › Reveal All：把画布扩大到所有图层像素（包括画布外的）的范围，背景图层扩展为背景色（`image_ops::reveal_all`），记录「Reveal All」；没有画布外像素时什么也不做 | 无 |
 | Invert | Image › Adjustments › Invert | ⌘I |
 | Desaturate | Image › Adjustments › Desaturate | ⇧⌘U |
 | Equalize | Image › Adjustments › Equalize | 无 |

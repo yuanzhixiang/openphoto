@@ -34,10 +34,15 @@
 - `crop` 按裁剪原点平移参考线；`resize` 按宽高比例缩放参考线。
 - 测试 `guides_follow_the_canvas`：旋转、裁剪、缩放后参考线的位置与方向。
 
+## Reveal All
+
+`reveal_all(doc, background)`：Image › Reveal All。用 `Document::content_bounds` 求出画布与所有图层像素（包括画布外的）的并集，把画布扩大到这个范围（`place_canvas`，旧画布放在相应偏移处），背景图层的扩展区域填 `background`（背景色）。没有任何像素在画布外时什么也不做并返回 `false`。测试 `reveal_all_grows_the_canvas_to_the_hidden_pixels` 覆盖：左边外和右下外的像素都出现在新画布上，背景扩展为背景色，第二次调用返回 `false`。
+
 ## 已知限制
 
 - 没有 Image Rotation › Arbitrary...（任意角度，需要重采样）。
-- 图层与画布同样大，裁剪掉的像素直接丢弃（Photoshop 裁剪工具可以选择保留画布外像素）。
+- 裁剪总是删掉新画布外的像素（`clipped`，相当于 Photoshop 开启「Delete Cropped Pixels」）；Photoshop 裁剪工具可以关闭它而保留画布外像素。
+- 图像旋转、画布翻转（`remapped`）和 Image Size 的重采样只处理画布内的像素，图层上画布外的像素会丢失；Photoshop 会连同它们一起旋转、缩放。
 - `remapped` 会把整幅图像展开成缓冲区，内存占用为图像尺寸 × 4 字节，与图层稀疏程度无关。
 
 ## 测试覆盖

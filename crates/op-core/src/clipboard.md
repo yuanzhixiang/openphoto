@@ -47,7 +47,7 @@
 ### 粘贴
 
 - 新建与画布同样大的透明图层，按 `Document::next_layer_name` 命名（「Layer N」），插到活动图层正上方并设为活动图层（`insert_above_active`）。
-- 只写入 alpha 大于 0 的像素；落在画布外的部分被裁掉。
+- 只写入 alpha 大于 0 的像素；落在画布外的部分保留在新图层上（`set_pixel_at`），与 Photoshop 一致，Image › Reveal All 可以让它们显示出来。
 - 粘贴后取消选区（原选区记为可以 Reselect 的选区），与 Photoshop 一致。
 - 历史记录由调用方负责（`op-ui` 记录「Paste」「Cut」）。
 
@@ -58,7 +58,6 @@
 
 ## 已知限制
 
-- 图层与画布同样大，粘贴或剪切到画布外的像素会丢失（Photoshop 中图层可以超出画布）。
 - 没有 Paste Into / Paste Outside（需要图层蒙版）。
 - 不支持粘贴文字（Photoshop 会创建文字图层）和矢量路径。
 
@@ -68,4 +67,4 @@
 - `copying_transparent_pixels_fails`：透明图层上复制返回 `Empty` 及其提示文字；Copy Merged 能取到下层的像素。
 - `cut_clears_and_paste_stacks_on_the_original`：背景图层上剪切后留下背景色；粘贴回原位置，生成「Layer 1」、成为活动图层并取消选区。
 - `paste_centers_when_the_origin_is_out_of_view`：原位置超出画布时居中；Paste in Place 保持原位置；外部图片居中到可见区域。
-- `paste_cuts_off_pixels_outside_the_canvas`：超出画布的像素被裁掉。
+- `paste_keeps_pixels_outside_the_canvas`：画布内的部分正常显示，超出右边的像素保留在图层上，图层内容范围伸到画布外。
