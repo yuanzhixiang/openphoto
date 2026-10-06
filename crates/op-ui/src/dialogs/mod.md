@@ -1,5 +1,5 @@
 # dialogs/mod.rs：模态对话框
 
-只负责导出各对话框：Canvas Size（`canvas_size.md`）、Fill（`fill.md`）、Image Size（`image_size.md`）、New（`new_document.md`）、New Guide（`new_guide.md`）、Select › Modify（`modify_selection.md`）、Trim（`trim.md`）、「Save changes?」确认（`save_changes.md`）、调整与滤镜对话框（`adjust.md`，各调整对话框各有自己的模块与 spec，经典滤镜对话框的布局见 `filter_layout.md`，共用的控件见 `uxp.md`、`appkit.md`）、Equalize 询问框（`equalize.md`）、Custom 滤镜（`custom_filter.md`）和 Color Picker（`color_picker.md`）。外框和按钮等公共部件见 `common.md`。
+只负责导出各对话框：Canvas Size（`canvas_size.md`）、Fill（`fill.md`）、Image Size（`image_size.md`）、New（`new_document.md`）、New Guide（`new_guide.md`）、Select › Modify（`modify_selection.md`）、Trim（`trim.md`）、「Save changes?」确认（`save_changes.md`）、调整与滤镜对话框（`adjust.md`，各调整对话框各有自己的模块与 spec，经典滤镜对话框的布局见 `filter_layout.md`，共用的控件见 `uxp.md`、`appkit.md`）、Equalize 询问框（`equalize.md`）、Custom 滤镜（`custom_filter.md`）、插件式扭曲对话框的布局（`distort.md`）和 Color Picker（`color_picker.md`）。外框和按钮等公共部件见 `common.md`。
 
 任一对话框打开期间，`AppState::modal_open()` 为真：所有菜单命令禁用，单键快捷键不触发，与 Photoshop 的模态对话框行为一致。

@@ -47,12 +47,11 @@ Gaussian Blur、Box Blur、Surface Blur、Motion Blur、Unsharp Mask、Add Noise
 - Motion Blur、Emboss 的角度在输入框右侧带角度盘：圆内一条从中心指向角度的线（Motion Blur 的线穿过中心两端）。
 - 选项：Minimum、Maximum 的 Preserve 为下拉框；Add Noise 的 Distribution 与 Offset 的 Undefined Areas 为带标题的分组框加单选按钮；Add Noise 的 Monochromatic 为复选框。
 
-### 通用布局
+### 插件式扭曲对话框
 
-还未重做的 Twirl、Pinch、Spherize、Polar Coordinates 用通用布局，右侧固定是 OK、Cancel 按钮和其下的 Preview 复选框：
+Twirl、Pinch、Spherize、Polar Coordinates 按 Photoshop 2026 的插件式对话框重做（`distort_ui`），布局与绘制在 `distort.rs`（见 `distort.md`）：大预览框（带滚动槽与左下缩放条）、右上 OK / Cancel（89 × 26，13 pt 文字），预览框下方是设置（输入框 + 五边形滑块，或 Polar Coordinates 的两个单选按钮），右下是扭曲示意图。设置仍存在本模块的参数表里，所以记忆、校验、预览与经典对话框相同。
 
-- 对话框宽 400，按参数依次排列：数值参数一行（标签在左、输入框在右，下方一条细轨道和三角标记，占 52）；选项参数不超过 4 项时为标签加其下每项一行的单选按钮（每行 24），超过 4 项时为标签右侧 200 宽的下拉框（占 36）；复选参数为一个复选框（占 28）。高度为 36 + 各行高度 + 20，至少 150。
-- 打开时第一个输入框获得焦点并全选。
+每个滤镜对话框都有经典或插件式布局之一（`Kind::size` 在没有布局时 panic，`every_filter_dialog_has_an_effect` 会暴露遗漏）；旧的通用布局已删除。
 
 ## 重做的对话框（`Custom`）
 
@@ -65,7 +64,7 @@ Gaussian Blur、Box Blur、Surface Blur、Motion Blur、Unsharp Mask、Add Noise
 ## 交互
 
 - 输入框：任一参数超出范围或不是数字时，OK 置灰，也不预览。每个滤镜对话框都必须在 `effect()` 里映射到 `Filter`，否则 OK 永远置灰。
-- 三角标记：在轨道上按下或拖动时把它移到指针位置，按该行的比例换算取值（按小数位数取整）。
+- 三角标记：在轨道上按下或拖动时把它移到指针位置，按该行的比例换算取值（按小数位数取整）。插件式对话框的五边形滑块线性取整数。
 - 角度盘：在盘内按下或拖动时取指针方向的角度（整度）；Motion Blur 的角度折回 −90–90。
 - Preview：勾选时文档实时显示结果，取消勾选时恢复原样。
 - OK 或 Enter（所有值有效时）：返回 `Outcome::Apply(adjustment)`；Cancel 或 Esc：返回 `Outcome::Cancel`。
@@ -76,5 +75,5 @@ Gaussian Blur、Box Blur、Surface Blur、Motion Blur、Unsharp Mask、Add Noise
 - `defaults_match_photoshop`：Levels、Exposure、Hue/Saturation 的默认调整。
 - `filters_read_choices_and_checkboxes`：Add Noise 的分布与单色、Offset 的空白区域选项映射到对应的滤镜参数。
 - `fields_show_values_as_photoshop_does`：Gaussian Blur、Unsharp Mask 的半径显示「1.0」，Add Noise 显示「12.5」，Minimum、Maximum 显示「1」。
-- `every_filter_dialog_has_an_effect`：每种用参数表的滤镜对话框的默认值都能得到滤镜（漏掉映射会让 OK 置灰）。
+- `every_filter_dialog_has_an_effect`：每种用参数表的滤镜对话框的默认值都能得到滤镜（漏掉映射会让 OK 置灰），并且都有布局。
 - `ui_tests.rs` 的 `filter_dialogs_remember_their_last_values`、`more_filters_from_the_menu` 与截图测试覆盖记忆、从菜单打开并应用、以及布局。

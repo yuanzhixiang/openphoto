@@ -33,6 +33,7 @@
     - `PolarCoordinates { to_polar }`：Rectangular to Polar 把绕中心的角度（从正上方逆时针）映射到 x、到中心的距离映射到 y；Polar to Rectangular 反之（角度取 `(x + 1)/w` 一圈）。
     - 与 Photoshop 的平均差：Twirl 0.5 级、Pinch 0.2 级、Spherize 1.2–1.7 级、Polar 0.03–0.7 级；孤立的单像素亮点在亚像素坐标差异下会差得较多。
 - `Filter::name()`：菜单与历史名称（「Gaussian Blur」「Box Blur」「Average」「Unsharp Mask」「Add Noise」「Median」「Minimum」「Maximum」「High Pass」「Offset」「Mosaic」「Solarize」「Blur」「Blur More」「Sharpen」「Sharpen More」「Find Edges」「Motion Blur」「Emboss」「Twirl」「Pinch」「Spherize」「Polar Coordinates」「Fragment」「Custom」「Surface Blur」「Dust & Scratches」）。
+- `distortion_source(filter, x, y, w, h)`：扭曲滤镜在 `w` × `h` 图像中为像素 (x, y) 取色的源位置（其它滤镜返回原位置），供对话框画示意图。
 - `apply(doc, filter, background)`：先做与调整相同的检查（`adjust::check`：没有图层、图层隐藏、像素锁定时返回 `FillError`），再应用。`background` 是 Offset 在背景图层上使用的背景色。
 
 ## 行为规则
