@@ -29,7 +29,7 @@
   - `BlackWhite { weights, tint }`：红、黄、绿、青、蓝、洋红六个权重（百分比）。灰度 = 最小通道 + (中间通道 − 最小) × 次色权重 + (最大 − 中间) × 主色权重；主色是最大的通道（红/绿/蓝），次色是最大两个通道合成的颜色（黄/青/洋红）。与 Photoshop 逐级相同（默认预设 40、60、40、60、20、80）。`tint` 为 Tint 颜色时，以「颜色」混合把它设到这个灰度上（`set_lum`：按 0.3 R + 0.59 G + 0.11 B 的亮度平移，再用 ClipColor 收回 0–1），与 Photoshop 相差不超过 2 级。
   - `Vibrance { vibrance, saturation }`：Vibrance 为近似：在 HSL 中饱和度乘 `1 + vibrance × (1 − s)`（对低饱和颜色作用更大；Photoshop 还会保护肤色，未还原）。Saturation 与 Photoshop 一致（相差不超过 2 级）：在 sRGB 线性光中各通道以灰 `0.2878 R + 0.7122 G`（蓝的权重为 0，与 Photoshop 的实测一致）为中心缩放 `1 + saturation/100` 倍。
   - `PhotoFilter { color, density, preserve_luminosity }`：在 D50 的 XYZ 中（线性 sRGB 经 `SRGB_TO_XYZ_D50`）把 X、Y、Z 分别乘以 `1 − 密度 + 密度 × 滤镜色的对应分量 / 白的分量`，再转回 sRGB——Photoshop 正是这样（拟合出的变换矩阵的本征向量即这组原色），与 Photoshop 相差不超过 1 级。Preserve Luminosity 时再用 `set_lum` 把结果的亮度设回原像素的亮度（相差不超过 6 级）。
-  - `GradientMap { from, to }`：按像素亮度在两种颜色之间线性插值。
+  - `GradientMap { from, to, method }`：像素的亮度（0.299 R + 0.587 G + 0.114 B，与 Photoshop 一致）决定在渐变上的位置，颜色由 `gradient::blend_colors` 按方法插值（见 `gradient.md`）。
   - `AutoTone`、`AutoColor`：每个通道各自去掉最暗、最亮 0.1% 后拉伸到 0–255（Photoshop 的 Auto Color 还会中和中间调，这里没有）；`AutoContrast`：三个通道合并统计、按同一范围拉伸，颜色关系不变。直方图取当前图层选区内、alpha 不为 0 的像素。
   - `Curves { points, counts }`：RGB 复合、红、绿、蓝通道各最多 16 个（输入, 输出）点（`Adjustment::curves(points)` 只设复合通道，`curves_per_channel([..; 4])` 四个通道，空列表表示该通道不变）；先各通道自己的曲线，再复合曲线。`curve_table(points)` 生成查找表：按输入排序、去掉重复输入后做自然三次样条（两端二阶导为 0），第一个点之前、最后一个点之后保持平直，结果限制在 0–255、四舍五入；与 Photoshop 2026 的 12 组曲线逐级相同。没有点时为恒等，只有一个点时为常数。
   - `ChannelMixer { rows, monochrome }`：每个输出通道（Monochrome 时为三个通道相同的灰）= (R × 红% + G × 绿% + B × 蓝%) / 100 + 常数% × 2.55，半数进位并限制在 0–255。与 Photoshop 2026 相差不超过 1 级。
@@ -53,7 +53,7 @@
 
 ## 已知限制
 
-- Vibrance 滑块本身是近似（Photoshop 的 Vibrance 带有肤色保护，未还原）；Gradient Map 尚未与 Photoshop 核对。
+- Vibrance 滑块本身是近似（Photoshop 的 Vibrance 带有肤色保护，未还原）。
 - Equalize 不提供 Photoshop 在有选区时弹出的选项，总是按选区内的直方图只处理选区。
 
 ## 数据来源
@@ -79,3 +79,4 @@ Brightness/Contrast 的表与 `fixtures/adjust/` 下的对照数据都由脚本�
 - `channel_histograms`：三个通道的直方图与合并直方图。
 - `photoshop::channel_mixer_matches_photoshop`、`photoshop::selective_color_matches_photoshop`：三组通道混合（含单色）与七组可选颜色设置对照 Photoshop。
 - `photoshop::black_white_photo_filter_and_exposure_match_photoshop`：Black & White（含两组 Tint）、四组 Photo Filter、四组 Exposure、三组 Vibrance 的 Saturation 对照 Photoshop。
+- `photoshop::gradient_map_matches_photoshop`：红→蓝渐变在四种方法下对照 Photoshop。

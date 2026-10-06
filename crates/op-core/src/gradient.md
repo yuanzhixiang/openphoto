@@ -31,3 +31,14 @@
 - `positions_of_each_kind`：各类型在典型点的 t 值。
 - `paints_black_to_white`：5 像素黑到白得到 `[0, 64, 128, 191, 255]`，反向时颠倒。
 - `half_opacity_and_selection`：50% 不透明度只作用于选区内的像素。
+
+## 渐变插值方法（`Method`、`blend_colors`）
+
+量自 Photoshop 2026 的 Gradient Map（红→蓝、黑→白，各方法逐级对照）：
+
+- 两个色标之间的位置先做「经典缓动」：`t` 与 smoothstep `3t² − 2t³` 的平均（即 Photoshop 渐变 Smoothness 100%）。
+- `Classic`：在 sRGB 数值中按缓动后的位置插值（与 Photoshop 逐级相同）。
+- `Linear`：在线性光中插值（相差不超过 2 级）。
+- `Perceptual`：在 OKLab 中插值（相差不超过 2 级）。
+- `Smooth`（对话框默认）：OKLab 中插值，缓动只取经典缓动的 40%（测量较粗，相差不超过 6 级）。
+- 渐变工具本身仍按 RGB 线性插值，尚未使用这些方法。
