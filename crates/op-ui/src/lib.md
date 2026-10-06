@@ -4,7 +4,7 @@
 
 定义 `OpenPhotoApp`（实现 `eframe::App`），负责：
 
-- 启动时安装字体与样式、注册画布渲染器、在 macOS 上安装原生菜单栏，并打开命令行传入的文件。
+- 启动时安装字体与样式、注册画布渲染器、在 macOS 上安装原生菜单栏并把窗口标记为 sRGB 色彩空间，然后打开命令行传入的文件。
 - 每帧按固定顺序处理输入、排布各区域、显示浮层。
 - 排布文档标签栏（`doc_tabs.rs`）和当前文档的视图（`document_view.rs`）。
 
@@ -13,7 +13,8 @@
 1. `theme::install_fonts`、`theme::apply_style`。
 2. `op_render::install` 注册画布管线。依赖 wgpu 渲染后端，缺失时直接 panic（应用只支持 wgpu）。
 3. macOS 上 `menu::NativeMenu::install`。`new_headless` 跳过这一步，供无窗口 UI 测试使用（见 `ui_tests.md`）。
-4. 有命令行文件时逐个打开；没有时新建一个 1920×1080 白色背景的「Untitled-1」文档。
+4. macOS 上 `color_management::use_srgb` 把窗口的 Metal 图层标记为 sRGB（见 `color_management.md`）。`new_headless` 没有窗口，同样跳过。
+5. 有命令行文件时逐个打开；没有时新建一个 1920×1080 白色背景的「Untitled-1」文档。
 
 ## 每帧流程
 
