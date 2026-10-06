@@ -99,12 +99,15 @@
 
 ## 绘画工具
 
-适用于画笔、铅笔、橡皮擦（笔画算法见 `crates/op-core/src/paint.md`）：
+适用于画笔、铅笔、橡皮擦与修饰工具（减淡、加深、海绵、模糊、锐化、仿制图章、历史记录画笔；笔画算法见 `crates/op-core/src/paint.md`）：
 
-- 在画布上按下开始一笔（使用当前工具的大小、硬度、不透明度、流量；铅笔的流量固定为 100%、没有柔边），拖动时继续，松开后记录一条历史：「Brush Tool」「Pencil」或「Eraser」。画笔和铅笔用前景色，橡皮擦在背景图层上用背景色。
+- 在画布上按下开始一笔（使用当前工具的大小、硬度、不透明度、流量；铅笔的流量固定为 100%、没有柔边），拖动时继续，松开后记录一条历史：「Brush Tool」「Pencil」「Eraser」「Dodge Tool」「Burn Tool」「Sponge Tool」「Blur Tool」「Sharpen Tool」「Clone Stamp」「History Brush」。画笔和铅笔用前景色，橡皮擦在背景图层上用背景色。
+- 笔画类型在按下时决定（`stroke_kind`）：减淡/加深按各自的 Range，海绵按 Mode，模糊/锐化，仿制图章和历史记录画笔见下。
+- 仿制图章：按住 ⌥ 单击设定取样点（这一次按压不绘制，即使先松开 ⌥）。之后按下时，偏移为「按下位置 − 取样点」；勾选 Aligned（默认）时第一笔之后的偏移保持不变，否则每一笔都从取样点重新开始。取样来自当前图层在按下时的像素。没有取样点时弹出「Could not use the clone stamp because the area to clone has not been defined (option-click to define a source point).」。取样点按文档保存在 `DocState::clone_source` / `clone_offset`。
+- 历史记录画笔：从文档打开（或新建）时的状态（第一条历史）中取同一图层的像素来画；该状态中没有这个图层或尺寸不同时弹出「Could not use the history brush because the history state does not contain a corresponding layer.」。
 - 按下时按住 Shift：从上一笔结束的位置画直线到按下的位置，再继续这一笔。
 - 图层不能画时（隐藏、锁定像素），在按下的那一刻弹出 Photoshop 的提示，不开始笔画。
-- 光标：笔刷在屏幕上的直径不小于 4 点时，隐藏系统光标，画出笔刷大小的圆圈（半透明黑色外圈加白色细圈）；更小时显示十字光标。
+- 光标：所有这些工具，笔刷在屏幕上的直径不小于 4 点时，隐藏系统光标，画出笔刷大小的圆圈（半透明黑色外圈加白色细圈）；更小时显示十字光标。
 
 ## 蚂蚁线
 

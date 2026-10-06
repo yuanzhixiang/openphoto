@@ -15,7 +15,13 @@
 ## 对外接口
 
 - `BrushTip`：直径（像素）、硬度（0 柔边 – 1 硬边）、`aliased`（铅笔：没有抗锯齿）。笔印透明度：从中心到 `半径 × 硬度` 为 1，之后平滑衰减到半径外 0.5 像素处为 0；硬度为 1 时也保留 1 像素的抗锯齿边缘。铅笔的像素中心在半径内为 1，否则为 0（直径至少按 1 像素计）。
-- `StrokeKind::Paint(rgb)`：画颜色（画笔、铅笔）。`StrokeKind::Erase { background }`：橡皮擦。
+- `StrokeKind`：
+  - `Paint(rgb)`：画颜色（画笔、铅笔）。`Erase { background }`：橡皮擦。
+  - `Dodge(range)`、`Burn(range)`：减淡、加深。`ToneRange` 为 Shadows / Midtones（默认）/ Highlights，`label()` 为菜单文字。
+  - `Sponge { saturate }`：海绵（加色或去色）。
+  - `Blur`、`Sharpen`：模糊、锐化。
+  - `Source { image, dx, dy }`：画另一张图像中的像素，目标 (x, y) 取 `image` 的 (x − dx, y − dy)——仿制图章（同一图层的另一处）和历史记录画笔（图层的早先状态，偏移为 0）都用它。
+  `StrokeKind` 可以克隆，但不再是 `Copy`（`Source` 带着图像）。
 - `Stroke::begin(doc, tip, kind, opacity, flow)`：在当前图层上开始一笔，同时记下当前选区。
 - `Stroke::add_point(doc, x, y)`：把笔画延伸到 (`x`, `y`)。第一点放一个笔印；之后沿直线每隔直径的 25%（Photoshop 默认间距，至少 1 像素）放一个，跨调用保持间距连续。
 - `last_point()`：笔画结束的位置，界面用于 Shift+单击画直线。
@@ -33,15 +39,27 @@
 - 选区：按选中程度（0–255 → 0–1）缩放数量，羽化的选区按比例生效。
 - 每个笔印之后调用 `mark_dirty`。
 
+### 修饰工具
+
+修饰工具先算出笔画前像素在「满强度」下的目标值，再按 `数量`（覆盖率 × 不透明度 × 选择程度；界面把 Exposure / Strength 作为不透明度传入，海绵的 Flow 作为流量）在预乘 alpha 下从原像素混向目标；背景图层或锁定透明像素时只混颜色、保持 alpha。目标值（v 为 0–1 的通道值）：
+
+- 减淡：`v + w(v) × (1 − v)`；加深：`v − w(v) × v`。权重 w：Shadows `(1 − v)²`、Midtones `4v(1 − v)`、Highlights `v²`。逐通道计算；这是对 Photoshop 算法的近似。
+- 海绵：在 HSL 中把饱和度变为 0（去色）或加倍（加色，最大 1）。
+- 模糊：笔画前像素的 3×3 预乘平均；锐化：`v + (v − 3×3 平均)`。因为基于笔画前的像素，同一笔内来回涂抹不会继续累积模糊/锐化。
+- 来源：`image` 中对应位置的像素（含 alpha）；超出 `image` 范围时保持原像素。
+
 ## 已知限制
 
 - 只有圆形笔尖，没有笔刷预设、角度、圆度、间距设置，也没有压感、平滑（Smoothing）和喷枪。
+- 没有涂抹工具（Smudge）；修饰工具的 Protect Tones、Vibrance、Sample All Layers、Protect Detail 选项没有实现。
 - 画笔模式只有 Normal；橡皮擦只有 Brush 模式（没有 Pencil、Block 模式）。
 - 每个笔印都会触发整个文档重新合成和上传，大文档上绘画较慢。
 
 ## 测试覆盖
 
 - `hard_brush_paints_full_color_in_its_core`、`pencil_is_aliased`：硬边画笔中心为完整颜色；铅笔只有完全透明和完全不透明。
+- `dodge_burn_and_sponge`：中间调减淡变亮、加深变暗；Highlights 几乎不影响暗像素；去色后三通道相等。
+- `blur_sharpen_and_clone`：模糊让黑白边缘出现中间值；仿制把 (5, 5) 的红点画到 (20, 20)，旁边不变。
 - `opacity_caps_a_single_stroke`：同一笔内反复涂抹，结果停在 50% 不透明度。
 - `flow_builds_up`：低流量时重复经过同一点会加深。
 - `selection_masks_paint`：选区外不被画到。

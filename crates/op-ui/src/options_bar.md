@@ -37,6 +37,13 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
   - 笔刷预设按钮：白色圆点，下方是当前大小数字，旁边一个下拉箭头。点击弹出 Size 滑块（1–5000 px，对数刻度）和 Hardness 滑块（铅笔没有）。
   - 分隔线后是「Mode:」下拉（画笔、铅笔显示 Normal，橡皮擦显示 Brush），目前置灰。
   - 「Opacity:」百分比；画笔和橡皮擦还有「Flow:」百分比。
+- **修饰工具**（笔刷选择器同画笔）：
+  - 减淡、加深：「Range:」下拉（Shadows / Midtones / Highlights，默认 Midtones，两个工具各自保存）、「Exposure:」百分比（默认 50%）、勾选且置灰的「Protect Tones」。
+  - 海绵：「Mode:」下拉（Desaturate / Saturate，默认 Desaturate）、「Flow:」百分比（默认 50%）、勾选且置灰的「Vibrance」。
+  - 模糊、锐化：置灰的「Mode: Normal」、「Strength:」百分比（默认 50%）、置灰的「Sample All Layers」；锐化还有勾选且置灰的「Protect Detail」。
+  - 仿制图章：置灰的「Mode: Normal」、Opacity、Flow、「Aligned」复选框（默认勾选）、置灰的「Sample: Current Layer」。
+  - 历史记录画笔：置灰的「Mode: Normal」、Opacity、Flow。
+  每个工具的笔刷（大小、硬度、不透明度/强度、流量）分开保存在 `AppState` 中；Range、海绵模式、Aligned 保存在 `AppState::retouch`。
 - **油漆桶**：Fill（Foreground，置灰）、Mode（全部混合模式）、Opacity、Tolerance（0–255）、Anti-alias、Contiguous、All Layers，都会生效。
 - **移动工具**：Auto-Select 复选框加「Layer」字段、Show Transform Controls 复选框。只有外观，状态不保存。
 - **抓手、缩放工具**：「100%」和「Fit Screen」两个按钮，作用于当前文档。
