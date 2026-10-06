@@ -21,6 +21,7 @@
 - `type_options`：文字工具选项（见 `type_tool.md`）。
 - `typing_text()`：当前文档有正在输入的文字时为真；此时 `modal_open()` 也为真。
 - `shape`：形状工具选项（`ShapeOptions`：多边形边数 5、直线粗细 1 px，Photoshop 的默认值）。
+- `move_options`：移动工具选项（`MoveOptions`：`auto_select`、`show_transform_controls`，都默认关闭，与 Photoshop 一致）。
 - `gradient`：渐变工具选项（`op_core::gradient::GradientOptions`：类型、混合模式、不透明度、反向）。
 - `wand`：魔棒选项：组合方式与区域规则（`op_core::fill::BucketOptions` 的容差、消除锯齿、连续、所有图层，默认值同油漆桶）。
 - `editing_background` 与 `picker_hsb`：Color 面板正在编辑前景还是背景，以及缓存的 HSB。缓存 HSB 是为了在灰色（饱和度为 0）时色相不跳回 0。
@@ -55,6 +56,7 @@
 - 合成缓存：`canvas_image()` 返回当前合成结果，只在文档 `revision` 变化时重新合成。
 - 图层缩略图：`layer_thumbnail()` 按图层缓存，文档 `revision` 变化后重新生成；最近邻缩小。
 - 移动：`move_drag` 是进行中的移动和拖动起点（文档像素）。
+- `transform_controls_bounds()`：移动工具 Show Transform Controls 的框（文档像素），即 `op_core::transform::bounds` 的结果，不能变换时为 `None`；按（修订号、当前图层、选区修订号）缓存。
 - 绘画：`stroke` 是进行中的笔画和它的工具；`last_paint_point` 是上一笔结束的位置，用于 Shift+单击画直线。
 - `text_edit`：正在输入的文字（见 `type_tool.md`）。
 - `shape_drag`：形状工具拖动中的起点与当前点。

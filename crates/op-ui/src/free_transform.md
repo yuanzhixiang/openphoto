@@ -37,6 +37,10 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
 - 中心参考点：半径 4 pt 的圆加十字线。
 - 选项栏（见 `options_bar.md`）显示 W、H 百分比与角度，右侧是取消与确认按钮。
 
+## 移动工具的变换控件
+
+`controls_handle_at` 与 `draw_controls` 供移动工具的 Show Transform Controls 使用（见 `document_view.md`）：框和控制点的画法与自由变换共用 `draw_box`，没有中心参考点；`controls_handle_at` 判断指针是否抓住了某个控制点（与自由变换相同的 8 pt 抓取半径）。
+
 ## 已知限制
 
 - 选项栏的数值只读，不能输入；没有参考点位置选择、插值方式选择。

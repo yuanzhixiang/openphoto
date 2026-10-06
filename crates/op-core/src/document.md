@@ -54,6 +54,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `edit_target()`：像素编辑（绘画、填充、渐变）的目标 `EditTarget`，优先级为快速蒙版 > 图层蒙版 > 图层像素：要写入的图像（图层像素或蒙版）、是否是蒙版（颜色要换成灰度）、是否要保持 alpha（背景图层、锁定透明像素，或蒙版）。
 - `has_background()`：是否存在背景图层。它决定 Canvas Size 中「画布扩展颜色」是否有意义：没有背景图层时，所有扩展区域都是透明的。
 - `layer(id)` / `layer_mut(id)`：按 ID 线性查找图层。
+- `layer_at(x, y)`：移动工具 Auto-Select 用。从上往下找第一个在 (x, y) 处显示出像素的图层：图层可见、不透明度与填充不为 0、像素 alpha 大于 0，且没有被启用的图层蒙版以 0 值遮住。坐标在画布外或没有这样的图层时为 `None`。
 - `composite_rgba8()`：合成为紧密排列的直通 RGBA8 缓冲区，长度为 `width * height * 4`。
 - `composite_layers_rgba8(layers)`：按同样的规则只合成给定的图层列表（自底向上，尺寸与文档一致），供合并图层使用；`composite_rgba8` 就是对文档全部图层调用它。
 
@@ -115,4 +116,5 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `transparent_bitmap_opens_as_regular_layer`：含半透明像素时打开为「Layer 0」普通图层，文档没有背景图层，该图层为活动图层。
 - `resize_canvas_centered`：2×2 白色背景居中扩展到 4×5、扩展色黑色，验证新尺寸、四周为黑、原图位于 (1,1)–(2,2)，且高度差为奇数时多出的一行在底部（第 3 行为黑）。
 - `resize_canvas_keeps_layers_transparent`：左上锚点扩展到 3×3 时，非背景图层的扩展区域保持透明，原像素位置不变。
+- `layer_at_finds_the_topmost_visible_pixel`：上层有像素处选中上层，透明处落到背景，隐藏上层后落到背景，画布外为 `None`。
 - `composite_half_opacity_over_white`：50% 不透明度黑色图层叠在白色背景上得到 `[128, 128, 128, 255]`，验证 gamma 空间混合与量化规则。
