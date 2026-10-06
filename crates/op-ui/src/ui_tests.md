@@ -69,3 +69,4 @@
 - `levels_and_curves_edit_one_channel`：Levels 用 ⌥3 只改红色通道的黑场，Curves 用 ⌥4 只抬高绿色通道。`curves_dialog_adds_points` 按新的曲线图位置点击。
 - `channel_mixer_and_selective_color_apply`：Channel Mixer 的红色输出改为 50% 红；Selective Color 选 Yellows、Cyan 100、Absolute，结果等于核心算法。
 - `small_uxp_adjustment_dialogs_apply`：依次用 Vibrance、Posterize、Exposure、Black & White 的第一个输入框输入并应用，再用 Photo Filter 的默认值应用，结果都等于核心算法。
+- `equalize_asks_about_the_selection`：见 `dialogs/equalize.md`。

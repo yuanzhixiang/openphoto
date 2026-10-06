@@ -259,3 +259,4 @@ Cut、Copy、CopyMerged、Paste、PasteInPlace 由 `actions::clipboard` 执行�
 
 - Photoshop 的 Layer › New › Layer... 会弹出「New Layer」对话框；这里直接创建图层，所以菜单项文字不带省略号。
 - Layer from Background、Duplicate Layer 在 Photoshop 中会先弹出对话框，这里直接执行；Flatten Image 在有隐藏图层时 Photoshop 会询问是否丢弃，这里直接丢弃。
+- Equalize：有选区时不直接执行，先弹出 Equalize 询问框（`dialogs/equalize.md`）。

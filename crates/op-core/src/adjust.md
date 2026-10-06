@@ -9,6 +9,7 @@
 - `Adjustment`：
   - `Invert`：每个颜色通道取 `255 - v`。
   - `Desaturate`：三个通道都设为该像素的 HSL 亮度 `(max + min) / 2`（向上取整），与 Photoshop 的 Desaturate 一致（不是加权亮度）。
+  - `EqualizeEntireImage`：用选区内的直方图生成同一张表，但作用于整个图层（忽略选区）。
   - `Threshold(level)`：亮度（`luminosity`）大于等于 `level` 的像素变白，其余变黑。Photoshop 的取值范围 1–255，默认 128。
   - `Posterize(levels)`：每个通道量化为 `levels` 个色阶：`round(round(v × (L−1) / 255) × 255 / (L−1))`。范围 2–255，默认 4。
   - `Equalize`：直方图均衡。用活动图层选区内、alpha 不为 0 的像素的 R、G、B 三个通道值合在一起统计直方图（`channel_histogram`），每个值映射为它在累计直方图中的位置 × 255（四舍五入），同一张表作用于三个通道。
@@ -54,7 +55,6 @@
 ## 已知限制
 
 - Vibrance 滑块本身是近似（Photoshop 的 Vibrance 带有肤色保护，未还原）。
-- Equalize 不提供 Photoshop 在有选区时弹出的选项，总是按选区内的直方图只处理选区。
 
 ## 数据来源
 
@@ -80,3 +80,4 @@ Brightness/Contrast 的表与 `fixtures/adjust/` 下的对照数据都由脚本�
 - `photoshop::channel_mixer_matches_photoshop`、`photoshop::selective_color_matches_photoshop`：三组通道混合（含单色）与七组可选颜色设置对照 Photoshop。
 - `photoshop::black_white_photo_filter_and_exposure_match_photoshop`：Black & White（含两组 Tint）、四组 Photo Filter、四组 Exposure、三组 Vibrance 的 Saturation 对照 Photoshop。
 - `photoshop::gradient_map_matches_photoshop`：红→蓝渐变在四种方法下对照 Photoshop。
+- `equalize_the_entire_image_from_the_selection`：选区外的像素在 EqualizeEntireImage 时按选区的表变化，Equalize 时不变。
