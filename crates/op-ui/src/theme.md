@@ -36,7 +36,11 @@
 - Phosphor 图标字体作为回退字体加在比例字体族末尾，所以图标可以直接写在文字里。
 - 分隔与折叠条颜色（Photoshop 2026 实测）：3 pt 分隔条和折叠条的线 `DIVIDER_DARK` `#383838`、分隔条中间的线 `DIVIDER_LIGHT` `#474747`、折叠条底色 `COLLAPSE_BAR` `#424242`、折叠箭头 `COLLAPSE_CHEVRON` `#c8c8c8`；面板标签文字 `TAB_TEXT_ACTIVE` `#f0f0f0`、`TAB_TEXT` `#b0b0b0`。
 - 选项栏颜色（Photoshop 2026 实测）：底色 `OPTIONS_BAR` `#535353`、分隔线 `OPTIONS_SEPARATOR` `#3e3e3e`、图标 `OPTIONS_ICON` `#dddddd`、铃铛 `OPTIONS_BELL` `#b9b9b9`、禁用图标 `OPTIONS_ICON_DISABLED` `#989898`、标签文字 `TEXT_BRIGHT` `#f0f0f0`；复选框 `CHECKBOX` `#d4d4d4` 与对勾 `CHECK_MARK` `#323232`；下拉框边框 `DROPDOWN_BORDER` `#666666`（悬停 `DROPDOWN_BORDER_HOVER` `#808080`）。
-- 对话框字体：Photoshop 的对话框使用 macOS 系统字体 SF。运行时从 `/System/Library/Fonts/SFNS.ttf` 读取（不随应用分发），按可变字体的 `wght` 轴注册三个字体族：`dialog`（400）、`dialog-medium`（510，比 Regular 略重，Photoshop 新式对话框如 New Layer 中文字的样子）和 `dialog-bold`（700），后面依次接界面字体作为回退。读不到时（非 macOS）只有回退字体，即 Source Sans 3。`dialog(size)`、`dialog_medium(size)`、`dialog_bold(size)` 返回对应字体。目前 New Layer 与 Duplicate Layer 对话框使用它们，其它对话框仍用 Source Sans 3。
+- 对话框字体：Photoshop 2026 的对话框文字有两类，必须按对话框选对（用文字宽度与字形在 Photoshop 截图上逐一核对过）：
+  - **AppKit 绘制的**（经典对话框 Duplicate Layer、Image Size，macOS 提示框，所有窗口标题）：macOS 系统字体 SF。运行时从 `/System/Library/Fonts/SFNS.ttf` 读取（不随应用分发），按可变字体注册 `dialog`（wght 400）和 `dialog-bold`（700），两者都设 `opsz` = 17：AppKit 给 17 pt 以下的文字用 Text 光学尺寸，比字体默认的 Display（28）宽约 10%，不设就会窄。后面依次接界面字体作为回退；读不到时（非 macOS）只有 Source Sans 3。正文 12 pt（`dialog(pt(12.0))`），标题 13 pt 粗体，提示框 13 pt。
+  - **UXP（Spectrum）对话框**（New Layer、New Group、Layer from Background）：Spectrum 的 Adobe Clean（t 的斜切顶、y 的直尾可以分辨），与面板同一种字体，所以用 Source Sans 3：`uxp(size)` 为 Regular、`uxp_bold(size)` 为 Semibold，都是 12 pt。
+- 字距：AppKit 按 SF 的 `trak` 表随字号调整字距（12 pt 为 0，13 pt 为 −12/2048 em，14 pt 为 −22），egui 不会。`system_tracking(size)` 按表插值给出 egui 的额外字距，`tracked_galley(painter, text, font, color)` 用它排版；窗口标题和提示框的文字都这样画（12 pt 正文不需要）。
+- 测试 `dialog_text_is_as_wide_as_photoshops`：九段文字（Image Size、Duplicate Layer、窗口标题、提示框、New Layer 的）在 2x 下的宽度与 Photoshop 实测相差不超过 3%；去掉 opsz 17、去掉字距或给 UXP 对话框用错字体都会失败（已验证）。
 - Phosphor Bold 单独注册为字体族 `phosphor-bold`，`tool_icon(size)` 返回它，只用于工具栏和工具列表的图标。
 
 ## egui 样式（`apply_style`）
