@@ -27,6 +27,11 @@
 | FillForeground | 无（Photoshop 的隐藏快捷键） | ⌥⌫ |
 | FillBackground | 无（Photoshop 的隐藏快捷键） | ⌘⌫ |
 | Clear | Edit › Clear | ⌫ / Delete |
+| Cut | Edit › Cut | ⌘X |
+| Copy | Edit › Copy | ⌘C |
+| CopyMerged | Edit › Copy Merged | ⇧⌘C |
+| Paste | Edit › Paste | ⌘V |
+| PasteInPlace | Edit › Paste Special › Paste in Place | ⇧⌘V |
 | SelectAll | Select › All | ⌘A |
 | Deselect | Select › Deselect | ⌘D |
 | Reselect | Select › Reselect | ⇧⌘D |
@@ -41,13 +46,15 @@
 
 同时决定命令能否执行和菜单项是否置灰：
 
-- 有模态对话框打开时，所有命令不可用。
+- 有输入框获得键盘焦点时（`AppState::typing`），Cut、Copy、CopyMerged、Paste、PasteInPlace 始终可用（包括模态对话框里的输入框），执行时作用于输入框的文字（见下文「剪贴板」）。
+- 除此之外，有模态对话框打开时所有命令不可用。
 - New、Open、ToggleHistory 始终可用。
 - Undo、ToggleLastState：当前文档能撤销时可用；Redo：能重做时可用。
 - DeleteLayer：当前文档的图层多于 1 个时可用。
 - CloseOthers：打开的文档多于 1 个时可用。
 - ToggleLayerVisibility：当前文档有选中图层时可用。
 - Deselect、SelectInverse：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
+- 其余命令：有当前文档时可用。Paste 不检查剪贴板里有没有内容（读取系统剪贴板里的图片代价较高，不适合每帧检查），剪贴板为空时执行 Paste 什么也不做。
 
 ## 填充与清除
 
@@ -59,16 +66,29 @@
 ## 选区命令的历史记录
 
 Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别为「Select All」「Deselect」「Reselect」「Select Inverse」，与 Photoshop 一致。
-- 其余命令：有当前文档时可用。
+
+## 剪贴板
+
+Cut、Copy、CopyMerged、Paste、PasteInPlace 由 `actions::clipboard` 执行：
+
+- 有输入框获得焦点时，把操作转交给输入框：Cut/Copy（CopyMerged 视同 Copy）转成 egui 的 `Event::Cut` / `Event::Copy`，Paste/PasteInPlace 读取系统剪贴板的文字转成 `Event::Paste`（没有文字时什么也不做）。这些事件放进 `AppState::forward_events`，由 `OpenPhotoApp::raw_input_hook` 注入 egui 的下一帧输入，并请求重绘。macOS 上这几个菜单项带 ⌘X/⌘C/⌘V 快捷键，按键被原生菜单接住、egui 收不到，所以需要这样转交，输入框里的剪切、复制、粘贴才能正常工作。
+- 否则对当前文档执行（像素规则见 `op-core` 的 `clipboard.md`）：
+  - Copy / Copy Merged：复制成功后放进剪贴板（见 `clipboard.md`），不记录历史。
+  - Cut：复制并清除，记录「Cut」。
+  - Paste / Paste in Place：从剪贴板取出内容，按当前视图的可见区域（`document_view::visible_rect`）计算位置，粘贴为新图层，记录「Paste」。剪贴板为空时什么也不做。
+  - 失败时弹出 Photoshop 的提示，例如「Could not complete the Copy command because the selected area is empty.」。
 
 `run()` 执行前会再检查一次 `enabled`，不可用的命令直接忽略。
 
 ## 快捷键识别
 
 - **macOS**：带 ⌘ 的快捷键由原生菜单的 key equivalent 处理，egui 收不到这些按键。唯一的例外是 Zoom In：菜单项显示为 Photoshop 的 ⌘+，而 macOS 只在按住 Shift 时才匹配「+」，所以 `from_shortcuts_beside_menu` 额外在 egui 里捕获 ⌘=，转成 ZoomIn。
-- **没有原生菜单时**（其它平台，以及 macOS 上的无窗口测试）：`from_shortcuts` 在 egui 里按 `SHORTCUT_ORDER` 依次匹配全部快捷键。egui 的 `consume_key` 会忽略多按的 Shift/Alt，所以列表必须把更具体的组合放在前面（例如 ⇧⌘Z 在 ⌘Z 之前、⌥⌘W 在 ⌘W 之前），否则会被误触发成另一个命令。ZoomIn 同时接受 ⌘= 和 ⌘+。
+- **没有原生菜单时**（其它平台，以及 macOS 上的无窗口测试）：`from_shortcuts` 在 egui 里按 `SHORTCUT_ORDER` 依次匹配全部快捷键。egui 的 `consume_key` 会忽略多按的 Shift/Alt，所以列表必须把更具体的组合放在前面（例如 ⇧⌘Z 在 ⌘Z 之前、⌥⌘W 在 ⌘W 之前、⇧⌘C 在 ⌘C 之前），否则会被误触发成另一个命令。ZoomIn 同时接受 ⌘= 和 ⌘+。
+- egui-winit 不把 ⌘X/⌘C/⌘V 作为按键送出，而是转成 `Event::Cut`、`Event::Copy`、`Event::Paste`（而且只在系统剪贴板有文字时才送出 `Paste`）。`from_shortcuts` 把这些事件识别为 Cut、Copy（按住 Shift 时为 CopyMerged）、Paste（按住 Shift 时为 PasteInPlace）。正在输入框里输入时不识别剪贴板快捷键和事件，由输入框自己处理。
 
 ## 与 Photoshop 的差异
+
+- 没有原生菜单的平台上，系统剪贴板只有图片时 ⌘V 收不到任何事件（见上文），只能通过菜单粘贴。
 
 - Photoshop 的 Layer › New › Layer... 会弹出「New Layer」对话框；这里直接创建图层，所以菜单项文字不带省略号。
 - Delete Layer 在 Photoshop 里还可以在 Layers 面板选中图层后按 Delete 键触发；这里目前只能通过菜单和 Layers 面板的垃圾桶按钮。

@@ -20,6 +20,9 @@
 - `color_picker`：Color Picker 会话，打开期间为 `Some`，包含对话框和 `PickerTarget`（确定后写入前景色、背景色、Canvas Size 的扩展颜色，还是 Fill 对话框的 Color...）。`open_color_picker(target)` 以 Photoshop 的标题打开前景或背景色拾色器。
 - `swatches`：Swatches 面板的色板列表，初始为固定的 36 个颜色，Color Picker 的「Add to Swatches」会往末尾追加。只在本次运行中保留。
 - `alert`：待显示的错误信息。
+- `clipboard`：Cut/Copy/Paste 用的剪贴板（见 `clipboard.md`）。默认不连接系统剪贴板（无窗口测试不应改动用户的剪贴板），`OpenPhotoApp::new` 启动时换成连接系统剪贴板的版本。
+- `typing`：上一帧是否有输入框获得键盘焦点，每帧执行命令前更新。决定菜单的 Cut/Copy/Paste 作用于输入框还是文档。
+- `forward_events`：要注入 egui 下一帧输入的事件（菜单的 Cut/Copy/Paste 转交给输入框时使用，见 `commands.md`）。
 - `modal_open()`：Canvas Size、Fill、Color Picker 或错误提示打开时为真，此时命令与单键快捷键都不执行。
 
 ## DocState

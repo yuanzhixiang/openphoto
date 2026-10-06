@@ -24,5 +24,6 @@
   - ⇧F5 打开 Fill 对话框，Enter 后填充前景色。
   - 油漆桶单击填充整片连通区域，记录「Paint Bucket」。
   - 移动工具拖动图层上的色块，方向键和 Shift+方向键微移，分别记录「Move」和「Nudge」；没有选区时拖动背景图层弹出锁定提示。
-- `drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标。
+  - 选区填红后 ⌘C、粘贴（以 egui-winit 实际送出的 `Event::Paste` 模拟 ⌘V）：得到「Layer 1」，叠在原位置，选区被取消，记录「Paste」；在新图层上 ⌘X 剪掉一半，记录「Cut」；复制只有透明像素的区域时弹出「selected area is empty」提示。
+- `drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标；`layer_pixel(harness, layer, x, y)` 读取某个图层（自底向上的序号）的像素。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。

@@ -14,12 +14,13 @@
 2. `op_render::install` 注册画布管线。依赖 wgpu 渲染后端，缺失时直接 panic（应用只支持 wgpu）。
 3. macOS 上 `menu::NativeMenu::install`。`new_headless` 跳过这一步，供无窗口 UI 测试使用（见 `ui_tests.md`）。
 4. macOS 上 `color_management::use_srgb` 把窗口的 Metal 图层标记为 sRGB（见 `color_management.md`）。`new_headless` 没有窗口，同样跳过。
-5. 有命令行文件时逐个打开；没有时新建一个 1920×1080 白色背景的「Untitled-1」文档。
+5. 连接系统剪贴板（`clipboard::Clipboard::new(true)`）。`new_headless` 跳过这一步，测试不会改动用户的剪贴板。
+6. 有命令行文件时逐个打开；没有时新建一个 1920×1080 白色背景的「Untitled-1」文档。
 
 ## 每帧流程
 
 1. 拖放进窗口的文件逐个打开。
-2. 执行命令：macOS 上有原生菜单时，取菜单事件和 egui 补充捕获的 ⌘=；没有原生菜单时（其它平台、无窗口测试），由 egui 处理全部快捷键（见 `commands.md`）。
+2. 执行命令：先记下是否有输入框获得焦点（`AppState::typing`）。macOS 上有原生菜单时，取菜单事件和 egui 补充捕获的 ⌘=；没有原生菜单时（其它平台、无窗口测试），由 egui 处理全部快捷键（见 `commands.md`）。
 3. 处理单键快捷键（工具、D、X）。
 4. 按顺序排布区域（egui 面板先加的在外侧），尺寸按 Photoshop 1:1 量取（pt）：
    - 标题栏（仅 macOS，高 29，含底部 1 pt 分隔线）
@@ -31,6 +32,10 @@
    这些面板都不使用 egui 自带的分隔线，边框由各区域按 Photoshop 自己绘制。
 5. 确定当前文档：当前文档已不存在时，改为最后一个标签（见 `doc_tabs.rs` 的 `ensure_active`）。
 6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、Fill 对话框、Color Picker（画在前两者之上）、macOS 菜单状态同步、错误提示对话框。
+
+## 输入注入
+
+`raw_input_hook` 在 egui 处理每帧输入之前，把 `AppState::forward_events` 里的事件追加到原始输入中并清空它。菜单的 Cut/Copy/Paste 转交给输入框时用到（见 `commands.md`「剪贴板」）。
 
 ## 文档标签
 

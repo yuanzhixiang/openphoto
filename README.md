@@ -22,9 +22,8 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 
 ### P1
 
-3. **剪贴板**：Edit › Cut（⌘X）、Copy（⌘C）、Copy Merged（⇧⌘C）、Paste（⌘V）、Paste Special。
-4. **图层操作**：
-    - 图层可以超出画布：目前图层与画布同样大，移动到画布外的像素会丢失。
+3. **图层操作**：
+    - 图层可以超出画布：目前图层与画布同样大，移动到画布外、以及粘贴时超出画布的像素会丢失。
     - Layer › Duplicate Layer...、Rename Layer...（以及双击图层名重命名）。
     - Layer › New › Layer from Background...（以及双击背景图层转为普通图层）、Layer Via Copy（⌘J）、Layer Via Cut（⇧⌘J）。
     - 在 Layers 面板拖动调整图层顺序；Layer › Arrange（Bring to Front 等）。
@@ -32,34 +31,34 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
     - Group Layers（⌘G）、Ungroup Layers（⇧⌘G）与图层组。
     - Layers 面板多选、Select › All Layers（⌥⌘A）、Delete › Hidden Layers。
     - 「Layer...」新建图层对话框（⇧⌘N 在 Photoshop 中会先弹出这个对话框）。
-5. **图像尺寸与方向**：Image › Image Size...（⌥⌘I，含重采样）、Image Rotation（180°、90° 顺/逆时针、任意角度、水平/垂直翻转画布）、Crop、Trim...、Reveal All。
-6. **裁剪工具**：裁剪框的拖动、比例约束、确认/取消。
-7. **变换**：Edit › Free Transform（⌘T）、Transform 子菜单（缩放、旋转、斜切、扭曲、透视、翻转、旋转 90°/180°）。
-8. **调整**：Image › Adjustments 的 Invert（⌘I）、Desaturate（⇧⌘U）、Brightness/Contrast、Levels（⌘L）、Curves（⌘M）、Exposure、Hue/Saturation（⌘U）、Color Balance（⌘B）、Black & White、Threshold、Posterize、Vibrance、Photo Filter、Channel Mixer、Gradient Map、Selective Color、Shadows/Highlights、Equalize、Replace Color、Match Color；Auto Tone/Contrast/Color。
-9. **滤镜**：Blur（Gaussian Blur、Box Blur、Motion Blur 等）、Sharpen（Unsharp Mask、Smart Sharpen 等）、Noise（Add Noise、Median 等）、Pixelate、Stylize、Distort、Render、Other（High Pass、Offset、Minimum/Maximum）、Last Filter（⌃⌘F）。
-10. **文件**：保存与打开 PSD（File › Save ⌘S、Save As... ⇧⌘S、Save a Copy...）、Revert（F12）、Open Recent、File › New 对话框（尺寸、分辨率、背景内容）、Quick Export as PNG、关闭有未保存更改的文档时的确认。
-11. **其它工具**：画笔的笔刷预设、笔尖形状、压感与平滑，画笔模式（Multiply 等）和橡皮擦的 Pencil/Block 模式；渐变工具、吸管的取样大小选项、颜色取样器、套索/多边形套索/磁性套索、魔棒与快速选择、仿制图章、污点修复画笔、模糊/锐化/涂抹、减淡/加深/海绵、历史记录画笔、背景橡皮擦与魔术橡皮擦、旋转视图（R）。工具栏按住按钮弹出同组工具列表（目前只支持右键）。
-12. **视图**：标尺（⌘R）、参考线与 View › Guides、网格、对齐（⇧⌘;）、Extras（⌘H）、屏幕模式（F）、Fit Layer(s) on Screen、200%、Print Size、Flip Horizontal，状态栏缩放框可输入。
-13. **面板**：Navigator、Info、Histogram、Brushes 与 Brush Settings、Channels、Paths、Adjustments、Gradients、Patterns、Styles、Actions、Character、Paragraph、Tool Presets、Clone Source、Layer Comps、Notes、Timeline 等；面板拖动停靠、浮动、折叠为图标，Window › Workspace。
+4. **图像尺寸与方向**：Image › Image Size...（⌥⌘I，含重采样）、Image Rotation（180°、90° 顺/逆时针、任意角度、水平/垂直翻转画布）、Crop、Trim...、Reveal All。
+5. **裁剪工具**：裁剪框的拖动、比例约束、确认/取消。
+6. **变换**：Edit › Free Transform（⌘T）、Transform 子菜单（缩放、旋转、斜切、扭曲、透视、翻转、旋转 90°/180°）。
+7. **调整**：Image › Adjustments 的 Invert（⌘I）、Desaturate（⇧⌘U）、Brightness/Contrast、Levels（⌘L）、Curves（⌘M）、Exposure、Hue/Saturation（⌘U）、Color Balance（⌘B）、Black & White、Threshold、Posterize、Vibrance、Photo Filter、Channel Mixer、Gradient Map、Selective Color、Shadows/Highlights、Equalize、Replace Color、Match Color；Auto Tone/Contrast/Color。
+8. **滤镜**：Blur（Gaussian Blur、Box Blur、Motion Blur 等）、Sharpen（Unsharp Mask、Smart Sharpen 等）、Noise（Add Noise、Median 等）、Pixelate、Stylize、Distort、Render、Other（High Pass、Offset、Minimum/Maximum）、Last Filter（⌃⌘F）。
+9. **文件**：保存与打开 PSD（File › Save ⌘S、Save As... ⇧⌘S、Save a Copy...）、Revert（F12）、Open Recent、File › New 对话框（尺寸、分辨率、背景内容，以及按剪贴板内容尺寸新建）、Quick Export as PNG、关闭有未保存更改的文档时的确认。
+10. **其它工具**：画笔的笔刷预设、笔尖形状、压感与平滑，画笔模式（Multiply 等）和橡皮擦的 Pencil/Block 模式；渐变工具、吸管的取样大小选项、颜色取样器、套索/多边形套索/磁性套索、魔棒与快速选择、仿制图章、污点修复画笔、模糊/锐化/涂抹、减淡/加深/海绵、历史记录画笔、背景橡皮擦与魔术橡皮擦、旋转视图（R）。工具栏按住按钮弹出同组工具列表（目前只支持右键）。
+11. **视图**：标尺（⌘R）、参考线与 View › Guides、网格、对齐（⇧⌘;）、Extras（⌘H）、屏幕模式（F）、Fit Layer(s) on Screen、200%、Print Size、Flip Horizontal，状态栏缩放框可输入。
+12. **面板**：Navigator、Info、Histogram、Brushes 与 Brush Settings、Channels、Paths、Adjustments、Gradients、Patterns、Styles、Actions、Character、Paragraph、Tool Presets、Clone Source、Layer Comps、Notes、Timeline 等；面板拖动停靠、浮动、折叠为图标，Window › Workspace。
 
 ### P2
 
-14. **文字**：横排/直排文字工具、Character 与 Paragraph 面板、Type 菜单（抗锯齿、转为形状、变形文字、栅格化等）。
-15. **路径与形状**：钢笔/自由钢笔/弯度钢笔、锚点工具、路径选择/直接选择、Paths 面板；矩形、椭圆、三角形、多边形、直线、自定形状工具与形状图层、Combine Shapes。
-16. **蒙版**：图层蒙版、矢量蒙版、剪贴蒙版（⌥⌘G）、快速蒙版（Q）、Select and Mask（⌥⌘R）、存储/载入选区。
-17. **图层样式**：Blending Options、斜面和浮雕、描边、内阴影、内发光、光泽、颜色/渐变/图案叠加、外发光、投影。
-18. **填充图层与调整图层**：Layer › New Fill Layer、New Adjustment Layer。
-19. **选择菜单其余项**：Color Range、Focus Area、Modify（Border、Smooth、Expand、Contract、Feather）、Grow、Similar、Transform Selection；选框工具的 Fixed Ratio / Fixed Size 样式。
-20. **颜色模式与位深**：Image › Mode 的灰度、位图、双色调、索引颜色、CMYK、Lab、多通道，16/32 位每通道；Color Settings、Assign/Convert to Profile；CMYK 与 Photoshop 一致的数值（需要 ICC 色彩管理）。
-21. **Color Picker 余项**：「Add to Swatches」的命名对话框、Color Libraries、CMYK 色域外警告、打开拾色器期间在文档上吸取颜色。
-22. **History 面板余项**：快照、从状态新建文档、历史记录画笔源、按操作类型显示不同图标、History Options。
+13. **文字**：横排/直排文字工具、Character 与 Paragraph 面板、Type 菜单（抗锯齿、转为形状、变形文字、栅格化等）。
+14. **路径与形状**：钢笔/自由钢笔/弯度钢笔、锚点工具、路径选择/直接选择、Paths 面板；矩形、椭圆、三角形、多边形、直线、自定形状工具与形状图层、Combine Shapes。
+15. **蒙版**：图层蒙版（包括 Edit › Paste Special › Paste Into ⌥⇧⌘V 与 Paste Outside）、矢量蒙版、剪贴蒙版（⌥⌘G）、快速蒙版（Q）、Select and Mask（⌥⌘R）、存储/载入选区。
+16. **图层样式**：Blending Options、斜面和浮雕、描边、内阴影、内发光、光泽、颜色/渐变/图案叠加、外发光、投影。
+17. **填充图层与调整图层**：Layer › New Fill Layer、New Adjustment Layer。
+18. **选择菜单其余项**：Color Range、Focus Area、Modify（Border、Smooth、Expand、Contract、Feather）、Grow、Similar、Transform Selection；选框工具的 Fixed Ratio / Fixed Size 样式。
+19. **颜色模式与位深**：Image › Mode 的灰度、位图、双色调、索引颜色、CMYK、Lab、多通道，16/32 位每通道；Color Settings、Assign/Convert to Profile；CMYK 与 Photoshop 一致的数值（需要 ICC 色彩管理）。
+20. **Color Picker 余项**：「Add to Swatches」的命名对话框、Color Libraries、CMYK 色域外警告、打开拾色器期间在文档上吸取颜色。
+21. **History 面板余项**：快照、从状态新建文档、历史记录画笔源、按操作类型显示不同图标、History Options。
 
 ### P3
 
-23. **智能对象与智能滤镜**、Place Embedded/Linked、Package。
-24. **画板与 Frame 工具**、切片工具与 Save for Web、Export 子菜单其余项（Artboards/Layer Comps/Layers to Files 等）。
-25. **视频与动画**：Timeline、Video Layers、Render Video。
-26. **自动化**：Actions、Batch、Scripts、Image Processor、Droplet、Data Sets 与 Variables。
-27. **专业滤镜与工具**：Liquify、Camera Raw Filter、Lens Correction、Adaptive Wide Angle、Vanishing Point、Puppet Warp、Perspective Warp、Content-Aware Scale/Fill/Move、Auto-Align/Blend Layers、Photomerge、Merge to HDR Pro、Apply Image、Calculations、Trap、Analysis（测量、计数）、3D/Materials。
-28. **依赖 Adobe 云与 AI 的功能**：Generative Fill/Expand/Upscale、Generate Image、Neural Filters、AI Denoise/Sharpen、Select Subject/Sky、Sky Replacement、Remove Background、Reflection Removal、Harmonize、Adobe Stock、Libraries、Bridge、Firefly Boards、Invite to Edit、Share for Review、Version History、Content Credentials、上下文任务栏（Contextual Task Bar）。
-29. **其它**：打印、File Info、Plugins 菜单、Keyboard Shortcuts 与 Menus 自定义、Preset Manager、Purge、Help 菜单内容。
+22. **智能对象与智能滤镜**、Place Embedded/Linked、Package。
+23. **画板与 Frame 工具**、切片工具与 Save for Web、Export 子菜单其余项（Artboards/Layer Comps/Layers to Files 等）。
+24. **视频与动画**：Timeline、Video Layers、Render Video。
+25. **自动化**：Actions、Batch、Scripts、Image Processor、Droplet、Data Sets 与 Variables。
+26. **专业滤镜与工具**：Liquify、Camera Raw Filter、Lens Correction、Adaptive Wide Angle、Vanishing Point、Puppet Warp、Perspective Warp、Content-Aware Scale/Fill/Move、Auto-Align/Blend Layers、Photomerge、Merge to HDR Pro、Apply Image、Calculations、Trap、Analysis（测量、计数）、3D/Materials。
+27. **依赖 Adobe 云与 AI 的功能**：Generative Fill/Expand/Upscale、Generate Image、Neural Filters、AI Denoise/Sharpen、Select Subject/Sky、Sky Replacement、Remove Background、Reflection Removal、Harmonize、Adobe Stock、Libraries、Bridge、Firefly Boards、Invite to Edit、Share for Review、Version History、Content Credentials、上下文任务栏（Contextual Task Bar）。
+28. **其它**：打印、File Info、Plugins 菜单、Keyboard Shortcuts 与 Menus 自定义、Preset Manager、Purge、Help 菜单内容。

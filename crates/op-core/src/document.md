@@ -35,6 +35,8 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `new_with_background(title, width, height, background)`：File > New。生成单一背景图层（名为 `"Background"`、`is_background = true`），用 `background` 颜色填满，并设为活动图层。分辨率 72 ppi，RGB，8 位。
 - `from_rgba8(title, width, height, pixels)`：从紧密排列的 RGBA8 缓冲区打开一个扁平位图，得到单一图层并设为活动图层，规则与 Photoshop 打开图片时一致：所有像素的 alpha 都是 255 时，是名为 `"Background"` 的背景图层（`is_background = true`）；只要有一个像素的 alpha 小于 255，就是名为 `"Layer 0"` 的普通图层，文档因此没有背景图层。其余元数据同上（72 ppi、RGB、8 位）。
 - `new_layer_id()`：从全局计数器分配新的 `LayerId`；它不修改文档，也不把图层加入列表。
+- `next_layer_name()`：新图层的名字「Layer N」，N 为现有「Layer 数字」名称中最大的数字加 1，没有时为 1，与 Photoshop 一致。
+- `insert_above_active(layer)`：把图层插到活动图层正上方（没有活动图层时放在最上面），设为活动图层，并 `mark_dirty()`。
 - `revision()` / `mark_dirty()`：读取 / 递增修订号。修订号在每次像素或图层属性变化时递增，渲染层与图层缩略图缓存据此判断是否需要刷新。
 - `snapshot()` / `restore(snapshot)`：生成 / 恢复快照。`restore` 会覆盖宽高、分辨率、图层与活动图层，并调用 `mark_dirty()`。
 - `resize_canvas(width, height, anchor, fill)`：Image > Canvas Size。
