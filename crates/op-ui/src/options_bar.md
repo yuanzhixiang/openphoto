@@ -58,7 +58,15 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
   两个复选框都默认关闭，值保存在 `AppState::move_options` 并生效，行为见 `document_view.md`「移动工具」。
 - **抓手、缩放工具**：「100%」和「Fit Screen」两个按钮，作用于当前文档。
 - **裁剪工具**（`crop_bar`，绝对定位，坐标为距选项栏左边的 pt，Photoshop 2026 实测，与截图相差 1–2 px）：比例菜单 (110–201，显示「W x H x Reso...」或预设名)；W 输入框 (205–272.5)；交换按钮（实心双箭头，中心 290.25）；H 输入框 (310–376)；W x H x Resolution 类时分隔线 380、分辨率框 (385–439.5)、单位下拉「px/in / px/cm」(442.5–496.5)、分隔线 500.5；Clear (506–552.5，`#454545` 底 `#666666` 边)；Straighten 图标（中心 574）与文字（x 592）；分隔线 649.5；叠加菜单（网格图标，中心 670.75：六种叠加、Auto/Always/Never Show Overlay、Cycle Overlay、置灰的 Cycle Orientation）；齿轮菜单（中心 705：Use Classic Mode、Show Cropped Area、Auto Center Preview、Enable Crop Shield、Opacity、Auto Adjust Opacity）；分隔线 726.5；「Delete Cropped Pixels」复选框 (735)；「Fill:」(870.5) 与下拉 (892–1023.5，Background (default)，Generative Expand 与 Content-Aware Fill 置灰)；ⓘ (1042)；复位 (1070.5，框没变时置灰)；框改变后出现取消 ⦸ (1103.75) 与确认 ✓ (1138.5)。Ratio 类没有分辨率框，Clear 及其后的元素左移 121 pt。这一栏比 1350 pt 的窗口宽，所以右侧的 Share 等应用按钮整体右移（Share 在 1166.5，头像被窗口裁掉一半），与 Photoshop 一致。
-- **自由变换进行中**（不论当前工具）：「W:」「H:」两个只读百分比字段、分隔线、角度图标与只读角度字段；右侧原本的 Share、Search 等按钮换成取消（⦸，「Cancel transform (Esc)」）和确认（✓，「Commit transform (Return)」）两个按钮。
+- **自由变换进行中**（不论当前工具，`transform_bar`，绝对定位，Photoshop 2026 实测，坐标为距选项栏左边的 pt）：
+  - Home、工具预设（换成暗色的变换图标：带控制点的框与箭头）、右侧的 Share 和 Workspace 都变暗、不可点，Bell、Search、Discover 照常。
+  - 参考点复选框（13.5 pt 圆角框，中心 120.25，默认不勾选）与 3 × 3 参考点格（中心 146，未勾选时暗色，勾选后可点选参考点，所选为实心）。
+  - 「X:」(163) 输入框 (174.5–235.5)、相对定位 △（中心 250.75，打开时有底色，X/Y 显示相对开始位置的位移）、「Y:」(268.5) 输入框 (279.5–340)，显示参考点当前位置，如「60.00 px」。
+  - 分隔线 343.5；「W:」(349) 输入框 (362.5–417)；链接按钮 (420–446，打开时 `#383838` 底 `#636363` 边，默认打开)；「H:」(450.5) 输入框 (463–517)，如「100.00%」。
+  - 分隔线 520.5；角度图标 (532.25) 与输入框 (542.5–597) 和「°」；分隔线 609.5；斜切「H:」(617) 输入框 (629.5–677.5)「°」，「V:」(691.5) 输入框 (702.5–750.5)「°」。
+  - 分隔线 763.5；「Interpolation:」(770) 与下拉 (839.5–901.5)：Nearest Neighbor、Bilinear、Bicubic（默认）、Bicubic Smoother、Bicubic Sharper、Bicubic Automatic。
+  - 变形切换图标（919，暗色，还没有变形）；分隔线 935；取消 ⦸ (983) 与确认 ✓ (1011.5)。
+  - 输入框（`value_box`）：获得焦点时保留输入的文字，按 Enter 或失去焦点时提交（可带「px」「%」「°」），提交用的 Enter 不再传给画布（否则会确认变换）。W、H、角度、斜切的修改以参考点为轴（`FreeTransform::pivoting`）；链接时 W 与 H 按比例一起变。有自由四角（扭曲后）时输入框不可用。
 - **其它工具**：不显示工具选项。
 
 ## 已知限制

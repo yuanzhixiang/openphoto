@@ -70,3 +70,7 @@ Edit › Transform 的固定变换：`Rotate180`、`Rotate90Clockwise`、`Rotate
 
 - `projective_maps_the_box_onto_any_quad`：梯形的四角精确对应、逆映射、平行四边形是仿射、与仿射映射一致。
 - `distorting_the_layer`：把方块的上边两角向内收，上面一行的覆盖少于下面一行。
+
+## 插值（`Interpolation`）
+
+自由变换选项栏的六种：Nearest Neighbor、Bilinear、Bicubic（默认，Keys a = −0.5）、Bicubic Smoother（Mitchell–Netravali）、Bicubic Sharper（a = −0.75）、Bicubic Automatic（按 Bicubic）。`transform_with(doc, m, background, how)` 按所选方法采样（预乘颜色，三次核的过冲被限制在有效范围内）；`transform` 用 Bicubic；选区的遮罩总是双线性。`Affine::skew(h, v)` 为水平、竖直斜切。测试 `interpolation_methods`：放大 2 倍时邻近保持硬边、双线性有过渡、各方法中间都是实心。

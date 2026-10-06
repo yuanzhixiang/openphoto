@@ -6,7 +6,7 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
 
 ## 状态
 
-会话保存在 `DocState::free_transform`（`FreeTransform`）：开始时的文档快照 `before`、原始范围 `bounds`、平移 `offset`、缩放 `scale`、角度 `angle`、自由四角 `quad`（斜切、扭曲、透视之后才有：左上、右上、右下、左下，文档像素）、模式 `mode`（`TransformMode`：Free、Skew、Distort、Perspective）、进行中的拖动 `drag`，以及文档当前显示的变换 `applied`（`Projective`）。框的映射 `mapping()`：有自由四角时为范围到四角的投影变换（`Projective::rect_to_quad`），否则为 `Affine::around(范围中心, scale, angle, offset)`。
+会话保存在 `DocState::free_transform`（`FreeTransform`）：开始时的文档快照 `before`、原始范围 `bounds`、平移 `offset`、缩放 `scale`、角度 `angle`、斜切 `skew`（水平与竖直，弧度）、参考点 `reference` 与是否显示 `show_reference`、相对定位 `relative`、宽高链接 `linked`、插值 `interpolation`、自由四角 `quad`（斜切、扭曲、透视之后才有：左上、右上、右下、左下，文档像素）、模式 `mode`（`TransformMode`：Free、Skew、Distort、Perspective）、进行中的拖动 `drag`，以及文档当前显示的变换 `applied`（`Projective`）。框的映射 `mapping()`：有自由四角时为范围到四角的投影变换（`Projective::rect_to_quad`），否则为「平移到范围中心 + offset · 旋转 angle · 斜切 skew · 缩放 scale · 平移回范围中心」。预览用所选插值（`transform_with`）。
 
 ## 流程
 
@@ -41,7 +41,8 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
 - 框：1 pt 蓝色（`#2c8be8`）细线。
 - 控制点：7 pt 白色方块，深灰描边。
 - 中心参考点：半径 4 pt 的圆加十字线。
-- 选项栏（见 `options_bar.md`）显示 W、H 百分比与角度，右侧是取消与确认按钮。
+- 参考点（半径 4 pt 的圆加十字线）只在选项栏的参考点复选框打开时显示，位置为所选参考点（默认中心）变换后的位置；Photoshop 2026 默认不显示。
+- 选项栏（见 `options_bar.md`）：参考点、X、Y、W、H、角度、斜切、插值、取消与确认。
 
 ## 移动工具的变换控件
 
@@ -50,7 +51,7 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
 ## 已知限制
 
 - 选项栏的数值只读，不能输入；没有参考点位置选择、插值方式选择。
-- 没有变形（Warp 与 Split Warp）、Content-Aware Scale、Puppet Warp。有自由四角时选项栏的 W、H、角度仍显示参数框的数值。
+- 没有变形（Warp 与 Split Warp）、Content-Aware Scale、Puppet Warp。鼠标的缩放与旋转仍以中心为轴（参考点只影响选项栏的数值修改与 X/Y）；参考点不能在画布上拖动。
 
 ## 测试覆盖
 
@@ -60,3 +61,5 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
 - `distort_skew_and_perspective`：⌘ 拖右下角只移动它，之后普通拖动继续扭曲；透视模式下右上角外拉、左上角内收；⌘⇧ 拖右边沿自身滑动；映射跟随四角。
 - `turning_and_flipping_the_box`：右键菜单的旋转与翻转改变参数框的角度与缩放；自由四角绕中点转 180°。
 - `ui_tests::transform_distort_from_the_menu`：Edit › Transform › Distort 后拖右下角，确认记录「Free Transform」，远角变红而左上角不动，Transform Again 可用。
+- `options_bar_numbers_pivot_on_the_reference_point`：参考点在左上时 W 50% 保持左上角不动；绕中心转 90° 中心不动；45° 水平斜切让左上角左移。
+- `ui_tests::transform_bar_takes_typed_numbers`：在 W 框输入 50 回车，W、H 都变为 50% 且仍在变换中；角度输入 90 后中心不动。
