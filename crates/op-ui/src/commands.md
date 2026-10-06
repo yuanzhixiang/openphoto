@@ -69,10 +69,10 @@
 | NewLayerNoDialog | 不弹对话框直接新建图层（`panels::new_layer`），与 Photoshop 的 ⌥⇧⌘N 一致；不在菜单里 | ⌥⇧⌘N |
 | DeleteLayer | Layer › Delete › Layer | 无 |
 | ToggleLayerVisibility | Layer › Hide Layers / Show Layers | ⌘, |
-| LayerFromBackground | Layer › New › Layer from Background | 无 |
+| LayerFromBackground | Layer › New › Layer from Background...：打开 New Layer 对话框的 Layer from Background 版本（`dialogs/new_layer.md`） | 无 |
 | LayerViaCopy | Layer › New › Layer Via Copy | ⌘J |
 | LayerViaCut | Layer › New › Layer Via Cut | ⇧⌘J |
-| DuplicateLayer | Layer › Duplicate Layer | 无 |
+| DuplicateLayer | Layer › Duplicate Layer...：打开 Duplicate Layer 对话框（`dialogs/duplicate_layer.md`），文档列表为当前文档在前、其余打开的文档按标签顺序，新文档的默认标题为下一个「Untitled-N」 | 无 |
 | DeleteHiddenLayers | Layer › Delete › Hidden Layers | 无 |
 | BringToFront | Layer › Arrange › Bring to Front | ⇧⌘] |
 | BringForward | Layer › Arrange › Bring Forward | ⌘] |

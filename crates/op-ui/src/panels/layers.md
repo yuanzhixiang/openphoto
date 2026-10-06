@@ -41,7 +41,8 @@
 - Layer › Hide Layers（⌘,）也会切换当前图层的可见性，同样不记录历史。
 - 拖动图层行：拖动期间在指针最接近的两行之间画一条 2 pt 的强调色横线，表示松开后的位置；松开后移动图层（`layer_ops::move_layer`），记录「Layer Order」。目标位置不允许（背景图层本身不能移动，也不能把图层放到背景图层下面，或位置没有变化）时不画横线，松开后什么也不做。
 - 双击图层名称（缩略图右侧）：在名称处打开输入框，名称全选。Enter 或点击别处确认，Esc 取消；名称改变且不为空时改名（首尾空白去掉），记录「Rename Layer」。正在输入时单键快捷键不生效。
-- 双击背景图层名称、或点击背景图层右侧的锁图标：把背景图层转为普通图层「Layer 0」（`layer_ops::layer_from_background`），记录「Layer From Background」。Photoshop 双击背景图层时会先弹出「New Layer」对话框询问名称，这里直接转换。
+- 双击背景图层名称：与 Photoshop 一样弹出 New Layer 对话框的 Layer from Background 版本（`dialogs/new_layer.md`），确认后转为普通图层。
+- 点击背景图层右侧的锁图标：不弹对话框，直接转为普通图层「Layer 0」（`layer_ops::layer_from_background`），记录「Layer From Background」，与 Photoshop 一致。
 
 ## 背景图层
 

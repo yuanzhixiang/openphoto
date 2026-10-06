@@ -36,7 +36,7 @@
 - Phosphor 图标字体作为回退字体加在比例字体族末尾，所以图标可以直接写在文字里。
 - 分隔与折叠条颜色（Photoshop 2026 实测）：3 pt 分隔条和折叠条的线 `DIVIDER_DARK` `#383838`、分隔条中间的线 `DIVIDER_LIGHT` `#474747`、折叠条底色 `COLLAPSE_BAR` `#424242`、折叠箭头 `COLLAPSE_CHEVRON` `#c8c8c8`；面板标签文字 `TAB_TEXT_ACTIVE` `#f0f0f0`、`TAB_TEXT` `#b0b0b0`。
 - 选项栏颜色（Photoshop 2026 实测）：底色 `OPTIONS_BAR` `#535353`、分隔线 `OPTIONS_SEPARATOR` `#3e3e3e`、图标 `OPTIONS_ICON` `#dddddd`、铃铛 `OPTIONS_BELL` `#b9b9b9`、禁用图标 `OPTIONS_ICON_DISABLED` `#989898`、标签文字 `TEXT_BRIGHT` `#f0f0f0`；复选框 `CHECKBOX` `#d4d4d4` 与对勾 `CHECK_MARK` `#323232`；下拉框边框 `DROPDOWN_BORDER` `#666666`（悬停 `DROPDOWN_BORDER_HOVER` `#808080`）。
-- 对话框字体：Photoshop 的对话框使用 macOS 系统字体 SF。运行时从 `/System/Library/Fonts/SFNS.ttf` 读取（不随应用分发），按可变字体的 `wght` 轴注册两个字体族：`dialog`（字重 510，比 Regular 略重，接近 Photoshop 中的显示效果）和 `dialog-bold`（700），后面依次接界面字体作为回退。读不到时（非 macOS）只有回退字体，即 Source Sans 3。`dialog(size)`、`dialog_bold(size)` 返回对应字体。目前 New Layer 对话框使用它们，其它对话框仍用 Source Sans 3。
+- 对话框字体：Photoshop 的对话框使用 macOS 系统字体 SF。运行时从 `/System/Library/Fonts/SFNS.ttf` 读取（不随应用分发），按可变字体的 `wght` 轴注册三个字体族：`dialog`（400）、`dialog-medium`（510，比 Regular 略重，Photoshop 新式对话框如 New Layer 中文字的样子）和 `dialog-bold`（700），后面依次接界面字体作为回退。读不到时（非 macOS）只有回退字体，即 Source Sans 3。`dialog(size)`、`dialog_medium(size)`、`dialog_bold(size)` 返回对应字体。目前 New Layer 与 Duplicate Layer 对话框使用它们，其它对话框仍用 Source Sans 3。
 - Phosphor Bold 单独注册为字体族 `phosphor-bold`，`tool_icon(size)` 返回它，只用于工具栏和工具列表的图标。
 
 ## egui 样式（`apply_style`）

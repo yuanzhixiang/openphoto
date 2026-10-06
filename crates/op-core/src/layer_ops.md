@@ -9,6 +9,10 @@
 ### 复制
 
 - `duplicate(doc)`：Layer › Duplicate Layer。在活动图层正上方插入一个完全相同的图层（像素、可见性、不透明度、Fill、混合模式、锁定都相同）并设为活动图层，返回新 ID；没有活动图层时返回 `None`。名称为「原名 copy」，已存在时依次为「原名 copy 2」「原名 copy 3」……，与 Photoshop 一致。背景图层的副本是普通图层。
+- `duplicate_name(doc)`：Duplicate Layer 对话框「As」的默认值（与 `duplicate` 的命名规则相同）。
+- `duplicate_named(doc, name)`：复制到同一文档，名称为 `name`。
+- `duplicate_into(source, target, name)`：把 `source` 的活动图层复制到另一个文档 `target`：像素位置不变（`with_canvas` 平移 0，超出 `target` 画布的像素保留在画布外），图层蒙版扩展（显示）或裁到新画布，背景图层的副本是普通图层；插在 `target` 活动图层上方并设为活动图层。
+- `duplicate_to_new(source, title, name)`：生成一个与 `source` 同尺寸、同分辨率、标题为 `title` 的新文档，里面只有活动图层的副本 `name`。
 - `via_copy(doc)`：Layer › New › Layer Via Copy（⌘J）。
   - 没有选区：复制整个图层。背景图层的副本按 `next_layer_name` 命名为「Layer N」，普通图层的副本命名为「原名 copy」（规则同上）。
   - 有选区：把选区内的像素（规则同 Edit › Copy，见 `clipboard.md`）放到原位置的新图层「Layer N」上；选区保留（与 Paste 不同）。选区内只有透明像素时返回 `ClipError::Empty`。
@@ -59,6 +63,7 @@
 
 ## 测试覆盖
 
+- `duplicate_layer_dialog_targets`：默认名「Background copy」；同文档改名复制；复制到更小的文档时位置不变、超出部分保留在画布外并成为活动图层；复制到新文档时尺寸、标题和唯一图层正确。
 - `duplicates_are_named_like_photoshop`：「copy」「copy 2」命名；⌘J 作用于背景图层得到「Layer 2」这样的普通图层。
 - `via_copy_and_cut_move_the_selection_in_place`：选区复制到「Layer N」并沿用不透明度、保留选区；剪切后原图层对应像素变透明。
 - `arrange_keeps_the_background_at_the_bottom`：Send to Back 停在背景之上，背景不能上移。

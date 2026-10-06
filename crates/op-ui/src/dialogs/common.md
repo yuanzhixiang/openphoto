@@ -16,3 +16,11 @@
 ## 使用方
 
 Canvas Size（`canvas_size.md`）、Fill（`fill.md`）和 Color Picker（`color_picker.md`）。
+
+## Photoshop 2026 新式对话框控件
+
+照 New Layer 对话框实测，供 New Layer、Duplicate Layer 等对话框使用（文字为系统字体，见 `theme.md`）：
+
+- `ps_dropdown(ui, rect, id, content, menu)`：圆角 3、1 pt `#7a7a7a` 边、面板色底（悬停变浅）的下拉框，内容由 `content` 画出，距右边 13.5 pt 是 10 × 6 pt 的 V 形箭头；点击弹出 `menu`。
+- `ps_checkbox(ui, min, label, checked, enabled)`：12 pt 见方、圆角 2.5 的复选框，未勾选时 1 pt `#a0a0a0` 边，勾选时为浅灰底加深色对勾；文字在框右 9.5 pt，点击框或文字都会切换；不可用时框和文字为 `#8e8e8e`。
+- `ps_button(ui, rect, label, default, enabled, bold)`：胶囊形按钮，1 pt 边：默认按钮 `#f1f1f1`、其它 `#727272`、不可用 `#5e5e5e`；标签 13 pt，`bold` 时为粗体（New Layer 这类新式对话框），否则为常规字重（Duplicate Layer 等）。

@@ -54,6 +54,10 @@
 - D：恢复默认颜色（前景黑、背景白）；X：交换前景色与背景色。
 - 其它字母：按 `op_tools::tool_for_key` 选择工具（规则见 `crates/op-tools/src/lib.md`），并让工具栏那一格显示所选工具。Shift+字母在同组工具间循环，与 Photoshop 一致。
 
+## 复制图层到其它文档（`duplicate_layer`）
+
+Duplicate Layer 对话框确认后调用，按目标分三种情况处理，见 `dialogs/duplicate_layer.md`。两个文档同时可变时用 `HashMap::get_disjoint_mut` 取出源文档和目标文档。
+
 ## 已知限制
 
 - 不处理 Q（快速蒙版）、F（屏幕模式）、R（旋转视图）等尚未实现功能的快捷键。
