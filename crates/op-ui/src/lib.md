@@ -31,7 +31,13 @@
    - 中间：有文档时，上面是文档标签栏，下面是当前文档的视图；没有文档时只有粘贴板底色。
    这些面板都不使用 egui 自带的分隔线，边框由各区域按 Photoshop 自己绘制。
 5. 确定当前文档：当前文档已不存在时，改为最后一个标签（见 `doc_tabs.rs` 的 `ensure_active`）。
-6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、Fill 对话框、Trim 对话框、调整对话框、Color Picker（画在前两者之上）、macOS 菜单状态同步、错误提示对话框。
+6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、Fill 对话框、Trim 对话框、调整对话框、「Save changes?」确认、Color Picker（画在前两者之上）、macOS 菜单状态同步、错误提示对话框。
+
+## 关闭窗口与退出
+
+- 每帧开始时检查窗口的关闭请求（点窗口的关闭按钮等）：还没有批准退出（`quit_approved`）且有文档存在未保存修改时，取消这次关闭（`ViewportCommand::CancelClose`），并像 Quit 一样开始逐个询问（还没有在询问时）。没有未保存修改时直接关闭。
+- 浮层阶段显示「Save changes?」确认（`save_prompt` 对应的文档已不存在时跳过并继续处理队列），回答交给 `actions::answer_save_prompt`。
+- `quit_approved` 为真时发送 `ViewportCommand::Close`，应用退出。
 
 ## 输入注入
 

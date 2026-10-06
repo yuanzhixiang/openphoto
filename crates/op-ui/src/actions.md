@@ -2,9 +2,11 @@
 
 ## 职责
 
-文档的打开、新建、导出、关闭，剪贴板命令的执行，以及单键快捷键（工具切换、默认颜色、交换颜色）。带修饰键的快捷键属于命令，见 `commands.md`。
+文档的打开、新建、保存、恢复、导出、关闭（含未保存修改的确认）与退出，剪贴板命令的执行，以及单键快捷键（工具切换、默认颜色、交换颜色）。带修饰键的快捷键属于命令，见 `commands.md`。
 
 ## 打开
+
+- 打开成功后记下文档的文件路径（`DocState::path`）。
 
 - `open_dialog`：系统文件对话框，可多选，过滤为 `op_io::OPEN_EXTENSIONS` 列出的格式（PNG、JPEG、WebP、TIFF、BMP、GIF）。
 - `open_paths`：逐个打开，成功的作为新文档加入并成为当前文档，第一条历史为「Open」。失败时写日志，并通过 `alert` 弹出「Could not open “路径”: 原因」。
@@ -20,10 +22,17 @@
 
 ## 关闭
 
-- Close：关闭当前文档。
-- Close All：关闭全部文档。
-- Close Others：关闭当前文档以外的全部文档。
-- 关闭时同时移除标签和文档状态（`AppState::close_document`）。目前没有「是否保存更改」的确认（也还没有保存功能）。
+- Close：关闭当前文档；Close All：关闭全部文档；Close Others：关闭当前文档以外的全部文档；标签上的「×」关闭该文档。
+- 所有关闭都经过 `request_close(ids)`：把要关闭的文档放进 `close_queue`，`continue_closing` 依次处理：没有未保存修改的直接关闭（`AppState::close_document`，同时移除标签和文档状态）；有未保存修改的切换为当前文档，弹出「Save changes?」确认（`save_prompt`，见 `dialogs/save_changes.md`）并暂停。
+- `answer_save_prompt`：Save → 执行 Save（可能弹出 Save As 对话框），成功后关闭并继续处理队列；Don't Save → 直接关闭并继续；Cancel，或 Save As 对话框被取消、保存失败 → 清空队列，停止关闭（也停止退出）。
+- `quit`：Quit OpenPhoto 与关闭窗口：把全部文档放进队列并标记 `quit_after_close`；队列处理完时设置 `quit_approved`，`lib.rs` 随后关闭窗口、退出应用。
+
+## 保存
+
+- `save(id)`：File › Save。文档有文件、且文件能容纳它（PSD 总是可以；PNG/JPEG 等扁平格式只在只有一个图层时可以）时，直接写回该文件并标记为已保存；否则转到 Save As。返回是否保存成功。
+- `save_as(id, copy)`：File › Save As...（`copy` 为假）与 Save a Copy...（为真）。系统保存对话框，默认文件名为标题去掉扩展名加 `.psd`，默认目录为文档所在目录，格式过滤器为 `op_io::SAVE_FORMATS`。取消时返回假。
+- `save_to(id, path, copy)`：写入 `path`（失败时弹出「Could not save “路径”: 原因」）。之后：如果是副本，或所选格式无法容纳文档的图层（例如多图层文档存为 PNG，相当于 Photoshop 的「存储副本」），文档的文件、标题和已保存状态都不变；否则文档改用新文件，标题改为新文件名，并标记为已保存。
+- `revert()`：File › Revert（F12）。重新读取文档的文件，用它的内容替换文档（尺寸、图层、选区等，通过快照恢复），记录一条「Revert」历史并标记为已保存。读取失败时弹出提示。
 
 ## 剪贴板（`clipboard`）
 

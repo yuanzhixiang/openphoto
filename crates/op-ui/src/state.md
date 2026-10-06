@@ -20,17 +20,20 @@
 - `color_picker`：Color Picker 会话，打开期间为 `Some`，包含对话框和 `PickerTarget`（确定后写入前景色、背景色、Canvas Size 的扩展颜色，还是 Fill 对话框的 Color...）。`open_color_picker(target)` 以 Photoshop 的标题打开前景或背景色拾色器。
 - `swatches`：Swatches 面板的色板列表，初始为固定的 36 个颜色，Color Picker 的「Add to Swatches」会往末尾追加。只在本次运行中保留。
 - `alert`：待显示的错误信息。
+- 关闭与退出：`close_queue` 是等待关闭的文档；`save_prompt` 是正在询问「Save changes?」的文档；`quit_after_close` 表示队列处理完后要退出；`quit_approved` 表示可以关闭窗口了（见 `actions.md`「关闭」）。
 - `clipboard`：Cut/Copy/Paste 用的剪贴板（见 `clipboard.md`）。默认不连接系统剪贴板（无窗口测试不应改动用户的剪贴板），`OpenPhotoApp::new` 启动时换成连接系统剪贴板的版本。
 - `typing`：上一帧是否有输入框获得键盘焦点，每帧执行命令前更新。决定菜单的 Cut/Copy/Paste 作用于输入框还是文档。
 - `forward_events`：要注入 egui 下一帧输入的事件（菜单的 Cut/Copy/Paste 转交给输入框时使用，见 `commands.md`）。
 - `trim_dialog`：Trim 对话框，打开期间为 `Some`。
 - `adjust_dialog`：调整或滤镜对话框（见 `dialogs/adjust.md`），打开期间为 `Some`。
 - `last_filter`：上次成功应用的滤镜及其设置，供 Filter › Last Filter 使用；只在本次运行中保留，所有文档共用。
-- `modal_open()`：Canvas Size、Fill、Trim、调整对话框、Color Picker 或错误提示打开时为真，此时命令与单键快捷键都不执行。
+- `modal_open()`：Canvas Size、Fill、Trim、调整对话框、Color Picker、「Save changes?」确认或错误提示打开时为真，此时命令与单键快捷键都不执行。
 
 ## DocState
 
 - `doc`：`op_core::Document`。
+- `path`：文档打开自或最近保存到的文件；新建且未保存的文档为 `None`。
+- 未保存修改：`saved_state` 记录与磁盘文件（新建文档则为新建时）一致的历史状态 id。`is_dirty()` 在当前历史状态的 id 与它不同时为真（所以撤销回保存时的状态视为没有修改，与 Photoshop 一致）；`mark_saved()` 把当前状态记为已保存。
 - `untagged`：文档没有嵌入色彩配置文件（标签标题里显示「#」）。打开的文件为真，新建的文档为假。
 - `history`：该文档的 `op_core::History`。第一条状态名为「Open」（打开文件）或「New」（新建）。
 - `view`：视图状态，见下文。

@@ -7,7 +7,8 @@
 ## 对外接口
 
 - `DEFAULT_LIMIT = 50`：最大状态数，对应 Photoshop「历史记录状态」偏好的默认值。该上限包含第一条状态。`History` 没有修改上限的接口，上限始终是 50。
-- `HistoryState`：公开字段 `name`（面板上显示的步骤名，例如 `"Open"`、`"New"`、`"Canvas Size"`），快照私有。
+- `HistoryState`：公开字段 `name`（面板上显示的步骤名，例如 `"Open"`、`"New"`、`"Canvas Size"`）和 `id`（进程内唯一的编号，来自一个原子计数器，状态被删除后也不会复用），快照私有。
+- `current_id()`：当前状态的 `id`。界面层把保存时的 `current_id()` 记下来，之后不相等就表示有未保存的修改（撤销回保存时的状态视为没有修改）。
 - `History::new(doc, name)`：以文档当前内容作为第一条状态（通常名为 `"Open"` 或 `"New"`）。
 - `record(doc, name)`：在一次编辑之后调用，记录文档当前内容为新状态。
 - `states()`、`current()`：全部状态与当前状态下标。

@@ -15,6 +15,11 @@
 | Close | File › Close | ⌘W |
 | CloseAll | File › Close All | ⌥⌘W |
 | CloseOthers | File › Close Others | ⌥⌘P |
+| Save | File › Save | ⌘S |
+| SaveAs | File › Save As... | ⇧⌘S |
+| SaveACopy | File › Save a Copy... | ⌥⌘S |
+| Revert | File › Revert | F12 |
+| Quit | OpenPhoto › Quit OpenPhoto | ⌘Q |
 | ExportAs | File › Export › Export As... | ⌥⇧⌘W |
 | Undo | Edit › Undo | ⌘Z |
 | Redo | Edit › Redo | ⇧⌘Z |
@@ -88,7 +93,8 @@
 
 - 有输入框获得键盘焦点时（`AppState::typing`），Cut、Copy、CopyMerged、Paste、PasteInPlace 始终可用（包括模态对话框里的输入框），执行时作用于输入框的文字（见下文「剪贴板」）。
 - 除此之外，有模态对话框打开时所有命令不可用。
-- New、Open、ToggleHistory 始终可用。
+- New、Open、ToggleHistory、Quit 始终可用（有模态对话框时除外）。
+- Revert：当前文档有文件且有未保存修改时可用。Save、Save As、Save a Copy：有当前文档时可用。
 - Undo、ToggleLastState：当前文档能撤销时可用；Redo：能重做时可用。
 - DeleteLayer：当前文档的图层多于 1 个时可用。
 - CloseOthers：打开的文档多于 1 个时可用。
@@ -151,7 +157,7 @@ Cut、Copy、CopyMerged、Paste、PasteInPlace 由 `actions::clipboard` 执行�
 
 - **macOS**：带 ⌘ 的快捷键由原生菜单的 key equivalent 处理，egui 收不到这些按键。唯一的例外是 Zoom In：菜单项显示为 Photoshop 的 ⌘+，而 macOS 只在按住 Shift 时才匹配「+」，所以 `from_shortcuts_beside_menu` 额外在 egui 里捕获 ⌘=，转成 ZoomIn。
 - `Shortcut` 有 `cmd`（macOS 上为 Command）、`shift`、`alt`、`ctrl`（macOS 上的 Control 键）四个修饰键。传给 muda 时 `ctrl` 写作 `Ctrl+`，在 macOS 上就是 Control 键。
-- **没有原生菜单时**（其它平台，以及 macOS 上的无窗口测试）：`from_shortcuts` 在 egui 里按 `SHORTCUT_ORDER` 依次匹配全部快捷键。egui 的 `consume_key` 会忽略多按的 Shift/Alt，所以列表必须把更具体的组合放在前面（例如 ⇧⌘Z 在 ⌘Z 之前、⌥⌘W 在 ⌘W 之前、⇧⌘C 在 ⌘C 之前），否则会被误触发成另一个命令。ZoomIn 同时接受 ⌘= 和 ⌘+。
+- **没有原生菜单时**（其它平台，以及 macOS 上的无窗口测试）：有模态对话框时 `from_shortcuts` 不消费任何按键（所有命令此时都不可用，按键留给对话框，例如确认框里的 ⌘D「Don't Save」）；否则在 egui 里按 `SHORTCUT_ORDER` 依次匹配全部快捷键。egui 的 `consume_key` 会忽略多按的 Shift/Alt，所以列表必须把更具体的组合放在前面（例如 ⇧⌘Z 在 ⌘Z 之前、⌥⌘W 在 ⌘W 之前、⇧⌘C 在 ⌘C 之前），否则会被误触发成另一个命令。ZoomIn 同时接受 ⌘= 和 ⌘+。
 - egui-winit 不把 ⌘X/⌘C/⌘V 作为按键送出，而是转成 `Event::Cut`、`Event::Copy`、`Event::Paste`（而且只在系统剪贴板有文字时才送出 `Paste`）。`from_shortcuts` 把这些事件识别为 Cut、Copy（按住 Shift 时为 CopyMerged）、Paste（按住 Shift 时为 PasteInPlace）。正在输入框里输入时不识别剪贴板快捷键和事件，由输入框自己处理。
 
 ## 与 Photoshop 的差异

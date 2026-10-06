@@ -31,5 +31,6 @@
   - ⌘I 反相（#141414 → #ebebeb）并记录「Invert」；打开 Threshold 后文档立即预览为白色，Esc 取消后恢复，历史不变；Posterize 按 Enter 用默认 4 级应用并记录「Posterize」。
   - ⌘L 打开 Levels，在已聚焦的输入黑场输入 20 后文档预览为黑色，Enter 后记录「Levels」。
   - 白色方块上应用 Gaussian Blur（在聚焦的半径输入框输入 4，Enter），边缘变为中间值；之前 Last Filter 不可用，之后 ⌃⌘F 再应用一次并新增一条「Gaussian Blur」历史。
+  - 修改后标签标题以「 *」结尾；`save_to` 保存为 PSD 后标题变为新文件名、「*」消失；撤销到保存前算修改，重做回来不算；修改后按 F12 恢复为文件内容并记录「Revert」；关闭有修改的文档时弹出确认，Esc 取消后文档仍在，⌘D（Don't Save）后文档关闭。
 - `run_command(harness, command)` 直接执行一个命令（用于没有快捷键的菜单项）；`double_click(harness, pos)` 模拟一次双击；`drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标；`layer_pixel(harness, layer, x, y)` 读取某个图层（自底向上的序号）的像素。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。
