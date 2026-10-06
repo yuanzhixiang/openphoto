@@ -34,6 +34,7 @@
 - 字体文件随应用打包，字节数据以 `SOURCE_SANS_REGULAR`、`SOURCE_SANS_SEMIBOLD` 公开，文字工具也用它们栅格化文字。
 - 比例字体族首选 Source Sans 3 Regular；另有名为 `semibold` 的字体族（Source Sans 3 Semibold），用于标签和标题。
 - Phosphor 图标字体作为回退字体加在比例字体族末尾，所以图标可以直接写在文字里。
+- Phosphor Bold 单独注册为字体族 `phosphor-bold`，`tool_icon(size)` 返回它，只用于工具栏和工具列表的图标。
 
 ## egui 样式（`apply_style`）
 

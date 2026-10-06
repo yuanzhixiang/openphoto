@@ -8,7 +8,7 @@
 
 ### `Tool`
 
-68 个工具，涵盖 Photoshop 工具栏及各组弹出菜单里的全部工具，例如 `Move`、`Artboard`、`RectangularMarquee`、`EllipticalMarquee`、`SingleRowMarquee`、`SingleColumnMarquee`、`Lasso`、`PolygonalLasso`……`Hand`、`RotateView`、`Zoom`。
+70 个工具，涵盖 Photoshop 工具栏及各组弹出菜单里的全部工具，例如 `Move`、`Artboard`、`RectangularMarquee`、`EllipticalMarquee`、`SingleRowMarquee`、`SingleColumnMarquee`、`Lasso`、`PolygonalLasso`……`Hand`、`RotateView`、`Zoom`。
 
 ### `TOOLBAR`
 
@@ -18,7 +18,7 @@
 |---|---|
 | 1 | Move、Artboard |
 | 2 | Rectangular / Elliptical / Single Row / Single Column Marquee |
-| 3 | Lasso、Polygonal Lasso、Magnetic Lasso |
+| 3 | Lasso、Polygonal Lasso、Magnetic Lasso、Selection Brush |
 | 4 | Object Selection、Quick Selection、Magic Wand |
 | 5 | Crop、Perspective Crop、Slice、Slice Select |
 | 6 | Frame |
@@ -30,18 +30,19 @@
 | 12 | Eraser、Background Eraser、Magic Eraser |
 | 13 | Gradient、Paint Bucket |
 | 14 | Blur、Sharpen、Smudge |
-| 15 | Dodge、Burn、Sponge |
-| 16 | Pen、Freeform Pen、Curvature Pen、Add / Delete Anchor Point、Convert Point |
-| 17 | Horizontal / Vertical Type、Vertical / Horizontal Type Mask |
-| 18 | Path Selection、Direct Selection |
-| 19 | Rectangle、Ellipse、Triangle、Polygon、Line、Custom Shape |
-| 20 | Hand、Rotate View |
-| 21 | Zoom |
+| 15 | Adjustment Brush |
+| 16 | Dodge、Burn、Sponge |
+| 17 | Pen、Freeform Pen、Curvature Pen、Add / Delete Anchor Point、Convert Point |
+| 18 | Horizontal / Vertical Type、Vertical / Horizontal Type Mask |
+| 19 | Path Selection、Direct Selection |
+| 20 | Rectangle、Ellipse、Triangle、Polygon、Line、Custom Shape |
+| 21 | Hand、Rotate View |
+| 22 | Zoom |
 
 ### `Tool::name()`、`Tool::shortcut()`、`Tool::slot()`
 
 - `name()`：与 Photoshop 相同的英文全名，例如 `"Elliptical Marquee Tool"`。
-- `shortcut()`：与 Photoshop 一致的单键快捷键。同组工具共用组的字母（V、M、L、W、C、K、I、J、B、S、Y、E、G、O、P、T、A、U、H、Z），Rotate View 单独用 R。Single Row/Column Marquee、Blur 组、Add/Delete Anchor Point、Convert Point 没有快捷键。
+- `shortcut()`：与 Photoshop 一致的单键快捷键。同组工具共用组的字母（V、M、L、W、C、K、I、J、B、S、Y、E、G、O、P、T、A、U、H、Z），Rotate View 单独用 R。Single Row/Column Marquee、Blur 组、Add/Delete Anchor Point、Convert Point、Selection Brush、Adjustment Brush 没有快捷键。
 - `slot()`：工具所在的格。
 
 ### `tool_for_key(key, shift, active, current)`
@@ -56,5 +57,5 @@
 
 ## 测试覆盖
 
-- `every_tool_appears_once`：68 个工具在工具栏中各出现一次。
+- `every_tool_appears_once`：70 个工具在工具栏中各出现一次，工具栏共 22 格。
 - `keys_select_the_group_and_shift_cycles`：M、⇧M 循环（跳过单行/单列选框）、格记忆、从其它格按 ⇧M、R 与 H 的处理、未使用的字母。
