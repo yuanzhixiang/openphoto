@@ -20,6 +20,13 @@
 | Redo | Edit › Redo | ⇧⌘Z |
 | ToggleLastState | Edit › Toggle Last State | ⌥⌘Z |
 | CanvasSize | Image › Canvas Size... | ⌥⌘C |
+| Rotate180 | Image › Image Rotation › 180° | 无 |
+| Rotate90Clockwise | Image › Image Rotation › 90° Clockwise | 无 |
+| Rotate90CounterClockwise | Image › Image Rotation › 90° Counter Clockwise | 无 |
+| FlipCanvasHorizontal | Image › Image Rotation › Flip Canvas Horizontal | 无 |
+| FlipCanvasVertical | Image › Image Rotation › Flip Canvas Vertical | 无 |
+| Crop | Image › Crop | 无 |
+| Trim | Image › Trim... | 无 |
 | NewLayer | Layer › New › Layer | ⇧⌘N |
 | DeleteLayer | Layer › Delete › Layer | 无 |
 | ToggleLayerVisibility | Layer › Hide Layers / Show Layers | ⌘, |
@@ -65,6 +72,7 @@
 - DeleteLayer：当前文档的图层多于 1 个时可用。
 - CloseOthers：打开的文档多于 1 个时可用。
 - ToggleLayerVisibility、DuplicateLayer、LayerViaCopy：当前文档有选中图层时可用；LayerViaCut 还要求有选区。
+- Crop：当前文档有选区时可用。
 - LayerFromBackground：文档有背景图层时可用。DeleteHiddenLayers：既有隐藏图层也有可见图层时可用。
 - Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
 - Deselect、SelectInverse：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
@@ -80,6 +88,12 @@
 ## 选区命令的历史记录
 
 Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别为「Select All」「Deselect」「Reselect」「Select Inverse」，与 Photoshop 一致。
+
+## 画布命令
+
+- Image Rotation 五项：旋转或翻转整个文档（`image_ops::reorient`），旋转记录「Rotate Canvas」，翻转记录「Flip Canvas Horizontal」/「Flip Canvas Vertical」。
+- Crop：裁剪到选区外接矩形（`image_ops::crop_to_selection`），记录「Crop」。
+- Trim：打开 Trim 对话框（见 `dialogs/trim.md`）。
 
 ## 图层命令
 

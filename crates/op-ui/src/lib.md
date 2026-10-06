@@ -31,7 +31,7 @@
    - 中间：有文档时，上面是文档标签栏，下面是当前文档的视图；没有文档时只有粘贴板底色。
    这些面板都不使用 egui 自带的分隔线，边框由各区域按 Photoshop 自己绘制。
 5. 确定当前文档：当前文档已不存在时，改为最后一个标签（见 `doc_tabs.rs` 的 `ensure_active`）。
-6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、Fill 对话框、Color Picker（画在前两者之上）、macOS 菜单状态同步、错误提示对话框。
+6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、Fill 对话框、Trim 对话框、Color Picker（画在前两者之上）、macOS 菜单状态同步、错误提示对话框。
 
 ## 输入注入
 
@@ -56,6 +56,10 @@
 
 - Fill 对话框请求拾色时（Contents 选 Color...），以「Color Picker (Fill Color)」为标题打开 Color Picker，确定后写回对话框。
 - 确定时对当前文档执行填充并记录「Fill」，失败时弹出提示。
+
+## Trim 对话框的接入
+
+确定时对当前文档执行 `image_ops::trim`，画布有变化时记录「Trim」；没有可裁掉的边时什么也不记录。
 
 ## Color Picker 的接入
 

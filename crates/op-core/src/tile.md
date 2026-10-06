@@ -27,6 +27,8 @@ tile 边长，固定为 256 像素。每个 tile 占 256×256×4 = 262144 字节
 - `tile_mut(tx, ty)`：可写访问。tile 缺失时分配一个全透明 tile；tile 被其他图像共享时先复制一份（写时复制），因此写入永远不会影响共享该 tile 的快照。
 - `pixel(x, y)`：读取单个像素。
 - `with_canvas(width, height, dx, dy, fill)`：生成一张新尺寸的图像，把当前图像放在 (`dx`, `dy`)（可为负），新图像中不被原图覆盖的区域填 `fill`。这是 Canvas Size 的底层实现。
+- `to_rgba8()`：整幅图像转为紧密排列的 RGBA8 缓冲区（未分配的 tile 为全透明）。
+- `remapped(width, height, source)`：生成新尺寸的图像，新图像的像素 (x, y) 取原图像素 `source(x, y)`。用于旋转和翻转；整幅图像先展开成缓冲区再重建，结果中全透明的 tile 不保留。`source` 必须返回原图范围内的坐标。
 - `allocated_tiles()`：已分配的 tile 数，用于调试和内存统计。
 
 ## 行为规则与不变量

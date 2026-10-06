@@ -40,6 +40,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `revision()` / `mark_dirty()`：读取 / 递增修订号。修订号在每次像素或图层属性变化时递增，渲染层与图层缩略图缓存据此判断是否需要刷新。
 - `snapshot()` / `restore(snapshot)`：生成 / 恢复快照。`restore` 会覆盖宽高、分辨率、图层与活动图层，并调用 `mark_dirty()`。
 - `resize_canvas(width, height, anchor, fill)`：Image > Canvas Size。
+- `transform_canvas(width, height, image, selection)`：把画布换成 `width`×`height`：每个图层的图像经过 `image` 函数、当前选区和可 Reselect 的选区经过 `selection` 函数，然后更新尺寸、选区修订号并 `mark_dirty()`。Crop、Trim、Image Rotation 和画布翻转都通过它实现（见 `image_ops.md`）。不记录历史。
 - `has_background()`：是否存在背景图层。它决定 Canvas Size 中「画布扩展颜色」是否有意义：没有背景图层时，所有扩展区域都是透明的。
 - `layer(id)` / `layer_mut(id)`：按 ID 线性查找图层。
 - `composite_rgba8()`：合成为紧密排列的直通 RGBA8 缓冲区，长度为 `width * height * 4`。
