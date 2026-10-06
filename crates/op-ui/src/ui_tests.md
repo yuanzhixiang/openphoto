@@ -23,5 +23,6 @@
   - ⌥⌫、⌘⌫ 用前景色、背景色填充选区；普通图层上 ⌫ 清除选区；没有选区时 ⌫ 删除图层。
   - ⇧F5 打开 Fill 对话框，Enter 后填充前景色。
   - 油漆桶单击填充整片连通区域，记录「Paint Bucket」。
+  - 移动工具拖动图层上的色块，方向键和 Shift+方向键微移，分别记录「Move」和「Nudge」；没有选区时拖动背景图层弹出锁定提示。
 - `drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。

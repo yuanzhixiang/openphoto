@@ -55,6 +55,12 @@
 - **单击**（没有拖动）：有选区且没按 Shift/⌥ 时取消选区，记录「Deselect」，与 Photoshop 一致。
 - **单行/单列选框**：单击选中所在的整行或整列（1 像素），按同样规则组合，记录「Single Row Marquee」或「Single Column Marquee」。
 
+## 移动工具
+
+- 拖动：移动当前图层的像素，有选区时只移动选中的像素（规则见 `crates/op-core/src/move_tool.md`）。位移是拖动距离四舍五入到整像素，每一步都从开始时的像素重新计算。松开时如果确实移动了，记录「Move」。
+- 不能移动时（锁定、隐藏、没有选区的背景图层），在开始拖动时弹出 Photoshop 的提示。
+- 方向键微移见 `actions.md`。
+
 ## 油漆桶
 
 单击文档：按油漆桶选项（见 `crates/op-core/src/fill.md`）用前景色填充单击处的相似颜色区域，记录「Paint Bucket」。不能填充时弹出 Photoshop 的提示。光标为十字。
@@ -96,7 +102,6 @@
 
 ## 已知限制
 
-- 移动工具只有光标，还不能移动像素。
 - 选框工具的「Fixed Ratio」「Fixed Size」样式没有效果。
 - 没有标尺和参考线。
 - 滚动条的滑块长度与 Photoshop 不完全一致（Photoshop 的可滚动范围算法不同），也不能点击轨道翻页。

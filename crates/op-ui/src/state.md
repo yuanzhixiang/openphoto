@@ -30,6 +30,7 @@
 - `view`：视图状态，见下文。
 - 合成缓存：`canvas_image()` 返回当前合成结果，只在文档 `revision` 变化时重新合成。
 - 图层缩略图：`layer_thumbnail()` 按图层缓存，文档 `revision` 变化后重新生成；最近邻缩小。
+- 移动：`move_drag` 是进行中的移动和拖动起点（文档像素）。
 - 绘画：`stroke` 是进行中的笔画和它的工具；`last_paint_point` 是上一笔结束的位置，用于 Shift+单击画直线。
 - 选框拖动：`marquee_drag` 保存拖动中的起点、当前点（文档像素）、组合方式，以及 Shift/⌥ 是否已用于选择组合方式。
 - 蚂蚁线轮廓：`selection_outline()` 按选区版本号缓存轮廓线段。
