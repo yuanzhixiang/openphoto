@@ -20,5 +20,8 @@
   - ⇧M 切换到椭圆选框，之后按 M 仍选中椭圆选框（格的记忆）。
   - B 选中画笔，`]` 把 30 px 增大到 35 px，数字键改变不透明度；拖动一笔后经过的像素变为前景色，没经过的不变，并记录「Brush Tool」。
   - 图层隐藏时用画笔单击，弹出 Photoshop 的提示。
+  - ⌥⌫、⌘⌫ 用前景色、背景色填充选区；普通图层上 ⌫ 清除选区；没有选区时 ⌫ 删除图层。
+  - ⇧F5 打开 Fill 对话框，Enter 后填充前景色。
+  - 油漆桶单击填充整片连通区域，记录「Paint Bucket」。
 - `drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。

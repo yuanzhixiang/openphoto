@@ -23,6 +23,10 @@
 | NewLayer | Layer › New › Layer | ⇧⌘N |
 | DeleteLayer | Layer › Delete › Layer | 无 |
 | ToggleLayerVisibility | Layer › Hide Layers / Show Layers | ⌘, |
+| Fill | Edit › Fill... | ⇧F5 |
+| FillForeground | 无（Photoshop 的隐藏快捷键） | ⌥⌫ |
+| FillBackground | 无（Photoshop 的隐藏快捷键） | ⌘⌫ |
+| Clear | Edit › Clear | ⌫ / Delete |
 | SelectAll | Select › All | ⌘A |
 | Deselect | Select › Deselect | ⌘D |
 | Reselect | Select › Reselect | ⇧⌘D |
@@ -44,6 +48,13 @@
 - CloseOthers：打开的文档多于 1 个时可用。
 - ToggleLayerVisibility：当前文档有选中图层时可用。
 - Deselect、SelectInverse：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
+
+## 填充与清除
+
+- Fill：打开 Fill 对话框（见 `dialogs/fill.md`）。
+- FillForeground / FillBackground：立即用前景色 / 背景色填充当前图层的选区（没有选区时整个图层），Normal、100%，记录「Fill」。不能填充时弹出 Photoshop 的提示。
+- Clear：有选区时清除选区内容（背景图层上填背景色），记录「Clear」；没有选区时删除当前图层（图层多于一个时），与 Photoshop 2026 一致。
+- ⌥⌫、⌘⌫、⌫ 不是菜单快捷键：macOS 上由 `from_shortcuts_beside_menu`、其它平台由 `from_shortcuts` 在 egui 里识别。正在输入框里输入文字时不处理这些键，以免影响删除文字。
 
 ## 选区命令的历史记录
 

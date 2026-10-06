@@ -55,6 +55,10 @@
 - **单击**（没有拖动）：有选区且没按 Shift/⌥ 时取消选区，记录「Deselect」，与 Photoshop 一致。
 - **单行/单列选框**：单击选中所在的整行或整列（1 像素），按同样规则组合，记录「Single Row Marquee」或「Single Column Marquee」。
 
+## 油漆桶
+
+单击文档：按油漆桶选项（见 `crates/op-core/src/fill.md`）用前景色填充单击处的相似颜色区域，记录「Paint Bucket」。不能填充时弹出 Photoshop 的提示。光标为十字。
+
 ## 绘画工具
 
 适用于画笔、铅笔、橡皮擦（笔画算法见 `crates/op-core/src/paint.md`）：

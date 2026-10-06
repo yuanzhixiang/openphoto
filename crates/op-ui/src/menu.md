@@ -10,7 +10,7 @@
 
 - **OpenPhoto**：About OpenPhoto、Services、Hide OpenPhoto、Hide Others、Show All、Quit OpenPhoto（系统预置项）。
 - **File**：New...、Open...；Close、Close All、Close Others；Save（置灰，⌘S）、Save As...（置灰，⇧⌘S）；Export › Export As...。
-- **Edit**：Undo、Redo、Toggle Last State。macOS 会自动往名为「Edit」的菜单里追加 Writing Tools、AutoFill、Start Dictation、Emoji & Symbols，Photoshop 里也有这些项。
+- **Edit**：Undo、Redo、Toggle Last State；Clear；Fill...。其余项按 Photoshop 的顺序列出并置灰（Fade...、Cut、Copy、Copy Merged、Paste、Paste Special、Search、Check Spelling...、Find and Replace Text...、Stroke...、Content-Aware Fill...、Content-Aware Scale、Puppet Warp、Perspective Warp、Free Transform、Transform、Auto-Align/Blend Layers...、Define Brush Preset/Pattern/Custom Shape...、Purge、Color Settings...、Assign/Convert to Profile...、Keyboard Shortcuts...、Menus...、Toolbar...）。Cut、Copy、Paste 不带快捷键，以免在输入框里拦截 ⌘C/⌘V；Clear 也不带快捷键，⌫ 由 egui 处理。macOS 会自动往名为「Edit」的菜单里追加 Writing Tools、AutoFill、Start Dictation、Emoji & Symbols，Photoshop 里也有这些项。
 - **Image**：条目、分组和顺序与 Photoshop 一致（Mode ›、Adjustments ›、Auto Tone、Auto Contrast、Auto Color、Image Size...、Canvas Size...、Image Rotation ›、Crop、Trim...、Reveal All、Duplicate...、Apply Image...、Calculations...、Variables ›、Apply Data Set...、Trap...、Analysis ›），只少了 Photoshop 的 Generative Upscale...。除 Canvas Size... 外全部置灰。
 - **Layer**：New › Layer；Delete › Layer；Hide Layers。
 - **Select**：All、Deselect、Reselect、Inverse；其余项与 Photoshop 相同但置灰（All Layers、Deselect Layers、Find Layers、Isolate Layers、Color Range...、Focus Area...、Subject、Sky、Select and Mask...、Modify ›、Grow、Similar、Transform Selection、Edit in Quick Mask Mode、Load Selection...、Save Selection...）。

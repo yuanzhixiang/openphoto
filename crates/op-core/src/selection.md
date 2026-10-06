@@ -11,6 +11,7 @@
 - `Selection::all(w, h)`：全选。
 - `Selection::rect(w, h, rect)`：矩形选区，边界四舍五入到整像素，超出文档的部分被裁掉。
 - `Selection::ellipse(w, h, rect, anti_alias)`：`rect` 的内切椭圆。开启抗锯齿时，边缘像素按 4×4 超采样的覆盖率部分选中；关闭时，像素中心在椭圆内才选中。
+- `Selection::from_mask(w, h, mask, anti_alias)`：从 0/255 蒙版创建（油漆桶的填充区域）。开启抗锯齿时，紧邻选中区域外侧的像素按 50% 选中。
 - `get(x, y)`：某像素的选中程度（文档外为 0）。
 - `is_empty()`：没有任何像素被选中。
 - `bounds()`：选中像素（值 > 0）的外接矩形。
