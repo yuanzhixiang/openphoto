@@ -212,7 +212,7 @@ Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别�
 ## 调整命令
 
 - Invert、Desaturate、Equalize、Auto Tone、Auto Contrast、Auto Color：立即对当前图层（选区内）应用（`op-core` 的 `adjust.md`），记录同名历史；图层隐藏或像素锁定时弹出 Photoshop 的提示（例如「Could not complete the Invert command because the target layer is hidden.」）。
-- 其余带对话框的调整（Threshold、Posterize、Levels、Curves、Hue/Saturation、Exposure、Brightness/Contrast、Color Balance、Black & White、Vibrance、Photo Filter、Gradient Map）：先做同样的检查，失败时弹出提示；通过后计算直方图（Levels 用 R/G/B 合并的通道直方图，其余用亮度直方图）、保存文档快照，打开对话框（见 `dialogs/adjust.md`，预览流程见 `lib.md`）。
+- 其余带对话框的调整（Threshold、Posterize、Levels、Curves、Hue/Saturation、Exposure、Brightness/Contrast、Color Balance、Black & White、Vibrance、Photo Filter、Gradient Map）：先做同样的检查，失败时弹出提示；通过后计算直方图（Levels 用 R/G/B 合并的通道直方图，其余用亮度直方图）、保存文档快照，打开对话框（见 `dialogs/adjust.md`，预览流程见 `lib.md`）；Gradient Map 取前景色与背景色，Hue/Saturation 的 Colorize 以前景色的色相起步。
 
 ## 滤镜命令
 

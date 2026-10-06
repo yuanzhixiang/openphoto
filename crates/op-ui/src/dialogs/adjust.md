@@ -2,7 +2,7 @@
 
 ## 组件职责
 
-带设置的调整与滤镜对话框：Image › Adjustments 的 Threshold...、Posterize...、Levels...、Hue/Saturation...、Exposure...，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Unsharp Mask...、Add Noise...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
+带设置的调整与滤镜对话框：Image › Adjustments 的 Threshold...、Posterize...、Levels...、Hue/Saturation...、Exposure...，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Unsharp Mask...、Add Noise...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...。Brightness/Contrast...、Color Balance...、Hue/Saturation... 已按 Photoshop 2026 重做，布局与设置在各自的模块里（`brightness_contrast.md`、`color_balance.md`、`hue_saturation.md`），本模块只为它们画窗口框与标题、转交 OK/Cancel 并处理预览。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
 
 对话框的结果是 `Effect`：`Adjustment(Adjustment)` 或 `Filter(Filter)`。`Effect::name()` 是历史名称，`Effect::apply(doc, background)` 调用对应的 `op-core` 函数。
 
@@ -18,10 +18,7 @@
 | Curves | 没有数值参数，由曲线图编辑（见下） |
 | Posterize | Levels（2–255，4） |
 | Levels | 输入黑场（0–253，0）、gamma（0.01–9.99，1.00）、输入白场（2–255，255）、输出黑场（0–255，0）、输出白场（0–255，255） |
-| Hue/Saturation | Hue（−180–180，0）、Saturation（−100–100，0）、Lightness（−100–100，0） |
 | Exposure | Exposure（−20.00–20.00，0.00）、Offset（−0.5000–0.5000，0.0000）、Gamma Correction（0.01–9.99，1.00） |
-| Brightness/Contrast | Brightness（−150–150，0）、Contrast（−50–100，0） |
-| Color Balance | Cyan — Red、Magenta — Green、Yellow — Blue（−100–100，0，只作用于中间调）、Preserve Luminosity（勾选） |
 | Black and White | Reds、Yellows、Greens、Cyans、Blues、Magentas（%，−200–300，默认 40、60、40、60、20、80） |
 | Vibrance | Vibrance、Saturation（−100–100，0） |
 | Photo Filter | Filter（Photoshop 的 20 种预设：Warming Filter (85) 等，默认 Warming Filter (85)）、Density（1–100%，25）、Preserve Luminosity（勾选） |
@@ -46,8 +43,14 @@
 - Curves（420 × 380）：「Preset: Default」「Channel: RGB」（固定文字）；240 × 240 的曲线图：亮度直方图作底、四等分网格、对角基线、曲线（1.5 pt 浅色线）与控制点（6 pt 方块，选中的实心）；图下方显示选中点的「Output:」「Input:」。默认两个端点 (0, 0)、(255, 255)。
   - 单击或开始拖动：8 pt 内有控制点就选中它，否则在指针处加一个新点并选中；拖动时点跟随指针，横坐标限制在相邻两点之间；拖出图表 20 pt 以外松开时删除该点（端点不会被删除）。
 - Levels（400 × 330）：「Channel: RGB」（固定文字）；「Input Levels:」直方图，下方三个三角标记（黑色 = 输入黑场、灰色 = gamma、白色 = 输入白场）及对应的三个输入框（左、中、右）；「Output Levels:」黑到白的渐变条，下方两个三角标记（黑、白）及两个输入框。
-- 其余对话框（Hue/Saturation、Exposure 与全部滤镜）宽 400，按参数依次排列：数值参数一行（标签在左、输入框在右，下方一条细轨道和三角标记，占 52）；选项参数不超过 4 项时为标签加其下每项一行的单选按钮（每行 24），超过 4 项时为标签右侧 200 宽的下拉框（占 36）；复选参数为一个复选框（占 28）。高度为 36 + 各行高度 + 20，至少 150。
+- 其余对话框（Exposure、Black and White、Vibrance、Photo Filter、Gradient Map 与全部滤镜）宽 400，按参数依次排列：数值参数一行（标签在左、输入框在右，下方一条细轨道和三角标记，占 52）；选项参数不超过 4 项时为标签加其下每项一行的单选按钮（每行 24），超过 4 项时为标签右侧 200 宽的下拉框（占 36）；复选参数为一个复选框（占 28）。高度为 36 + 各行高度 + 20，至少 150。
 - 打开时第一个输入框获得焦点并全选。
+
+## 重做的对话框（`Custom`）
+
+- `AdjustDialog` 对这三种对话框持有各自的状态（`Custom::BrightnessContrast`、`ColorBalance`、`HueSaturation`），`effect()` 取自它们，`show` 用它们的尺寸并调用它们的 `ui`；窗口框与标题栏仍是 `common::frame`（标题用 AppKit 13 pt 粗体）。
+- 它们返回 `uxp::Button`：OK → `Outcome::Apply`，Cancel → `Outcome::Cancel`，Brightness/Contrast 的 Auto → 按直方图算出 Auto 的取值（见 `brightness_contrast.md`）。
+- `set_colorize_hue(hue)`：打开 Hue/Saturation 时由 `commands.rs` 传入前景色的色相，作为 Colorize 的初始色相（Photoshop 的行为）。
 
 ## 交互
 
@@ -61,4 +64,4 @@
 
 - `defaults_match_photoshop`：Levels、Hue/Saturation 的默认调整，Exposure 输入框的默认文字。
 - `filters_read_choices_and_checkboxes`：Add Noise 的分布与单色、Offset 的空白区域选项映射到对应的滤镜参数。
-- `invalid_values_disable_the_dialog`：Levels 黑白场过近、Hue 超出范围时没有可应用的调整。
+- `invalid_values_disable_the_dialog`：Levels 黑白场过近时没有可应用的调整。

@@ -23,3 +23,4 @@
 - 只描了选项栏外框、移动工具选项、折叠条和图标列用到的图标；工具栏底部的图形直接画在 `toolbar.rs` 里；其它工具的选项栏和工具栏的工具图标仍用 Phosphor 图标。
 - 头像是占位的纯色圆，不是 Photoshop 的账户头像。
 - 裁剪工具选项栏的图标（照 Photoshop 2026 的 2x 截图描出）：Straighten（水平仪：上方的点、两侧方块与带气泡的杯形）、CropOverlay（3 × 3 网格加裁切标记和菜单小三角）、Info（圆圈里的 i）、CropReset（转动的箭头加底线）、CropCancel（⦸）、CropCommit（✓）、Swap（上下两个相反的实心箭头）。
+- Hue/Saturation 对话框的图标（描自 Photoshop 2026 的 2x 截图）：`TargetedHand`（目标调整手形，两侧小三角）、`Eyedropper`、`EyedropperPlus`、`EyedropperMinus`（空心管身、斜向的箍和顶端圆球，后两者右下角加「+」「−」）、`PresetMenu`（三条横线与右下角的小三角）。
