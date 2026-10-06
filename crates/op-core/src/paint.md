@@ -41,7 +41,7 @@
 
 ### 在蒙版上绘画
 
-编辑目标是蒙版时（`Document::editing_mask`），笔画的基准图像是蒙版：画笔/铅笔的颜色换成灰度（`adjust::mask_gray`，即亮度），橡皮擦画背景色的灰度，修饰工具直接作用于灰度图像；蒙版不透明，alpha 保持不变。
+笔画的目标按快速蒙版 > 图层蒙版 > 像素的优先级决定。快速蒙版模式下，图层隐藏或锁定也可以绘画（只改快速蒙版）。编辑目标是蒙版（快速蒙版或 `Document::editing_mask`）时，笔画的基准图像是蒙版：画笔/铅笔的颜色换成灰度（`adjust::mask_gray`，即亮度），橡皮擦画背景色的灰度，修饰工具直接作用于灰度图像；蒙版不透明，alpha 保持不变。
 
 ### 修饰工具
 
@@ -63,6 +63,7 @@
 
 - `hard_brush_paints_full_color_in_its_core`、`pencil_is_aliased`：硬边画笔中心为完整颜色；铅笔只有完全透明和完全不透明。
 - `dodge_burn_and_sponge`：中间调减淡变亮、加深变暗；Highlights 几乎不影响暗像素；去色后三通道相等。
+- `quick_mask_round_trip`：快速蒙版模式下在隐藏图层上也能画；涂黑处退出后不在选区内；什么都不画时退出后没有选区。
 - `blur_sharpen_and_clone`：模糊让黑白边缘出现中间值；仿制把 (5, 5) 的红点画到 (20, 20)，旁边不变。
 - `opacity_caps_a_single_stroke`：同一笔内反复涂抹，结果停在 50% 不透明度。
 - `flow_builds_up`：低流量时重复经过同一点会加深。

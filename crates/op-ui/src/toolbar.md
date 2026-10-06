@@ -13,7 +13,7 @@
 2. 工具按钮，每个按钮是一组工具（分组与顺序见 `crates/op-tools/src/lib.md`），显示这组里最近用过的工具（初始为组内第一个）。在 Crop、Eyedropper、Pen、Hand 所在的格前留出小间隔。
 3. Edit Toolbar（「…」）按钮，只有外观。
 4. 前景色/背景色色块。
-5. Quick Mask 和 Change Screen Mode 按钮，只有外观。
+5. Quick Mask 按钮（「Edit in Quick Mask Mode (Q)」）：点击进入/退出当前文档的快速蒙版（`toggle_quick_mask`，记录「Quick Mask」），在快速蒙版中时显示为按下状态；Change Screen Mode 按钮只有外观。
 
 ## 工具按钮
 

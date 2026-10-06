@@ -105,6 +105,7 @@
 | ModifyFeather | Select › Modify › Feather... | ⇧F6 |
 | Grow | Select › Grow | 无 |
 | Similar | Select › Similar | 无 |
+| QuickMask | Select › Edit in Quick Mask Mode | Q（单键，见 `actions.md`） |
 | ZoomIn | View › Zoom In | ⌘+（同时接受 ⌘=） |
 | ZoomOut | View › Zoom Out | ⌘- |
 | FitOnScreen | View › Fit on Screen | ⌘0 |
@@ -149,7 +150,7 @@
 
 ## 选区命令的历史记录
 
-Modify 五项打开对应对话框（`dialogs/modify_selection.md`）；Grow、Similar 按魔棒选项（`AppState::wand` 的容差、消除锯齿、所有图层）立即扩大选区，记录「Grow」「Similar」。
+QuickMask 进入或退出快速蒙版（`toolbar::toggle_quick_mask`），两种情况都记录「Quick Mask」；菜单项带勾选标记表示当前文档在快速蒙版中。Modify 五项打开对应对话框（`dialogs/modify_selection.md`）；Grow、Similar 按魔棒选项（`AppState::wand` 的容差、消除锯齿、所有图层）立即扩大选区，记录「Grow」「Similar」。
 
 
 Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别为「Select All」「Deselect」「Reselect」「Select Inverse」，与 Photoshop 一致。

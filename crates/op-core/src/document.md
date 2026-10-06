@@ -28,7 +28,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 
 ### `Snapshot`
 
-文档中可撤销的部分：`width`、`height`、`resolution`、`layers`、`active_layer`、`selection`、`last_selection`、`guides`。字段私有，只能通过 `Document::snapshot()` 创建、`Document::restore()` 使用。克隆代价低，因为图层里的 tile 通过 `Arc` 共享。
+文档中可撤销的部分：`width`、`height`、`resolution`、`layers`、`active_layer`、`selection`、`last_selection`、`guides`、`quick_mask`。字段私有，只能通过 `Document::snapshot()` 创建、`Document::restore()` 使用。克隆代价低，因为图层里的 tile 通过 `Arc` 共享。
 
 `title`、`id`、`color_mode`、`bit_depth` 和 `revision` 不在快照中，撤销/重做不会改变它们。
 
@@ -44,11 +44,14 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 - `revision()` / `mark_dirty()`：读取 / 递增修订号。修订号在每次像素或图层属性变化时递增，渲染层与图层缩略图缓存据此判断是否需要刷新。
 - `snapshot()` / `restore(snapshot)`：生成 / 恢复快照。`restore` 会覆盖宽高、分辨率、图层与活动图层，并调用 `mark_dirty()`。
 - `resize_canvas(width, height, anchor, fill)`：Image > Canvas Size。
-- `transform_canvas(width, height, image, selection)`：把画布换成 `width`×`height`：每个图层的图像和图层蒙版都经过 `image` 函数、当前选区和可 Reselect 的选区经过 `selection` 函数，然后更新尺寸、选区修订号并 `mark_dirty()`。Crop、Trim、Image Rotation 和画布翻转都通过它实现（见 `image_ops.md`）。不记录历史。
+- `transform_canvas(width, height, image, selection)`：把画布换成 `width`×`height`：每个图层的图像、图层蒙版和快速蒙版都经过 `image` 函数、当前选区和可 Reselect 的选区经过 `selection` 函数，然后更新尺寸、选区修订号并 `mark_dirty()`。Crop、Trim、Image Rotation 和画布翻转都通过它实现（见 `image_ops.md`）。不记录历史。
 - `map_guides(f)`：用 `f` 变换每条参考线（裁剪、扩展画布、缩放、旋转、翻转时调用）。`resize_canvas` 自己按锚点偏移参考线。
 - `mask_target`：编辑目标是当前图层的蒙版（在 Layers 面板点了蒙版缩略图）还是像素。不在快照里，撤销不会改变它。
+- `quick_mask`：快速蒙版模式（Q）下的灰度图像（白 = 选中，黑 = 未选中），在快照里，所以在快速蒙版上的绘画可以撤销。
+- `enter_quick_mask()`：把当前选区转为灰度图像（没有选区时整幅为白），并取消选区（选区在退出前不存在）。
+- `exit_quick_mask()`：把灰度图像转回选区；全白或全黑时没有选区。
 - `editing_mask()`：`mask_target` 为真且当前图层确实有蒙版。
-- `edit_target()`：像素编辑（绘画、填充、渐变）的目标 `EditTarget`：要写入的图像（图层像素或蒙版）、是否是蒙版（颜色要换成灰度）、是否要保持 alpha（背景图层、锁定透明像素，或蒙版）。
+- `edit_target()`：像素编辑（绘画、填充、渐变）的目标 `EditTarget`，优先级为快速蒙版 > 图层蒙版 > 图层像素：要写入的图像（图层像素或蒙版）、是否是蒙版（颜色要换成灰度）、是否要保持 alpha（背景图层、锁定透明像素，或蒙版）。
 - `has_background()`：是否存在背景图层。它决定 Canvas Size 中「画布扩展颜色」是否有意义：没有背景图层时，所有扩展区域都是透明的。
 - `layer(id)` / `layer_mut(id)`：按 ID 线性查找图层。
 - `composite_rgba8()`：合成为紧密排列的直通 RGBA8 缓冲区，长度为 `width * height * 4`。
