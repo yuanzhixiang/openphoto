@@ -31,7 +31,7 @@
    - 中间：有文档时，上面是文档标签栏，下面是当前文档的视图；没有文档时只有粘贴板底色。
    这些面板都不使用 egui 自带的分隔线，边框由各区域按 Photoshop 自己绘制。
 5. 确定当前文档：当前文档已不存在时，改为最后一个标签（见 `doc_tabs.rs` 的 `ensure_active`）。
-6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、Fill 对话框、Trim 对话框、Threshold/Posterize 对话框、Color Picker（画在前两者之上）、macOS 菜单状态同步、错误提示对话框。
+6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、Fill 对话框、Trim 对话框、调整对话框、Color Picker（画在前两者之上）、macOS 菜单状态同步、错误提示对话框。
 
 ## 输入注入
 
@@ -57,12 +57,12 @@
 - Fill 对话框请求拾色时（Contents 选 Color...），以「Color Picker (Fill Color)」为标题打开 Color Picker，确定后写回对话框。
 - 确定时对当前文档执行填充并记录「Fill」，失败时弹出提示。
 
-## Threshold / Posterize 对话框的接入（预览）
+## 调整对话框的接入（预览）
 
 - 打开时（`commands.md`）保存文档快照到对话框的 `before`。
 - 每帧：对话框中的值有效且勾选 Preview 时，目标调整与当前预览（`previewing`）不同就先恢复快照、再对文档应用新的调整；取消勾选或值无效时恢复快照。预览不记录历史。
 - Cancel / Esc：有预览时恢复快照。
-- OK / Enter：先恢复快照，再正式应用并记录调整名称（「Threshold」「Posterize」）。
+- OK / Enter：先恢复快照，再正式应用并记录调整名称（「Threshold」「Posterize」「Levels」「Hue/Saturation」「Exposure」）。
 - 当前文档在对话框打开期间消失时，直接丢弃对话框。
 
 ## Trim 对话框的接入

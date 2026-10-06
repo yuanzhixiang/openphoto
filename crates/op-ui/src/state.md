@@ -24,8 +24,8 @@
 - `typing`：上一帧是否有输入框获得键盘焦点，每帧执行命令前更新。决定菜单的 Cut/Copy/Paste 作用于输入框还是文档。
 - `forward_events`：要注入 egui 下一帧输入的事件（菜单的 Cut/Copy/Paste 转交给输入框时使用，见 `commands.md`）。
 - `trim_dialog`：Trim 对话框，打开期间为 `Some`。
-- `adjust_dialog`：Threshold 或 Posterize 对话框，打开期间为 `Some`。
-- `modal_open()`：Canvas Size、Fill、Trim、Threshold/Posterize、Color Picker 或错误提示打开时为真，此时命令与单键快捷键都不执行。
+- `adjust_dialog`：调整对话框（Threshold、Posterize、Levels、Hue/Saturation、Exposure），打开期间为 `Some`。
+- `modal_open()`：Canvas Size、Fill、Trim、调整对话框、Color Picker 或错误提示打开时为真，此时命令与单键快捷键都不执行。
 
 ## DocState
 
