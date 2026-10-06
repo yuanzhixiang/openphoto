@@ -6,7 +6,7 @@
 
 ## 菜单结构
 
-已实现的项发出 `Command`；尚未实现的项显示为置灰，并带上 Photoshop 的快捷键文字，让菜单读起来和 Photoshop 一致。
+已实现的项发出 `Command`；尚未实现的项显示为置灰，并带上 Photoshop 的快捷键文字，让菜单读起来和 Photoshop 一致。菜单栏的顺序与 Photoshop 相同：OpenPhoto、File、Edit、Image、Layer、Type、Select、Filter、View、Plugins、Window、Help。
 
 - **OpenPhoto**：About OpenPhoto、Services、Hide OpenPhoto、Hide Others、Show All、Quit OpenPhoto（系统预置项）。
 - **File**：New...、Open...；Close、Close All、Close Others；Save（置灰，⌘S）、Save As...（置灰，⇧⌘S）；Export › Export As...。
@@ -14,6 +14,9 @@
 - **Image**：条目、分组和顺序与 Photoshop 一致（Mode ›、Adjustments ›、Auto Tone、Auto Contrast、Auto Color、Image Size...、Canvas Size...、Image Rotation ›、Crop、Trim...、Reveal All、Duplicate...、Apply Image...、Calculations...、Variables ›、Apply Data Set...、Trap...、Analysis ›，Image Size... 与 Canvas Size... 之间还有 Generative Upscale...）。Adjustments › 子菜单按 Photoshop 的顺序列出全部 24 项，其中 Levels...（⌘L）、Exposure...、Hue/Saturation...（⌘U）、Invert（⌘I）、Posterize...、Threshold...、Desaturate（⇧⌘U）、Equalize 可用，其余置灰并显示 Photoshop 的快捷键（Curves ⌘M、Color Balance ⌘B、Black & White ⌥⇧⌘B）。可用的还有 Canvas Size...；Image Rotation › 180°、90° Clockwise、90° Counter Clockwise、Flip Canvas Horizontal、Flip Canvas Vertical（Arbitrary... 置灰）；Crop；Trim...。其余全部置灰。
 - **Layer**：按 Photoshop 2026 的完整顺序列出。可用的有：New › Layer、Layer from Background、Layer Via Copy、Layer Via Cut；Duplicate Layer；Delete › Layer、Hidden Layers；Hide Layers；Arrange › Bring to Front、Bring Forward、Send Backward、Send to Back；Merge Down；Merge Visible；Flatten Image。其余项置灰（New 里的 Group/Artboard/Frame 各项，Copy CSS、Copy SVG、Quick Export as PNG、Export As...、Rename Layer...、Layer Style、Smart Filter、New Fill Layer、New Adjustment Layer、Harmonize、Layer Content Options...、Layer Mask、Vector Mask、Create Clipping Mask、Mask All Objects、Smart Objects、Video Layers、Rasterize、New Layer Based Slice、Group Layers、Ungroup Layers、Arrange › Reverse、Combine Shapes、Align、Distribute、Lock Layers...、Link Layers、Select Linked Layers、Matting）。Photoshop 中 Layer from Background...、Duplicate Layer... 会先弹出对话框，这里直接执行，所以标签不带省略号；Photoshop 在只选中一个图层时把 ⌘E 项显示为「Merge Down」，这里只能单选，所以固定为 Merge Down。
 - **Select**：All、Deselect、Reselect、Inverse；其余项与 Photoshop 相同但置灰（All Layers、Deselect Layers、Find Layers、Isolate Layers、Color Range...、Focus Area...、Subject、Sky、Select and Mask...、Modify ›、Grow、Similar、Transform Selection、Edit in Quick Mask Mode、Load Selection...、Save Selection...）。
+- **Type**：按 Photoshop 的顺序列出全部项（More from Adobe Fonts...、Panels ›、Anti-Alias ›、Orientation ›、OpenType ›、Create Work Path、Convert to Shape、Rasterize Type Layer、Convert to Paragraph Text、Convert to Dynamic Text ›、Warp Text...、Match Font...、Font Preview Size ›、Language Options ›、Update All Text Layers、Manage Missing Fonts、Paste Lorem Ipsum、Load/Save Default Type Styles），全部置灰。
+- **Filter**：按 Photoshop 的顺序列出全部项。可用的有：Last Filter（⌃⌘F，标签显示上次使用的滤镜名称，如「Gaussian Blur」，从未使用时为「Last Filter」）；Blur › Average、Box Blur...、Gaussian Blur...；Noise › Add Noise...、Median...；Pixelate › Mosaic...；Sharpen › Unsharp Mask...；Stylize › Solarize；Other › High Pass...、Maximum...、Minimum...、Offset...。其余置灰并带 Photoshop 的快捷键（Adaptive Wide Angle ⌥⇧⌘A、Camera Raw Filter ⇧⌘A、Lens Correction ⇧⌘R、Liquify ⇧⌘X、Vanishing Point ⌥⌘V），Blur Gallery、Distort、Render、Video 子菜单整体置灰。
+- **Plugins**：Plugins Panel、Manage Plugins...，置灰。
 - **View**：Zoom In、Zoom Out、Fit on Screen、100%。
 - **Window**：History。同时被设为 macOS 的窗口菜单，系统会在里面列出窗口。
 - **Help**：OpenPhoto Help（置灰）。
@@ -38,4 +41,4 @@
 ## 已知限制
 
 - Image 菜单中 Generative Upscale... 没有列出。
-- Type、Filter、Plugins 菜单没有列出；File、Edit、Layer、View、Window 菜单只列出了部分项。
+- File、Edit、View、Window 菜单只列出了部分项。

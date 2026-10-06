@@ -1,13 +1,15 @@
-# dialogs/adjust.rs：调整对话框
+# dialogs/adjust.rs：调整与滤镜对话框
 
 ## 组件职责
 
-Image › Adjustments 中带数值设置的调整对话框：Threshold...、Posterize...、Levels...、Hue/Saturation...、Exposure...。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整对话框的接入」）。像素算法见 `op-core` 的 `adjust.md`。
+带设置的调整与滤镜对话框：Image › Adjustments 的 Threshold...、Posterize...、Levels...、Hue/Saturation...、Exposure...，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Unsharp Mask...、Add Noise...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
+
+对话框的结果是 `Effect`：`Adjustment(Adjustment)` 或 `Filter(Filter)`。`Effect::name()` 是历史名称，`Effect::apply(doc, background)` 调用对应的 `op-core` 函数。
 
 ## 数据输入
 
 - `AdjustDialog::new(kind, histogram, before)`：`kind` 为对话框种类；`histogram` 是打开时活动图层选区内的直方图（Threshold 用亮度，Levels 用 R/G/B 合并）；`before` 是打开时的文档快照。
-- 每个设置是一个「参数」：标签、范围、默认值、小数位数。输入框中的文字按小数位数格式化。默认值与范围同 Photoshop：
+- 每个设置是一个「参数」：标签、范围、默认值、小数位数，以及类型——数值（输入框 + 滑块）、选项（单选按钮，值为选中项的序号）、复选（值为 0 或 1）。输入框中的文字按小数位数格式化。调整的默认值与范围同 Photoshop；滤镜的默认值尚未与 Photoshop 核对：
 
 | 对话框 | 参数（范围，默认值） |
 |---|---|
@@ -16,6 +18,14 @@ Image › Adjustments 中带数值设置的调整对话框：Threshold...、Post
 | Levels | 输入黑场（0–253，0）、gamma（0.01–9.99，1.00）、输入白场（2–255，255）、输出黑场（0–255，0）、输出白场（0–255，255） |
 | Hue/Saturation | Hue（−180–180，0）、Saturation（−100–100，0）、Lightness（−100–100，0） |
 | Exposure | Exposure（−20.00–20.00，0.00）、Offset（−0.5000–0.5000，0.0000）、Gamma Correction（0.01–9.99，1.00） |
+| Gaussian Blur | Radius (pixels)（0.1–1000.0，1.0） |
+| Box Blur | Radius (pixels)（1–2000，1） |
+| Unsharp Mask | Amount (%)（1–500，50）、Radius (pixels)（0.1–1000.0，1.0）、Threshold (levels)（0–255，0） |
+| Add Noise | Amount (%)（0.10–400.00，12.50）、Distribution（Uniform / Gaussian，Uniform）、Monochromatic（不勾选） |
+| Median、Minimum、Maximum | Radius (pixels)（1–500，1） |
+| High Pass | Radius (pixels)（0.1–1000.0，10.0） |
+| Offset | Horizontal (pixels right)、Vertical (pixels down)（−30000–30000，0）、Undefined Areas（Set to Transparent / Repeat Edge Pixels / Wrap Around，Set to Transparent） |
+| Mosaic | Cell Size (square)（2–200，10） |
 
 - 每次打开都恢复默认值；Preview 默认勾选。
 
@@ -26,7 +36,7 @@ Image › Adjustments 中带数值设置的调整对话框：Threshold...、Post
 - Threshold（400 × 232）：「Threshold Level:」与输入框；下方 258 × 100 的直方图（深灰底，每个值一条竖线，高度按最大计数归一化）；直方图下方一个三角标记。
 - Posterize（330 × 132）：「Levels:」与输入框。
 - Levels（400 × 330）：「Channel: RGB」（固定文字）；「Input Levels:」直方图，下方三个三角标记（黑色 = 输入黑场、灰色 = gamma、白色 = 输入白场）及对应的三个输入框（左、中、右）；「Output Levels:」黑到白的渐变条，下方两个三角标记（黑、白）及两个输入框。
-- Hue/Saturation、Exposure（400 × 220）：每个参数一行，标签在左、输入框在右，下方一条细轨道和三角标记，行距 52。
+- 其余对话框（Hue/Saturation、Exposure 与全部滤镜）宽 400，按参数依次排列：数值参数一行（标签在左、输入框在右，下方一条细轨道和三角标记，占 52）；选项参数为标签加其下每项一行的单选按钮（每行 24）；复选参数为一个复选框（占 28）。高度为 36 + 各行高度 + 20，至少 150。
 - 打开时第一个输入框获得焦点并全选。
 
 ## 交互
@@ -40,4 +50,5 @@ Image › Adjustments 中带数值设置的调整对话框：Threshold...、Post
 ## 测试覆盖
 
 - `defaults_match_photoshop`：Levels、Hue/Saturation 的默认调整，Exposure 输入框的默认文字。
+- `filters_read_choices_and_checkboxes`：Add Noise 的分布与单色、Offset 的空白区域选项映射到对应的滤镜参数。
 - `invalid_values_disable_the_dialog`：Levels 黑白场过近、Hue 超出范围时没有可应用的调整。

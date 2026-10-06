@@ -35,6 +35,19 @@
 | Levels | Image › Adjustments › Levels... | ⌘L |
 | HueSaturation | Image › Adjustments › Hue/Saturation... | ⌘U |
 | Exposure | Image › Adjustments › Exposure... | 无 |
+| LastFilter | Filter › Last Filter | ⌃⌘F |
+| Average | Filter › Blur › Average | 无 |
+| BoxBlur | Filter › Blur › Box Blur... | 无 |
+| GaussianBlur | Filter › Blur › Gaussian Blur... | 无 |
+| AddNoise | Filter › Noise › Add Noise... | 无 |
+| Median | Filter › Noise › Median... | 无 |
+| Mosaic | Filter › Pixelate › Mosaic... | 无 |
+| UnsharpMask | Filter › Sharpen › Unsharp Mask... | 无 |
+| Solarize | Filter › Stylize › Solarize | 无 |
+| HighPass | Filter › Other › High Pass... | 无 |
+| Maximum | Filter › Other › Maximum... | 无 |
+| Minimum | Filter › Other › Minimum... | 无 |
+| Offset | Filter › Other › Offset... | 无 |
 | NewLayer | Layer › New › Layer | ⇧⌘N |
 | DeleteLayer | Layer › Delete › Layer | 无 |
 | ToggleLayerVisibility | Layer › Hide Layers / Show Layers | ⌘, |
@@ -80,7 +93,7 @@
 - DeleteLayer：当前文档的图层多于 1 个时可用。
 - CloseOthers：打开的文档多于 1 个时可用。
 - ToggleLayerVisibility、DuplicateLayer、LayerViaCopy：当前文档有选中图层时可用；LayerViaCut 还要求有选区。
-- Crop：当前文档有选区时可用。
+- Crop：当前文档有选区时可用。LastFilter：有当前文档且本次运行中用过滤镜时可用。
 - LayerFromBackground：文档有背景图层时可用。DeleteHiddenLayers：既有隐藏图层也有可见图层时可用。
 - Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
 - Deselect、SelectInverse：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
@@ -108,6 +121,13 @@ Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别�
 - Invert、Desaturate、Equalize：立即对当前图层（选区内）应用（`op-core` 的 `adjust.md`），记录同名历史；图层隐藏或像素锁定时弹出 Photoshop 的提示（例如「Could not complete the Invert command because the target layer is hidden.」）。
 - Threshold、Posterize、Levels、Hue/Saturation、Exposure：先做同样的检查，失败时弹出提示；通过后计算直方图（Levels 用 R/G/B 合并的通道直方图，其余用亮度直方图）、保存文档快照，打开对话框（见 `dialogs/adjust.md`，预览流程见 `lib.md`）。
 
+## 滤镜命令
+
+- Average、Solarize：立即对当前图层应用（`op-core` 的 `filter.md`），记录同名历史，并记为 `last_filter`。
+- 带设置的滤镜（Box Blur、Gaussian Blur、Add Noise、Median、Mosaic、Unsharp Mask、High Pass、Maximum、Minimum、Offset）：检查同调整命令，通过后保存快照并打开对话框（`dialogs/adjust.md`）。
+- LastFilter：用 `last_filter` 的设置立即再应用一次，记录该滤镜的名称，不弹出对话框。
+- 失败时弹出 Photoshop 的提示，例如「Could not complete the Gaussian Blur command because the target layer is hidden.」。
+
 ## 图层命令
 
 像素与顺序规则见 `op-core` 的 `layer_ops.md`。成功后记录的历史名称：Duplicate Layer →「Duplicate Layer」，Layer Via Copy / Cut →「Layer Via Copy」/「Layer Via Cut」，Layer from Background →「Layer From Background」，Delete › Hidden Layers →「Delete Hidden Layers」，Arrange 四项 →「Layer Order」，Merge Down / Merge Visible / Flatten Image → 同名。Layer Via Copy / Cut 失败时弹出 Photoshop 的提示（例如选区内只有透明像素时「Could not complete the Layer Via Copy command because the selected area is empty.」）。
@@ -130,6 +150,7 @@ Cut、Copy、CopyMerged、Paste、PasteInPlace 由 `actions::clipboard` 执行�
 ## 快捷键识别
 
 - **macOS**：带 ⌘ 的快捷键由原生菜单的 key equivalent 处理，egui 收不到这些按键。唯一的例外是 Zoom In：菜单项显示为 Photoshop 的 ⌘+，而 macOS 只在按住 Shift 时才匹配「+」，所以 `from_shortcuts_beside_menu` 额外在 egui 里捕获 ⌘=，转成 ZoomIn。
+- `Shortcut` 有 `cmd`（macOS 上为 Command）、`shift`、`alt`、`ctrl`（macOS 上的 Control 键）四个修饰键。传给 muda 时 `ctrl` 写作 `Ctrl+`，在 macOS 上就是 Control 键。
 - **没有原生菜单时**（其它平台，以及 macOS 上的无窗口测试）：`from_shortcuts` 在 egui 里按 `SHORTCUT_ORDER` 依次匹配全部快捷键。egui 的 `consume_key` 会忽略多按的 Shift/Alt，所以列表必须把更具体的组合放在前面（例如 ⇧⌘Z 在 ⌘Z 之前、⌥⌘W 在 ⌘W 之前、⇧⌘C 在 ⌘C 之前），否则会被误触发成另一个命令。ZoomIn 同时接受 ⌘= 和 ⌘+。
 - egui-winit 不把 ⌘X/⌘C/⌘V 作为按键送出，而是转成 `Event::Cut`、`Event::Copy`、`Event::Paste`（而且只在系统剪贴板有文字时才送出 `Paste`）。`from_shortcuts` 把这些事件识别为 Cut、Copy（按住 Shift 时为 CopyMerged）、Paste（按住 Shift 时为 PasteInPlace）。正在输入框里输入时不识别剪贴板快捷键和事件，由输入框自己处理。
 

@@ -57,12 +57,12 @@
 - Fill 对话框请求拾色时（Contents 选 Color...），以「Color Picker (Fill Color)」为标题打开 Color Picker，确定后写回对话框。
 - 确定时对当前文档执行填充并记录「Fill」，失败时弹出提示。
 
-## 调整对话框的接入（预览）
+## 调整与滤镜对话框的接入（预览）
 
 - 打开时（`commands.md`）保存文档快照到对话框的 `before`。
 - 每帧：对话框中的值有效且勾选 Preview 时，目标调整与当前预览（`previewing`）不同就先恢复快照、再对文档应用新的调整；取消勾选或值无效时恢复快照。预览不记录历史。
 - Cancel / Esc：有预览时恢复快照。
-- OK / Enter：先恢复快照，再正式应用并记录调整名称（「Threshold」「Posterize」「Levels」「Hue/Saturation」「Exposure」）。
+- OK / Enter：先恢复快照，再正式应用（`Effect::apply`，滤镜需要的背景色取当前背景色）并记录调整或滤镜的名称（如「Levels」「Gaussian Blur」）；应用的是滤镜时，把它记为 `last_filter`。失败时弹出提示。
 - 当前文档在对话框打开期间消失时，直接丢弃对话框。
 
 ## Trim 对话框的接入
