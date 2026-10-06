@@ -33,6 +33,8 @@ tile 边长，固定为 256 像素。每个 tile 占 256×256×4 = 262144 字节
 - `clipped()`：删掉画布外像素后的图像（背景图层、开启「删除裁剪的像素」的裁剪用它）。只保留画布范围内的 tile 并清掉边缘 tile 的画布外部分。
 - `with_canvas(width, height, dx, dy, fill)`：生成新画布尺寸的图像，所有像素（包括画布外的）平移 (`dx`, `dy`)，平移后落在新画布外的像素继续保留。`fill` 不透明时，新画布中原画布（平移后）没有覆盖的区域填 `fill`（背景图层的扩展色）；原画布内本来透明的像素保持透明。这是 Canvas Size、移动工具和 Reveal All 的底层实现。
 - `to_rgba8()`：画布部分转为紧密排列的 RGBA8 缓冲区。
+- `region_rgba8(x0, y0, w, h)`：任意区域（可伸到画布外）的像素，按 tile 逐行段拷贝。
+- `from_region(width, height, x0, y0, w, h, pixels)`：画布尺寸为 `width`×`height`、内容只有给定区域像素的图像，用 `write_span_at` 逐行写入，全透明 tile 丢弃。自由变换用这两个方法在画布外也能处理像素。
 - `remapped(width, height, source)`：新尺寸的图像，像素 (x, y) 取原图画布内像素 `source(x, y)`。用于旋转和翻转；画布外的像素不参与（见已知限制）。
 - `allocated_tiles()`：已分配的 tile 数，用于调试和内存统计。
 
@@ -63,7 +65,7 @@ tile 边长，固定为 256 像素。每个 tile 占 256×256×4 = 262144 字节
 - 只支持 8 位 RGBA 存储，没有 16 位或浮点 tile。
 - 没有 mipmap 或多分辨率层级。
 - 写入后不会自动回收变为全透明的 tile。
-- 以画布大小缓冲区重建图层的操作会丢掉画布外的像素：`remapped`（图像旋转、画布翻转）、Image Size 的重采样、自由变换的结果、合并图层（Merge Down/Visible/Layers）。Photoshop 中这些操作会连同画布外的像素一起处理。
+- 以画布大小缓冲区重建图层的操作会丢掉画布外的像素：`remapped`（图像旋转、画布翻转）、Image Size 的重采样、合并图层（Merge Down/Visible/Layers）。Photoshop 中这些操作会连同画布外的像素一起处理。
 
 ## 测试覆盖
 
@@ -74,4 +76,5 @@ tile 边长，固定为 256 像素。每个 tile 占 256×256×4 = 262144 字节
 - `filled_leaves_nothing_past_the_canvas`：10×10 纯色图像在 (10, 0) 读出透明，内容范围正好是画布，没有画布外像素。
 - `moving_keeps_pixels_outside_the_canvas`：平移 (−300, 5) 后像素落到画布左边很远处并被保留，内容范围正确；再平移回来两个像素都复原。
 - `clipped_drops_what_is_outside`：左边、右边（边缘 tile 内）和下方 tile 中的画布外像素都被删掉，只剩画布内的一个 tile。
+- `regions_reach_outside_the_canvas`：读出伸到画布左上外和右边很远处的区域，再用 `from_region` 写回，内容范围和像素都不变。
 - `opaque_fill_only_covers_new_canvas_area`：用不透明色扩展画布时只填新增区域，原画布内的透明像素保持透明，结果没有画布外像素。
