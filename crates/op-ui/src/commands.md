@@ -65,7 +65,8 @@
 | Maximum | Filter › Other › Maximum... | 无 |
 | Minimum | Filter › Other › Minimum... | 无 |
 | Offset | Filter › Other › Offset... | 无 |
-| NewLayer | Layer › New › Layer | ⇧⌘N |
+| NewLayer | Layer › New › Layer...：打开 New Layer 对话框（`dialogs/new_layer.md`），默认名称为下一个「Layer N」 | ⇧⌘N |
+| NewLayerNoDialog | 不弹对话框直接新建图层（`panels::new_layer`），与 Photoshop 的 ⌥⇧⌘N 一致；不在菜单里 | ⌥⇧⌘N |
 | DeleteLayer | Layer › Delete › Layer | 无 |
 | ToggleLayerVisibility | Layer › Hide Layers / Show Layers | ⌘, |
 | LayerFromBackground | Layer › New › Layer from Background | 无 |

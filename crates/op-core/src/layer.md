@@ -39,6 +39,15 @@
 - `lock_transparency`、`lock_pixels`、`lock_position`：三种锁定。
 - `kind`：图层内容。
 - `mask`：图层蒙版（`Option<LayerMask>`），新建图层时没有。
+- `color`：颜色标签（`LayerColor`），新建图层时为 `None`。
+
+### `LayerColor`
+
+图层的颜色标签：`None`、`Red`、`Orange`、`Yellow`、`Green`、`Blue`、`Violet`、`Gray`，顺序与 Photoshop 的 Color 菜单一致。`label()` 为英文名；`psd_index()` / `from_psd_index()` 是 PSD `lclr` 块里的编号（0 = None … 7 = Gray，用 Photoshop 2026 保存的文件核对过）。
+
+### `neutral_color(mode)`
+
+New Layer 对话框「Fill with ‹mode›-neutral color」用的中性色：在该混合模式下不改变下方图像的颜色。Overlay、Soft Light、Hard Light、Vivid Light、Linear Light、Pin Light 为 50% 灰 (128, 128, 128)；Multiply、Color Burn、Linear Burn、Darken、Divide 为白色；Screen、Color Dodge、Linear Dodge、Lighten、Difference、Exclusion、Subtract 为黑色；其余模式（Normal、Dissolve、Darker/Lighter Color、Hard Mix、Hue、Saturation、Color、Luminosity）没有中性色，返回 `None`。
 
 ### `LayerMask`
 

@@ -18,13 +18,13 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 ### P0
 
 1. **已有界面的像素级校准**：Image Size（Photoshop 左侧还有预览图）、Fill、Trim、各调整对话框（Threshold、Posterize、Levels、Hue/Saturation、Exposure）与滤镜对话框（Photoshop 的滤镜对话框带预览缩略图和缩放按钮，这里没有）和 Layers 面板的改名输入框、拖动指示线是按 Photoshop 的结构排列的，尚未逐像素比对；窗口框架（标题栏、选项栏、工具栏、图标列、面板列的外框尺寸，文档标签栏、滚动条、状态栏）、History 面板和 Color Picker 已经按 Photoshop 1:1 量取。还没有逐像素比对的是：除移动工具外各工具的选项栏内容（选项栏外框与移动工具已逐像素对齐）、工具栏图标的具体字形（Phosphor Bold 只是近似，按钮位置与尺寸已对齐）、Properties 面板 Canvas 之后的分区（面板列的折叠条、组高度、标签栏、Color、Properties、Layers 面板、图标列、工具栏底部已逐像素对齐）、Canvas Size 对话框。
-2. **界面字体**：Photoshop 面板使用 Adobe Clean，对话框使用 macOS 系统字体；OpenPhoto 全部使用 Source Sans 3，字形和字宽不同。
+2. **界面字体**：Photoshop 面板使用 Adobe Clean（Adobe 专有字体，不能内置，面板继续用 Source Sans 3 近似），对话框使用 macOS 系统字体；本应用已能在运行时加载系统字体（`theme::dialog`），New Layer 对话框已改用，其余对话框还没有切换并重新校准。
 
 ### P1
 
 3. **图层操作**：
     - 画布外像素的余项：图层已经可以超出画布（移动、粘贴、Canvas Size、Reveal All、PSD 读写都保留画布外像素），自由变换也连同画布外像素一起变换，但图像旋转与翻转、Image Size、合并图层仍只处理画布内的像素。
-    - 对话框：「New Layer」（⇧⌘N、Layer from Background...、双击背景图层时弹出）、「Duplicate Layer」（含目标文档）、Rename Layer...；Flatten Image 时询问是否丢弃隐藏图层。
+    - 对话框：Layer from Background... 与双击背景图层时弹出的 New Layer 对话框（⇧⌘N 的 New Layer 对话框已实现）、「Duplicate Layer」（含目标文档）、Rename Layer...；Flatten Image 时询问是否丢弃隐藏图层；New Layer 对话框的「Use previous layer to create clipping mask」（依赖剪贴蒙版）。
     - Group Layers（⌘G）、Ungroup Layers（⇧⌘G）与图层组。
     - Layers 面板多选（以及多选后的 Merge Layers）、Select › All Layers（⌥⌘A）、Arrange › Reverse、Lock Layers...（⌘/）、Link Layers。
     - Layers 面板中把图层拖到「新建」按钮上复制、拖到垃圾桶上删除。
