@@ -2,7 +2,7 @@
 
 ## 组件职责
 
-带设置的调整与滤镜对话框：Image › Adjustments 下带对话框的调整，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Surface Blur...、Motion Blur...、Unsharp Mask...、Add Noise...、Dust & Scratches...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...、Emboss...、Twirl...、Pinch...、Spherize...、Polar Coordinates...、Custom...。Levels...、Curves...、Brightness/Contrast...、Color Balance...、Hue/Saturation...、Channel Mixer...、Selective Color...、Vibrance...、Posterize...、Exposure...、Photo Filter...、Black & White...、Threshold...、Gradient Map... 已按 Photoshop 2026 重做（即全部带对话框的调整），布局与设置在各自的模块里（`levels.md`、`curves.md`、`brightness_contrast.md`、`color_balance.md`、`hue_saturation.md`、`channel_mixer.md`、`selective_color.md`、`vibrance.md`、`exposure.md`、`photo_filter.md`、`black_white.md`、`threshold.md`、`gradient_map.md`），本模块只为它们画窗口框与标题、转交 OK/Cancel 并处理预览。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
+带设置的调整与滤镜对话框：Image › Adjustments 下带对话框的调整，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Surface Blur...、Motion Blur...、Unsharp Mask...、Add Noise...、Dust & Scratches...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...、Emboss...、Twirl...、Pinch...、Spherize...、Polar Coordinates...、Custom...、Trace Contour...。Levels...、Curves...、Brightness/Contrast...、Color Balance...、Hue/Saturation...、Channel Mixer...、Selective Color...、Vibrance...、Posterize...、Exposure...、Photo Filter...、Black & White...、Threshold...、Gradient Map... 已按 Photoshop 2026 重做（即全部带对话框的调整），布局与设置在各自的模块里（`levels.md`、`curves.md`、`brightness_contrast.md`、`color_balance.md`、`hue_saturation.md`、`channel_mixer.md`、`selective_color.md`、`vibrance.md`、`exposure.md`、`photo_filter.md`、`black_white.md`、`threshold.md`、`gradient_map.md`），本模块只为它们画窗口框与标题、转交 OK/Cancel 并处理预览。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
 
 对话框的结果是 `Effect`：`Adjustment(Adjustment)` 或 `Filter(Filter)`。`Effect::name()` 是历史名称，`Effect::apply(doc, background)` 调用对应的 `op-core` 函数。
 
@@ -30,6 +30,7 @@
 | Mosaic | Cell Size (square)（2–200，10） |
 | Surface Blur | Radius (pixels)（1–100，5）、Threshold (levels)（2–255，15） |
 | Dust & Scratches | Radius (pixels)（1–500，1）、Threshold (levels)（0–255，0） |
+| Trace Contour | Level（0–255，128）、Edge（Lower / Upper，Upper） |
 
 - 滤镜对话框记住上次按 OK 时的设置（Photoshop 的行为）：`settings()` 返回输入框里的文字，`lib.rs` 在应用时按 `Kind` 存进 `AppState::filter_settings`，`commands.rs` 下次打开同一对话框时用 `restore(values)` 放回（个数不符时忽略）。Cancel 不记住。只在本次运行内有效，不写入偏好。调整对话框（`Custom` 的各调整变体）每次打开都是默认值，`settings()` 返回 `None`；Custom 滤镜（`Custom::Kernel`）同样记住，内容见 `custom_filter.md`。
 - Preview 默认勾选。
@@ -38,14 +39,14 @@
 
 ### 经典滤镜对话框
 
-Gaussian Blur、Box Blur、Surface Blur、Motion Blur、Unsharp Mask、Add Noise、Dust & Scratches、Median、Minimum、Maximum、High Pass、Offset、Mosaic、Emboss 按 Photoshop 2026 的经典对话框逐点重做（`classic_ui`），每个对话框的尺寸与各行位置在 `filter_layout.rs`（见 `filter_layout.md`）：
+Gaussian Blur、Box Blur、Surface Blur、Motion Blur、Unsharp Mask、Add Noise、Dust & Scratches、Median、Minimum、Maximum、High Pass、Offset、Mosaic、Emboss、Trace Contour 按 Photoshop 2026 的经典对话框逐点重做（`classic_ui`），每个对话框的尺寸与各行位置在 `filter_layout.rs`（见 `filter_layout.md`）：
 
 - 窗口框与标题栏是 `common::frame`（标题 AppKit 13 pt 粗体）。
 - 右上角：OK（默认按钮）在 y 38.5、Cancel 在 73.5，左边距窗口右缘 90.5，宽 59.5（Gaussian Blur、High Pass 为 80，Offset 为 60），高 26；其下 Preview 复选框。
 - 左上角预览框（除 Offset 外都有）：`PANE` 区域里居中显示文档（带当前预览效果）的中心部分，100%（一个图像像素对应一个屏幕像素），不缩放、不平滑；纹理由 `lib.rs` 的 `pane_texture` 在打开时与预览变化后重新生成（截取中心不超过 392 × 392 像素）。预览框下方是缩放控件：缩小（100% 时变暗）、「100%」、放大，目前只是显示。已知差异：Photoshop 的预览框不论 Preview 是否勾选都显示效果，这里取消勾选时显示原图；也还不能缩放、拖动查看其他部分。
 - 数值行：右对齐到输入框的标签、19 pt 高的输入框（`appkit::field`，打开时第一个输入框获得焦点并全选）、单位文字（角度的「°」紧贴输入框）；下方 3 pt 灰色轨道，白色三角标记的尖端在轨道下 0.5 pt，标记从轨道起点左 2.25 pt 走到终点右 0.75 pt，位置按该行的 `Scale` 换算（Photoshop 的滑块大多不均匀）。
 - Motion Blur、Emboss 的角度在输入框右侧带角度盘：圆内一条从中心指向角度的线（Motion Blur 的线穿过中心两端）。
-- 选项：Minimum、Maximum 的 Preserve 为下拉框；Add Noise 的 Distribution 与 Offset 的 Undefined Areas 为带标题的分组框加单选按钮；Add Noise 的 Monochromatic 为复选框。
+- 选项：Minimum、Maximum 的 Preserve 为下拉框；Add Noise 的 Distribution、Offset 的 Undefined Areas 与 Trace Contour 的 Edge 为带标题的分组框加单选按钮；Add Noise 的 Monochromatic 为复选框。
 
 ### 插件式扭曲对话框
 
