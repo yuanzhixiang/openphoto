@@ -63,3 +63,10 @@ Edit › Transform 的固定变换：`Rotate180`、`Rotate90Clockwise`、`Rotate
 - `move_scale_and_flip_the_layer`：平移后像素到达新位置、原处变透明；放大 2 倍内部为实色、外圈因插值半透明；水平翻转。
 - `selected_pixels_move_and_leave_the_background_color`：背景图层上移动选中像素，原处填背景色，选区跟随移动。
 - `transforming_takes_pixels_outside_the_canvas_along`：一半在画布左边外的横条，范围包括画布外部分；向右平移后两个像素都在画布内；再向上平移到画布外，像素仍在图层上，范围为 (2, −4)–(4, −3)。
+
+## 投影变换（`Projective`）
+
+扭曲、透视需要的 3 × 3 投影变换（双精度）：`rect_to_quad(范围, 四角)` 把范围映射到任意四边形（Heckbert 的单位正方形到四边形构造，四角为平行四边形时退化为仿射），`inverse`、`after`、`from_affine`、`is_affine`。`transform` 对映射是泛型的（`Mapping` trait，`Affine` 与 `Projective` 都实现），逐像素用逆映射双线性采样，所以仿射与投影的变换走同一条路径。
+
+- `projective_maps_the_box_onto_any_quad`：梯形的四角精确对应、逆映射、平行四边形是仿射、与仿射映射一致。
+- `distorting_the_layer`：把方块的上边两角向内收，上面一行的覆盖少于下面一行。

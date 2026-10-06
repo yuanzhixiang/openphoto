@@ -6,13 +6,13 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
 
 ## 状态
 
-会话保存在 `DocState::free_transform`（`FreeTransform`）：开始时的文档快照 `before`、原始范围 `bounds`、平移 `offset`、缩放 `scale`、角度 `angle`、进行中的拖动 `drag`，以及文档当前显示的变换 `applied`。框的映射为 `Affine::around(范围中心, scale, angle, offset)`。
+会话保存在 `DocState::free_transform`（`FreeTransform`）：开始时的文档快照 `before`、原始范围 `bounds`、平移 `offset`、缩放 `scale`、角度 `angle`、自由四角 `quad`（斜切、扭曲、透视之后才有：左上、右上、右下、左下，文档像素）、模式 `mode`（`TransformMode`：Free、Skew、Distort、Perspective）、进行中的拖动 `drag`，以及文档当前显示的变换 `applied`（`Projective`）。框的映射 `mapping()`：有自由四角时为范围到四角的投影变换（`Projective::rect_to_quad`），否则为 `Affine::around(范围中心, scale, angle, offset)`。
 
 ## 流程
 
-- `start(state)`：用 `transform::bounds` 检查并取得范围，保存快照，开始会话。失败时由调用方弹出提示（例如背景图层无选区时「Could not complete the Free Transform command because the layer is locked.」）。
+- `start(state)`：用 `transform::bounds` 检查并取得范围，保存快照，开始会话。`start_in(state, mode)`：Edit › Transform › Scale、Rotate（都是 Free）、Skew、Distort、Perspective；已在变换中时只切换模式。失败时由调用方弹出提示（例如背景图层无选区时「Could not complete the Free Transform command because the layer is locked.」）。
 - 进行中，每帧 `preview`：框的映射与 `applied` 不同时，先恢复快照，再对文档应用新的映射，文档实时显示结果。预览不记录历史。
-- 确认（`commit`）：Enter、在框内双击，或选项栏的 ✓ 按钮。映射不是恒等时记录「Free Transform」，并把映射记为 `AppState::last_transform`（供 Transform › Again 使用）；恒等时视为取消。
+- 确认（`commit`）：Enter、在框内双击，或选项栏的 ✓ 按钮。映射不是恒等时记录「Free Transform」（无论从哪个模式开始，Photoshop 2026 都记这个名字，实测），并把映射记为 `AppState::last_transform`（供 Transform › Again 使用）；恒等时视为取消。
 - 取消（`cancel`）：Esc 或选项栏的 ⦸ 按钮，恢复快照。
 - 有输入框获得键盘焦点时，Enter 和 Esc 不作用于变换。
 - 会话期间 `AppState::transforming()` 为真，`modal_open()` 也为真：菜单命令与单键工具快捷键都不生效，与 Photoshop 一致。
@@ -28,6 +28,12 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
   - 缩放比例的绝对值至少为 1 / 原始范围的较长边（框不会缩成 0）；越过固定点时翻转。
   - 框旋转后，缩放在框自身的坐标轴上计算。
 - 旋转：绕当前中心，角度随指针相对中心的角度变化；按住 Shift 吸附到 15° 的倍数。
+- 斜切、扭曲、透视（Photoshop 的修饰键；在 Skew、Distort、Perspective 模式下不按修饰键也是这样）：
+  - ⌘ 拖角点：扭曲，只移动这个角；⌘ 拖边：这条边的两个角一起移动。
+  - ⌘⇧ 拖边：斜切，这条边沿自身方向滑动；Skew 模式下拖角点只沿水平或竖直中较大的方向移动。
+  - ⌘⌥⇧ 拖角点：透视，角点沿较大的方向移动，同一条边上的相邻角反向移动同样的距离。
+  - 有了自由四角后：普通拖控制点继续按扭曲处理；框内拖动平移四角；框外拖动让四角绕它们的中点转动（Shift 15°）。
+- 右键菜单（`context_menu`）：Free Transform、Scale、Rotate、Skew、Distort、Perspective（切换模式），置灰的 Warp、Content-Aware Scale、Puppet Warp，Rotate 180°、Rotate 90° Clockwise、Rotate 90° Counter Clockwise、Flip Horizontal、Flip Vertical（`turn_box`：转动或翻转框本身——参数框改角度或缩放符号，自由四角绕中点转动或翻转）。
 - 光标：框内为移动光标；框外为旋转（`Alias`）光标；控制点上为按框角度换算的双向箭头。
 
 ## 外观
@@ -44,10 +50,13 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
 ## 已知限制
 
 - 选项栏的数值只读，不能输入；没有参考点位置选择、插值方式选择。
-- 没有右键菜单与斜切、扭曲、透视、变形；没有 ⌘ 拖动角点的自由扭曲。
+- 没有变形（Warp 与 Split Warp）、Content-Aware Scale、Puppet Warp。有自由四角时选项栏的 W、H、角度仍显示参数框的数值。
 
 ## 测试覆盖
 
 - `corner_scales_proportionally_from_the_opposite_corner`：角点拖动等比放大 2 倍时左上角不动；Shift 时只放大宽度。
 - `side_handles_move_and_rotate`：边控制点只缩放一个方向且对边不动；移动的偏移；Shift 旋转吸附到 90°。
 - `hit_testing_the_quad`：点是否在框内。
+- `distort_skew_and_perspective`：⌘ 拖右下角只移动它，之后普通拖动继续扭曲；透视模式下右上角外拉、左上角内收；⌘⇧ 拖右边沿自身滑动；映射跟随四角。
+- `turning_and_flipping_the_box`：右键菜单的旋转与翻转改变参数框的角度与缩放；自由四角绕中点转 180°。
+- `ui_tests::transform_distort_from_the_menu`：Edit › Transform › Distort 后拖右下角，确认记录「Free Transform」，远角变红而左上角不动，Transform Again 可用。
