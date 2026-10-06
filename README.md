@@ -29,7 +29,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
     - Layers 面板多选（以及多选后的 Merge Layers）、Select › All Layers（⌥⌘A）、Arrange › Reverse、Lock Layers...（⌘/）、Link Layers。
     - Layers 面板中把图层拖到「新建」按钮上复制、拖到垃圾桶上删除。
 4. **图像尺寸与方向**：Image › Image Size...（⌥⌘I，含重采样）、Image Rotation › Arbitrary...（任意角度）、Reveal All。
-5. **裁剪工具**：裁剪框的拖动、比例约束、确认/取消。
+5. **裁剪工具**：裁剪框超出画布时扩展画布、旋转与拉直、比例预设与叠加方式、关闭「删除裁剪的像素」、拖动框内移动图像（Photoshop 的默认方式）、切换工具时的「是否裁剪」询问、透视裁剪工具。
 6. **变换**：斜切、扭曲、透视、变形（Skew、Distort、Perspective、Warp 及 Split Warp）；自由变换选项栏的数值输入、参考点、插值方式；右键菜单与 ⌘ 拖动角点的自由扭曲；Transform Selection；变换框外观与 Photoshop 的逐像素比对。
 7. **调整**：Image › Adjustments 的 Brightness/Contrast、Curves（⌘M）、Color Balance（⌘B）、Black & White（⌥⇧⌘B）、Vibrance、Photo Filter、Channel Mixer、Color Lookup、Gradient Map、Selective Color、Shadows/Highlights、HDR Toning、Replace Color、Match Color；Auto Tone/Contrast/Color；Levels 的单通道（R/G/B）、预设、自动与吸管；Hue/Saturation 的分颜色范围编辑、Colorize 与预设；Exposure 的预设与吸管；各调整对话框记住上次的值；Equalize 在有选区时的「只均化选区 / 按选区均化整幅图像」询问。
 8. **滤镜**：Blur 的 Blur、Blur More、Lens/Motion/Radial/Shape/Smart/Surface Blur；Blur Gallery；Distort 全部；Noise 的 Despeckle、Dust & Scratches、Reduce Noise；Pixelate 的 Color Halftone、Crystallize、Facet、Fragment、Mezzotint、Pointillize；Render 全部（Clouds 等）；Sharpen 的 Sharpen、Sharpen Edges、Sharpen More、Smart Sharpen；Stylize 的 Diffuse、Emboss、Extrude、Find Edges、Oil Paint、Tiles、Trace Contour、Wind；Video；Other 的 Custom、HSB/HSL；Filter Gallery；Edit › Fade（⇧⌘F）；Photoshop 滤镜对话框的预览缩略图；已实现滤镜的取值细节（Gaussian Blur 半径与标准差的换算、Add Noise 的强度、Minimum/Maximum 的圆形范围与小数半径、Offset 在背景图层上的「Set to Background」标签）与 Photoshop 核对。

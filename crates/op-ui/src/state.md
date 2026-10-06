@@ -47,6 +47,7 @@
 - 移动：`move_drag` 是进行中的移动和拖动起点（文档像素）。
 - 绘画：`stroke` 是进行中的笔画和它的工具；`last_paint_point` 是上一笔结束的位置，用于 Shift+单击画直线。
 - `gradient_drag`：渐变工具拖动中的起点与当前点（文档像素）。
+- `crop`：裁剪工具的裁剪框（见 `crop_tool.md`）。
 - `free_transform`：自由变换会话（见 `free_transform.md`）。
 - `lasso`：正在绘制的套索轨迹（文档像素坐标的点、组合方式、是否为多边形套索）。
 - `sample_average(x, y, size, all_layers)`：吸管取样，见 `document_view.md`。

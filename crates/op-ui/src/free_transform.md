@@ -14,6 +14,7 @@ Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、�
 - 进行中，每帧 `preview`：框的映射与 `applied` 不同时，先恢复快照，再对文档应用新的映射，文档实时显示结果。预览不记录历史。
 - 确认（`commit`）：Enter、在框内双击，或选项栏的 ✓ 按钮。映射不是恒等时记录「Free Transform」，并把映射记为 `AppState::last_transform`（供 Transform › Again 使用）；恒等时视为取消。
 - 取消（`cancel`）：Esc 或选项栏的 ⦸ 按钮，恢复快照。
+- 有输入框获得键盘焦点时，Enter 和 Esc 不作用于变换。
 - 会话期间 `AppState::transforming()` 为真，`modal_open()` 也为真：菜单命令与单键工具快捷键都不生效，与 Photoshop 一致。
 
 ## 交互（与 Photoshop 一致）
