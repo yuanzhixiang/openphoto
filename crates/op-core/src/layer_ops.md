@@ -17,7 +17,8 @@
   - `ungroup(doc)`：Layer › Ungroup Layers（⇧⌘G）：当前组消失，它的直接子图层进入它原来所在的组，并全部被选中。
   - `new_group(doc)`：一个空的「Group N」，插入规则同 `Document::insert_above_active`，并被选中。
   - `can_move_block(doc, id, gap)` / `move_block(doc, id, gap)`：把图层连同其中的内容移到 `gap`（`layers` 中移动前的位置，介于 `gap - 1` 与 `gap` 之间）。新的父组：`gap` 正上方是一个组、正下方是它里面的图层时，就是这个组（放在组内最上面）；否则与正上方的图层同组；在最上面时不在任何组里。背景图层不能动，不能放到背景下面，组不能放进自己里面。Layers 面板拖动排序用它。
-  - `delete_selected` 删除组时连同组里的内容一起删除。
+  - `delete_selected` 删除组时连同组里的内容一起删除（Photoshop「Group and Contents」）。`delete_selected_keep_contents`：「Group Only」，选中的组消失、其中的图层留在组原来的位置（进入组的父组），其它选中图层照常删除。`deleting_groups_with_contents(doc)`：选中图层中第一个非空组的名字，界面据此先询问。
+  - 复制（Duplicate Layer、⌘J、复制到其它文档）作用于组时，连同组里的所有图层一起复制（`cloned_block`：换成新 id，块内的父子关系随之对应），放在原组正上方（其它文档中按 `Document::insertion_point`）。
 - `duplicate_name(doc)`：Duplicate Layer 对话框「As」的默认值（与 `duplicate` 的命名规则相同）。
 - `duplicate_named(doc, name)`：复制到同一文档，名称为 `name`。
 - `duplicate_into(source, target, name)`：把 `source` 的活动图层复制到另一个文档 `target`：像素位置不变（`with_canvas` 平移 0，超出 `target` 画布的像素保留在画布外），图层蒙版扩展（显示）或裁到新画布，背景图层的副本是普通图层；插在 `target` 活动图层上方并设为活动图层。
@@ -72,6 +73,7 @@
 
 ## 测试覆盖
 
+- `deleting_only_the_group_keeps_its_layers`、`duplicating_a_group_copies_its_layers`：只删组时图层留下并移出组；复制组得到「Group 1 copy」及其中图层的副本，复制到其它文档同样带上组里的图层。
 - `grouping_ungrouping_and_moving_blocks`：⌘G 把不相邻的两层放进新组（位置、父子关系、选中）；组展开时新图层插在组内最上面；把组外的图层移到组内最上面；组不能移到自身里或背景下面；取消编组后结构复原并选中原子图层；删除组连同内容。
 - `selected_layers_merge_delete_and_hide`：两个图层合并成上面那个，名字和位置正确、不透明像素叠加，未选的图层不动；隐藏/显示选中图层；删除选中图层后活动图层正确，最后一个图层不能删。
 - `duplicate_layer_dialog_targets`：默认名「Background copy」；同文档改名复制；复制到更小的文档时位置不变、超出部分保留在画布外并成为活动图层；复制到新文档时尺寸、标题和唯一图层正确。

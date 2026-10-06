@@ -8,7 +8,8 @@ Photoshop 的错误提示和确认询问都是 macOS 原生提示框（NSAlert�
 
 - `Alert { message, icon, cancel, dont_show_again }`：消息；图标（`App` 应用图标，或 `Caution` 警告三角加应用小图标）；是否有 Cancel；「Don’t show again」复选框及是否勾选（`None` 表示没有）。
 - `Alert::error(message)`：应用图标、只有 OK。`Alert::caution(message)`：警告图标、Cancel 与 OK、带复选框。
-- `show(ctx, alert)` 返回 `Option<Answer>`：`Ok { dont_show_again }` 或 `Cancel`；还没回答时为 `None`。
+- `Alert::choose(message, choices)`：警告图标，按钮为一列横跨整宽的选项（第一个为蓝色默认按钮），见下文。
+- `show(ctx, alert)` 返回 `Option<Answer>`：`Ok { dont_show_again }`、`Cancel` 或 `Choice(序号)`；还没回答时为 `None`。
 
 ## 布局（Photoshop 2026 实测，相对提示框左上角的 pt）
 
@@ -17,11 +18,12 @@ Photoshop 的错误提示和确认询问都是 macOS 原生提示框（NSAlert�
 - 消息：粗体系统字体 14 pt、颜色 `#1c1c1c`，从 x 22.5 开始，宽度超过 216 时换行；第一行大写字母从 y 103 开始，行距 16。
 - 复选框（有时）：消息下方 13 pt，16 pt 见方圆角 4，未勾选 `#9f9f9f`、勾选为蓝底白勾；「Don’t show again」在框右 7 pt，中等字重 14 pt。点击框或文字切换。
 - 按钮：在最后一行消息下方 13 pt（有复选框时在复选框下方 16 pt），高 28 的胶囊，系统字体 14 pt。只有 OK 时 OK 横跨 (16, …)–(244, …)；有 Cancel 时 Cancel (16–126，`#a4a4a4` 底、深色字)、OK (134–244，`#3478f6` 底、白字)。按下时颜色变暗。
+- 竖排选项（`choices` 非空时）：每个按钮 28 pt 高、横跨 (16, …)–(244, …)，间距 34 pt，第一个蓝底白字，其余灰底；与 Photoshop 删除组时的「Group and Contents / Group Only / Cancel」一致。
 - 高度随消息行数变化：按钮下边再留 16 pt。
 
 ## 交互
 
-- Enter：OK。Esc：有 Cancel 时为 Cancel，否则为 OK。点击按钮同理。
+- Enter：OK（竖排选项时为第一个）。Esc：竖排选项时为最后一个，有 Cancel 时为 Cancel，否则为 OK。点击按钮同理。
 - 显示期间是模态的，菜单和快捷键不生效。
 
 ## 已知限制
