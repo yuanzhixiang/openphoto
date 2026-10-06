@@ -46,6 +46,7 @@
   - T 选中文字工具，单击后输入「Hello」、Enter、「World」，期间单键快捷键不生效，图层实时显示为「Hello」（生成 `type_tool` 截图）；⌘Enter 后记录「Type Tool」，基线上方有白色像素；另起一段输入后按 Esc，文字被丢弃。
   - ⌘N 打开 New 对话框（生成 `new_document` 截图），Enter 后创建 1920×1080 的「Untitled-2」；透明背景内容创建「Layer 1」普通图层，分辨率按设置。
   - 红色背景上 ⌥⇧⌘B 打开 Black & White 并按默认预设应用得到 102 灰；Gradient Map 用黑到白；打开 Photo Filter（生成 `photo_filter` 截图）。
+  - ⌘M 打开 Curves，在曲线图 (128, 192) 处单击加点（生成 `curves` 截图），Enter 后 128 灰变为约 192，记录「Curves」。
 - `active_canvas_pixel(harness, x, y)` 读取显示用的画布像素（含快速蒙版的红色）；`alt_click(harness, pos)` 模拟一次 ⌥单击。
 - `run_command(harness, command)` 直接执行一个命令（用于没有快捷键的菜单项）；`double_click(harness, pos)` 模拟一次双击；`drag(harness, from, to, modifiers)` 模拟一次带修饰键的拖动；`doc_point` 把文档像素换算成屏幕坐标；`layer_pixel(harness, layer, x, y)` 读取某个图层（自底向上的序号）的像素。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。

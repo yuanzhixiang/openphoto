@@ -22,8 +22,9 @@
   - `PhotoFilter { color, density, preserve_luminosity }`：每个通道向「乘以滤镜色」的结果混合 `density%`；Preserve Luminosity 同上。
   - `GradientMap { from, to }`：按像素亮度在两种颜色之间线性插值。
   - `AutoTone`、`AutoColor`：每个通道各自去掉最暗、最亮 0.1% 后拉伸到 0–255（Photoshop 的 Auto Color 还会中和中间调，这里没有）；`AutoContrast`：三个通道合并统计、按同一范围拉伸，颜色关系不变。直方图取当前图层选区内、alpha 不为 0 的像素。
-  - Levels、Exposure、Brightness/Contrast 先算出 256 项查找表再逐像素查表。
-- `Adjustment::name()`：菜单与历史名称（「Invert」「Desaturate」「Threshold」「Posterize」「Equalize」「Levels」「Hue/Saturation」「Exposure」「Brightness/Contrast」「Color Balance」「Black & White」「Vibrance」「Photo Filter」「Gradient Map」「Auto Tone」「Auto Contrast」「Auto Color」）。
+  - `Curves { points, count }`：RGB 复合通道的曲线，最多 16 个（输入, 输出）点（`Adjustment::curves(points)` 构造）。`curve_table(points)` 生成查找表：按输入排序、去掉重复输入后做自然三次样条（两端二阶导为 0），第一个点之前、最后一个点之后保持平直，结果限制在 0–255；没有点时为恒等，只有一个点时为常数。
+  - Levels、Exposure、Brightness/Contrast、Curves 先算出 256 项查找表再逐像素查表。
+- `Adjustment::name()`：菜单与历史名称（「Invert」「Desaturate」「Threshold」「Posterize」「Equalize」「Levels」「Hue/Saturation」「Exposure」「Brightness/Contrast」「Color Balance」「Black & White」「Vibrance」「Photo Filter」「Gradient Map」「Auto Tone」「Auto Contrast」「Auto Color」「Curves」）。
 - `channel_histogram(doc)`：活动图层选区内、alpha 不为 0 的像素的 R、G、B 值合并统计的直方图（Equalize 与 Levels 对话框使用）。
 - `mask_gray(rgb)`：颜色画在图层蒙版上的灰度（亮度，三个通道相同）。
 - `luminosity(px)`：亮度 `(299 R + 587 G + 114 B) / 1000`，四舍五入到 0–255（Rec. 601 权重）。
@@ -49,6 +50,7 @@
 - `equalize_stretches_the_range`：只有 100 和 200 两个值时分别映射到 128 和 255。
 - `levels_hue_saturation_and_exposure`：Levels 的黑白场拉伸与 gamma 2（128 → 181）；红色色相 +120° 变绿、饱和度 −100 加亮度 +50 得到 191 灰；曝光 +1 档把 128 变为 176。
 - `color_adjustments`：亮度提高中间调、对比度拉开；Black & White 默认预设下纯红为 102、纯黄为 153；黑到红的渐变映射；中间调偏红且保持亮度；Vibrance 提高低饱和颜色；蓝色滤镜 50% 把 200 灰变为 (100, 100, 200)。
+- `curves_pass_through_their_points`：两点曲线为恒等；S 曲线经过各点且单调；端点外平直；(64→128) 的曲线把 64 灰变为 128。
 - `auto_tone_stretches_each_channel`：两个像素时各通道拉伸到 0 与 255。
 - `only_the_selection_changes`：选区外的像素不变。
 - `hidden_layers_are_refused`：隐藏图层返回错误及 Photoshop 的提示文字。
