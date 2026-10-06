@@ -132,6 +132,9 @@
 | NewGuide | View › Guides › New Guide... | 无 |
 | HideApp | OpenPhoto › Hide OpenPhoto | ⌃⌘H |
 | ToggleHistory | Window › History | 无 |
+| ToggleHistogram | Window › Histogram | 无 |
+| ToggleInfo | Window › Info | F8 |
+| ToggleNavigator | Window › Navigator | 无 |
 
 ## 可用条件（`enabled`）
 
@@ -139,7 +142,7 @@
 
 - 有输入框获得键盘焦点时（`AppState::typing`），Cut、Copy、CopyMerged、Paste、PasteInPlace 始终可用（包括模态对话框里的输入框），执行时作用于输入框的文字（见下文「剪贴板」）。
 - 除此之外，有模态对话框打开时所有命令不可用。
-- New、Open、ToggleHistory、Quit、HideApp 与五个视图开关（Rulers、Extras、Guides、Grid、Lock Guides）始终可用（有模态对话框时除外）；ClearGuides 在当前文档有参考线时可用；FitLayers、Zoom200、PrintSize、NewGuide 有当前文档时可用。
+- New、Open、ToggleHistory、ToggleInfo、ToggleNavigator、ToggleHistogram、Quit、HideApp 与五个视图开关（Rulers、Extras、Guides、Grid、Lock Guides）始终可用（有模态对话框时除外）；ClearGuides 在当前文档有参考线时可用；FitLayers、Zoom200、PrintSize、NewGuide 有当前文档时可用。
 - Revert：当前文档有文件且有未保存修改时可用。Save、Save As、Save a Copy：有当前文档时可用。
 - Undo、ToggleLastState：当前文档能撤销时可用；Redo：能重做时可用。
 - DeleteLayer：当前文档的图层多于 1 个时可用。
@@ -167,6 +170,7 @@ Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别�
 
 ## 视图命令
 
+- ToggleInfo、ToggleNavigator、ToggleHistogram 打开或关闭对应的浮动面板（`panels/floating.md`），菜单项带勾选标记；History 菜单项同样带勾选。
 - 五个视图开关切换 `AppState::view` 对应的字段（见 `rulers.md`），菜单项显示勾选状态（`Command::checked`）。
 - Zoom200：以窗口中心缩放到 200%。PrintSize：缩放到让 1 英寸（文档分辨率个像素）在屏幕上为 72 pt。FitLayers：让当前图层的非透明像素充满窗口并居中（空图层时不动）。
 - ClearGuides：删除当前文档的全部参考线，记录「Clear Guides」。NewGuide：打开 New Guide 对话框（`dialogs/new_guide.md`）。

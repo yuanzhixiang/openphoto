@@ -21,7 +21,7 @@
 - **Filter**：按 Photoshop 的顺序列出全部项。可用的有：Last Filter（⌃⌘F，标签显示上次使用的滤镜名称，如「Gaussian Blur」，从未使用时为「Last Filter」）；Blur › Average、Box Blur...、Gaussian Blur...；Noise › Add Noise...、Median...；Pixelate › Mosaic...；Sharpen › Unsharp Mask...；Stylize › Solarize；Other › High Pass...、Maximum...、Minimum...、Offset...。其余置灰并带 Photoshop 的快捷键（Adaptive Wide Angle ⌥⇧⌘A、Camera Raw Filter ⇧⌘A、Lens Correction ⇧⌘R、Liquify ⇧⌘X、Vanishing Point ⌥⌘V），Blur Gallery、Distort、Render、Video 子菜单整体置灰。
 - **Plugins**：Plugins Panel、Manage Plugins...，置灰。
 - **View**：按 Photoshop 2026 的完整顺序列出。可用的有 Zoom In、Zoom Out、Fit on Screen、Fit Layer(s) on Screen、100%、200%、Print Size；Extras（⌘H，带勾选）；Show › Grid（⌘'）、Guides（⌘;）（带勾选）；Rulers（⌘R，带勾选）；Guides › Lock Guides（⌥⌘;，带勾选）、Clear Guides、New Guide...。其余置灰并带 Photoshop 的快捷键：Proof Setup ›、Proof Colors（⌘Y）、Gamut Warning（⇧⌘Y）、Pixel Aspect Ratio ›、Pixel Aspect Ratio Correction、32-bit Preview Options...、Fit Artboard on Screen、Actual Size、Flip Horizontal、Pattern Preview、Screen Mode ›、Show 里的其余项（Target Path ⇧⌘H 等）、Snap（⇧⌘;）、Snap To ›、Guides 里的其余项、Lock Slices、Clear Slices。
-- **Window**：History。同时被设为 macOS 的窗口菜单，系统会在里面列出窗口。
+- **Window**：按 Photoshop 2026 的完整顺序列出。可用的有 Histogram、History、Info（F8）、Navigator（带勾选）；其余置灰并带 Photoshop 的快捷键（Arrange ›、Workspace ›、Actions ⌥F9、Brush Settings F5、Color F6、Layers F7 等，以及 Application Frame、Options、Tools、Contextual Task Bar）。同时被设为 macOS 的窗口菜单，系统会在末尾列出窗口。
 - **Help**：OpenPhoto Help（置灰）。
 
 ## 动态内容
@@ -44,4 +44,4 @@
 ## 已知限制
 
 - Image 菜单中 Generative Upscale... 没有列出。
-- Edit、Window 菜单，以及 File › Export 子菜单只列出了部分项。
+- Edit 菜单，以及 File › Export 子菜单只列出了部分项。

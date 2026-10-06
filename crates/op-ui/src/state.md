@@ -24,6 +24,7 @@
 - `gradient`：渐变工具选项（`op_core::gradient::GradientOptions`：类型、混合模式、不透明度、反向）。
 - `wand`：魔棒选项：组合方式与区域规则（`op_core::fill::BucketOptions` 的容差、消除锯齿、连续、所有图层，默认值同油漆桶）。
 - `editing_background` 与 `picker_hsb`：Color 面板正在编辑前景还是背景，以及缓存的 HSB。缓存 HSB 是为了在灰色（饱和度为 0）时色相不跳回 0。
+- `floating`：浮动面板（Info、Navigator、Histogram）是否打开（见 `panels/floating.md`）。
 - `history_open`、`history_panel`：History 弹出面板是否打开，以及它的标签与高度。
 - `fill_dialog`：Fill 对话框，打开期间为 `Some`。
 - `bucket`：油漆桶选项（默认值见 `crates/op-core/src/fill.md`）。
@@ -59,6 +60,8 @@
 - `shape_drag`：形状工具拖动中的起点与当前点。
 - `gradient_drag`：渐变工具拖动中的起点与当前点（文档像素）。
 - `clone_source`、`clone_offset`、`picking_clone_source`：仿制图章的取样点、对齐偏移，以及「这次按压是在设定取样点」的标记（见 `document_view.md`）。
+- `pointer`：指针在文档上的位置（文档像素），指针不在画布上时为 `None`；Info 面板使用。
+- 直方图与合成缩略图：`composite_histogram()`、`composite_texture(ctx, max_px)`，都按文档修订号缓存，供 Histogram 与 Navigator 面板使用。
 - `guide_drag`：正在拖动的参考线（从标尺拖出时 `index` 为 `None`，否则为被移动参考线的序号）。
 - `crop`：裁剪工具的裁剪框（见 `crop_tool.md`）。
 - `free_transform`：自由变换会话（见 `free_transform.md`）。

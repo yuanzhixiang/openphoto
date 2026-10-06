@@ -36,7 +36,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 9. **文件**：PSD 的图层组、图层蒙版、调整图层、16/32 位与 CMYK 等模式、ZIP 压缩数据的读写；Photoshop 保存时的选项对话框（PNG/JPEG 选项、多图层存为扁平格式时的提示）；Open Recent、Photoshop 新版的「New Document」对话框（预设、最近使用、模板）与 New 对话框的单位、颜色模式、位深、颜色配置文件选项、Quick Export as PNG、File › Export 子菜单其余项；未保存修改确认框与 Photoshop 的逐像素比对；用 Photoshop 打开 OpenPhoto 写出的 PSD 的实际验证。
 10. **其它工具**：画笔的笔刷预设、笔尖形状、压感与平滑，画笔模式（Multiply 等）和橡皮擦的 Pencil/Block 模式；渐变工具的渐变编辑器与预设、Dither、Method（Perceptual/Linear/Classic）、透明度渐变以及 Photoshop 2024 起默认的「渐变填充图层」模式；吸管的取样环与其余取样方式（Current & Below 等）、颜色取样器、磁性套索、套索拖动中按 ⌥ 临时切换多边形、快速选择与对象选择、污点修复画笔/修复画笔/修补/内容感知移动/红眼、涂抹、图案图章、艺术历史记录画笔、仿制图章的取样范围（Current & Below、All Layers）与仿制源面板、历史记录画笔选择其它状态作为来源、修饰工具的 Protect Tones/Vibrance/Protect Detail 与按住拖动时连续累积的效果、背景橡皮擦与魔术橡皮擦、颜色替换与混合器画笔、旋转视图（R）。工具栏按住按钮弹出同组工具列表（目前只支持右键）。
 11. **视图**：对齐（Snap ⇧⌘;、Snap To）、智能参考线、画布参考线、参考线版面、Edit/Clear Selected Guides、标尺单位与原点、参考线与网格的颜色设置、参考线保存到 PSD；屏幕模式（F）、Actual Size、Flip Horizontal、Show › Selection Edges/Layer Edges/Pixel Grid 等其余项、Proof Setup/Colors 与 Gamut Warning；状态栏缩放框可输入。
-12. **面板**：Navigator、Info、Histogram、Brushes 与 Brush Settings、Channels、Paths、Adjustments、Gradients、Patterns、Styles、Actions、Character、Paragraph、Tool Presets、Clone Source、Layer Comps、Notes、Timeline 等；面板拖动停靠、浮动、折叠为图标，Window › Workspace。
+12. **面板**：Navigator/Info/Histogram 的余项（面板选项、扩展视图、可输入的缩放）、Brushes 与 Brush Settings、Channels、Paths、Adjustments、Gradients、Patterns、Styles、Actions、Character、Paragraph、Tool Presets、Clone Source、Layer Comps、Notes、Timeline 等；面板拖动停靠、浮动、折叠为图标，Window › Workspace。
 
 ### P2
 
