@@ -66,3 +66,4 @@
 - 布局回归测试 `layout_matches_photoshop_2026`（不忽略，随 `cargo test` 运行）：渲染默认工作区（参考文档、移动工具、白色前景），在 `PHOTOSHOP_PIXELS` 表里约 60 个点上比较灰度与 Photoshop 2026 的 2x 截图（容差 6）。这些点都选在实测的 1 pt 边上：折叠条与分隔条的线、面板组间隔、标签栏底线、图标列与工具栏的分隔条、选项栏分隔线、Home 图标、色块边框、Color 面板的区域边缘、Properties 的框与输入框、面板菜单图标等，所以任何一处布局移动 1 pt 都会失败，并列出所有不一致的点。重新校准某处布局后，要从新的 Photoshop 截图更新这张表。
 - 截图测试（标记为 `#[ignore]`，只生成图片、不做断言）：用 `cargo test -p op-ui ui_tests -- --ignored` 运行，用于和 Photoshop 对比外观。
 - `brightness_contrast_dialog_types_and_applies`、`color_balance_tones_keep_their_values`、`hue_saturation_ranges_and_colorize`：重做的 UXP 调整对话框的输入、切换色调/范围、Colorize 与应用结果（辅助函数 `in_dialog` / `click_dialog` 按居中对话框的 Photoshop 点坐标点击，`color_document` 建单色文档）。`screenshot_adjustment_dialogs` 也截取 Brightness/Contrast、Color Balance、Curves。
+- `levels_and_curves_edit_one_channel`：Levels 用 ⌥3 只改红色通道的黑场，Curves 用 ⌥4 只抬高绿色通道。`curves_dialog_adds_points` 按新的曲线图位置点击。

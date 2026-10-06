@@ -34,6 +34,7 @@
   - `Curves { points, counts }`：RGB 复合、红、绿、蓝通道各最多 16 个（输入, 输出）点（`Adjustment::curves(points)` 只设复合通道，`curves_per_channel([..; 4])` 四个通道，空列表表示该通道不变）；先各通道自己的曲线，再复合曲线。`curve_table(points)` 生成查找表：按输入排序、去掉重复输入后做自然三次样条（两端二阶导为 0），第一个点之前、最后一个点之后保持平直，结果限制在 0–255、四舍五入；与 Photoshop 2026 的 12 组曲线逐级相同。没有点时为恒等，只有一个点时为常数。
   - Levels、Exposure、Brightness/Contrast、Color Balance、Curves、Equalize 与 Auto 系列先算出三个通道的 256 项查找表（`Adjustment::tables()`）再逐像素查表。
 - `Adjustment::name()`：菜单与历史名称（「Invert」「Desaturate」「Threshold」「Posterize」「Equalize」「Levels」「Hue/Saturation」「Exposure」「Brightness/Contrast」「Color Balance」「Black & White」「Vibrance」「Photo Filter」「Gradient Map」「Auto Tone」「Auto Contrast」「Auto Color」「Curves」）。
+- `rgb_histograms(doc)`：活动图层选区内、alpha 不为 0 的像素的红、绿、蓝三个直方图（Levels、Curves 对话框）。
 - `channel_histogram(doc)`：活动图层选区内、alpha 不为 0 的像素的 R、G、B 值合并统计的直方图（Equalize 与 Levels 对话框使用）。
 - `hsl_color(h, s, l)`、`hue_of(rgb)`：HSL 与 RGB 之间的换算（Colorize 的颜色、前景色的色相）。
 - `mask_gray(rgb)`：颜色画在图层蒙版上的灰度（亮度，三个通道相同）。
@@ -73,3 +74,4 @@ Brightness/Contrast 的表与 `fixtures/adjust/` 下的对照数据都由脚本�
   - `channel_levels_apply_before_the_composite`、`curves_per_channel`：单通道先于复合通道。
   - `brightness_contrast_matches_photoshop`：七组组合与十一组 Use Legacy。
   - `color_balance_matches_photoshop`：80 组随机三色调设置（含 Preserve Luminosity），每级误差不超过 3。
+- `channel_histograms`：三个通道的直方图与合并直方图。

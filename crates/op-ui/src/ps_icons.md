@@ -24,3 +24,4 @@
 - 头像是占位的纯色圆，不是 Photoshop 的账户头像。
 - 裁剪工具选项栏的图标（照 Photoshop 2026 的 2x 截图描出）：Straighten（水平仪：上方的点、两侧方块与带气泡的杯形）、CropOverlay（3 × 3 网格加裁切标记和菜单小三角）、Info（圆圈里的 i）、CropReset（转动的箭头加底线）、CropCancel（⦸）、CropCommit（✓）、Swap（上下两个相反的实心箭头）。
 - Hue/Saturation 对话框的图标（描自 Photoshop 2026 的 2x 截图）：`TargetedHand`（目标调整手形，两侧小三角）、`Eyedropper`、`EyedropperPlus`、`EyedropperMinus`（空心管身、斜向的箍和顶端圆球，后两者右下角加「+」「−」）、`PresetMenu`（三条横线与右下角的小三角）。
+- Levels / Curves 的图标：`EyedropperBlack` / `EyedropperGray` / `EyedropperWhite`（管身下半为该颜色的吸管）、`CurvePoints`（穿过四个点的波浪线）、`Pencil`、`TargetedHandVertical`（带上下箭头的手形）、`GridQuarters`、`GridTenths`。
