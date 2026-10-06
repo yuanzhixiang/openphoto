@@ -12,6 +12,12 @@
 - `can_merge_selected(doc)` / `merge_selected(doc)`：Layer › Merge Layers（多选时的 ⌘E）：选中图层中可见的那些合并成一个，放在最上面那个的位置并沿用它的名字（其中有背景图层时合并进背景图层）；结果的不透明度、填充、混合模式复位，蒙版并入像素；隐藏的选中图层保持不动。至少两个选中图层可见时可用。
 - `delete_selected(doc)`：删除所有选中图层；会删光所有图层时拒绝。之后最低被删图层下面的那个（没有时最低的剩余图层）成为活动图层。
 - `toggle_selected_visibility(doc)`：Layer › Hide Layers / Show Layers：隐藏所有选中图层；全部已隐藏时改为全部显示。返回现在是否可见。
+- 图层组：
+  - `can_group(doc)` / `group_selected(doc)`：Layer › Group Layers（⌘G）：选中的图层（连同其中的内容；已在另一个选中组里的不重复算）放进一个新的「Group N」，组放在最上面那个选中图层原来的位置和所在的组里；选中背景图层时不可用。新组被选中。
+  - `ungroup(doc)`：Layer › Ungroup Layers（⇧⌘G）：当前组消失，它的直接子图层进入它原来所在的组，并全部被选中。
+  - `new_group(doc)`：一个空的「Group N」，插入规则同 `Document::insert_above_active`，并被选中。
+  - `can_move_block(doc, id, gap)` / `move_block(doc, id, gap)`：把图层连同其中的内容移到 `gap`（`layers` 中移动前的位置，介于 `gap - 1` 与 `gap` 之间）。新的父组：`gap` 正上方是一个组、正下方是它里面的图层时，就是这个组（放在组内最上面）；否则与正上方的图层同组；在最上面时不在任何组里。背景图层不能动，不能放到背景下面，组不能放进自己里面。Layers 面板拖动排序用它。
+  - `delete_selected` 删除组时连同组里的内容一起删除。
 - `duplicate_name(doc)`：Duplicate Layer 对话框「As」的默认值（与 `duplicate` 的命名规则相同）。
 - `duplicate_named(doc, name)`：复制到同一文档，名称为 `name`。
 - `duplicate_into(source, target, name)`：把 `source` 的活动图层复制到另一个文档 `target`：像素位置不变（`with_canvas` 平移 0，超出 `target` 画布的像素保留在画布外），图层蒙版扩展（显示）或裁到新画布，背景图层的副本是普通图层；插在 `target` 活动图层上方并设为活动图层。
@@ -66,6 +72,7 @@
 
 ## 测试覆盖
 
+- `grouping_ungrouping_and_moving_blocks`：⌘G 把不相邻的两层放进新组（位置、父子关系、选中）；组展开时新图层插在组内最上面；把组外的图层移到组内最上面；组不能移到自身里或背景下面；取消编组后结构复原并选中原子图层；删除组连同内容。
 - `selected_layers_merge_delete_and_hide`：两个图层合并成上面那个，名字和位置正确、不透明像素叠加，未选的图层不动；隐藏/显示选中图层；删除选中图层后活动图层正确，最后一个图层不能删。
 - `duplicate_layer_dialog_targets`：默认名「Background copy」；同文档改名复制；复制到更小的文档时位置不变、超出部分保留在画布外并成为活动图层；复制到新文档时尺寸、标题和唯一图层正确。
 - `duplicates_are_named_like_photoshop`：「copy」「copy 2」命名；⌘J 作用于背景图层得到「Layer 2」这样的普通图层。

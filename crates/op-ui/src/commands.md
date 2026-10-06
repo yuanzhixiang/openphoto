@@ -85,6 +85,10 @@
 | DeselectLayers | Select › Deselect Layers：不选任何图层 | 无 |
 | Align(how) | Layer › Align › Top Edges…Right Edges（`op_core::align::align`），记录如「Align Left Edges」；移动工具选项栏的对齐按钮也执行它 | 无 |
 | Distribute(how) | Layer › Distribute › Top Edges…Vertically（`op_core::align::distribute`），记录如「Distribute Vertical Centers」 | 无 |
+| GroupLayers | Layer › Group Layers：选中的图层编组（`layer_ops::group_selected`），记录「Group Layers」；选中背景图层时不可用 | ⌘G |
+| UngroupLayers | Layer › Ungroup Layers：取消当前组（`layer_ops::ungroup`），记录「Ungroup Layers」；当前图层是组时可用 | ⇧⌘G |
+| NewGroup | Layer › New › Group...：打开 New Group 对话框 | 无 |
+| NewGroupFromLayers | Layer › New › Group from Layers...：打开 New Group from Layers 对话框；可用条件同 GroupLayers | 无 |
 | RenameLayer | Layer › Rename Layer...：在 Layers 面板里就地改名当前图层（与 Photoshop 2026 一样没有对话框）；当前图层是背景图层时不可用 | 无 |
 | Fill | Edit › Fill... | ⇧F5 |
 | FillForeground | 无（Photoshop 的隐藏快捷键） | ⌥⌫ |

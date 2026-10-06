@@ -20,6 +20,10 @@ Layer › New › Layer...（⇧⌘N）弹出的对话框，设置新图层的�
 
 Layer › New › Layer from Background... 与双击 Layers 面板中的背景图层时弹出同一个对话框的变体（`NewLayerDialog::from_background`）：标题仍是「New Layer」，高 157（没有中性色那一行），名称默认为「Layer 0」，「Use previous layer...」置灰。确认后背景图层变为普通图层，并使用对话框中的名称、颜色标签、混合模式和不透明度（`panels::layer_from_background_with`），记录「Layer From Background」。
 
+## New Group 与 New Group from Layers 版本
+
+Layer › New › Group... 与 Group from Layers... 弹出同一布局的变体（`NewLayerDialog::group`，`Kind::Group` / `Kind::GroupFromLayers`）：标题分别为「New Group」「New Group from Layers」，高 128，没有剪贴蒙版和中性色两行，Mode 行上移 29 pt（中心 y 96.5），默认名称为下一个「Group N」，默认模式为 Pass Through，模式菜单最上面多一项「Pass Through」（与 Photoshop 2026 截图一致）。确认后新建空组或把选中的图层编组，并使用对话框中的名称、颜色标签、模式和不透明度（`panels::new_group_from`），分别记录「New Group」「Group Layers」。
+
 ## 交互
 
 - Enter 或 OK：按当前值新建图层（`panels::new_layer_from`）：插在当前图层上方并选中，设名称（为空时用「Layer」）、颜色标签、混合模式和不透明度（0–100% 截断）；勾选中性色填充且模式有中性色时整幅画布填该颜色。记录一条「New Layer」历史。
