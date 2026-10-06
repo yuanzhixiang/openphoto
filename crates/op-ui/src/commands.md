@@ -45,8 +45,8 @@
 
 ## 快捷键识别
 
-- **macOS**：带 ⌘ 的快捷键由原生菜单的 key equivalent 处理，egui 收不到这些按键。唯一的例外是 Zoom In：菜单项显示为 Photoshop 的 ⌘+，而 macOS 只在按住 Shift 时才匹配「+」，所以 `from_shortcuts` 额外在 egui 里捕获 ⌘=，转成 ZoomIn。
-- **其它平台**：没有原生菜单，`from_shortcuts` 在 egui 里按 `SHORTCUT_ORDER` 依次匹配全部快捷键。egui 的 `consume_key` 会忽略多按的 Shift/Alt，所以列表必须把更具体的组合放在前面（例如 ⇧⌘Z 在 ⌘Z 之前、⌥⌘W 在 ⌘W 之前），否则会被误触发成另一个命令。ZoomIn 同时接受 ⌘= 和 ⌘+。
+- **macOS**：带 ⌘ 的快捷键由原生菜单的 key equivalent 处理，egui 收不到这些按键。唯一的例外是 Zoom In：菜单项显示为 Photoshop 的 ⌘+，而 macOS 只在按住 Shift 时才匹配「+」，所以 `from_shortcuts_beside_menu` 额外在 egui 里捕获 ⌘=，转成 ZoomIn。
+- **没有原生菜单时**（其它平台，以及 macOS 上的无窗口测试）：`from_shortcuts` 在 egui 里按 `SHORTCUT_ORDER` 依次匹配全部快捷键。egui 的 `consume_key` 会忽略多按的 Shift/Alt，所以列表必须把更具体的组合放在前面（例如 ⇧⌘Z 在 ⌘Z 之前、⌥⌘W 在 ⌘W 之前），否则会被误触发成另一个命令。ZoomIn 同时接受 ⌘= 和 ⌘+。
 
 ## 与 Photoshop 的差异
 

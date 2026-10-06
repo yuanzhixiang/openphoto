@@ -8,7 +8,7 @@ Image › Canvas Size...（⌥⌘C）：改变画布尺寸而不缩放图像，�
 
 尺寸按 Photoshop 对话框截图量取（参考截图像素，经 `UI_SCALE` 缩放）。对话框 681×553，圆角 10，带阴影，不遮暗背景。
 
-- **标题栏**：高 42，浅灰底 `#d0d2d4`，居中深色「Canvas Size」。
+- **标题栏**：浅灰底 `#d0d2d4`，居中深色「Canvas Size」（由 `common.rs` 绘制，高 28 pt）。
 - **Current Size: 1.70M**：带一条延伸到右侧的分隔线；下面是当前的 Width、Height（像素）。
 - **New Size: 1.70M**：随输入实时更新；输入无效时显示「—」。下面是：
   - Width、Height 两行，各有数字输入框（119 宽）和单位下拉（237 宽）。
@@ -37,7 +37,8 @@ Image › Canvas Size...（⌥⌘C）：改变画布尺寸而不缩放图像，�
 ## 画布扩展颜色
 
 - 选项：Foreground、Background（默认）、White、Black、Gray（50% 灰，128）、Other...。色块显示当前选择对应的颜色。
-- 点击色块弹出拾色器，选色后自动切换为 Other...。
+- 选择「Other...」或点击色块：打开 Color Picker（标题「Color Picker」，初始为当前扩展颜色，见 `color_picker.md`）。在 Color Picker 里确定后，扩展颜色切换为 Other... 并使用所选颜色；取消则保持原来的选择。
+- Color Picker 叠在本对话框上时，Enter 和 Esc 只作用于 Color Picker。
 - 只有文档有背景图层时可用；没有背景图层时下拉和色块置灰、文字变暗。扩展颜色只填充背景图层的新增区域，其它图层的新增区域是透明的；缩小画布时超出部分直接裁掉。
 
 ## 键盘与焦点

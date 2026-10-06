@@ -13,8 +13,10 @@
 - `editing_background` 与 `picker_hsb`：Color 面板正在编辑前景还是背景，以及缓存的 HSB。缓存 HSB 是为了在灰色（饱和度为 0）时色相不跳回 0。
 - `history_open`、`history_panel`：History 弹出面板是否打开，以及它的标签与高度。
 - `canvas_size_dialog`：Canvas Size 对话框，打开期间为 `Some`。
+- `color_picker`：Color Picker 会话，打开期间为 `Some`，包含对话框和 `PickerTarget`（确定后写入前景色、背景色还是 Canvas Size 的扩展颜色）。`open_color_picker(target)` 以 Photoshop 的标题打开前景或背景色拾色器。
+- `swatches`：Swatches 面板的色板列表，初始为固定的 36 个颜色，Color Picker 的「Add to Swatches」会往末尾追加。只在本次运行中保留。
 - `alert`：待显示的错误信息。
-- `modal_open()`：Canvas Size 对话框或错误提示打开时为真，此时命令与单键快捷键都不执行。
+- `modal_open()`：Canvas Size、Color Picker 或错误提示打开时为真，此时命令与单键快捷键都不执行。
 
 ## DocState
 

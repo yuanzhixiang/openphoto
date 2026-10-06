@@ -12,13 +12,13 @@
 
 1. `theme::install_fonts`、`theme::apply_style`。
 2. `op_render::install` 注册画布管线。依赖 wgpu 渲染后端，缺失时直接 panic（应用只支持 wgpu）。
-3. macOS 上 `menu::NativeMenu::install`。
+3. macOS 上 `menu::NativeMenu::install`。`new_headless` 跳过这一步，供无窗口 UI 测试使用（见 `ui_tests.md`）。
 4. 有命令行文件时逐个打开；没有时新建一个 1920×1080 白色背景的「Untitled-1」文档。
 
 ## 每帧流程
 
 1. 拖放进窗口的文件逐个打开。
-2. 执行命令：macOS 上取菜单事件和 egui 补充捕获的 ⌘=（见 `commands.md`）；其它平台取 egui 快捷键。
+2. 执行命令：macOS 上有原生菜单时，取菜单事件和 egui 补充捕获的 ⌘=；没有原生菜单时（其它平台、无窗口测试），由 egui 处理全部快捷键（见 `commands.md`）。
 3. 处理单键快捷键（工具、D、X）。
 4. 按顺序排布区域（egui 面板先加的在外侧）：
    - 标题栏（仅 macOS，高 40）
@@ -29,7 +29,7 @@
    - 中间：有文档时显示 egui_dock 文档区，没有文档时只有粘贴板底色。
    以上尺寸是参考截图像素，再经 `UI_SCALE` 缩放。
 5. 确定当前文档：取 dock 中获得焦点的标签；没有焦点时，若当前文档已不存在则改为第一个标签。
-6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、macOS 菜单状态同步、错误提示对话框。
+6. 浮层：History 弹出面板（`history_open` 时）、Canvas Size 对话框、Color Picker（画在 Canvas Size 之上）、macOS 菜单状态同步、错误提示对话框。
 
 ## 文档标签
 
@@ -48,6 +48,13 @@
 ## Canvas Size 对话框的接入
 
 对话框返回「确定」时，若新尺寸与当前尺寸不同，则对当前文档执行 `resize_canvas` 并记录一条「Canvas Size」历史；尺寸相同则不做任何事（不产生历史记录）。
+
+## Color Picker 的接入
+
+- Canvas Size 请求拾色时（选择「Other...」或点击色块），以「Color Picker」为标题、当前扩展颜色为初始色打开 Color Picker。
+- Color Picker 打开期间，Canvas Size 不响应 Enter/Esc。
+- 每帧把 Color Picker 的「Add to Swatches」结果追加到 `swatches`。
+- 确定时按目标写回：前景色、背景色，或 Canvas Size 的扩展颜色。
 
 ## 错误提示
 
