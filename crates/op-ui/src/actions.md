@@ -8,7 +8,7 @@
 
 - `open_dialog`：系统文件对话框，可多选，过滤为 `op_io::OPEN_EXTENSIONS` 列出的格式（PNG、JPEG、WebP、TIFF、BMP、GIF）。
 - `open_paths`：逐个打开，成功的作为新文档加入并成为当前文档，第一条历史为「Open」。失败时写日志，并通过 `alert` 弹出「Could not open “路径”: 原因」。
-- 打开普通位图时，整张图是一个「Background」图层，与 Photoshop 一致。
+- 打开普通位图时整张图是一个图层，与 Photoshop 一致：完全不透明的图片是锁定的「Background」背景图层，带透明的图片是普通的「Layer 0」图层。
 
 ## 新建
 
@@ -16,7 +16,7 @@
 
 ## 导出
 
-`export_dialog`（File › Export › Export As...）：系统保存对话框，默认文件名为去掉扩展名的文档标题加 `.png`，可选 PNG 或 JPEG。导出的是所有可见图层的合成结果。失败时通过 `alert` 提示。
+`export_dialog`（File › Export › Export As...）：系统保存对话框，默认文件名为去掉扩展名的文档标题加 `.png`，可选 PNG 或 JPEG。导出的是所有可见图层的合成结果；PNG 保留透明，JPEG 的透明区域铺成白色（细节见 `crates/op-io/src/lib.md`）。失败时通过 `alert` 提示「Could not export: 原因」，不会留下不完整的文件。
 
 ## 关闭
 
@@ -34,6 +34,5 @@
 
 ## 已知限制
 
-- 导出对话框提供 JPEG 选项，但选择 JPEG 时导出会失败并弹出错误（原因见 `crates/op-io/src/lib.md`），目前只有 PNG 能成功导出。
 - Photoshop 里按住 Shift 加字母键可以在同组工具间循环，这里没有。
 - 不处理 Q（快速蒙版）、F（屏幕模式）、R（旋转视图）等尚未实现功能的快捷键。

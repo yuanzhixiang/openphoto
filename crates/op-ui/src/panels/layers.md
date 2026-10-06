@@ -26,7 +26,7 @@
 - 混合模式：切换后立即记录一条「Blending Change」历史。
 - 不透明度、Fill：拖动或输入期间不记录，结束时记录一条「Opacity Change」或「Fill Opacity Change」，避免一次拖动产生多条历史。
 - 三个锁定按钮：切换后记录一条「Lock Change」历史。
-- 新建图层：在当前图层上方插入一个透明图层，命名为「Layer N」（N 为非背景图层数加 1），选中它，记录「New Layer」。也可以用 ⇧⌘N 或 Layer › New › Layer。
+- 新建图层：在当前图层上方插入一个透明图层，命名为「Layer N」，N 为现有「Layer 数字」名称中最大的数字加 1，没有时为 1（与 Photoshop 一致：打开带透明的图片得到「Layer 0」后，新建的是「Layer 1」），选中它，记录「New Layer」。也可以用 ⇧⌘N 或 Layer › New › Layer。
 - 删除图层：删除当前图层，选中它下面的图层（没有则选中最底层），记录「Delete Layer」。只剩一个图层时按钮不可用。
 - Layer › Hide Layers（⌘,）也会切换当前图层的可见性，同样不记录历史。
 

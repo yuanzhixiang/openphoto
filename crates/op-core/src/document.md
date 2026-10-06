@@ -33,7 +33,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 公开字段：`id`、`title`、`width`、`height`、`resolution`（ppi）、`color_mode`、`bit_depth`、`layers`（自底向上）、`active_layer`。私有字段 `revision`。
 
 - `new_with_background(title, width, height, background)`：File > New。生成单一背景图层（名为 `"Background"`、`is_background = true`），用 `background` 颜色填满，并设为活动图层。分辨率 72 ppi，RGB，8 位。
-- `from_rgba8(title, width, height, pixels)`：从紧密排列的 RGBA8 缓冲区打开一个扁平位图，同样得到单一的 `"Background"` 背景图层并设为活动图层。即使像素含透明，也照样标为背景图层。其余元数据同上（72 ppi、RGB、8 位）。
+- `from_rgba8(title, width, height, pixels)`：从紧密排列的 RGBA8 缓冲区打开一个扁平位图，得到单一图层并设为活动图层，规则与 Photoshop 打开图片时一致：所有像素的 alpha 都是 255 时，是名为 `"Background"` 的背景图层（`is_background = true`）；只要有一个像素的 alpha 小于 255，就是名为 `"Layer 0"` 的普通图层，文档因此没有背景图层。其余元数据同上（72 ppi、RGB、8 位）。
 - `new_layer_id()`：从全局计数器分配新的 `LayerId`；它不修改文档，也不把图层加入列表。
 - `revision()` / `mark_dirty()`：读取 / 递增修订号。修订号在每次像素或图层属性变化时递增，渲染层与图层缩略图缓存据此判断是否需要刷新。
 - `snapshot()` / `restore(snapshot)`：生成 / 恢复快照。`restore` 会覆盖宽高、分辨率、图层与活动图层，并调用 `mark_dirty()`。
@@ -88,6 +88,8 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 
 ## 测试覆盖
 
+- `opaque_bitmap_opens_as_background`：完全不透明的像素打开为背景图层。
+- `transparent_bitmap_opens_as_regular_layer`：含半透明像素时打开为「Layer 0」普通图层，文档没有背景图层，该图层为活动图层。
 - `resize_canvas_centered`：2×2 白色背景居中扩展到 4×5、扩展色黑色，验证新尺寸、四周为黑、原图位于 (1,1)–(2,2)，且高度差为奇数时多出的一行在底部（第 3 行为黑）。
 - `resize_canvas_keeps_layers_transparent`：左上锚点扩展到 3×3 时，非背景图层的扩展区域保持透明，原像素位置不变。
 - `composite_half_opacity_over_white`：50% 不透明度黑色图层叠在白色背景上得到 `[128, 128, 128, 255]`，验证 gamma 空间混合与量化规则。

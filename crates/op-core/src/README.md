@@ -24,7 +24,7 @@
 
 - 一个 `Document` 有固定的像素宽高、分辨率（ppi）、颜色模式、位深，以及按「自底向上」排列的图层列表 `layers` 和当前活动图层 `active_layer`。
 - 目前唯一的图层类型是栅格图层（`LayerKind::Raster(TiledImage)`）。每个图层的 `TiledImage` 与文档同宽高；`Document::resize_canvas` 会同步改写所有图层，保持这一不变量。
-- 「背景」图层（`is_background = true`）沿用 Photoshop 语义：锁定、不透明、总在最底层。新建文档和打开位图文件都会得到单一的背景图层，名为 `"Background"`。
+- 「背景」图层（`is_background = true`）沿用 Photoshop 语义：锁定、不透明、总在最底层。新建文档得到单一的背景图层，名为 `"Background"`。打开位图文件时，完全不透明的图片同样得到背景图层；带透明的图片得到名为 `"Layer 0"` 的普通图层，与 Photoshop 一致。
 - `DocId` 与 `LayerId` 共用同一个进程级原子计数器（从 1 开始递增），因此在整个进程内两类 ID 互不重复、也不会在文档之间重复。
 - `Document` 维护一个 `revision` 计数器。任何像素或图层属性变化都需要调用 `mark_dirty()` 递增它；渲染层据此判断是否重新上传纹理。`op-core` 内部只有 `resize_canvas` 和 `restore` 会自动递增，直接修改公开字段（例如图层属性）的调用方必须自己调用 `mark_dirty()`。
 
