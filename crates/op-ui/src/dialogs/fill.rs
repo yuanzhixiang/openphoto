@@ -1,24 +1,17 @@
-//! Edit > Fill (Shift+F5).
-//!
-//! Laid out after Photoshop's Fill dialog (Contents, then Blending with Mode,
-//! Opacity and Preserve Transparency; OK and Cancel on the right). Sizes are
-//! in Photoshop points.
+//! Edit > Fill (Shift+F5): Contents, the Options group (Color
+//! Adaptation, for Content-Aware) and the Blending group (Mode, Opacity,
+//! Preserve Transparency), laid out at the positions measured on Photoshop
+//! 2026's dialog (348 × 293 pt, a classic AppKit dialog). Sizes are in
+//! Photoshop points from the dialog's top-left corner.
 
-use egui::{Align2, Color32, FontId, Key, Rect, Sense, Stroke, Ui, vec2};
+use egui::{Align2, Color32, Key, Rect, Sense, Ui, vec2};
 use op_core::fill::FillOptions;
 use op_core::{BlendMode, Color};
 
-use super::common;
-use crate::theme::{self, color, pt};
+use super::{appkit, common};
+use crate::theme::{self, pt};
 
-const SIZE: egui::Vec2 = vec2(pt(420.0), pt(222.0));
-const FONT: f32 = pt(12.5);
-const LABEL_RIGHT: f32 = pt(84.0);
-const CONTROL_X: f32 = pt(92.0);
-const CONTROL_W: f32 = pt(200.0);
-const CONTROL_H: f32 = pt(22.0);
-const BUTTON_X: f32 = pt(316.0);
-const BUTTON: egui::Vec2 = vec2(pt(88.0), pt(24.0));
+const SIZE: egui::Vec2 = vec2(pt(348.0), pt(293.0));
 
 /// What the dialog fills with ("Contents").
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -159,36 +152,20 @@ impl FillDialog {
         background: Color,
         active: bool,
     ) -> Outcome {
-        let at = |x: f32, y: f32| frame.min + vec2(x, y);
-        let font = FontId::proportional(FONT);
-        common::frame(ui, frame, "Fill", theme::semibold(pt(13.0)));
-        let painter = ui.painter().clone();
-        let row = |y: f32| {
-            Rect::from_min_size(
-                at(CONTROL_X, y - CONTROL_H / 2.0),
-                vec2(CONTROL_W, CONTROL_H),
-            )
-        };
-        let label = |text: &str, y: f32| {
-            painter.text(
-                at(LABEL_RIGHT, y),
-                Align2::RIGHT_CENTER,
-                text,
-                font.clone(),
-                color::TEXT,
-            );
+        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
+        let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
+        common::frame(ui, frame, "Fill", theme::dialog_bold(pt(13.0)));
+        let label = |ui: &Ui, cy: f32, text: &str| {
+            appkit::text(ui, at(112.5, cy), Align2::RIGHT_CENTER, text, appkit::TEXT);
         };
 
-        // Contents
-        label("Contents:", pt(56.0));
+        label(ui, 48.5, "Contents:");
         let mut contents = self.contents;
-        common::dropdown(
+        appkit::popup(
             ui,
-            row(pt(56.0)),
+            r(118.0, 38.0, 263.0, 59.0),
             "fill-contents",
             contents.label(),
-            FONT,
-            true,
             |ui| {
                 for (i, c) in Contents::ALL.into_iter().enumerate() {
                     if i == 3 || i == 6 {
@@ -208,32 +185,40 @@ impl FillDialog {
             self.contents = contents;
         }
 
-        // Blending section with its rule
-        let header_y = pt(96.0);
-        let r = painter.text(
-            at(pt(20.0), header_y),
-            Align2::LEFT_CENTER,
-            "Blending",
-            theme::semibold(FONT),
-            color::TEXT,
-        );
-        painter.line_segment(
-            [
-                egui::pos2(r.right() + pt(8.0), r.center().y),
-                at(pt(296.0), header_y),
-            ],
-            Stroke::new(1.0, Color32::from_gray(0x73)),
+        // The two group boxes, their titles breaking the top edge 5 pt
+        // either side
+        for (top, bottom, title) in [(116.0, 166.0, "Options"), (184.0, 282.0, "Blending")] {
+            let t = appkit::text(
+                ui,
+                at(30.5, top - 1.5),
+                Align2::LEFT_CENTER,
+                title,
+                appkit::TEXT,
+            );
+            appkit::group(
+                ui.painter(),
+                r(11.5, top, 262.5, bottom),
+                (t.left() - pt(5.0), t.right() + pt(5.0)),
+            );
+        }
+        // Color Adaptation only applies to Content-Aware, which isn't
+        // available
+        appkit::checkbox_with(
+            ui,
+            at(20.0, 141.5),
+            (12.0, 11.0),
+            "Color Adaptation",
+            &mut false,
+            false,
         );
 
-        label("Mode:", pt(126.0));
+        label(ui, 208.5, "Mode:");
         let mut mode = self.mode;
-        common::dropdown(
+        appkit::popup(
             ui,
-            row(pt(126.0)),
+            r(118.0, 198.0, 253.0, 219.0),
             "fill-mode",
             mode.label(),
-            FONT,
-            true,
             |ui| {
                 for (gi, group) in BlendMode::GROUPS.iter().enumerate() {
                     if gi > 0 {
@@ -247,55 +232,36 @@ impl FillDialog {
         );
         self.mode = mode;
 
-        label("Opacity:", pt(156.0));
-        let field = Rect::from_min_size(
-            at(CONTROL_X, pt(156.0) - CONTROL_H / 2.0),
-            vec2(pt(52.0), CONTROL_H),
-        );
-        common::number_field(
+        label(ui, 236.5, "Opacity:");
+        appkit::field(
             ui,
-            field,
+            r(117.0, 227.0, 169.0, 246.0),
             &mut self.opacity,
             "fill-opacity",
-            FONT,
+            (0.0, 100.0),
+            1.0,
+            0,
             self.first_frame,
         );
-        painter.text(
-            field.right_center() + vec2(pt(6.0), 0.0),
-            Align2::LEFT_CENTER,
-            "%",
-            font.clone(),
-            color::TEXT,
-        );
-
-        // Left-aligned under the fields (ui.put would center it)
-        let check = Rect::from_min_size(
-            at(CONTROL_X, pt(186.0) - pt(9.0)),
-            vec2(pt(200.0), pt(18.0)),
-        );
-        let mut check_ui = ui.new_child(egui::UiBuilder::new().max_rect(check));
-        check_ui.checkbox(
+        appkit::text(ui, at(177.5, 236.5), Align2::LEFT_CENTER, "%", appkit::TEXT);
+        appkit::checkbox_with(
+            ui,
+            at(20.0, 257.5),
+            (12.0, 11.0),
+            "Preserve Transparency",
             &mut self.preserve_transparency,
-            egui::RichText::new("Preserve Transparency").font(font.clone()),
-        );
-
-        // Buttons
-        let button_font = FontId::proportional(pt(13.0));
-        let opacity = self.opacity();
-        let ok = common::pill_button(
-            ui,
-            Rect::from_min_size(at(BUTTON_X, pt(44.0)), BUTTON),
-            "OK",
-            button_font.clone(),
-            opacity.is_some(),
-        );
-        let cancel = common::pill_button(
-            ui,
-            Rect::from_min_size(at(BUTTON_X, pt(76.0)), BUTTON),
-            "Cancel",
-            button_font,
             true,
         );
+
+        let opacity = self.opacity();
+        let ok = appkit::button(
+            ui,
+            r(278.5, 38.5, 338.5, 64.5),
+            "OK",
+            true,
+            opacity.is_some(),
+        );
+        let cancel = appkit::button(ui, r(278.5, 73.5, 338.5, 99.5), "Cancel", false, true);
         if cancel.clicked() {
             return Outcome::Cancel;
         }

@@ -170,20 +170,49 @@ pub fn button_with(
 /// A 13 pt checkbox: light gray with a dark check when on, a dark box
 /// with a light edge when off; the label 10.5 pt to its right.
 pub fn checkbox(ui: &mut Ui, min: Pos2, label: &str, checked: &mut bool) -> egui::Response {
-    let b = Rect::from_min_size(min, vec2(pt(13.0), pt(13.0)));
-    let galley = theme::tracked_galley(ui.painter(), label, font(), TEXT);
+    checkbox_with(ui, min, (13.0, 10.5), label, checked, true)
+}
+
+/// [`checkbox`] `size` pt square with its label `gap` pt after it (the
+/// Fill dialog's are 12 pt, 11 pt); disabled, a `#4d4d4d` box in a
+/// `#5d5d5d` edge with a dimmed label.
+pub fn checkbox_with(
+    ui: &mut Ui,
+    min: Pos2,
+    (size, gap): (f32, f32),
+    label: &str,
+    checked: &mut bool,
+    enabled: bool,
+) -> egui::Response {
+    let b = Rect::from_min_size(min, vec2(pt(size), pt(size)));
+    let ink = if enabled { TEXT } else { TEXT_OFF };
+    let galley = theme::tracked_galley(ui.painter(), label, font(), ink);
     let hit = Rect::from_min_max(
         b.min,
-        Pos2::new(b.right() + pt(10.5) + galley.size().x, b.bottom()),
+        Pos2::new(b.right() + pt(gap) + galley.size().x, b.bottom()),
     );
-    let response = ui.interact(hit, ui.id().with(("appkit-check", label)), Sense::click());
+    let sense = if enabled {
+        Sense::click()
+    } else {
+        Sense::hover()
+    };
+    let response = ui.interact(hit, ui.id().with(("appkit-check", label)), sense);
     if response.clicked() {
         *checked = !*checked;
     }
     let painter = ui.painter();
-    if *checked {
+    let k = size / 13.0;
+    if !enabled {
+        painter.rect(
+            b,
+            pt(3.0),
+            Color32::from_gray(0x4d),
+            Stroke::new(pt(1.0), Color32::from_gray(0x5d)),
+            StrokeKind::Inside,
+        );
+    } else if *checked {
         painter.rect_filled(b, pt(3.0), Color32::from_gray(0xd4));
-        let p = |x: f32, y: f32| b.min + vec2(pt(x), pt(y));
+        let p = |x: f32, y: f32| b.min + vec2(pt(x * k), pt(y * k));
         painter.add(Shape::line(
             vec![p(3.0, 6.75), p(5.5, 9.25), p(10.0, 3.75)],
             Stroke::new(pt(1.75), Color32::from_gray(0x32)),
@@ -198,9 +227,9 @@ pub fn checkbox(ui: &mut Ui, min: Pos2, label: &str, checked: &mut bool) -> egui
         );
     }
     painter.galley(
-        Pos2::new(b.right() + pt(10.5), b.center().y - galley.size().y / 2.0),
+        Pos2::new(b.right() + pt(gap), b.center().y - galley.size().y / 2.0),
         galley,
-        TEXT,
+        ink,
     );
     response
 }

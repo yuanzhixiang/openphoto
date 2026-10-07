@@ -1,21 +1,18 @@
-//! Image > Trim.
-//!
-//! Laid out after Photoshop's Trim dialog: "Based On" with three choices,
-//! "Trim Away" with a checkbox per side, OK and Cancel on the right. Sizes
-//! are in Photoshop points.
+//! Image > Trim: "Based on" with three choices, "Trim away" with a
+//! checkbox per side, OK and Cancel, laid out at the positions measured on
+//! Photoshop 2026's dialog (258 × 248 pt, the New Layer dialog's family).
+//! Sizes are in Photoshop points from the dialog's top-left corner.
 
-use egui::{Align2, Color32, FontId, Key, Pos2, Rect, Sense, Stroke, Ui, vec2};
+use egui::{Align2, Color32, Key, Rect, Sense, Stroke, Ui, vec2};
 use op_core::image_ops::{TrimBasis, TrimSides};
 
 use super::common;
-use crate::theme::{self, color, pt};
+use crate::theme::{self, pt};
 
-const SIZE: egui::Vec2 = vec2(pt(380.0), pt(236.0));
-const FONT: f32 = pt(12.5);
-const LEFT: f32 = pt(20.0);
-const RULE_RIGHT: f32 = pt(256.0);
-const BUTTON_X: f32 = pt(276.0);
-const BUTTON: egui::Vec2 = vec2(pt(88.0), pt(24.0));
+const SIZE: egui::Vec2 = vec2(pt(258.0), pt(248.0));
+const FONT: f32 = pt(12.0);
+const TEXT: Color32 = Color32::from_gray(0xf1);
+const TEXT_OFF: Color32 = Color32::from_gray(0x8e);
 
 pub enum Outcome {
     Open,
@@ -59,75 +56,57 @@ impl TrimDialog {
     }
 
     fn ui(&mut self, ui: &mut Ui, frame: Rect) -> Outcome {
-        let at = |x: f32, y: f32| frame.min + vec2(x, y);
-        let font = FontId::proportional(FONT);
-        common::frame(ui, frame, "Trim", theme::semibold(pt(13.0)));
+        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
+        let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
+        common::frame(ui, frame, "Trim", theme::dialog_bold(pt(13.0)));
         let painter = ui.painter().clone();
-        let header = |text: &str, y: f32| {
-            let r = painter.text(
-                at(LEFT, y),
+        let heading = |cy: f32, text: &str| {
+            painter.text(
+                at(20.0, cy),
                 Align2::LEFT_CENTER,
                 text,
-                theme::semibold(FONT),
-                color::TEXT,
+                theme::uxp_bold(FONT),
+                TEXT,
             );
-            painter.line_segment(
-                [
-                    Pos2::new(r.right() + pt(8.0), r.center().y),
-                    at(RULE_RIGHT, y),
-                ],
-                Stroke::new(1.0, Color32::from_gray(0x73)),
-            );
-        };
-        // A control left-aligned in a row (ui.put would center it)
-        let row = |ui: &mut Ui, x: f32, y: f32, w: f32| {
-            let r = Rect::from_min_size(at(x, y - pt(9.0)), vec2(w, pt(18.0)));
-            ui.new_child(egui::UiBuilder::new().max_rect(r))
         };
 
-        header("Based On", pt(52.0));
+        heading(57.0, "Based on");
         let choices = [
-            (TrimBasis::Transparent, "Transparent Pixels"),
-            (TrimBasis::TopLeftColor, "Top Left Pixel Color"),
-            (TrimBasis::BottomRightColor, "Bottom Right Pixel Color"),
+            (TrimBasis::Transparent, "Transparent pixels"),
+            (TrimBasis::TopLeftColor, "Top left pixel color"),
+            (TrimBasis::BottomRightColor, "Bottom right pixel color"),
         ];
         for (i, (basis, label)) in choices.into_iter().enumerate() {
-            let mut child = row(ui, pt(32.0), pt(78.0 + 24.0 * i as f32), pt(220.0));
             let enabled = basis != TrimBasis::Transparent || self.can_trim_transparent;
-            child.add_enabled_ui(enabled, |ui| {
-                ui.radio_value(
-                    &mut self.basis,
-                    basis,
-                    egui::RichText::new(label).font(font.clone()),
-                );
-            });
+            if radio(
+                ui,
+                at(26.0, 84.0 + 24.0 * i as f32),
+                label,
+                self.basis == basis,
+                enabled,
+            ) {
+                self.basis = basis;
+            }
         }
 
-        header("Trim Away", pt(164.0));
+        heading(166.0, "Trim away");
         let sides = [
-            (&mut self.sides.top, "Top", pt(32.0), pt(190.0)),
-            (&mut self.sides.left, "Left", pt(132.0), pt(190.0)),
-            (&mut self.sides.bottom, "Bottom", pt(32.0), pt(214.0)),
-            (&mut self.sides.right, "Right", pt(132.0), pt(214.0)),
+            (&mut self.sides.top, "Top", 20.0, 186.0),
+            (&mut self.sides.left, "Left", 97.0, 186.0),
+            (&mut self.sides.bottom, "Bottom", 20.0, 210.0),
+            (&mut self.sides.right, "Right", 97.0, 210.0),
         ];
         for (flag, label, x, y) in sides {
-            let mut child = row(ui, x, y, pt(96.0));
-            child.checkbox(flag, egui::RichText::new(label).font(font.clone()));
+            common::ps_checkbox(ui, at(x, y), label, flag, true);
         }
 
-        let button_font = FontId::proportional(pt(13.0));
-        let ok = common::pill_button(
+        let ok = common::ps_button(ui, r(168.0, 48.0, 238.0, 72.0), "OK", true, true, true);
+        let cancel = common::ps_button(
             ui,
-            Rect::from_min_size(at(BUTTON_X, pt(44.0)), BUTTON),
-            "OK",
-            button_font.clone(),
-            true,
-        );
-        let cancel = common::pill_button(
-            ui,
-            Rect::from_min_size(at(BUTTON_X, pt(76.0)), BUTTON),
+            r(168.0, 84.0, 238.0, 108.0),
             "Cancel",
-            button_font,
+            false,
+            true,
             true,
         );
         if cancel.clicked() {
@@ -141,4 +120,45 @@ impl TrimDialog {
         }
         Outcome::Open
     }
+}
+
+/// A 12 pt radio button centered on `center`, its label 15 pt to the
+/// right, measured: chosen, a `#d6d6d6` disc with a dark dot; otherwise a
+/// 1 pt `#a0a0a0` ring (dimmed when it can't be chosen). Returns whether
+/// it was clicked.
+fn radio(ui: &mut Ui, center: egui::Pos2, label: &str, chosen: bool, enabled: bool) -> bool {
+    let ink = if enabled { TEXT } else { TEXT_OFF };
+    let galley = ui
+        .painter()
+        .layout_no_wrap(label.to_owned(), theme::uxp(FONT), ink);
+    let hit = Rect::from_min_max(
+        center - vec2(pt(6.0), pt(8.0)),
+        egui::pos2(center.x + pt(15.0) + galley.size().x, center.y + pt(8.0)),
+    );
+    let sense = if enabled {
+        Sense::click()
+    } else {
+        Sense::hover()
+    };
+    let clicked = ui
+        .interact(hit, ui.id().with(("trim-radio", label)), sense)
+        .clicked();
+    let painter = ui.painter();
+    if chosen {
+        painter.circle_filled(center, pt(6.0), Color32::from_gray(0xd6));
+        painter.circle_filled(center, pt(2.25), Color32::from_gray(0x53));
+    } else {
+        let ring = if enabled {
+            Color32::from_gray(0xa0)
+        } else {
+            Color32::from_gray(0x6e)
+        };
+        painter.circle_stroke(center, pt(5.5), Stroke::new(pt(1.0), ring));
+    }
+    painter.galley(
+        egui::pos2(center.x + pt(15.0), center.y - galley.size().y / 2.0),
+        galley,
+        ink,
+    );
+    clicked
 }

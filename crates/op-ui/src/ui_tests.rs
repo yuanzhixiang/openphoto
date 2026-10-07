@@ -230,10 +230,11 @@ fn screenshot_painting() {
 #[ignore]
 fn screenshot_fill_dialog() {
     let mut h = harness(Vec::new());
-    reference_document(&mut h);
+    probe_document(&mut h);
     h.key_press_modifiers(Modifiers::SHIFT, egui::Key::F5);
     h.run_steps(4);
     shot(&mut h, "fill_dialog");
+    shot_dialog(&mut h, "fill", 348.0, 293.0);
 }
 
 #[test]
@@ -743,9 +744,10 @@ fn rotate_crop_and_trim() {
 #[ignore]
 fn screenshot_trim_dialog() {
     let mut h = harness(Vec::new());
-    reference_document(&mut h);
+    probe_document(&mut h);
     run_command(&mut h, crate::commands::Command::Trim);
     shot(&mut h, "trim_dialog");
+    shot_dialog(&mut h, "trim", 258.0, 248.0);
 }
 
 #[test]
@@ -4596,12 +4598,26 @@ fn screenshot_canvas_size_dialog() {
     h.state_mut().state.background = Color::from_rgba8([0x52, 0x65, 0x6e, 255]);
     run_command(&mut h, crate::commands::Command::CanvasSize);
     h.run_steps(3);
-    let (x, y) = dialog_origin(&mut h);
+    shot_dialog(&mut h, "canvas_size", 458.0, 372.0);
+}
+
+/// Saves the open dialog, `w` × `h` pt, as `target/ui-shots/<name>.png`
+/// (2x, like the Photoshop captures it is compared with).
+fn shot_dialog(h: &mut Harness<'_, OpenPhotoApp>, name: &str, w: f32, ht: f32) {
+    let (x, y) = dialog_origin(h);
     let image = h.render().expect("render frame");
-    let crop = image::imageops::crop_imm(&image, (x * 2.0) as u32, (y * 2.0) as u32, 916, 744);
+    let crop = image::imageops::crop_imm(
+        &image,
+        (x * 2.0) as u32,
+        (y * 2.0) as u32,
+        (w * 2.0) as u32,
+        (ht * 2.0) as u32,
+    );
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/ui-shots");
     std::fs::create_dir_all(&dir).unwrap();
-    crop.to_image().save(dir.join("canvas_size.png")).unwrap();
+    crop.to_image()
+        .save(dir.join(format!("{name}.png")))
+        .unwrap();
 }
 
 #[test]
