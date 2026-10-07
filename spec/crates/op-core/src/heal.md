@@ -19,6 +19,7 @@ The healing algorithm shared by the Healing Brush, Spot Healing Brush, Patch too
 - `patch_with(doc, selection, source, (dx, dy), style, transparent)`: heals the selection from `source` (target (x, y) takes the source at (x − dx, y − dy)) in `style`. The Patch tool passes its Diffusion; Use Pattern passes the tiled pattern at offset 0. With `transparent` only the source's texture goes over the layer: the healed result's difference from its own 5 × 5 average is added to the layer's colors, so the area keeps its colors and takes on the source's detail.
 - `patch_to(doc, selection, (dx, dy))`: the Patch tool's Destination mode and Content-Aware Move's Extend: the selected pixels are copied by (dx, dy) and healed into their new place; the original stays.
 - `content_aware_move(doc, selection, (dx, dy))`: the selected pixels move by (dx, dy), healed into their new place, and the area they leave is filled with the membrane of its surroundings (a smooth fill, without texture).
+- `patch_to_from` and `content_aware_move_from(…, merged)`: the same reading `merged` (Content-Aware Move's Sample All Layers: the visible layers composited) instead of the layer. Only the pixels whose result differs from `merged` are written to the active layer, opaque; the rest of the layer is untouched, so working on an empty layer leaves the moved pixels and the filled hole there and the layers below unchanged.
 
 All three document operations return whether anything changed; they do nothing without an active pixel layer or an empty selection.
 
@@ -36,4 +37,5 @@ All three document operations return whether anything changed; they do nothing w
 - `modes_combine_with_the_pixels_under`: Normal, Darken, Lighten and Multiply give the blend modes' colors; Replace's dither takes about 30% of pixels at coverage 0.3, all at 1 and none at 0.
 - `create_texture_mirrors_the_surroundings`: outside the dab the texture keeps its own pixels; its center takes the pixel 2r + 2 away.
 - `patch_transparent_and_pattern`: the tiled pattern repeats from the corner; a Transparent patch with a black-and-white checker keeps a red area reddish with the checker's alternation.
+- `content_aware_move_samples_all_layers`: moving a square on the background with the merged image puts the square and the white fill on an empty layer above, nothing elsewhere, and leaves the background as it was.
 - `patch_and_content_aware_move`: patching a black square from white beside it turns it white; moving a black square fills its old place with white and leaves it black at the new place.

@@ -489,20 +489,66 @@ pub fn tiled_pattern(pattern: &TiledImage, w: u32, h: u32) -> TiledImage {
 /// The Patch tool's Destination mode and Content-Aware Move's Extend: the
 /// selected pixels are copied by (`dx`, `dy`), healed into their new
 /// place; the original stays. Returns whether anything changed.
-pub fn patch_to(doc: &mut Document, selection: &Selection, (dx, dy): (i64, i64)) -> bool {
-    let Some(id) = doc.active_layer else {
-        return false;
-    };
-    let Some(original) = doc.layer(id).and_then(|l| l.image()).cloned() else {
+pub fn patch_to(doc: &mut Document, selection: &Selection, offset: (i64, i64)) -> bool {
+    patch_to_from(doc, selection, offset, None)
+}
+
+/// [`patch_to`] reading `merged` (Content-Aware Move's Sample All Layers:
+/// the visible layers composited) instead of the layer; see
+/// [`write_result`].
+pub fn patch_to_from(
+    doc: &mut Document,
+    selection: &Selection,
+    (dx, dy): (i64, i64),
+    merged: Option<&TiledImage>,
+) -> bool {
+    let Some(original) = read_image(doc, merged) else {
         return false;
     };
     let Some(result) = place_healed(&original, &original, selection, (dx, dy)) else {
         return false;
     };
+    write_result(doc, &original, result, merged.is_some())
+}
+
+/// What the move tools read: `merged`, or the active layer's pixels.
+fn read_image(doc: &Document, merged: Option<&TiledImage>) -> Option<TiledImage> {
+    match merged {
+        Some(m) => Some(m.clone()),
+        None => doc
+            .active_layer
+            .and_then(|id| doc.layer(id))
+            .and_then(|l| l.image())
+            .cloned(),
+    }
+}
+
+/// Puts `result` (computed from `read`) into the active layer: all of it,
+/// or, when it was computed from the merged image, only the pixels that
+/// changed, made opaque, so the rest of the layer stays as it was.
+fn write_result(doc: &mut Document, read: &TiledImage, result: TiledImage, merged: bool) -> bool {
+    let Some(id) = doc.active_layer else {
+        return false;
+    };
     let Some(image) = doc.layer_mut(id).and_then(|l| l.image_mut()) else {
         return false;
     };
-    *image = result;
+    if !merged {
+        *image = result;
+    } else {
+        let (w, h) = (
+            image.width().min(result.width()),
+            image.height().min(result.height()),
+        );
+        for y in 0..h {
+            for x in 0..w {
+                let p = result.pixel(x, y);
+                if p != read.pixel(x, y) {
+                    image.set_pixel(x, y, [p[0], p[1], p[2], 255]);
+                }
+            }
+        }
+    }
     doc.mark_dirty();
     true
 }
@@ -552,14 +598,22 @@ fn place_healed(
 /// Content-Aware Move: the selected pixels move by (`dx`, `dy`), healed
 /// into their new place, and the area they leave is filled smoothly from
 /// its surroundings. Returns whether anything changed.
-pub fn content_aware_move(doc: &mut Document, selection: &Selection, (dx, dy): (i64, i64)) -> bool {
-    let Some(id) = doc.active_layer else {
-        return false;
-    };
+pub fn content_aware_move(doc: &mut Document, selection: &Selection, offset: (i64, i64)) -> bool {
+    content_aware_move_from(doc, selection, offset, None)
+}
+
+/// [`content_aware_move`] reading `merged` (Sample All Layers) instead of
+/// the layer; see [`write_result`].
+pub fn content_aware_move_from(
+    doc: &mut Document,
+    selection: &Selection,
+    (dx, dy): (i64, i64),
+    merged: Option<&TiledImage>,
+) -> bool {
     let Some((bx0, by0, bx1, by1)) = selection.bounds() else {
         return false;
     };
-    let Some(original) = doc.layer(id).and_then(|l| l.image()).cloned() else {
+    let Some(original) = read_image(doc, merged) else {
         return false;
     };
     let (iw, ih) = (original.width(), original.height());
@@ -600,12 +654,7 @@ pub fn content_aware_move(doc: &mut Document, selection: &Selection, (dx, dy): (
     }
     // Place the moved pixels, healed into what's there now
     let result = place_healed(&result, &original, selection, (dx, dy)).unwrap_or(result);
-    let Some(image) = doc.layer_mut(id).and_then(|l| l.image_mut()) else {
-        return false;
-    };
-    *image = result;
-    doc.mark_dirty();
-    true
+    write_result(doc, &original, result, merged.is_some())
 }
 
 #[cfg(test)]
@@ -811,5 +860,48 @@ mod tests {
         // Still reddish, with the checker's alternation
         assert!(p[0] > p[1] && q[0] > q[1], "{p:?} {q:?}");
         assert!(p[0].abs_diff(q[0]) > 60, "{p:?} {q:?}");
+    }
+
+    #[test]
+    fn content_aware_move_samples_all_layers() {
+        // A black square on the background, an empty layer on top: moving
+        // with the merged image puts the square and the hole's fill on the
+        // empty layer, and nothing else
+        let mut doc = Document::new_with_background("t", 40, 40, Color::WHITE);
+        let bg = doc.layers[0].id;
+        for y in 10..14 {
+            for x in 10..14 {
+                doc.layer_mut(bg)
+                    .unwrap()
+                    .image_mut()
+                    .unwrap()
+                    .set_pixel(x, y, [0, 0, 0, 255]);
+            }
+        }
+        let id = doc.new_layer_id();
+        doc.layers
+            .push(crate::Layer::raster(id, "top", TiledImage::new(40, 40)));
+        doc.active_layer = Some(id);
+        let merged = doc.sample_source(crate::SampleScope::All).unwrap();
+        let sel = Selection::rect(40, 40, crate::selection::Rect::new(10.0, 10.0, 14.0, 14.0));
+        assert!(content_aware_move_from(
+            &mut doc,
+            &sel,
+            (15, 0),
+            Some(&merged)
+        ));
+        let top = doc.layer(id).unwrap().image().unwrap();
+        assert!(
+            top.pixel(27, 12)[0] < 60 && top.pixel(27, 12)[3] == 255,
+            "{:?}",
+            top.pixel(27, 12)
+        );
+        assert!(top.pixel(12, 12)[0] > 240 && top.pixel(12, 12)[3] == 255);
+        assert_eq!(top.pixel(2, 2)[3], 0);
+        // The background is untouched
+        assert_eq!(
+            doc.layer(bg).unwrap().image().unwrap().pixel(12, 12),
+            [0, 0, 0, 255]
+        );
     }
 }

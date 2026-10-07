@@ -2548,6 +2548,8 @@ pub struct HealOptions {
     pub patch_transparent: bool,
     pub patch_style: op_core::heal::HealStyle,
     pub extend: bool,
+    /// Content-Aware Move's Sample All Layers.
+    pub cam_all_layers: bool,
 }
 
 pub fn heal_options(app: &mut AppState) -> HealOptions {
@@ -2585,7 +2587,20 @@ pub fn heal_options(app: &mut AppState) -> HealOptions {
             diffusion: Some(diffusion(app, "patch.diffusion")),
         },
         extend: choice(app, "cam.move") == 1,
+        cam_all_layers: flag(app, "cam.all_layers", false),
     }
+}
+
+/// Sample All Layers for Blur, Sharpen, Smudge and the Mixer Brush.
+pub fn samples_all_layers(app: &mut AppState, tool: Tool) -> bool {
+    let key = match tool {
+        Tool::Blur => "blur.all_layers",
+        Tool::Sharpen => "sharpen.all_layers",
+        Tool::Smudge => "smudge.all_layers",
+        Tool::MixerBrush => "mixer.all_layers",
+        _ => return false,
+    };
+    flag(app, key, false)
 }
 
 /// The Paint Bucket's Source: Pattern.

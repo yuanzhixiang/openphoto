@@ -204,6 +204,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let magic_eraser = crate::options_tools::magic_eraser_options(app);
     let red_eye = crate::options_tools::red_eye_options(app);
     let heal = crate::options_tools::heal_options(app);
+    let sample_all = crate::options_tools::samples_all_layers(app, tool);
+    let pattern_aligned = app.flag("pattern.aligned", true);
     let magnetic = crate::options_tools::magnetic_options(app);
     let quick = crate::options_tools::quick_options(app);
     let object = crate::options_tools::object_options(app);
@@ -723,6 +725,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         mixer,
                         art,
                         clone_panel,
+                        sample_all,
+                        pattern_aligned,
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
                     if tool == Tool::MixerBrush {
@@ -1842,6 +1846,10 @@ struct StrokeSettings {
     art: Option<(op_core::paint::ArtStyle, f32, f32, f32)>,
     /// The Clone Source panel's scale and angle.
     clone_panel: crate::panels::clone_source::ClonePanel,
+    /// Blur's, Sharpen's, Smudge's and the Mixer Brush's Sample All Layers.
+    sample_all: bool,
+    /// The Pattern Stamp's Aligned.
+    pattern_aligned: bool,
 }
 
 /// The Art History Brush's options bar settings.
@@ -2009,6 +2017,8 @@ fn paint_input(
         mixer,
         art,
         clone_panel,
+        sample_all,
+        pattern_aligned,
     } = settings;
     // The pen's pressure at this point (a mouse paints at full pressure)
     let pen = dynamics.pen.unwrap_or(1.0);
@@ -2129,6 +2139,23 @@ fn paint_input(
                 }
                 if let Some((_, impressionist)) = &pattern {
                     stroke = stroke.with_impressionist(*impressionist);
+                }
+                // The Pattern Stamp with Aligned off starts the pattern
+                // where the stroke starts
+                let origin = ui
+                    .input(|i| i.pointer.press_origin())
+                    .map(|p| to_doc(state, p, ppp))
+                    .or(pointer);
+                if tool == Tool::PatternStamp
+                    && !pattern_aligned
+                    && let Some(p) = origin
+                {
+                    stroke = stroke.with_pattern_origin((p.x.max(0.0) as u32, p.y.max(0.0) as u32));
+                }
+                if sample_all
+                    && let Some(merged) = state.doc.sample_source(op_core::SampleScope::All)
+                {
+                    stroke = stroke.with_sample(merged);
                 }
                 match tool {
                     Tool::HealingBrush => stroke = stroke.with_heal_style(heal.heal_style),
@@ -2831,6 +2858,10 @@ fn patch_input(
         if dx == 0 && dy == 0 {
             return;
         }
+        // Content-Aware Move's Sample All Layers
+        let merged = (tool == Tool::ContentAwareMove && heal.cam_all_layers)
+            .then(|| state.doc.sample_source(op_core::SampleScope::All))
+            .flatten();
         let (changed, name, moved) = match tool {
             Tool::Patch if heal.patch_destination => (
                 op_core::heal::patch_to(&mut state.doc, &selection, (dx, dy)),
@@ -2858,12 +2889,17 @@ fn patch_input(
                 false,
             ),
             _ if heal.extend => (
-                op_core::heal::patch_to(&mut state.doc, &selection, (dx, dy)),
+                op_core::heal::patch_to_from(&mut state.doc, &selection, (dx, dy), merged.as_ref()),
                 "Content-Aware Move",
                 true,
             ),
             _ => (
-                op_core::heal::content_aware_move(&mut state.doc, &selection, (dx, dy)),
+                op_core::heal::content_aware_move_from(
+                    &mut state.doc,
+                    &selection,
+                    (dx, dy),
+                    merged.as_ref(),
+                ),
                 "Content-Aware Move",
                 true,
             ),

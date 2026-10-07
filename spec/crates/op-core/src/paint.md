@@ -46,7 +46,7 @@ The Mode of the Brush and Pencil, set with `Stroke::with_mode` (default Normal):
 
 ## Smudge, pattern, Background Eraser and Color Replacement
 
-- `Pattern(image)` (Pattern Stamp): the target pixel takes the pattern's color at (x mod width, y mod height), i.e. tiled from the document origin (Aligned); mixed in by coverage, opacity and flow. With Impressionist (`with_impressionist`) the pattern is read at the dab's center, moved by −1, 0 or 1 quarter of the tip in each direction by the pixel's 3 × 3 block, so each dab lays daubs of a few colors instead of the pattern's detail.
+- `Pattern(image)` (Pattern Stamp): the target pixel takes the pattern's color at (x mod width, y mod height), i.e. tiled from the document origin (Aligned), or with `with_pattern_origin((ox, oy))` (Aligned off) from that point, so the pattern's corner lands on the stroke's first point; mixed in by coverage, opacity and flow. With Impressionist (`with_impressionist`) the pattern is read at the dab's center, moved by −1, 0 or 1 quarter of the tip in each direction by the pixel's 3 × 3 block, so each dab lays daubs of a few colors instead of the pattern's detail.
 - `Smudge(strength)` (Smudge): does not use coverage but changes the current pixels directly: each dab pulls the pixels at the previous dab's position to the current position by "strength × tip coverage × selection" (reading everything before writing); the first dab only picks up color and changes nothing.
 - `BackgroundErase(ColorMatch)` (Background Eraser) and `ReplaceColor { color, mode, matching }` (Color Replacement; `mode` is the Hue / Saturation / Color / Luminosity blend formula) only change "matching" pixels:
   - Sample color (`Sampling`): `Continuous` takes the center of each dab (pixels before the stroke started), `Once` takes the center of the first dab, `Swatch(c)` uses the given color (the background color).
@@ -128,12 +128,14 @@ The options (`Stroke::with_retouch(Retouch { protect_tones, vibrance, protect_de
 - Blur: the 3×3 premultiplied average of the current pixels; Sharpen: `v + (v − 3×3 average)`. With Protect Detail, Sharpen adds half that difference, and nothing where it is under one level (noise).
 - Source: the pixel at the corresponding position in `image` (including alpha); outside the bounds of `image` the original pixel is kept.
 
+## Sample All Layers
+
+`with_sample(merged)` gives Blur, Sharpen, Smudge and the Mixer Brush the visible layers composited (the UI passes `Document::sample_source(All)` at the stroke's start). They read it instead of the layer: Blur and Sharpen blur or sharpen the merged pixels, Smudge drags them and the Mixer Brush picks up their paint, and the result is mixed into the active layer by the dab's amount, so an empty layer above the image takes on the retouched pixels. The stroke lays the same result into its copy of the merged image, so later dabs build on earlier ones as they do on a layer. Other stroke kinds ignore it.
+
 ## Known limitations
 
-- Brush tips are computed (round or elliptical); there are no sampled tips. There is no airbrush build-up, and no scattering, texture, dual brush or color dynamics.
+- Brush tips are computed (round or elliptical); there are no sampled tips, and no scattering, texture, dual brush or color dynamics.
 - Pressure only reaches the dabs of the coverage-based strokes (painting, erasing, retouching). Smudge, healing and the color-matching strokes use the tip's own size.
-- The retouching tools' Protect Tones, Vibrance, Sample All Layers and Protect Detail options are not implemented.
-- The only brush mode is Normal; the Eraser only has Brush mode (no Pencil or Block mode).
 - Every dab triggers a full recomposite and upload of the document, so painting on large documents is slow.
 
 ## Test coverage (brush shape and dynamics)
@@ -141,6 +143,8 @@ The options (`Stroke::with_retouch(Retouch { protect_tones, vibrance, protect_de
 - `cloning_scaled_and_turned`: at 200% wide a one-pixel column clones two pixels wide; turned 90° it becomes a row.
 - `art_history_paints_the_source_in_strokes`: a red source brings red strokes back into a white area and leaves the rest; on a layer already red, a 50% tolerance paints nothing.
 - `mixer_brush_loads_picks_up_and_runs_dry`: a dry, light load starts blue and fades; a wet blue brush on red lays a mix and keeps a mixed color; a clean wet brush smears black into white.
+- `unaligned_pattern_starts_at_the_stroke`: with the origin at the stroke's point, the pattern's first column lands there.
+- `sample_all_layers_reads_the_merged_image`: on an empty layer over black and white stripes, Blur alone changes nothing; with the merged image it lays blurred gray on the layer under the dab only.
 - `impressionist_pattern_daubs`: a one-pixel stripe pattern comes through as stripes, and with Impressionist in blocks of one color.
 - `retouching_builds_up_and_its_options`: a second Burn pass darkens further, `build_up` darkens in place, Protect Tones keeps a 2:1 red/green ratio that plain Dodge changes, Vibrance saturates a strong red less, Protect Detail sharpens an edge less.
 - `elliptical_tips_and_spacing`: a 30% round tip is wide at 0° and tall at 90°; 100% spacing places dabs a diameter apart.

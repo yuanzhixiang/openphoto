@@ -367,6 +367,14 @@ pub struct Stroke {
     /// Create Texture.
     heal_style: crate::heal::HealStyle,
     create_texture: bool,
+    /// Sample All Layers (Blur, Sharpen, Smudge, the Mixer Brush): the
+    /// merged image the stroke reads, kept up to date with what it lays
+    /// down.
+    sample: Option<TiledImage>,
+    /// Where a `Pattern` stroke's pattern starts (the Pattern Stamp with
+    /// Aligned off: the stroke's first point; otherwise the document's
+    /// corner).
+    pattern_origin: (u32, u32),
 }
 
 impl Stroke {
@@ -443,7 +451,24 @@ impl Stroke {
             source_transform: None,
             heal_style: crate::heal::HealStyle::default(),
             create_texture: false,
+            sample: None,
+            pattern_origin: (0, 0),
         })
+    }
+
+    /// The Pattern Stamp with Aligned off: the pattern starts at `origin`
+    /// for this stroke instead of at the document's corner.
+    pub fn with_pattern_origin(mut self, origin: (u32, u32)) -> Self {
+        self.pattern_origin = origin;
+        self
+    }
+
+    /// Sample All Layers: Blur, Sharpen, Smudge and the Mixer Brush read
+    /// `merged` (the visible layers composited, the document's size)
+    /// instead of the layer, and write their result into the layer.
+    pub fn with_sample(mut self, merged: TiledImage) -> Self {
+        self.sample = Some(merged);
+        self
     }
 
     /// A healing stroke's Mode and Diffusion.
@@ -644,12 +669,20 @@ impl Stroke {
             let (mx0, my0) = (x0.saturating_sub(1), y0.saturating_sub(1));
             let (mx1, my1) = ((x1 + 1).min(w), (y1 + 1).min(h));
             let bw = mx1 - mx0;
+            // Blur and Sharpen with Sample All Layers read the merged image
+            let sampled = matches!(self.kind, StrokeKind::Blur | StrokeKind::Sharpen)
+                .then_some(self.sample.as_mut())
+                .flatten();
             let mut now = Vec::with_capacity((bw * (my1 - my0)) as usize);
             for y in my0..my1 {
                 for x in mx0..mx1 {
-                    now.push(image.pixel(x, y));
+                    now.push(match &sampled {
+                        Some(m) => m.pixel(x, y),
+                        None => image.pixel(x, y),
+                    });
                 }
             }
+            let mut sampled = sampled;
             let at = |x: i64, y: i64| {
                 let x = x.clamp(mx0 as i64, mx1 as i64 - 1) as u32;
                 let y = y.clamp(my0 as i64, my1 as i64 - 1) as u32;
@@ -671,7 +704,13 @@ impl Stroke {
                     let target = retouch_target(&self.kind, self.retouch, cur, |dx, dy| {
                         at(x as i64 + dx, y as i64 + dy)
                     });
-                    image.set_pixel(x, y, mix(cur, target, amount, self.preserve_alpha));
+                    if let Some(m) = sampled.as_deref_mut() {
+                        m.set_pixel(x, y, mix(cur, target, amount, false));
+                        let own = image.pixel(x, y);
+                        image.set_pixel(x, y, mix(own, target, amount, self.preserve_alpha));
+                    } else {
+                        image.set_pixel(x, y, mix(cur, target, amount, self.preserve_alpha));
+                    }
                 }
             }
             doc.mark_dirty();
@@ -783,7 +822,8 @@ impl Stroke {
                 } else {
                     (x, y)
                 };
-                let p = image.pixel(x % pw, y % ph);
+                let (ox, oy) = (self.pattern_origin.0 % pw, self.pattern_origin.1 % ph);
+                let p = image.pixel((x + pw - ox) % pw, (y + ph - oy) % ph);
                 [p[0], p[1], p[2], base[3].max(p[3])]
             }
             &StrokeKind::ReplaceColor { color, mode, .. } => {
@@ -987,10 +1027,12 @@ impl Stroke {
         let selection = self.selection.clone();
         let preserve = self.preserve_alpha;
         let tip = self.tip;
+        let mut sample = self.sample.as_mut();
         let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
             return;
         };
-        // Read the dragged colors before writing any
+        // Read the dragged colors before writing any (from the merged
+        // image with Sample All Layers)
         let mut updates = Vec::new();
         for y in y0..y1 {
             for x in x0..x1 {
@@ -1006,12 +1048,21 @@ impl Stroke {
                     .as_ref()
                     .map_or(1.0, |s| s.get(x, y) as f32 / 255.0);
                 let amount = a * strength * selected;
-                let from = image.pixel(sx as u32, sy as u32);
-                updates.push((x, y, mix(image.pixel(x, y), from, amount, preserve)));
+                let from = match &sample {
+                    Some(m) => m.pixel(sx as u32, sy as u32),
+                    None => image.pixel(sx as u32, sy as u32),
+                };
+                let merged = sample
+                    .as_ref()
+                    .map(|m| mix(m.pixel(x, y), from, amount, false));
+                updates.push((x, y, mix(image.pixel(x, y), from, amount, preserve), merged));
             }
         }
-        for (x, y, p) in updates {
+        for (x, y, p, merged) in updates {
             image.set_pixel(x, y, p);
+            if let (Some(m), Some(q)) = (sample.as_deref_mut(), merged) {
+                m.set_pixel(x, y, q);
+            }
         }
         doc.mark_dirty();
     }
@@ -1150,15 +1201,20 @@ impl Stroke {
         let selection = self.selection.clone();
         let preserve = self.preserve_alpha;
         let flow = self.flow;
+        let sample = self.sample.as_mut();
         let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
             return;
         };
-        // The canvas's paint under the tip
+        // The canvas's paint under the tip (the merged image's with Sample
+        // All Layers)
         let (mut sum, mut weight) = ([0f32; 3], 0f32);
         for y in y0..y1 {
             for x in x0..x1 {
                 let a = tip.coverage(x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
-                let p = image.pixel(x, y);
+                let p = match &sample {
+                    Some(m) => m.pixel(x, y),
+                    None => image.pixel(x, y),
+                };
                 let k = a * p[3] as f32 / 255.0;
                 for c in 0..3 {
                     sum[c] += p[c] as f32 / 255.0 * k;
@@ -1213,6 +1269,27 @@ impl Stroke {
         }
         for (x, y, p) in updates {
             image.set_pixel(x, y, p);
+        }
+        // The merged image takes the same paint, so later dabs pick it up
+        if let Some(m) = sample {
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    let a = tip.coverage(x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+                    if a <= 0.0 {
+                        continue;
+                    }
+                    let selected = selection
+                        .as_ref()
+                        .map_or(1.0, |s| s.get(x, y) as f32 / 255.0);
+                    let q = apply(
+                        m.pixel(x, y),
+                        a * strength * selected,
+                        &StrokeKind::Paint(rgb),
+                        false,
+                    );
+                    m.set_pixel(x, y, q);
+                }
+            }
         }
         doc.mark_dirty();
     }
@@ -1621,6 +1698,54 @@ mod tests {
     fn one_dab(doc: &mut Document, kind: StrokeKind, strength: f32) {
         let mut s = Stroke::begin(doc, HARD, kind, strength, 1.0).unwrap();
         s.add_point(doc, 20.0, 20.0);
+    }
+
+    #[test]
+    fn unaligned_pattern_starts_at_the_stroke() {
+        let mut pattern = TiledImage::new(3, 1);
+        pattern.set_pixel(0, 0, [255, 0, 0, 255]);
+        pattern.set_pixel(1, 0, [0, 255, 0, 255]);
+        pattern.set_pixel(2, 0, [0, 0, 255, 255]);
+        let mut doc = Document::new_with_background("t", 40, 40, Color::WHITE);
+        let id = doc.layers[0].id;
+        let mut s = Stroke::begin(&doc, HARD, StrokeKind::Pattern(pattern), 1.0, 1.0)
+            .unwrap()
+            .with_pattern_origin((20, 20));
+        s.add_point(&mut doc, 20.0, 20.0);
+        let image = doc.layer(id).unwrap().image().unwrap();
+        // The pattern's first column lands on the stroke's first point
+        assert_eq!(image.pixel(20, 20), [255, 0, 0, 255]);
+        assert_eq!(image.pixel(21, 20), [0, 255, 0, 255]);
+        assert_eq!(image.pixel(19, 20), [0, 0, 255, 255]);
+    }
+
+    #[test]
+    fn sample_all_layers_reads_the_merged_image() {
+        // Black and white stripes on the background, an empty layer on top
+        let mut doc = Document::new_with_background("t", 40, 40, Color::WHITE);
+        let bg = doc.layers[0].id;
+        let image = doc.layer_mut(bg).unwrap().image_mut().unwrap();
+        for y in 0..40 {
+            for x in (0..40).step_by(2) {
+                image.set_pixel(x, y, [0, 0, 0, 255]);
+            }
+        }
+        let id = doc.new_layer_id();
+        doc.layers
+            .push(crate::Layer::raster(id, "top", TiledImage::new(40, 40)));
+        doc.active_layer = Some(id);
+        let merged = doc.sample_source(crate::SampleScope::All).unwrap();
+        // Without it Blur has nothing to blur; with it the blurred stripes
+        // land on the empty layer
+        one_dab(&mut doc, StrokeKind::Blur, 1.0);
+        assert_eq!(doc.layer(id).unwrap().image().unwrap().pixel(20, 20)[3], 0);
+        let mut s = Stroke::begin(&doc, HARD, StrokeKind::Blur, 1.0, 1.0)
+            .unwrap()
+            .with_sample(merged);
+        s.add_point(&mut doc, 20.0, 20.0);
+        let p = doc.layer(id).unwrap().image().unwrap().pixel(20, 20);
+        assert!(p[3] > 200 && (40..215).contains(&p[0]), "{p:?}");
+        assert_eq!(doc.layer(id).unwrap().image().unwrap().pixel(2, 2)[3], 0);
     }
 
     #[test]

@@ -66,7 +66,7 @@ Clicking it pops up the brush picker popup (`brush_presets.md`): Size, Hardness 
 
 ## Healing tools
 
-`heal_options` reads the Healing Brush's Mode, Source (Sampled / Pattern), Aligned (default off), Sample (Current Layer, Current & Below, All Layers), Use Legacy and Diffusion (1–7, default 5; with Use Legacy, no Diffusion), the Spot Healing Brush's Mode, Type (Create Texture; Content-Aware and Proximity Match both find a nearby spot) and Sample All Layers, the Patch tool's Source / Destination segment, Transparent and Diffusion, and Content-Aware Move's Move / Extend, which `document_view.rs` uses when a stroke or patch starts. `bucket_uses_pattern` reads the Paint Bucket's source.
+`heal_options` reads the Healing Brush's Mode, Source (Sampled / Pattern), Aligned (default off), Sample (Current Layer, Current & Below, All Layers), Use Legacy and Diffusion (1–7, default 5; with Use Legacy, no Diffusion), the Spot Healing Brush's Mode, Type (Create Texture; Content-Aware and Proximity Match both find a nearby spot) and Sample All Layers, the Patch tool's Source / Destination segment, Transparent and Diffusion, and Content-Aware Move's Move / Extend, which `document_view.rs` uses when a stroke or patch starts. `bucket_uses_pattern` reads the Paint Bucket's source, and `samples_all_layers(tool)` Sample All Layers for Blur, Sharpen, Smudge and the Mixer Brush (`blur.all_layers`, `sharpen.all_layers`, `smudge.all_layers`, `mixer.all_layers`); `HealOptions::cam_all_layers` is Content-Aware Move's.
 
 ## Magnetic Lasso
 
