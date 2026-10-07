@@ -66,6 +66,7 @@
 - `gradient_drag`：渐变工具拖动中的起点与当前点（文档像素）。
 - `clone_source`、`clone_offset`、`picking_clone_source`：仿制图章的取样点、对齐偏移，以及「这次按压是在设定取样点」的标记（见 `document_view.md`）。
 - `pointer`：指针在文档上的位置（文档像素），指针不在画布上时为 `None`；Info 面板使用。
+- `movable_layers()`：Align / Distribute 会移动的选中图层数，按文档修订号、选区修订号和选中图层缓存。对齐按钮和菜单项的可用状态每帧要问十几次，每次都要扫描图层像素的外框，不缓存时拖动大文档会明显卡顿。
 - 直方图与合成缩略图：`composite_histogram()`、`composite_texture(ctx, max_px)`，都按文档修订号缓存，供 Histogram 与 Navigator 面板使用。两者都取画布已有的合成图（`canvas_image()`），不再另外合成一遍；Quick Mask 打开时（画布带红色遮罩）Navigator 缩略图仍单独合成。
 - `guide_drag`：正在拖动的参考线（从标尺拖出时 `index` 为 `None`，否则为被移动参考线的序号）。
 - `crop`：裁剪工具的裁剪框（见 `crop_tool.md`）。

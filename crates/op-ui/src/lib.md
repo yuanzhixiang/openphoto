@@ -33,6 +33,10 @@
 5. 确定当前文档：当前文档已不存在时，改为最后一个标签（见 `doc_tabs.rs` 的 `ensure_active`）。
 6. 浮层：History 弹出面板（`history_open` 时）、浮动面板（Info、Navigator、Histogram，见 `panels/floating.md`）、Canvas Size 对话框、Image Size 对话框、Fill 对话框、Trim 对话框、调整对话框、「Save changes?」确认、Color Picker（画在前两者之上）、macOS 菜单状态同步、错误提示对话框。
 
+## 帧时间日志
+
+设置环境变量 `OPENPHOTO_FRAME_LOG`（任意值）启动时，每帧向 stderr 输出一行 `frame <毫秒> ms`，即与上一帧的间隔（含渲染）。开发时用来在真实 App 里检查拖动等操作是否流畅（3000 × 1080 文档上移动图层约 11 ms 一帧）。
+
 ## 关闭窗口与退出
 
 - 每帧开始时检查窗口的关闭请求（点窗口的关闭按钮等）：还没有批准退出（`quit_approved`）且有文档存在未保存修改时，取消这次关闭（`ViewportCommand::CancelClose`），并像 Quit 一样开始逐个询问（还没有在询问时）。没有未保存修改时直接关闭。

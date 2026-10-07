@@ -41,7 +41,7 @@
   - **UXP（Spectrum）对话框**（New Layer、New Group、Layer from Background）：Spectrum 的 Adobe Clean（t 的斜切顶、y 的直尾可以分辨），与面板同一种字体，所以用 Source Sans 3：`uxp(size)` 为 Regular、`uxp_bold(size)` 为 Semibold，都是 12 pt。
 - 字距：AppKit 按 SF 的 `trak` 表随字号调整字距（12 pt 为 0，13 pt 为 −12/2048 em，14 pt 为 −22），egui 不会。`system_tracking(size)` 按表插值给出 egui 的额外字距，`tracked_galley(painter, text, font, color)` 用它排版；窗口标题和提示框的文字都这样画（12 pt 正文不需要）。
 - 测试 `dialog_text_is_as_wide_as_photoshops`：九段文字（Image Size、Duplicate Layer、窗口标题、提示框、New Layer 的）在 2x 下的宽度与 Photoshop 实测相差不超过 3%；去掉 opsz 17、去掉字距或给 UXP 对话框用错字体都会失败（已验证）。
-- Phosphor Bold 单独注册为字体族 `phosphor-bold`，`tool_icon(size)` 返回它，只用于工具栏和工具列表的图标。
+- Phosphor Regular 另外单独注册为字体族 `phosphor-regular`（前面没有文字字体），`tool_icon(size)` 返回它，只用于工具栏和工具列表的图标：Regular 在工具栏尺寸下笔画约 1 pt，与 Photoshop 的图标一致；之前用的 Bold 粗了约一半。图标字形本身仍与 Photoshop 不同（见 README 的 P0 差距）。
 
 ## egui 样式（`apply_style`）
 

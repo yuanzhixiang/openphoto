@@ -8,6 +8,7 @@ Layer › Align、Layer › Distribute 以及移动工具选项栏的对齐/分�
 
 - `Align`：`Top`、`VerticalCenter`、`Bottom`、`Left`、`HorizontalCenter`、`Right`；`ALL` 为菜单顺序，`label()` 为菜单文字（「Top Edges」等），`name()` 为历史名称（「Align Left Edges」等，与 Photoshop 记录的一致）。
 - `Distribute`：上面六种加 `Horizontally`、`Vertically`（等间距）；同样有 `ALL`、`label()`、`name()`（「Distribute Vertical Centers」等）。
+- `movable_count(doc)`：会被移动的选中图层数（需要扫描各图层像素外框；`op-ui` 按修订号缓存它）。`can_align_count(doc, n)` 是给定该数目时的 `can_align`。
 - `can_align(doc)` / `align(doc, how)`：有像素选区时，选中的图层对齐到选区的外框（一个图层就可以）；没有选区时需要至少两个图层，对齐到它们的总外框。中心对齐的位移四舍五入到整像素。
 - `can_distribute(doc)` / `distribute(doc, how)`：需要至少三个图层。按所选的边或中心排序，最外侧的两个不动，中间的按所选的边或中心等距排列；`Horizontally`/`Vertically` 则让相邻图层之间的空隙相等。
 
