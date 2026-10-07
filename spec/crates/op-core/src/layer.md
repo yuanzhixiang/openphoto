@@ -1,0 +1,105 @@
+# layer.rs
+
+## 职责
+
+定义图层及其属性：图层 ID、混合模式、图层内容类型，以及可见性、不透明度、锁定等 Photoshop 图层属性。
+
+## 对外接口
+
+### `LayerId`
+
+不透明的 `u64` 包装，可比较、可哈希。ID 由 `Document::new_layer_id()` 从进程级计数器分配（与 `DocId` 共用计数器），本模块不负责分配。
+
+### `BlendMode`
+
+`PassThrough`（「Pass Through」）只用于组：组里的图层直接与组下方的内容混合，就像没有分组一样；组按一个整体合成时它等同于 Normal。
+
+
+- 收录 Photoshop 全部 27 种图层混合模式，枚举顺序与 Photoshop 混合模式菜单一致，默认值为 `Normal`。
+- `GROUPS`：按 Photoshop 菜单分成 6 组，组与组之间画分隔线：
+  1. `Normal`、`Dissolve`
+  2. `Darken`、`Multiply`、`ColorBurn`、`LinearBurn`、`DarkerColor`
+  3. `Lighten`、`Screen`、`ColorDodge`、`LinearDodge`、`LighterColor`
+  4. `Overlay`、`SoftLight`、`HardLight`、`VividLight`、`LinearLight`、`PinLight`、`HardMix`
+  5. `Difference`、`Exclusion`、`Subtract`、`Divide`
+  6. `Hue`、`Saturation`、`Color`、`Luminosity`
+- `label()`：菜单显示的英文名，与 Photoshop 措辞一致，例如 `LinearDodge` 显示为 `"Linear Dodge (Add)"`。
+
+### `LayerKind`
+
+- `Raster(TiledImage)`：像素图层。
+- `Group { collapsed }`：图层组（文件夹）。组本身没有像素；它里面的图层在 `Document::layers` 中紧挨着排在它下面，各自的 `parent` 指向组的 id（与 PSD 的存储方式相同：组记录在上、其中的图层在下）。`collapsed` 表示在 Layers 面板中折叠。
+- `Layer::group(id, name)` 新建一个组，混合模式为 `PassThrough`。`is_group()`；`image()` / `image_mut()` 返回像素图层的图像，组为 `None`——所有处理像素的代码都通过它们取图像，必须明确处理组的情况。
+
+（原 `LayerKind` 说明）
+
+图层内容类型。目前只有 `Raster(TiledImage)`：栅格图层，图像尺寸与文档一致。
+
+### `Layer`
+
+公开字段：
+
+- `id`、`name`
+- `visible`：是否参与合成。
+- `opacity`：图层不透明度，语义上作用于整个图层（包括图层样式）。
+- `fill`：填充不透明度，语义上只作用于像素本身，不作用于图层样式。
+- `blend_mode`
+- `is_background`：「背景」图层标记。按 Photoshop 语义，背景图层锁定、不透明、总在最底层。
+- `lock_transparency`、`lock_pixels`、`lock_position`、`lock_nesting`（防止自动嵌套进出画板和框架）：四种单项锁定。
+- `link`：链接编号（`Option<u32>`）。编号相同的图层链接在一起；没有别的图层同号的编号等于没链接，所以删除或取消链接后不需要整理（见 `link.md`）。
+- `lock_all`：全部锁定。它是独立的标志而不是把四个单项都打开，所以关掉它时单项锁定恢复原样（Photoshop 2026 实测：先锁位置，再点「全部锁定」两次，位置锁仍在）。PSD 里也是单独的位（见 `op-io` 的 `psd.md`）。
+- `kind`：图层内容。
+- `mask`：图层蒙版（`Option<LayerMask>`），新建图层时没有。
+- `color`：颜色标签（`LayerColor`），新建图层时为 `None`。
+- `parent`：所在的组，不在组里时为 `None`。
+
+### `LayerColor`
+
+图层的颜色标签：`None`、`Red`、`Orange`、`Yellow`、`Green`、`Blue`、`Violet`、`Gray`，顺序与 Photoshop 的 Color 菜单一致。`label()` 为英文名；`psd_index()` / `from_psd_index()` 是 PSD `lclr` 块里的编号（0 = None … 7 = Gray，用 Photoshop 2026 保存的文件核对过）。
+
+### `neutral_color(mode)`
+
+New Layer 对话框「Fill with ‹mode›-neutral color」用的中性色：在该混合模式下不改变下方图像的颜色。Overlay、Soft Light、Hard Light、Vivid Light、Linear Light、Pin Light 为 50% 灰 (128, 128, 128)；Multiply、Color Burn、Linear Burn、Darken、Divide 为白色；Screen、Color Dodge、Linear Dodge、Lighten、Difference、Exclusion、Subtract 为黑色；其余模式（Normal、Dissolve、Darker/Lighter Color、Hard Mix、Hue、Saturation、Color、Luminosity）没有中性色，返回 `None`。
+
+### `LayerMask`
+
+图层蒙版：白色显示图层、黑色隐藏、灰色部分显示。以不透明的灰度 `TiledImage` 保存（每个颜色通道都是蒙版值，alpha 恒为 255），所以纯白或纯黑的蒙版整幅只共享一个 tile。
+
+- `enabled`：Layer › Layer Mask › Disable 关闭时为假，蒙版保留但合成时忽略。
+- `filled(w, h, value)`：单一值的蒙版（255 显示全部，0 隐藏全部）。
+- `from_values(w, h, f)`：按每个像素的值构建（例如选区的选择程度）。
+- `value(x, y)`：某像素的蒙版值（图像外为 0）。
+
+`Layer::raster(id, name, image)` 构造一个普通栅格图层：可见、`opacity` 与 `fill` 均为 1.0、Normal 混合、非背景、无任何锁定。
+
+`is_locked()`：当图层是背景图层，或像素、位置被锁定时返回 `true`。透明锁定不计入；它在 Photoshop 中属于部分锁定。
+
+有效锁定（编辑操作一律用这几个方法，不直接读字段，否则会漏掉「全部锁定」）：
+
+- `transparency_locked()` = `lock_transparency || lock_all`
+- `pixels_locked()` = `lock_pixels || lock_all`
+- `position_locked()` = `lock_position || lock_all`
+
+`locks()` / `set_locks(Locks)` 一次读写五个标志。`Locks { transparency, pixels, position, nesting, all }` 是 Lock Layers 对话框和 `layer_ops` 使用的值类型。
+
+## 行为规则
+
+- `opacity` 与 `fill` 是 0..=1 的浮点数，本模块不做范围校验。
+- 背景图层的「锁定、不透明、在最底层」是语义约定，本模块不强制：字段都是公开的，由调用方（文档构造函数和 `op-ui` 图层面板）维护。`op-ui` 图层面板对背景图层禁用混合模式、不透明度和锁定开关的编辑。
+- 合成时 `opacity * fill` 作为图层整体 alpha 系数（见 `document.md`）；由于目前没有图层样式，两者在效果上没有区别。
+- `blend_mode` 在合成时生效，算法见 `blend.md`。
+
+## 与其它模块的关系
+
+- `document.rs` 持有 `Vec<Layer>`，并在构造时设置背景图层。
+- `op-ui` 图层面板用 `BlendMode::GROUPS` 和 `label()` 构建混合模式菜单，用 `is_locked()` 决定锁图标状态，直接修改 `Layer` 字段后调用 `Document::mark_dirty()`。
+
+## 已知限制
+
+- 只有栅格图层，没有图层组、调整图层、文字图层、形状图层或智能对象。
+- 没有图层蒙版、剪贴蒙版和图层样式（因此 `fill` 与 `opacity` 在效果上相同）。
+- 防止自动嵌套（`lock_nesting`）只保存状态：还没有画板和框架，它不影响任何操作。
+
+## 测试覆盖
+
+本文件没有单元测试。
