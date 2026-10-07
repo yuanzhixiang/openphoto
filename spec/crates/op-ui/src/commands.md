@@ -174,6 +174,7 @@ Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's men
 | HideApp | OpenPhoto › Hide OpenPhoto | ⌃⌘H |
 | ToggleHistory | Window › History | None |
 | ToggleHistogram | Window › Histogram | None |
+| ToggleCloneSource | Window › Clone Source (also the Clone Stamp's options bar toggle) | None |
 | ToggleInfo | Window › Info | F8 |
 | ToggleNavigator | Window › Navigator | None |
 

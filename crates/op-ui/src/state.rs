@@ -127,6 +127,10 @@ pub struct DocState {
     pub clone_offset: Option<egui::Vec2>,
     /// The button went down to pick the source; no painting until it's up.
     pub picking_clone_source: bool,
+    /// The Clone Source panel's five sources (point and offset), the one in
+    /// use being `clone_source` / `clone_offset`.
+    pub clone_slots: [(Option<egui::Pos2>, Option<egui::Vec2>); 5],
+    pub clone_slot: usize,
     /// The Crop tool's box, while the Crop tool is in use.
     pub crop: Option<CropBox>,
     /// The Perspective Crop tool's box, while it is in use.
@@ -257,6 +261,8 @@ impl DocState {
             clone_source: None,
             clone_offset: None,
             picking_clone_source: false,
+            clone_slots: [(None, None); 5],
+            clone_slot: 0,
             gradient_drag: None,
             shape_drag: None,
             text_edit: None,
@@ -523,6 +529,17 @@ impl DocState {
         }
         self.histogram = Some((rev, hist));
         hist
+    }
+
+    /// The Clone Source panel's slot `k` becomes the one in use: the current
+    /// source goes back to its slot and slot `k`'s comes out.
+    pub fn choose_clone_slot(&mut self, k: usize) {
+        if k >= 5 || k == self.clone_slot {
+            return;
+        }
+        self.clone_slots[self.clone_slot] = (self.clone_source, self.clone_offset);
+        (self.clone_source, self.clone_offset) = self.clone_slots[k];
+        self.clone_slot = k;
     }
 
     /// The merged image as a texture at most `max_px` on a side, cached
@@ -1350,6 +1367,8 @@ pub struct AppState {
     /// Option-click (None: the foreground color), and the paint the brush
     /// keeps between strokes when it isn't cleaned (None: clean).
     pub mixer: PaintOptions,
+    /// The Clone Source panel's settings.
+    pub clone_panel: crate::panels::clone_source::ClonePanel,
     /// The Art History Brush's brush.
     pub art_history: PaintOptions,
     pub mixer_load: Option<[u8; 3]>,
@@ -1543,6 +1562,7 @@ impl Default for AppState {
             }],
             pattern: 0,
             mixer: PaintOptions::brush(),
+            clone_panel: Default::default(),
             art_history: PaintOptions {
                 size: 10.0,
                 hardness: 1.0,

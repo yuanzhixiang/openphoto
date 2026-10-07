@@ -34,6 +34,16 @@ pub struct BrushTip {
     pub spacing: f32,
 }
 
+/// The Clone Source panel's transform of a `Source` stroke: the source
+/// point, and how the source is scaled (W, H) and turned (degrees,
+/// counterclockwise) about it on its way to the target.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SourceTransform {
+    pub origin: (f32, f32),
+    pub scale: (f32, f32),
+    pub angle: f32,
+}
+
 /// The Art History Brush's Style.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum ArtStyle {
@@ -351,6 +361,8 @@ pub struct Stroke {
     /// The Mixer Brush's paint: its color (None while clean) and how much
     /// of the load is left (0–1).
     mixer: (Option<[f32; 3]>, f32),
+    /// The Clone Source panel's scale and angle for a `Source` stroke.
+    source_transform: Option<SourceTransform>,
 }
 
 impl Stroke {
@@ -424,7 +436,15 @@ impl Stroke {
             impressionist: false,
             dab_center: (0.0, 0.0),
             mixer: (None, 1.0),
+            source_transform: None,
         })
+    }
+
+    /// Scales and turns a `Source` stroke's source about its source point
+    /// (the Clone Source panel's W, H and angle).
+    pub fn with_source_transform(mut self, transform: SourceTransform) -> Self {
+        self.source_transform = Some(transform);
+        self
     }
 
     /// The Mixer Brush's color at the end of the stroke (None if clean):
@@ -709,7 +729,23 @@ impl Stroke {
                 self.base.pixel(sx, sy)
             }),
             StrokeKind::Source { image, dx, dy } => {
-                let (sx, sy) = (x as i64 - dx, y as i64 - dy);
+                let (sx, sy) = match self.source_transform {
+                    // From the target point the source point lands on, back
+                    // through the turn and the scale
+                    // (about the middle of the source point's pixel, so an
+                    // unchanged transform clones exactly as without one)
+                    Some(t) => {
+                        let (ox, oy) = (t.origin.0.floor() + 0.5, t.origin.1.floor() + 0.5);
+                        let (tx, ty) = (ox + *dx as f32, oy + *dy as f32);
+                        let (rx, ry) = (x as f32 + 0.5 - tx, y as f32 + 0.5 - ty);
+                        let (s, c) = t.angle.to_radians().sin_cos();
+                        // (screen y points down: counterclockwise is −y)
+                        let (ux, uy) = (rx * c - ry * s, rx * s + ry * c);
+                        let (sx, sy) = (ux / t.scale.0.max(0.01), uy / t.scale.1.max(0.01));
+                        ((ox + sx).floor() as i64, (oy + sy).floor() as i64)
+                    }
+                    None => (x as i64 - dx, y as i64 - dy),
+                };
                 if sx < 0 || sy < 0 || sx >= image.width() as i64 || sy >= image.height() as i64 {
                     return base;
                 }
@@ -1747,6 +1783,61 @@ mod tests {
         s.add_point(&mut doc, 20.0, 20.0);
         assert_eq!(pixel(&doc, id, 20, 20), [255, 0, 0, 255]);
         assert_eq!(ArtStyle::ALL.len(), 10);
+    }
+
+    #[test]
+    fn cloning_scaled_and_turned() {
+        // A source with a red column at x = 5 (rows 0–40)
+        let (mut doc, id) = doc_filled([100, 100, 100, 255]);
+        {
+            let img = doc.layer_mut(id).unwrap().image_mut().unwrap();
+            for y in 0..40 {
+                img.set_pixel(5, y, [255, 0, 0, 255]);
+            }
+        }
+        let image = doc.layer(id).unwrap().image().unwrap().clone();
+        let big = BrushTip {
+            diameter: 30.0,
+            ..HARD
+        };
+        // Source point (5.5, 20.5) lands at (20.5, 20.5), scaled 200% wide
+        let source = StrokeKind::Source {
+            image: image.clone(),
+            dx: 15,
+            dy: 0,
+        };
+        let t = SourceTransform {
+            origin: (5.5, 20.5),
+            scale: (2.0, 1.0),
+            angle: 0.0,
+        };
+        let mut s = Stroke::begin(&doc, big, source, 1.0, 1.0)
+            .unwrap()
+            .with_source_transform(t);
+        s.add_point(&mut doc, 20.5, 20.5);
+        // The one-pixel column is now two wide (about the source point's
+        // middle)
+        assert_eq!(pixel(&doc, id, 19, 20), [255, 0, 0, 255]);
+        assert_eq!(pixel(&doc, id, 20, 20), [255, 0, 0, 255]);
+        assert_eq!(pixel(&doc, id, 22, 20), [100, 100, 100, 255]);
+        // Turned 90°: the column becomes a row
+        let (mut doc, id) = doc_filled([100, 100, 100, 255]);
+        let source = StrokeKind::Source {
+            image,
+            dx: 15,
+            dy: 0,
+        };
+        let t = SourceTransform {
+            origin: (5.5, 20.5),
+            scale: (1.0, 1.0),
+            angle: 90.0,
+        };
+        let mut s = Stroke::begin(&doc, big, source, 1.0, 1.0)
+            .unwrap()
+            .with_source_transform(t);
+        s.add_point(&mut doc, 20.5, 20.5);
+        assert_eq!(pixel(&doc, id, 15, 20), [255, 0, 0, 255]);
+        assert_eq!(pixel(&doc, id, 20, 15), [100, 100, 100, 255]);
     }
 
     #[test]

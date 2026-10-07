@@ -307,6 +307,8 @@ pub enum Command {
     ToggleInfo,
     ToggleNavigator,
     ToggleHistogram,
+    /// Window > Clone Source.
+    ToggleCloneSource,
 }
 
 /// A keyboard shortcut. `cmd` is Command on macOS and Ctrl elsewhere.
@@ -501,6 +503,7 @@ impl Command {
             },
             Self::ToggleNavigator
             | Self::ToggleHistogram
+            | Self::ToggleCloneSource
             | Self::FlipView
             | Self::TogglePixelGrid
             | Self::ToggleSmartGuides
@@ -729,6 +732,7 @@ impl Command {
             Self::ToggleInfo => app.floating.info,
             Self::ToggleNavigator => app.floating.navigator,
             Self::ToggleHistogram => app.floating.histogram,
+            Self::ToggleCloneSource => app.floating.clone_source,
             Self::QuickMask => app
                 .active_doc
                 .and_then(|id| app.docs.get(&id))
@@ -766,6 +770,7 @@ impl Command {
             | Self::ToggleInfo
             | Self::ToggleNavigator
             | Self::ToggleHistogram
+            | Self::ToggleCloneSource
             | Self::ToggleRulers
             | Self::ToggleExtras
             | Self::ToggleGuides
@@ -1681,6 +1686,9 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::ToggleHistogram => app
             .floating
             .toggle(crate::panels::floating::Floating::Histogram),
+        Command::ToggleCloneSource => app
+            .floating
+            .toggle(crate::panels::floating::Floating::CloneSource),
         Command::ToggleRulers => app.view.rulers = !app.view.rulers,
         Command::ToggleExtras => app.view.extras = !app.view.extras,
         Command::ToggleGuides => app.view.guides = !app.view.guides,

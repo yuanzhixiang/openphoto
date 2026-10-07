@@ -13,16 +13,23 @@ pub enum Floating {
     Info,
     Navigator,
     Histogram,
+    CloneSource,
 }
 
 impl Floating {
-    pub const ALL: [Self; 3] = [Self::Navigator, Self::Histogram, Self::Info];
+    pub const ALL: [Self; 4] = [
+        Self::Navigator,
+        Self::Histogram,
+        Self::Info,
+        Self::CloneSource,
+    ];
 
     pub fn title(self) -> &'static str {
         match self {
             Self::Info => "Info",
             Self::Navigator => "Navigator",
             Self::Histogram => "Histogram",
+            Self::CloneSource => "Clone Source",
         }
     }
 
@@ -38,6 +45,7 @@ impl Floating {
             }
             Self::Navigator => Vec2::new(pt(250.0), pt(230.0)),
             Self::Histogram => Vec2::new(pt(250.0), pt(150.0)),
+            Self::CloneSource => Vec2::new(pt(250.0), pt(250.0)),
         }
     }
 }
@@ -48,6 +56,7 @@ pub struct FloatingPanels {
     pub info: bool,
     pub navigator: bool,
     pub histogram: bool,
+    pub clone_source: bool,
 }
 
 impl FloatingPanels {
@@ -56,6 +65,7 @@ impl FloatingPanels {
             Floating::Info => self.info,
             Floating::Navigator => self.navigator,
             Floating::Histogram => self.histogram,
+            Floating::CloneSource => self.clone_source,
         }
     }
 
@@ -64,6 +74,7 @@ impl FloatingPanels {
             Floating::Info => &mut self.info,
             Floating::Navigator => &mut self.navigator,
             Floating::Histogram => &mut self.histogram,
+            Floating::CloneSource => &mut self.clone_source,
         };
         *open = !*open;
     }
@@ -147,6 +158,7 @@ pub fn show(ctx: &egui::Context, app: &mut AppState, panel_column_left: f32, top
                     Floating::Info => super::info::show(&mut child, app),
                     Floating::Navigator => super::navigator::show(&mut child, app),
                     Floating::Histogram => super::histogram::show(&mut child, app),
+                    Floating::CloneSource => super::clone_source::show(&mut child, app),
                 }
             });
         if close {

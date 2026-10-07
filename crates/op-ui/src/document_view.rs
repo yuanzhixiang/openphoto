@@ -156,6 +156,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let dynamics = paint_dynamics(app, tool);
     // The Mixer Brush's paint and settings
     let mixer = (tool == Tool::MixerBrush).then(|| mixer_settings(app));
+    // The Clone Source panel (the Clone Stamp's scale, angle and overlay)
+    let clone_panel = app.clone_panel;
     // The Art History Brush's Style, Area, Tolerance and Opacity
     let art = (tool == Tool::ArtHistoryBrush).then(|| art_settings(app));
     // The Pattern Stamp's pattern and Impressionist
@@ -663,6 +665,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         pattern: pattern.clone(),
                         mixer,
                         art,
+                        clone_panel,
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
                     if tool == Tool::MixerBrush {
@@ -852,6 +855,14 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     crate::perspective_crop::draw(ui, state, &perspective_options, canvas_rect, ppp);
     let transforming = state.free_transform.is_some();
     if let (Some(opts), Some(p), false) = (paint, response.hover_pos(), transforming) {
+        // The Clone Stamp's overlay: the source, as it would be painted,
+        // under the brush
+        if matches!(tool, Tool::CloneStamp | Tool::HealingBrush)
+            && clone_panel.show_overlay
+            && !(clone_panel.auto_hide && state.stroke.is_some())
+        {
+            clone_overlay(ui, state, canvas_rect, p, opts.size, clone_panel, ppp);
+        }
         brush_cursor(
             ui,
             canvas_rect,
@@ -1717,6 +1728,8 @@ struct StrokeSettings {
     mixer: Option<(op_core::paint::StrokeKind, f32)>,
     /// The Art History Brush's Style, Area (px), Tolerance and Opacity.
     art: Option<(op_core::paint::ArtStyle, f32, f32, f32)>,
+    /// The Clone Source panel's scale and angle.
+    clone_panel: crate::panels::clone_source::ClonePanel,
 }
 
 /// The Art History Brush's options bar settings.
@@ -1883,6 +1896,7 @@ fn paint_input(
         pattern,
         mixer,
         art,
+        clone_panel,
     } = settings;
     // The pen's pressure at this point (a mouse paints at full pressure)
     let pen = dynamics.pen.unwrap_or(1.0);
@@ -1983,6 +1997,12 @@ fn paint_input(
                     stroke = stroke.with_pressure(dynamics.pressure);
                 }
                 stroke = stroke.with_retouch(dynamics.retouch);
+                // The Clone Source panel's W, H and angle, about the source
+                if tool == Tool::CloneStamp
+                    && let Some(t) = state.clone_source.and_then(|o| clone_panel.transform(o))
+                {
+                    stroke = stroke.with_source_transform(t);
+                }
                 if let Some((_, impressionist)) = &pattern {
                     stroke = stroke.with_impressionist(*impressionist);
                 }
@@ -2051,6 +2071,79 @@ fn paint_input(
         }
     }
     None
+}
+
+/// The Clone Source panel's overlay at the pointer `at`: the merged image
+/// from the source (through the panel's scale and angle), at its opacity,
+/// inverted with Invert, inside the brush when Clipped (else over a box
+/// four brushes wide).
+fn clone_overlay(
+    ui: &Ui,
+    state: &mut DocState,
+    canvas: Rect,
+    at: Pos2,
+    size: f32,
+    panel: crate::panels::clone_source::ClonePanel,
+    ppp: f32,
+) {
+    let Some(picked) = state.clone_source else {
+        return;
+    };
+    let target = to_doc(state, at, ppp);
+    // (the middle of the source point's pixel, as the stroke maps it)
+    let source = egui::pos2(picked.x.floor() + 0.5, picked.y.floor() + 0.5);
+    // Before the first stroke, the source point is under the pointer
+    let offset = state.clone_offset.unwrap_or(target - picked);
+    let image = state.canvas_image();
+    let (w, h) = (image.width as i64, image.height as i64);
+    let span = if panel.clipped { size } else { size * 4.0 };
+    let n = (span.ceil() as usize).clamp(2, 256);
+    let step = span / n as f32;
+    let (s, c) = panel.angle.to_radians().sin_cos();
+    let (kx, ky) = (panel.scale.0 / 100.0, panel.scale.1 / 100.0);
+    let mut pixels = Vec::with_capacity(n * n);
+    for j in 0..n {
+        for i in 0..n {
+            let (dx, dy) = (
+                (i as f32 + 0.5) * step - span / 2.0,
+                (j as f32 + 0.5) * step - span / 2.0,
+            );
+            let inside = !panel.clipped || dx * dx + dy * dy <= (size / 2.0).powi(2);
+            // Back through the turn and the scale to the source
+            let (rx, ry) = (
+                target.x + dx - (source.x + offset.x),
+                target.y + dy - (source.y + offset.y),
+            );
+            let (ux, uy) = (rx * c - ry * s, rx * s + ry * c);
+            let (sx, sy) = (
+                (source.x + ux / kx.max(0.01)).floor() as i64,
+                (source.y + uy / ky.max(0.01)).floor() as i64,
+            );
+            if !inside || sx < 0 || sy < 0 || sx >= w || sy >= h {
+                pixels.push(Color32::TRANSPARENT);
+                continue;
+            }
+            let k = ((sy * w + sx) * 4) as usize;
+            let mut rgb = [image.pixels[k], image.pixels[k + 1], image.pixels[k + 2]];
+            if panel.invert {
+                rgb = rgb.map(|v| 255 - v);
+            }
+            let a = (image.pixels[k + 3] as f32 * panel.opacity) as u8;
+            pixels.push(Color32::from_rgba_unmultiplied(rgb[0], rgb[1], rgb[2], a));
+        }
+    }
+    let texture = ui.ctx().load_texture(
+        "clone-overlay",
+        egui::ColorImage::new([n, n], pixels),
+        egui::TextureOptions::NEAREST,
+    );
+    let screen = span * state.view.zoom / ppp;
+    ui.painter_at(canvas).image(
+        texture.id(),
+        Rect::from_center_size(at, egui::vec2(screen, screen)),
+        Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
+        Color32::WHITE,
+    );
 }
 
 /// Photoshop's "normal brush tip" cursor: the brush outline, drawn in white

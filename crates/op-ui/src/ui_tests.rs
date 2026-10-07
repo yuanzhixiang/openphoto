@@ -5564,6 +5564,61 @@ fn art_history_brush_paints_the_source_in_strokes() {
 }
 
 #[test]
+fn clone_source_panel_scales_and_keeps_sources() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A red column at x = 100
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    select_rect(&mut h, 100.0, 0.0, 101.0, 800.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.run_steps(2);
+    h.state_mut().state.select_tool(op_tools::Tool::CloneStamp);
+    h.state_mut().state.clone_stamp.hardness = 1.0;
+    h.run_steps(2);
+    // The options bar's Clone Source toggle opens the panel
+    click(&mut h, at_pt(203.0, 45.25));
+    assert!(h.state().state.floating.clone_source);
+    shot(&mut h, "clone_source_panel");
+    // W 200%: the column is cloned two pixels wide
+    h.state_mut().state.clone_panel.scale = (200.0, 200.0);
+    let src = doc_point(&h, 100.5, 300.5);
+    h.hover_at(src);
+    h.event_modifiers(
+        egui::Event::PointerButton {
+            pos: src,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers: Modifiers::ALT,
+        },
+        Modifiers::ALT,
+    );
+    h.run_steps(1);
+    h.event_modifiers(
+        egui::Event::PointerButton {
+            pos: src,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: Modifiers::ALT,
+        },
+        Modifiers::ALT,
+    );
+    h.run_steps(2);
+    let dst = doc_point(&h, 300.5, 300.5);
+    click(&mut h, dst);
+    assert_eq!(composite_pixel(&mut h, 299, 300), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 300, 300), [255, 0, 0, 255]);
+    assert_ne!(composite_pixel(&mut h, 302, 300), [255, 0, 0, 255]);
+    // A second slot starts empty; the first keeps its source
+    let state = h.state_mut().state.active().unwrap();
+    let first = state.clone_source;
+    state.choose_clone_slot(1);
+    assert_eq!(state.clone_source, None);
+    state.choose_clone_slot(0);
+    assert_eq!(state.clone_source, first);
+}
+
+#[test]
 fn airbrush_builds_up_while_held() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);

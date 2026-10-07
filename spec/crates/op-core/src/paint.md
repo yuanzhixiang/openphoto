@@ -20,7 +20,7 @@ Matches Photoshop: within one stroke, "flow" keeps accumulating but never exceed
   - `Dodge(range)`, `Burn(range)`: Dodge, Burn. `ToneRange` is Shadows / Midtones (default) / Highlights; `label()` is the menu text.
   - `Sponge { saturate }`: Sponge (saturate or desaturate).
   - `Blur`, `Sharpen`: Blur, Sharpen.
-  - `Source { image, dx, dy }`: paints pixels from another image; target (x, y) takes (x − dx, y − dy) of `image`. Used by both the Clone Stamp (another spot on the same layer) and the History Brush (an earlier state of the layer, offset 0).
+  - `Source { image, dx, dy }`: paints pixels from another image; target (x, y) takes (x − dx, y − dy) of `image`. With `Stroke::with_source_transform(SourceTransform { origin, scale, angle })` (the Clone Source panel), the source is scaled and turned about the source point instead. Measured from the middle of the source point's pixel and of the pixel it lands on (origin + (dx, dy)), a target pixel's offset is turned back by the angle and divided by the scale, and the source pixel there is taken. An unchanged transform clones exactly as without one. Used by both the Clone Stamp (another spot on the same layer) and the History Brush (an earlier state of the layer, offset 0).
   `StrokeKind` can be cloned but is no longer `Copy` (`Source` carries an image).
 - `Stroke::begin(doc, tip, kind, opacity, flow)`: starts a stroke on the current layer and records the current selection.
 - `Stroke::add_point(doc, x, y)`: extends the stroke to (`x`, `y`) at full pressure. The first point places one dab. After that, dabs are placed along a straight line every `spacing` × the current diameter (at least 1 pixel), and the spacing stays continuous across calls.
@@ -137,6 +137,7 @@ The options (`Stroke::with_retouch(Retouch { protect_tones, vibrance, protect_de
 
 ## Test coverage (brush shape and dynamics)
 
+- `cloning_scaled_and_turned`: at 200% wide a one-pixel column clones two pixels wide; turned 90° it becomes a row.
 - `art_history_paints_the_source_in_strokes`: a red source brings red strokes back into a white area and leaves the rest; on a layer already red, a 50% tolerance paints nothing.
 - `mixer_brush_loads_picks_up_and_runs_dry`: a dry, light load starts blue and fades; a wet blue brush on red lays a mix and keeps a mixed color; a clean wet brush smears black into white.
 - `impressionist_pattern_daubs`: a one-pixel stripe pattern comes through as stripes, and with Impressionist in blocks of one color.

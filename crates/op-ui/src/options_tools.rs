@@ -1797,7 +1797,12 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
             Label(x, t) => b.label(x, t, true),
             Picker(x) => picker(b, app, x),
             Icon(x, icon, tip) => {
-                b.icon(x, icon, tip, false, true);
+                let response = b.icon(x, icon, tip, false, true);
+                // The Clone Source panel's toggle
+                if icon == Icon::CloneSourcePanel && response.clicked() {
+                    app.floating
+                        .toggle(crate::panels::floating::Floating::CloneSource);
+                }
             }
             OverlayGear(x) => {
                 let response = b.icon(x, Icon::GearMenu, "Set additional options", false, true);
