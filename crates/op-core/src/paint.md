@@ -39,6 +39,16 @@
 - `Clear`：按强度降低透明度（像橡皮擦）。
 - 背景图层、锁定透明像素或蒙版上，混合结果保留原透明度；Behind 与 Clear 在这些地方不改变像素。
 
+## 涂抹、图案、背景橡皮擦与颜色替换
+
+- `Pattern(image)`（图案图章）：目标像素取图案在 (x mod 宽, y mod 高) 的颜色，即从文档原点平铺（Aligned）；按覆盖率、不透明度、流量混入。
+- `Smudge(strength)`（涂抹）：不走覆盖率，直接改当前像素：每个笔印把上一笔印位置的像素按「强度 × 笔尖覆盖 × 选区」拉到当前位置（先读完再写）；第一笔印只取色不改变。
+- `BackgroundErase(ColorMatch)`（背景橡皮擦）与 `ReplaceColor { color, mode, matching }`（颜色替换，`mode` 为 Hue / Saturation / Color / Luminosity 的混合公式）只改变「匹配」的像素：
+  - 取样颜色（`Sampling`）：`Continuous` 每个笔印取笔印中心（笔画开始前的像素），`Once` 取第一个笔印中心，`Swatch(c)` 用给定颜色（背景色）。
+  - 匹配：像素不透明度大于 0，且每个通道与取样颜色之差的最大值 ≤ 容差（0–1）；`protect` 给出颜色时，与它在容差内的像素不变（Protect Foreground Color）。
+  - `contiguous` 时只取笔印范围内、从中心像素出发四连通的匹配像素（中心不匹配则这一笔印不改变任何像素）；否则笔印内所有匹配像素。
+  - 背景橡皮擦把匹配像素的透明度按强度降低；颜色替换按强度把颜色移向混合结果、透明度不变。
+
 ## 像素规则
 
 - 画颜色（普通图层）：颜色以 `数量` 为 alpha 做 source-over，叠到原像素上。
@@ -74,6 +84,7 @@
 
 ## 测试覆盖
 
+- `pattern_smudge_background_eraser_and_color_replacement`：图案平铺、涂抹把红色拉到空处、背景橡皮擦只擦取样的灰色、颜色替换只给灰色换色。
 - `paint_modes_blend_with_the_layer`：Multiply、Behind、Clear；`a_square_tip_covers_a_block`：方形笔尖的角也被覆盖。
 - `hard_brush_paints_full_color_in_its_core`、`pencil_is_aliased`：硬边画笔中心为完整颜色；铅笔只有完全透明和完全不透明。
 - `dodge_burn_and_sponge`：中间调减淡变亮、加深变暗；Highlights 几乎不影响暗像素；去色后三通道相等。

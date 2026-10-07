@@ -16,6 +16,7 @@
 - `new_guide_dialog`：New Guide 对话框，打开期间为 `Some`。
 - `marquee`：选框工具选项：组合方式、羽化（像素）、消除锯齿（默认开启，与 Photoshop 一致）、样式。前三项在创建选区时生效，样式中的 Fixed Ratio / Fixed Size 目前没有效果。
 - `dodge`、`burn`、`sponge`、`blur`、`sharpen`、`clone_stamp`、`history_brush`：修饰工具各自的 `PaintOptions`（默认 30 px、硬度 0%；减淡/加深的不透明度即 Exposure 50%，模糊/锐化的不透明度即 Strength 50%，海绵的流量 50%）。`retouch`（`RetouchOptions`）：减淡与加深各自的 Range（默认 Midtones）、海绵是否 Saturate（默认否）、仿制图章 Aligned（默认是）。`paint_options(tool)` 也返回这些工具的设置。
+- `smudge`、`pattern_stamp`、`background_eraser`、`color_replacement`：涂抹（不透明度即 Strength 50%）、图案图章、背景橡皮擦、颜色替换的 `PaintOptions`（13 px、硬度 100%），`paint_options(tool)` 同样返回。`default_pattern()`：图案图章的默认图案。
 - `brush` / `pencil` / `eraser`：各绘画工具的 `PaintOptions`（大小 px、硬度、不透明度、流量），与 Photoshop 一样每个工具单独保存。默认值：画笔与橡皮擦 30 px、硬度 0%、不透明度和流量 100%；铅笔 1 px。`paint_options(tool)` 取当前绘画工具的设置。`size_step(size)` 是 `[`、`]` 的步长（小于 10 为 1，10–50 为 5，50–100 为 10，100–200 为 25，200–300 为 50，再往上为 100），大小范围 1–5000。
 - `eyedropper`：吸管选项（取样大小 `size`，1 表示 Point Sample；`all_layers`）。`EyedropperOptions::SIZES` 是 Photoshop 的七个取样大小。
 - `type_options`：文字工具选项（见 `type_tool.md`）。

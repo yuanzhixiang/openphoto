@@ -117,8 +117,9 @@
 
 适用于画笔、铅笔、橡皮擦与修饰工具（减淡、加深、海绵、模糊、锐化、仿制图章、历史记录画笔；笔画算法见 `crates/op-core/src/paint.md`）：
 
-- 在画布上按下开始一笔（使用当前工具的大小、硬度、不透明度、流量；铅笔的流量固定为 100%、没有柔边），拖动时继续，松开后记录一条历史：「Brush Tool」「Pencil」「Eraser」「Dodge Tool」「Burn Tool」「Sponge Tool」「Blur Tool」「Sharpen Tool」「Clone Stamp」「History Brush」。画笔和铅笔用前景色，按选项栏的 Mode（全部混合模式与 Behind、Clear，见 `paint.md`「绘画模式」）画上去；橡皮擦在背景图层上用背景色。橡皮擦的 Mode：Brush（按画笔的大小、硬度、不透明度、流量）、Pencil（硬边无抗锯齿、流量 100%）、Block（固定为屏幕上 16 像素见方的方块，不透明度与流量都是 100%，与 Photoshop 一致）。
+- 在画布上按下开始一笔（使用当前工具的大小、硬度、不透明度、流量；铅笔的流量固定为 100%、没有柔边），拖动时继续，松开后记录一条历史：「Brush Tool」「Pencil」「Eraser」「Dodge Tool」「Burn Tool」「Sponge Tool」「Blur Tool」「Sharpen Tool」「Clone Stamp」「History Brush」「Smudge Tool」「Pattern Stamp」「Background Eraser」「Color Replacement Tool」。画笔和铅笔用前景色，按选项栏的 Mode（全部混合模式与 Behind、Clear，见 `paint.md`「绘画模式」）画上去；橡皮擦在背景图层上用背景色。橡皮擦的 Mode：Brush（按画笔的大小、硬度、不透明度、流量）、Pencil（硬边无抗锯齿、流量 100%）、Block（固定为屏幕上 16 像素见方的方块，不透明度与流量都是 100%，与 Photoshop 一致）。
 - 笔画类型在按下时决定（`stroke_kind`）：减淡/加深按各自的 Range，海绵按 Mode，模糊/锐化，仿制图章和历史记录画笔见下。
+- 涂抹：Strength（选项栏，默认 50%）就是笔画的强度，不再乘不透明度。图案图章：用默认图案（`state::default_pattern`：深绿底上的绿点，18 × 22 像素）从文档原点平铺，Impressionist 等选项还没有效果。背景橡皮擦：取样、Limits、Tolerance、Protect Foreground Color 来自选项栏（`options_tools::color_match`），作用在背景图层上时先把背景转成普通图层「Layer 0」（与 Photoshop 一致）。颜色替换：Mode（Hue / Saturation / Color（默认）/ Luminosity）、取样、Limits、Tolerance，用前景色。这四个工具各有自己的笔刷（`AppState` 的 `smudge`、`pattern_stamp`、`background_eraser`、`color_replacement`：13 px 硬边）。
 - 仿制图章：按住 ⌥ 单击设定取样点（这一次按压不绘制，即使先松开 ⌥）。之后按下时，偏移为「按下位置 − 取样点」；勾选 Aligned（默认）时第一笔之后的偏移保持不变，否则每一笔都从取样点重新开始。取样按选项栏的 Sample：Current Layer（当前图层）、Current & Below（当前图层及其下方的合成，`Document::sample_source`）、All Layers（全部合成），都取按下时的像素。没有取样点时弹出「Could not use the clone stamp because the area to clone has not been defined (option-click to define a source point).」。取样点按文档保存在 `DocState::clone_source` / `clone_offset`。
 - 历史记录画笔：从文档打开（或新建）时的状态（第一条历史）中取同一图层的像素来画；该状态中没有这个图层或尺寸不同时弹出「Could not use the history brush because the history state does not contain a corresponding layer.」。
 - 按下时按住 Shift：从上一笔结束的位置画直线到按下的位置，再继续这一笔。
