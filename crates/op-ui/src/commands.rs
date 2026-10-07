@@ -29,6 +29,11 @@ pub enum Command {
     /// Quit OpenPhoto (asks about unsaved changes first).
     Quit,
     ExportAs,
+    /// File › Export › Quick Export as PNG, and Layer › Quick Export as
+    /// PNG and Export As... (the active layer alone).
+    QuickExportPng,
+    LayerQuickExportPng,
+    LayerExportAs,
     Undo,
     Redo,
     ToggleLastState,
@@ -397,6 +402,11 @@ impl Command {
                 shift: true,
                 ..alt_cmd(Key::W)
             },
+            Self::LayerQuickExportPng => shift_cmd(Key::Quote),
+            Self::LayerExportAs => Shortcut {
+                shift: true,
+                ..alt_cmd(Key::Quote)
+            },
             Self::Undo => cmd(Key::Z),
             Self::Redo => shift_cmd(Key::Z),
             Self::ToggleLastState => alt_cmd(Key::Z),
@@ -507,7 +517,8 @@ impl Command {
             | Self::StatusInfo(_)
             | Self::RulerUnits(_)
             | Self::OpenRecent(_)
-            | Self::ClearRecent => return None,
+            | Self::ClearRecent
+            | Self::QuickExportPng => return None,
             Self::ToggleRulers => cmd(Key::R),
             Self::ToggleExtras => cmd(Key::H),
             Self::ToggleGuides => cmd(Key::Semicolon),
@@ -911,6 +922,9 @@ impl Command {
             | Self::SelectAll
             | Self::CloseAll
             | Self::ExportAs
+            | Self::QuickExportPng
+            | Self::LayerQuickExportPng
+            | Self::LayerExportAs
             | Self::CanvasSize
             | Self::ImageSize
             | Self::Rotate180
@@ -1025,6 +1039,8 @@ impl Command {
 /// extra Shift/Alt when matching, so Shift+Cmd+Z must be checked before Cmd+Z.
 const SHORTCUT_ORDER: &[Command] = &[
     Command::ExportAs,
+    Command::LayerExportAs,
+    Command::LayerQuickExportPng,
     Command::BlackWhite,
     Command::AutoContrast,
     Command::ModifyFeather,
@@ -1221,6 +1237,9 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::CloseAll => actions::close_all(app),
         Command::CloseOthers => actions::close_others(app),
         Command::ExportAs => actions::export_dialog(app),
+        Command::QuickExportPng => actions::quick_export(app, false),
+        Command::LayerQuickExportPng => actions::quick_export(app, true),
+        Command::LayerExportAs => actions::export_layer_dialog(app),
         Command::ToggleHistory => app.history_open = !app.history_open,
         Command::Fill => app.fill_dialog = Some(Default::default()),
         Command::FillForeground | Command::FillBackground => {

@@ -192,6 +192,124 @@ pub fn export_dialog(app: &mut AppState) {
     }
 }
 
+/// The active layer alone (with its group's layers when it is a group),
+/// trimmed to its pixels: a document of its own for exporting. None when
+/// it has no visible pixels.
+pub(crate) fn layer_alone(doc: &op_core::Document) -> Option<op_core::Document> {
+    let id = doc.active_layer?;
+    let inside = |mut l: Option<op_core::LayerId>| {
+        while let Some(p) = l {
+            if p == id {
+                return true;
+            }
+            l = doc.layer(p).and_then(|x| x.parent);
+        }
+        false
+    };
+    let layers: Vec<op_core::Layer> = doc
+        .layers
+        .iter()
+        .filter(|l| inside(Some(l.id)))
+        .cloned()
+        .map(|mut l| {
+            if l.id == id {
+                l.visible = true;
+                l.parent = None;
+            }
+            l
+        })
+        .collect();
+    let pixels = doc.composite_layers_rgba8(&layers);
+    let (w, h) = (doc.width as usize, doc.height as usize);
+    let (mut x0, mut y0, mut x1, mut y1) = (w, h, 0, 0);
+    for y in 0..h {
+        for x in 0..w {
+            if pixels[(y * w + x) * 4 + 3] > 0 {
+                (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x + 1), y1.max(y + 1));
+            }
+        }
+    }
+    if x1 <= x0 || y1 <= y0 {
+        return None;
+    }
+    let mut out = Vec::with_capacity((x1 - x0) * (y1 - y0) * 4);
+    for y in y0..y1 {
+        out.extend_from_slice(&pixels[(y * w + x0) * 4..(y * w + x1) * 4]);
+    }
+    let name = doc.layer(id).map_or("Layer".to_owned(), |l| l.name.clone());
+    Some(op_core::Document::from_rgba8(
+        name,
+        (x1 - x0) as u32,
+        (y1 - y0) as u32,
+        &out,
+    ))
+}
+
+/// The save panel for an export: PNG first (and JPEG with `jpeg`), named
+/// after `name`.
+fn export_panel(name: &str, jpeg: bool) -> Option<PathBuf> {
+    let mut dialog = rfd::FileDialog::new()
+        .set_file_name(format!("{}.png", file_stem(name)))
+        .add_filter("PNG", &["png"]);
+    if jpeg {
+        dialog = dialog.add_filter("JPEG", &["jpg", "jpeg"]);
+    }
+    dialog.save_file()
+}
+
+/// File › Export › Quick Export as PNG (the document) and Layer › Quick
+/// Export as PNG (the active layer, trimmed): asks where, as Photoshop's
+/// default "Ask where to export each time", and writes a PNG.
+pub fn quick_export(app: &mut AppState, layer: bool) {
+    let options = app.export_options;
+    let Some(state) = app.active() else {
+        return;
+    };
+    let alone = if layer {
+        match layer_alone(&state.doc) {
+            Some(doc) => Some(doc),
+            None => return,
+        }
+    } else {
+        None
+    };
+    let doc = alone.as_ref().unwrap_or(&state.doc);
+    let Some(path) = export_panel(&doc.title, false) else {
+        return;
+    };
+    if let Err(e) = write_export(doc, &path, &options) {
+        app.alert = Some(format!("Could not export: {e}"));
+    }
+}
+
+/// Layer › Export As...: the active layer, trimmed, as PNG or JPEG.
+pub fn export_layer_dialog(app: &mut AppState) {
+    let options = app.export_options;
+    let Some(doc) = app.active().and_then(|s| layer_alone(&s.doc)) else {
+        return;
+    };
+    if let Some(path) = export_panel(&doc.title, true)
+        && let Err(e) = write_export(&doc, &path, &options)
+    {
+        app.alert = Some(format!("Could not export: {e}"));
+    }
+}
+
+/// Writes an export (a path without an extension gets `.png`).
+pub fn write_export(
+    doc: &op_core::Document,
+    path: &std::path::Path,
+    options: &op_io::ExportOptions,
+) -> Result<(), op_io::IoError> {
+    let png = path.with_extension("png");
+    let path = if path.extension().is_none() {
+        png.as_path()
+    } else {
+        path
+    };
+    op_io::export_with(doc, path, options)
+}
+
 /// Whether File > Save can write the document back to its own file: a
 /// Photoshop document always can; a flat format only holds one layer.
 fn saves_in_place(state: &crate::state::DocState) -> bool {

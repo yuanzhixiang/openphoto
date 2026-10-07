@@ -28,6 +28,9 @@ const ALL_COMMANDS: &[Command] = &[
     Command::Revert,
     Command::Quit,
     Command::ExportAs,
+    Command::QuickExportPng,
+    Command::LayerQuickExportPng,
+    Command::LayerExportAs,
     Command::Undo,
     Command::Redo,
     Command::ToggleLastState,
@@ -435,8 +438,30 @@ impl NativeMenu {
                 &sep(),
                 &todo("Invite to Edit...", None),
                 &todo("Share for Review", None),
-                &Submenu::with_items("Export", true, &[&item("Export As...", Command::ExportAs)])
-                    .expect("static menu definition is valid"),
+                &Submenu::with_items(
+                    "Export",
+                    true,
+                    &[
+                        &item("Quick Export as PNG", Command::QuickExportPng) as &dyn IsMenuItem,
+                        &item("Export As...", Command::ExportAs),
+                        &todo("Export Preferences...", None),
+                        &sep(),
+                        &todo("Save for Web (Legacy)...", Some("CmdOrCtrl+Shift+Alt+S")),
+                        &sep(),
+                        &todo("Artboards to Files...", None),
+                        &todo("Artboards to PDF...", None),
+                        &todo("Layer Comps to Files...", None),
+                        &todo("Layer Comps to PDF...", None),
+                        &todo("Layers to Files...", None),
+                        &sep(),
+                        &todo("Color Lookup Tables...", None),
+                        &todo("Data Sets as Files...", None),
+                        &todo("Paths to Illustrator...", None),
+                        &todo("Render Video...", None),
+                        &todo("Zoomify...", None),
+                    ],
+                )
+                .expect("static menu definition is valid"),
                 &sep(),
                 // Photoshop's Adobe Stock and Adobe Express items are left
                 // out: the app shows no Adobe brand or service
@@ -664,8 +689,8 @@ impl NativeMenu {
                 )
                 .expect("static menu definition is valid"),
                 &sep(),
-                &todo("Quick Export as PNG", Some("CmdOrCtrl+Shift+'")),
-                &todo("Export As...", Some("CmdOrCtrl+Shift+Alt+'")),
+                &item("Quick Export as PNG", Command::LayerQuickExportPng),
+                &item("Export As...", Command::LayerExportAs),
                 &sep(),
                 &item("Rename Layer...", Command::RenameLayer),
                 &todo_sub("Layer Style"),

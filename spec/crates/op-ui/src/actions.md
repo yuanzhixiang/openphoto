@@ -22,6 +22,17 @@ Opening, creating, saving, reverting, exporting, and closing documents (includin
 
 `export_dialog` (File › Export › Export As...): the system save dialog; the default file name is the document title without its extension plus `.png`, and PNG or JPEG can be chosen. What is exported is the composite of all visible layers; PNG keeps transparency, and JPEG fills transparent areas with white (details in `crates/op-io/src/lib.md`). On failure, `alert` shows "Could not export: reason", and no incomplete file is left behind.
 
+The other exports:
+
+- **`quick_export(layer)`** is File › Export › Quick Export as PNG (`layer` false) and Layer › Quick Export as PNG (true).
+  - It asks where with the save panel, because Photoshop's default Export Preferences say "Ask where to export each time". The panel offers PNG only and suggests the title (or the layer's name) plus `.png`.
+  - It writes a PNG with `AppState::export_options` (`write_export`). A path without an extension gets `.png`.
+- **`export_layer_dialog`** is Layer › Export As...: the same for the active layer, offering PNG or JPEG.
+- **`layer_alone(doc)`** builds the active layer as a document of its own, used by both layer exports:
+  - It takes the layer, made visible and top-level, or a group with its layers, composited alone (`composite_layers_rgba8`), so the layer's opacity and blend apply over transparency.
+  - The result is trimmed to the pixels that aren't fully transparent and titled with the layer's name.
+  - A layer without such pixels gives None, and nothing is exported.
+
 ## Close
 
 - Close: closes the current document; Close All: closes all documents; Close Others: closes all documents except the current one; the "×" on a tab closes that document.

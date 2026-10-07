@@ -21,6 +21,9 @@ Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's men
 | Revert | File › Revert | F12 |
 | Quit | OpenPhoto › Quit OpenPhoto | ⌘Q |
 | ExportAs | File › Export › Export As... | ⌥⇧⌘W |
+| QuickExportPng | File › Export › Quick Export as PNG | None |
+| LayerQuickExportPng | Layer › Quick Export as PNG | ⇧⌘' |
+| LayerExportAs | Layer › Export As... | ⌥⇧⌘' |
 | Undo | Edit › Undo | ⌘Z |
 | Redo | Edit › Redo | ⇧⌘Z |
 | ToggleLastState | Edit › Toggle Last State | ⌥⌘Z |

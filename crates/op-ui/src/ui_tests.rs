@@ -1245,6 +1245,42 @@ fn saving_reverting_and_closing_with_unsaved_changes() {
 }
 
 #[test]
+fn layer_exports_are_the_layer_alone_trimmed() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    crate::panels::new_layer(h.state_mut().state.active().unwrap());
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    select_rect(&mut h, 100.0, 100.0, 140.0, 130.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.run_steps(2);
+    let alone = crate::actions::layer_alone(&active(&h).doc).expect("pixels");
+    assert_eq!((alone.width, alone.height), (40, 30));
+    assert_eq!(alone.title, "Layer 1");
+    assert!(
+        alone
+            .composite_rgba8()
+            .chunks(4)
+            .all(|p| p == [255, 0, 0, 255])
+    );
+    // Written as a PNG
+    let path = std::env::temp_dir().join(format!("openphoto-layer-{}", std::process::id()));
+    crate::actions::write_export(&alone, &path, &Default::default()).unwrap();
+    let png = path.with_extension("png");
+    assert_eq!(
+        image::open(&png).unwrap().into_rgba8().dimensions(),
+        (40, 30)
+    );
+    std::fs::remove_file(png).ok();
+    // An empty layer has nothing to export
+    crate::panels::new_layer(h.state_mut().state.active().unwrap());
+    assert!(crate::actions::layer_alone(&active(&h).doc).is_none());
+    // The commands are on with a document
+    assert!(crate::commands::Command::LayerQuickExportPng.enabled(&h.state().state));
+    assert!(crate::commands::Command::QuickExportPng.enabled(&h.state().state));
+}
+
+#[test]
 fn jpeg_and_png_saves_ask_for_their_options() {
     use crate::theme::pt;
     use egui_kittest::kittest::Queryable;
