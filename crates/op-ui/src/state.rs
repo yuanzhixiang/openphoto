@@ -1595,6 +1595,11 @@ pub struct AppState {
     /// come to the window's right (left) side.
     pub reveal_panels: bool,
     pub reveal_tools: bool,
+    /// The panel column collapsed to icons (its » button).
+    pub panels_collapsed: bool,
+    /// Window › Workspace › Reset Essentials asked for (lib.rs puts the
+    /// panels back).
+    pub reset_workspace: bool,
     /// The Histogram panel: Expanded View, and the channel it shows (0
     /// luminosity, 1–3 red, green, blue, 4 RGB, 5 Colors).
     pub histogram_expanded: bool,
@@ -1804,6 +1809,8 @@ impl Default for AppState {
             hide_panels: false,
             reveal_panels: false,
             reveal_tools: false,
+            panels_collapsed: false,
+            reset_workspace: false,
             histogram_expanded: false,
             histogram_channel: 0,
             info_options: Default::default(),

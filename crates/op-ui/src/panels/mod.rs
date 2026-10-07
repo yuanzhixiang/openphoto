@@ -72,6 +72,13 @@ pub struct Panels {
     /// remaining space.
     heights: Vec<f32>,
     flex: usize,
+    /// Panels dragged out of the column by their tab: each floats on its
+    /// own, at its top-left corner.
+    pub floating: Vec<(PanelKind, Pos2)>,
+    /// The groups' tab bars this frame, where a floating panel docks.
+    bars: Vec<(usize, Rect)>,
+    /// With the column collapsed to icons: the panel open beside them.
+    pub flyout: Option<PanelKind>,
 }
 
 impl Default for Panels {
@@ -95,6 +102,9 @@ impl Default for Panels {
             // Photoshop 2026's default Essentials layout, measured
             heights: vec![pt(147.0), 0.0, pt(286.0)],
             flex: 1,
+            floating: Vec::new(),
+            bars: Vec::new(),
+            flyout: None,
         }
     }
 }
@@ -106,7 +116,11 @@ const MIN_GROUP: f32 = size::PANEL_TAB_BAR + 40.0;
 impl Panels {
     pub fn show(&mut self, ui: &mut Ui, app: &mut AppState) {
         ui.spacing_mut().item_spacing.y = 0.0;
-        crate::toolbar::header(ui, crate::toolbar::Collapse::Panels);
+        // The collapse bar's "»": the column collapses to icons
+        if crate::toolbar::header(ui, crate::toolbar::Collapse::Panels).clicked() {
+            app.panels_collapsed = true;
+        }
+        self.bars.clear();
 
         let area = ui.available_rect_before_wrap();
         let n = self.groups.len();
@@ -165,7 +179,14 @@ impl Panels {
     fn show_group(&mut self, ui: &mut Ui, index: usize, rect: Rect, app: &mut AppState) {
         let bar = Rect::from_min_size(rect.min, Vec2::new(rect.width(), size::PANEL_TAB_BAR));
         let body = Rect::from_min_max(Pos2::new(rect.left(), bar.bottom()), rect.max);
+        self.bars.push((index, bar));
+        let column_left = rect.left();
+        let mut torn = None;
         let group = &mut self.groups[index];
+        if group.tabs.is_empty() {
+            ui.painter().rect_filled(rect, 0, color::PANEL);
+            return;
+        }
 
         let painter = ui.painter_at(rect);
         painter.rect_filled(bar, 0, color::TAB_BAR);
@@ -191,9 +212,20 @@ impl Panels {
             let w = (galley.size().x + pt(19.0)).round();
             let tab_rect =
                 Rect::from_min_size(Pos2::new(x, tabs.top()), Vec2::new(w, tabs.height()));
-            let response = ui.interact(tab_rect, ui.id().with(("tab", index, i)), Sense::click());
-            if response.clicked() {
+            let response = ui.interact(
+                tab_rect,
+                ui.id().with(("tab", index, i)),
+                Sense::click_and_drag(),
+            );
+            if response.clicked() || response.drag_started() {
                 group.active = i;
+            }
+            // Dragged out of the column, the panel floats where it's let go
+            if response.drag_stopped()
+                && let Some(p) = response.interact_pointer_pos()
+                && p.x < column_left - pt(30.0)
+            {
+                torn = Some((i, p));
             }
             let active = group.active == i;
             if active {
@@ -242,16 +274,198 @@ impl Panels {
                 .id_salt(("panel-body", index)),
         );
         child.set_clip_rect(body);
-        match kind {
-            PanelKind::Color => color_panel::show(&mut child, app),
-            PanelKind::Swatches => color_panel::swatches(&mut child, app),
-            PanelKind::Properties => properties::show(&mut child, app),
-            PanelKind::Layers => layers::show(&mut child, app),
-            PanelKind::Gradients => presets::gradients(&mut child, app),
-            PanelKind::Channels => channels::show(&mut child, app),
-            PanelKind::Patterns => presets::patterns(&mut child, app),
-            other => placeholder(&mut child, other),
+        show_kind(&mut child, kind, app);
+        if let Some((i, p)) = torn {
+            let kind = group.tabs.remove(i);
+            group.active = group.active.min(group.tabs.len().saturating_sub(1));
+            self.floating
+                .push((kind, p - Vec2::new(pt(45.0), pt(13.0))));
         }
+    }
+
+    /// The panels dragged out of the column: each in its own frame with a
+    /// tab header, dragged by it; let go over a group's tab bar, it docks
+    /// there; its × docks it back into the first group.
+    pub fn show_floating(&mut self, ctx: &egui::Context, app: &mut AppState) {
+        let size = Vec2::new(size::PANEL_COLUMN, pt(300.0));
+        let mut dock: Option<(usize, usize)> = None;
+        for k in 0..self.floating.len() {
+            let (kind, pos) = self.floating[k];
+            let mut moved = Vec2::ZERO;
+            let mut dropped = None;
+            let mut close = false;
+            egui::Area::new(egui::Id::new(("docked-floating", kind.title())))
+                .fixed_pos(pos)
+                .order(egui::Order::Foreground)
+                .show(ctx, |ui| {
+                    let rect = Rect::from_min_size(pos, size);
+                    let bar = Rect::from_min_size(pos, Vec2::new(size.x, size::PANEL_TAB_BAR));
+                    let painter = ui.painter();
+                    painter.rect_filled(rect, 0, color::PANEL);
+                    painter.rect_filled(bar, 0, color::TAB_BAR);
+                    let header = ui.interact(
+                        bar,
+                        ui.id().with(("float-header", k)),
+                        Sense::click_and_drag(),
+                    );
+                    moved = header.drag_delta();
+                    if header.drag_stopped() {
+                        dropped = header.interact_pointer_pos();
+                    }
+                    painter.text(
+                        bar.left_center() + Vec2::new(pt(9.0), 0.0),
+                        Align2::LEFT_CENTER,
+                        kind.title(),
+                        theme::semibold(theme::font::BODY),
+                        color::TAB_TEXT_ACTIVE,
+                    );
+                    let x = Rect::from_center_size(
+                        bar.right_center() - Vec2::new(pt(14.0), 0.0),
+                        Vec2::splat(pt(18.0)),
+                    );
+                    let close_r = ui.interact(x, ui.id().with(("float-close", k)), Sense::click());
+                    painter.text(
+                        x.center(),
+                        Align2::CENTER_CENTER,
+                        crate::icons::X,
+                        theme::icon(pt(12.0)),
+                        if close_r.hovered() {
+                            color::TEXT
+                        } else {
+                            color::TEXT_DIM
+                        },
+                    );
+                    close = close_r.clicked();
+                    let body = Rect::from_min_max(Pos2::new(rect.left(), bar.bottom()), rect.max);
+                    let mut child =
+                        ui.new_child(UiBuilder::new().max_rect(body).id_salt(("float-body", k)));
+                    child.set_clip_rect(body);
+                    show_kind(&mut child, kind, app);
+                });
+            self.floating[k].1 += moved;
+            if close {
+                dock = Some((k, 0));
+            } else if let Some(p) = dropped
+                && let Some((g, _)) = self.bars.iter().find(|(_, r)| r.contains(p))
+            {
+                dock = Some((k, *g));
+            }
+        }
+        if let Some((k, g)) = dock {
+            let (kind, _) = self.floating.remove(k);
+            if let Some(group) = self.groups.get_mut(g) {
+                group.tabs.push(kind);
+                group.active = group.tabs.len() - 1;
+            }
+        }
+    }
+
+    /// The icon column, with the panels' buttons when the column is
+    /// collapsed to icons (a click opens that panel beside them).
+    pub fn icon_strip(&mut self, ui: &mut Ui, app: &mut AppState) -> Rect {
+        let (history, expand) = icon_strip(ui, app);
+        if expand {
+            app.panels_collapsed = false;
+            self.flyout = None;
+        }
+        if app.panels_collapsed {
+            let content = ui.max_rect().shrink2(Vec2::new(pt(3.0), 0.0));
+            let mut y = content.top() + pt(90.0);
+            for g in &self.groups {
+                for &kind in &g.tabs {
+                    let rect = Rect::from_min_size(
+                        Pos2::new(content.left() + pt(2.0), y),
+                        Vec2::new(content.width() - pt(4.0), pt(24.0)),
+                    );
+                    let r = ui.interact(
+                        rect,
+                        ui.id().with(("strip-panel", kind.title())),
+                        Sense::click(),
+                    );
+                    let on = self.flyout == Some(kind);
+                    if on {
+                        ui.painter().rect_filled(rect, 4, color::TOOL_ACTIVE);
+                    } else if r.hovered() {
+                        ui.painter().rect_filled(rect, 4, color::HOVER);
+                    }
+                    // (the panel's initials, where Photoshop draws its icon)
+                    let short: String = kind.title().chars().take(2).collect();
+                    ui.painter().text(
+                        rect.center(),
+                        Align2::CENTER_CENTER,
+                        short,
+                        theme::small(),
+                        color::TEXT,
+                    );
+                    let r = r.on_hover_text(kind.title());
+                    if r.clicked() {
+                        self.flyout = if on { None } else { Some(kind) };
+                    }
+                    y += pt(26.0);
+                }
+                y += pt(6.0);
+            }
+        }
+        history
+    }
+
+    /// The flyout of a collapsed panel, to the left of the icon column; a
+    /// click elsewhere closes it.
+    pub fn show_flyout(&mut self, ctx: &egui::Context, app: &mut AppState, strip: Rect) {
+        let Some(kind) = self.flyout.filter(|_| app.panels_collapsed) else {
+            self.flyout = None;
+            return;
+        };
+        let size = Vec2::new(size::PANEL_COLUMN, pt(320.0));
+        let pos = Pos2::new(strip.left() - size.x, strip.top() + pt(16.0));
+        let rect = Rect::from_min_size(pos, size);
+        egui::Area::new(egui::Id::new("panel-flyout"))
+            .fixed_pos(pos)
+            .order(egui::Order::Foreground)
+            .show(ctx, |ui| {
+                ui.interact(rect, ui.id().with("flyout-back"), Sense::click_and_drag());
+                let bar = Rect::from_min_size(pos, Vec2::new(size.x, size::PANEL_TAB_BAR));
+                ui.painter().rect_filled(rect, 0, color::PANEL);
+                ui.painter().rect_filled(bar, 0, color::TAB_BAR);
+                ui.painter().text(
+                    bar.left_center() + Vec2::new(pt(9.0), 0.0),
+                    Align2::LEFT_CENTER,
+                    kind.title(),
+                    theme::semibold(theme::font::BODY),
+                    color::TAB_TEXT_ACTIVE,
+                );
+                let body = Rect::from_min_max(Pos2::new(rect.left(), bar.bottom()), rect.max);
+                let mut child =
+                    ui.new_child(UiBuilder::new().max_rect(body).id_salt("flyout-body"));
+                child.set_clip_rect(body);
+                show_kind(&mut child, kind, app);
+            });
+        let pressed = ctx.input(|i| {
+            i.pointer
+                .primary_pressed()
+                .then(|| i.pointer.interact_pos())
+                .flatten()
+        });
+        if let Some(p) = pressed
+            && !rect.contains(p)
+            && !strip.contains(p)
+        {
+            self.flyout = None;
+        }
+    }
+}
+
+/// A docked panel's contents in `ui`.
+fn show_kind(ui: &mut Ui, kind: PanelKind, app: &mut AppState) {
+    match kind {
+        PanelKind::Color => color_panel::show(ui, app),
+        PanelKind::Swatches => color_panel::swatches(ui, app),
+        PanelKind::Properties => properties::show(ui, app),
+        PanelKind::Layers => layers::show(ui, app),
+        PanelKind::Gradients => presets::gradients(ui, app),
+        PanelKind::Channels => channels::show(ui, app),
+        PanelKind::Patterns => presets::patterns(ui, app),
+        other => placeholder(ui, other),
     }
 }
 
@@ -267,7 +481,7 @@ fn placeholder(ui: &mut Ui, kind: PanelKind) {
 
 /// The icon column between the canvas and the panels (collapsed History, Comments, ...).
 /// Returns the rect of the History button, which the History popout is anchored to.
-pub fn icon_strip(ui: &mut Ui, app: &mut AppState) -> Rect {
+fn icon_strip(ui: &mut Ui, app: &mut AppState) -> (Rect, bool) {
     use crate::theme::pt;
     // Photoshop: a 3 pt divider on each side (next to the document's
     // scrollbar and next to the panels), each a light line between two
@@ -293,7 +507,8 @@ pub fn icon_strip(ui: &mut Ui, app: &mut AppState) -> Rect {
     let mut inner = ui.new_child(egui::UiBuilder::new().max_rect(content));
     let ui = &mut inner;
     ui.spacing_mut().item_spacing.y = 0.0;
-    crate::toolbar::header(ui, crate::toolbar::Collapse::IconStrip);
+    // The collapse bar's "«": the collapsed column opens again
+    let expand = crate::toolbar::header(ui, crate::toolbar::Collapse::IconStrip).clicked();
     // Below the collapse bar, at Photoshop 2026's positions: a drag grip,
     // the History and Comments buttons, and a line under them
     let top = full.top();
@@ -340,5 +555,5 @@ pub fn icon_strip(ui: &mut Ui, app: &mut AppState) -> Rect {
         0,
         color::DIVIDER_DARK,
     );
-    history.rect
+    (history.rect, expand)
 }

@@ -582,7 +582,7 @@ impl OpenPhotoApp {
                     let column =
                         egui::Rect::from_min_max(egui::pos2(strip.right(), rect.top()), rect.max);
                     ui.scope_builder(egui::UiBuilder::new().max_rect(strip), |ui| {
-                        panels::icon_strip(ui, &mut self.state)
+                        self.panels.icon_strip(ui, &mut self.state)
                     });
                     ui.scope_builder(egui::UiBuilder::new().max_rect(column), |ui| {
                         self.panels.show(ui, &mut self.state)
@@ -1184,21 +1184,33 @@ impl eframe::App for OpenPhotoApp {
                 .frame(bar_frame)
                 .show(ui, |ui| toolbar::show(ui, &mut self.state));
         }
+        // Window › Workspace › Reset Essentials: the default panels
+        if std::mem::take(&mut self.state.reset_workspace) {
+            self.panels = panels::Panels::default();
+            self.state.panels_collapsed = false;
+            self.state.floating = Default::default();
+            self.state.hide_panels = false;
+            self.state.hide_tools = false;
+        }
         let (strip_rect, history_button) = if hide_panels {
             (egui::Rect::NOTHING, egui::Rect::NOTHING)
         } else {
-            egui::Panel::right("panels")
-                .show_separator_line(false)
-                .exact_size(size::PANEL_COLUMN)
-                .resizable(false)
-                .frame(bar_frame)
-                .show(ui, |ui| self.panels.show(ui, &mut self.state));
+            // Collapsed to icons, the column gives way to the icon strip's
+            // panel buttons
+            if !self.state.panels_collapsed {
+                egui::Panel::right("panels")
+                    .show_separator_line(false)
+                    .exact_size(size::PANEL_COLUMN)
+                    .resizable(false)
+                    .frame(bar_frame)
+                    .show(ui, |ui| self.panels.show(ui, &mut self.state));
+            }
             let strip = egui::Panel::right("icon-strip")
                 .show_separator_line(false)
                 .exact_size(size::ICON_STRIP)
                 .resizable(false)
                 .frame(bar_frame)
-                .show(ui, |ui| panels::icon_strip(ui, &mut self.state));
+                .show(ui, |ui| self.panels.icon_strip(ui, &mut self.state));
             (strip.response.rect, strip.inner)
         };
 
@@ -1243,6 +1255,8 @@ impl eframe::App for OpenPhotoApp {
                 self.history_popout(&ctx, strip_rect, history_button);
             }
             panels::floating::show(&ctx, &mut self.state, strip_rect.left(), strip_rect.top());
+            self.panels.show_floating(&ctx, &mut self.state);
+            self.panels.show_flyout(&ctx, &mut self.state, strip_rect);
         }
         self.reveal_hidden(&ctx, hide_tools, hide_panels);
 

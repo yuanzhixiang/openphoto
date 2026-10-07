@@ -283,6 +283,8 @@ const ALL_COMMANDS: &[Command] = &[
     Command::ToggleBrushSettings,
     Command::ToggleToolPresets,
     Command::ToggleLayerComps,
+    Command::WorkspaceEssentials,
+    Command::ResetWorkspace,
     Command::Align(Align::Top),
     Command::Align(Align::VerticalCenter),
     Command::Align(Align::Bottom),
@@ -1165,7 +1167,27 @@ impl NativeMenu {
             true,
             &[
                 &todo_sub("Arrange") as &dyn IsMenuItem,
-                &todo_sub("Workspace"),
+                &Submenu::with_items(
+                    "Workspace",
+                    true,
+                    &[
+                        &check_item("Essentials (Default)", Command::WorkspaceEssentials)
+                            as &dyn IsMenuItem,
+                        &sep(),
+                        &todo("3D", None),
+                        &todo("Graphic and Web", None),
+                        &todo("Motion", None),
+                        &todo("Painting", None),
+                        &todo("Photography", None),
+                        &sep(),
+                        &item("Reset Essentials", Command::ResetWorkspace),
+                        &todo("New Workspace...", None),
+                        &todo("Delete Workspace...", None),
+                        &todo("Keyboard Shortcuts & Menus...", None),
+                        &todo("Lock Workspace", None),
+                    ],
+                )
+                .expect("static menu definition is valid"),
                 &sep(),
                 &todo("Actions", Some("Alt+F9")),
                 &todo("Adjustments", None),

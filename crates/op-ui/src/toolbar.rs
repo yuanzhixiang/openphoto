@@ -290,11 +290,11 @@ pub const COLLAPSE_BAR: f32 = crate::theme::pt(13.0);
 
 /// The collapse bar: `#424242` between two `#383838` lines, with the
 /// chevrons Photoshop draws in it.
-pub fn header(ui: &mut Ui, kind: Collapse) {
+pub fn header(ui: &mut Ui, kind: Collapse) -> egui::Response {
     use crate::theme::pt;
-    let (rect, _) = ui.allocate_exact_size(
+    let (rect, response) = ui.allocate_exact_size(
         Vec2::new(ui.available_width(), COLLAPSE_BAR),
-        Sense::hover(),
+        Sense::click(),
     );
     let painter = ui.painter();
     painter.rect_filled(rect, 0, color::DIVIDER_DARK);
@@ -324,6 +324,7 @@ pub fn header(ui: &mut Ui, kind: Collapse) {
         color::COLLAPSE_CHEVRON,
         color::COLLAPSE_BAR,
     );
+    response
 }
 
 /// The toolbar's drag grip under the collapse bar: ten 1 × 4 pt dashes.

@@ -6796,6 +6796,55 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn panels_collapse_float_dock_and_reset() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // The column's » collapses it to icons; a panel's button opens it
+    // beside them, a click elsewhere closes it, and « opens the column
+    click(&mut h, at_pt(1338.0, 68.0));
+    assert!(h.state().state.panels_collapsed);
+    h.run_steps(2);
+    shot(&mut h, "panels_collapsed");
+    // (the first panel button: Color, 90 pt down the strip)
+    click(&mut h, at_pt(1350.0 - 21.5, 63.0 + 90.0 + 12.0));
+    assert_eq!(
+        h.state().panels.flyout,
+        Some(crate::panels::PanelKind::Color)
+    );
+    click(&mut h, at_pt(400.0, 400.0));
+    assert_eq!(h.state().panels.flyout, None);
+    click(&mut h, at_pt(1350.0 - 12.0, 68.0));
+    assert!(!h.state().state.panels_collapsed);
+    h.run_steps(2);
+    // The Swatches tab dragged out floats; dragged back by its header onto
+    // the first group's tab bar, it docks again
+    drag(
+        &mut h,
+        at_pt(1107.0, 87.0),
+        at_pt(600.0, 300.0),
+        Modifiers::NONE,
+    );
+    assert_eq!(h.state().panels.floating.len(), 1);
+    shot(&mut h, "panel_floating");
+    let (_, pos) = h.state().panels.floating[0];
+    let header = pos + egui::vec2(crate::theme::pt(120.0), crate::theme::pt(12.0));
+    drag(&mut h, header, at_pt(1180.0, 87.0), Modifiers::NONE);
+    assert!(h.state().panels.floating.is_empty());
+    // Tear it off again; Reset Essentials puts everything back
+    drag(
+        &mut h,
+        at_pt(1107.0, 87.0),
+        at_pt(600.0, 300.0),
+        Modifiers::NONE,
+    );
+    assert_eq!(h.state().panels.floating.len(), 1);
+    run_command(&mut h, Command::ResetWorkspace);
+    h.run_steps(2);
+    assert!(h.state().panels.floating.is_empty());
+}
+
+#[test]
 fn layer_comps_record_and_apply() {
     use crate::commands::Command;
     use egui_kittest::kittest::Queryable;

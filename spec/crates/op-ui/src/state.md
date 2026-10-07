@@ -38,6 +38,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `DocState::layer_comps` / `comp_applied` / `last_document_state` and `AppState::new_layer_comp`: layer comps (`panels/layer_comps.md`).
 - `tool_presets`, `tool_presets_current_only`, `new_tool_preset`: tool presets (`tool_presets.md`), the Tool Presets panel's Current Tool Only, and the New Tool Preset dialog while open (counted by `modal_open`).
 - `info_options`, `navigator_box`, `panel_options`: Info Panel Options, the Navigator's view box color, and the Panel Options dialog while open (`panels/panel_options.md`).
+- `panels_collapsed`, `reset_workspace`: the panel column collapsed to icons, and Reset Essentials asked for (`panels/mod.md`).
 - `reveal_panels`, `reveal_tools`: hidden panels or tools shown for the moment at the window's sides (`lib.md`).
 - `DocState::measure`: the Move tool's ⌘-hover distance labels (`smart_guides.md`).
 - `DocState::selected_guides` / `guide_selection()`: the guides selected with the Move tool. `ViewOptions::canvas_guides`: View › Show › Canvas Guides.
