@@ -64,3 +64,7 @@ Clicking it pops up Size (1–5000 px, logarithmic scale) and Hardness (not on t
 ## Magnetic Lasso
 
 `magnetic_options` reads the Magnetic Lasso's Width (pixels, 1–256, default 10), Contrast (1–100%, default 10%) and Frequency (0–100, default 57) for `document_view.rs`.
+
+## Quick Selection and Object Selection
+
+`quick_options` reads the Quick Selection tool's mode (0 New, 1 Add, 2 Subtract), brush diameter (`quick.size`, default 30), Sample All Layers and Enhance Edge; `object_options` reads the Object Selection tool's Sample All Layers and Hard Edge (default on).

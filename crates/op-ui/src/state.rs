@@ -71,6 +71,11 @@ pub struct DocState {
     pub patch_drag: Option<(egui::Pos2, egui::Pos2)>,
     /// The Magnetic Lasso under way (its outline is `lasso`).
     pub magnetic: Option<MagneticPath>,
+    /// A Quick Selection stroke under way.
+    pub quick: Option<QuickStroke>,
+    /// The Object Selection tool's rectangle being dragged (document
+    /// pixels).
+    pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
     /// A guide being dragged.
     pub guide_drag: Option<GuideDrag>,
     /// Where the pointer is over the document (document pixels), for the
@@ -177,6 +182,8 @@ impl DocState {
             lasso: None,
             patch_drag: None,
             magnetic: None,
+            quick: None,
+            object_drag: None,
             free_transform: None,
             crop: None,
             guide_drag: None,
@@ -878,6 +885,15 @@ pub struct MagneticPath {
     pub edges: Arc<op_core::magnetic::EdgeMap>,
     pub anchors: Vec<usize>,
     pub fixed: usize,
+}
+
+/// A Quick Selection stroke: the region it grows, the selection it
+/// started from and how it combines with it, and where its last dab was.
+pub struct QuickStroke {
+    pub select: op_core::smart_select::QuickSelect,
+    pub base: Option<op_core::Selection>,
+    pub op: op_core::SelectionOp,
+    pub last: egui::Pos2,
 }
 
 /// Eyedropper options.

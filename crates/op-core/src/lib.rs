@@ -24,6 +24,7 @@ pub mod paint;
 pub mod pixel;
 pub mod selection;
 pub mod shape;
+pub mod smart_select;
 pub mod text;
 pub mod tile;
 pub mod transform;

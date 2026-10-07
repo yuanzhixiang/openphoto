@@ -5303,7 +5303,9 @@ fn magnetic_lasso_follows_edges() {
         }
         doc.mark_dirty();
     }
-    h.state_mut().state.select_tool(op_tools::Tool::MagneticLasso);
+    h.state_mut()
+        .state
+        .select_tool(op_tools::Tool::MagneticLasso);
     h.run_steps(1);
     // Start a few pixels off the edge, then go round with the pointer a
     // little off the edges too; click at the corners
@@ -5332,9 +5334,59 @@ fn magnetic_lasso_follows_edges() {
     h.run_steps(2);
     h.key_press(egui::Key::Enter);
     h.run_steps(2);
-    let (x0, y0, x1, y1) = active(&h).doc.selection().and_then(|s| s.bounds()).expect("a selection");
+    let (x0, y0, x1, y1) = active(&h)
+        .doc
+        .selection()
+        .and_then(|s| s.bounds())
+        .expect("a selection");
     for (got, want) in [(x0, 200), (y0, 200), (x1, 400), (y1, 400)] {
         assert!(got.abs_diff(want) <= 3, "{:?}", (x0, y0, x1, y1));
     }
     assert_eq!(last_history(&h), "Magnetic Lasso");
+}
+
+#[test]
+fn quick_and_object_selection() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A red disc of radius 60 at (300, 300)
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.layers[0].id;
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 230..370u32 {
+            for x in 230..370u32 {
+                let (dx, dy) = (x as f32 + 0.5 - 300.0, y as f32 + 0.5 - 300.0);
+                if dx * dx + dy * dy < 3600.0 {
+                    image.set_pixel(x, y, [210, 40, 40, 255]);
+                }
+            }
+        }
+        doc.mark_dirty();
+    }
+    let bounds = |h: &Harness<'_, OpenPhotoApp>| active(h).doc.selection().and_then(|s| s.bounds());
+    let near = |b: (u32, u32, u32, u32)| {
+        b.0.abs_diff(240) <= 3 && b.1.abs_diff(240) <= 3 && b.2.abs_diff(360) <= 3 && b.3.abs_diff(360) <= 3
+    };
+    // Quick Selection: a short drag inside the disc selects all of it
+    h.state_mut().state.select_tool(Tool::QuickSelection);
+    h.run_steps(1);
+    let (a, b) = (doc_point(&h, 290.0, 300.0), doc_point(&h, 310.0, 300.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let got = bounds(&h).expect("a selection");
+    assert!(near(got), "{got:?}");
+    assert_eq!(last_history(&h), "Quick Selection");
+    // New turned into Add
+    assert_eq!(h.state().state.tool_settings.get("quick.mode").map(String::as_str), Some("1"));
+
+    // Object Selection around the disc finds it
+    run_command(&mut h, crate::commands::Command::Deselect);
+    h.state_mut().state.select_tool(Tool::ObjectSelection);
+    h.run_steps(1);
+    let (a, b) = (doc_point(&h, 200.0, 200.0), doc_point(&h, 400.0, 400.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let got = bounds(&h).expect("a selection");
+    assert!(near(got), "{got:?}");
+    assert_eq!(last_history(&h), "Object Selection");
 }

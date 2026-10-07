@@ -2343,3 +2343,24 @@ pub fn magnetic_options(app: &mut AppState) -> (u32, f32, f32) {
         .clamp(0.0, 100.0);
     (width as u32, contrast, frequency)
 }
+
+/// The Quick Selection tool's mode (0 New, 1 Add, 2 Subtract), brush
+/// diameter, Sample All Layers and Enhance Edge.
+pub fn quick_options(app: &mut AppState) -> (usize, f32, bool, bool) {
+    let mode = app.setting("quick.mode", "0").parse().unwrap_or(0);
+    let size = app.setting("quick.size", "30").parse().unwrap_or(30.0);
+    (
+        mode,
+        size,
+        flag(app, "quick.all_layers", false),
+        flag(app, "quick.enhance_edge", false),
+    )
+}
+
+/// The Object Selection tool's Sample All Layers and Hard Edge.
+pub fn object_options(app: &mut AppState) -> (bool, bool) {
+    (
+        flag(app, "object.all_layers", false),
+        flag(app, "object.hard_edge", true),
+    )
+}

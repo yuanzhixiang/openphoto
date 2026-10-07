@@ -162,6 +162,9 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let red_eye = crate::options_tools::red_eye_options(app);
     let heal = crate::options_tools::heal_options(app);
     let magnetic = crate::options_tools::magnetic_options(app);
+    let quick = crate::options_tools::quick_options(app);
+    let object = crate::options_tools::object_options(app);
+    let mut quick_switch_to_add = false;
     let sampling_ring = tool == Tool::Eyedropper && app.flag("eyedropper.ring", true);
     // The Zoom tool's Zoom Out button swaps what a click and Alt-click do
     let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
@@ -458,6 +461,13 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 );
                 lasso_input(ui, &response, state, tool, options, ppp);
             }
+            Tool::QuickSelection => {
+                quick_switch_to_add =
+                    quick_input(ui, &response, state, quick, app.marquee.feather, ppp);
+            }
+            Tool::ObjectSelection => {
+                object_input(ui, &response, state, app.marquee.mode, object, ppp);
+            }
             Tool::MagneticLasso => {
                 let options = (
                     app.marquee.mode,
@@ -555,6 +565,11 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
         }
     }
 
+    // Quick Selection's New turns into Add after the first stroke, as in
+    // Photoshop
+    if quick_switch_to_add {
+        *app.setting("quick.mode", "0") = "1".into();
+    }
     if let Some(message) = paint_error {
         app.alert = Some(message);
     }
@@ -1632,6 +1647,18 @@ fn draw_selection(
         }
     }
 
+    if let Some((a, b)) = state.object_drag {
+        let (a, b) = (to_screen(state, a, ppp), to_screen(state, b, ppp));
+        let r = Rect::from_two_pos(a, b);
+        for (p, q) in [
+            (r.left_top(), r.right_top()),
+            (r.right_top(), r.right_bottom()),
+            (r.right_bottom(), r.left_bottom()),
+            (r.left_bottom(), r.left_top()),
+        ] {
+            ants(p, q);
+        }
+    }
     if let Some(drag) = state.marquee_drag {
         let mods = ui.input(|i| i.modifiers);
         let r = marquee_rect(&drag, mods.shift, mods.alt);
@@ -2021,4 +2048,144 @@ fn patch_input(
         return;
     }
     lasso_input(ui, response, state, Tool::Lasso, lasso, ppp);
+}
+
+/// The pixels the Quick Selection and Object Selection tools look at: the
+/// merged image or the active layer.
+fn sampler(state: &mut DocState, all_layers: bool) -> Option<op_core::smart_select::Sampler> {
+    let (w, h) = (state.doc.width, state.doc.height);
+    let rgba = if all_layers {
+        state.canvas_image().pixels.clone()
+    } else {
+        let id = state.doc.active_layer?;
+        state.doc.layer(id)?.image()?.to_rgba8()
+    };
+    Some(op_core::smart_select::Sampler::new(w, h, &rgba))
+}
+
+/// The Quick Selection tool: drag to grow a selection from the colors
+/// under the brush (New, Add or Subtract; Shift adds, Alt subtracts).
+/// Returns whether its New mode should turn into Add (after a stroke).
+fn quick_input(
+    ui: &Ui,
+    response: &egui::Response,
+    state: &mut DocState,
+    (mode, size, all_layers, enhance): (usize, f32, bool, bool),
+    feather: f32,
+    ppp: f32,
+) -> bool {
+    use op_core::SelectionOp;
+    let pointer = ui
+        .input(|i| i.pointer.interact_pos())
+        .map(|p| to_doc(state, p, ppp));
+    let down = ui.input(|i| i.pointer.primary_down());
+    let radius = (size / 2.0).max(1.0);
+    if state.quick.is_none() && response.is_pointer_button_down_on() && down {
+        let Some(p) = pointer else {
+            return false;
+        };
+        let Some(sampler) = sampler(state, all_layers) else {
+            return false;
+        };
+        let mods = ui.input(|i| i.modifiers);
+        let base = state.doc.selection().cloned();
+        let op = if mods.alt || mode == 2 {
+            SelectionOp::Subtract
+        } else if mods.shift || mode == 1 {
+            SelectionOp::Add
+        } else {
+            SelectionOp::Replace
+        };
+        let mut select = op_core::smart_select::QuickSelect::new(sampler);
+        select.dab((p.x, p.y), radius);
+        state.quick = Some(crate::state::QuickStroke {
+            select,
+            base,
+            op,
+            last: p,
+        });
+    } else if let Some(stroke) = &mut state.quick
+        && down
+        && let Some(p) = pointer
+        && p.distance(stroke.last) >= radius / 2.0
+    {
+        stroke.select.dab((p.x, p.y), radius);
+        stroke.last = p;
+    }
+    let Some(stroke) = &state.quick else {
+        return false;
+    };
+    // The selection follows the stroke as it grows
+    let mut region = stroke.select.selection();
+    if enhance {
+        region = region.feather(1.0);
+    }
+    if feather > 0.0 {
+        region = region.feather(feather);
+    }
+    let combined = op_core::Selection::combine(stroke.base.as_ref(), region, stroke.op);
+    let replaced = stroke.op == SelectionOp::Replace;
+    state.doc.set_selection(Some(combined));
+    if down {
+        ui.ctx().request_repaint();
+        return false;
+    }
+    state.quick = None;
+    state.record("Quick Selection");
+    replaced && mode == 0
+}
+
+/// The Object Selection tool: drag a rectangle around an object; the
+/// object found in it becomes the selection (combined by the bar's mode
+/// and Shift/Alt).
+fn object_input(
+    ui: &Ui,
+    response: &egui::Response,
+    state: &mut DocState,
+    mode: crate::state::SelectionMode,
+    (all_layers, hard_edge): (bool, bool),
+    ppp: f32,
+) {
+    let pointer = ui
+        .input(|i| i.pointer.interact_pos())
+        .map(|p| to_doc(state, p, ppp));
+    if state.object_drag.is_none()
+        && response.drag_started_by(PointerButton::Primary)
+        && let Some(p) = ui.input(|i| i.pointer.press_origin())
+    {
+        let p = to_doc(state, p, ppp);
+        state.object_drag = Some((p, p));
+    }
+    let Some((a, _)) = state.object_drag else {
+        return;
+    };
+    if let Some(p) = pointer {
+        state.object_drag = Some((a, p));
+    }
+    if ui.input(|i| i.pointer.primary_down()) {
+        ui.ctx().request_repaint();
+        return;
+    }
+    let Some((a, b)) = state.object_drag.take() else {
+        return;
+    };
+    let (w, h) = (state.doc.width as f32, state.doc.height as f32);
+    let x0 = a.x.min(b.x).clamp(0.0, w) as u32;
+    let y0 = a.y.min(b.y).clamp(0.0, h) as u32;
+    let x1 = a.x.max(b.x).clamp(0.0, w) as u32;
+    let y1 = a.y.max(b.y).clamp(0.0, h) as u32;
+    let Some(sampler) = sampler(state, all_layers) else {
+        return;
+    };
+    let Some(mut region) = op_core::smart_select::object_in_rect(&sampler, (x0, y0, x1, y1)) else {
+        return;
+    };
+    if !hard_edge {
+        region = region.feather(1.0);
+    }
+    let mods = ui.input(|i| i.modifiers);
+    let (op, _, _) = selection_op(mods, state.doc.selection().is_some(), mode);
+    let combined = op_core::Selection::combine(state.doc.selection(), region, op);
+    state.doc.set_selection(Some(combined));
+    state.record("Object Selection");
 }
