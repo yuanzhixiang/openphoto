@@ -4933,7 +4933,10 @@ fn brush_modes_and_eraser_block() {
     let corner = (300.0 + half - 1.0) as u32;
     assert_eq!(composite_pixel(&mut h, corner, corner + 300)[0], 255);
     let outside = (300.0 + half + 2.0) as u32;
-    assert_eq!(composite_pixel(&mut h, outside, 600), [0x14, 0x14, 0x14, 255]);
+    assert_eq!(
+        composite_pixel(&mut h, outside, 600),
+        [0x14, 0x14, 0x14, 255]
+    );
 }
 
 #[test]
@@ -4957,7 +4960,10 @@ fn holding_a_toolbar_button_opens_its_flyout() {
     while h.ctx.input(|i| i.time) - start < 0.5 {
         h.step();
     }
-    assert!(!flyout_frame(&h.render().unwrap()).0.is_empty(), "open while held");
+    assert!(
+        !flyout_frame(&h.render().unwrap()).0.is_empty(),
+        "open while held"
+    );
     h.event(egui::Event::PointerButton {
         pos: p,
         button: egui::PointerButton::Primary,
@@ -4971,4 +4977,51 @@ fn holding_a_toolbar_button_opens_its_flyout() {
     click(&mut h, at_pt(80.0, 92.0 + 1.0 + 19.0 + 9.5));
     assert_eq!(h.state().state.tool, op_tools::Tool::Artboard);
     assert!(flyout_frame(&h.render().unwrap()).0.is_empty());
+}
+
+#[test]
+fn lasso_with_alt_draws_straight_edges() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.select_tool(op_tools::Tool::Lasso);
+    h.run_steps(2);
+    let press = |h: &mut Harness<'_, OpenPhotoApp>, p: Pos2, down: bool, m: Modifiers| {
+        h.event(egui::Event::PointerButton {
+            pos: p,
+            button: egui::PointerButton::Primary,
+            pressed: down,
+            modifiers: m,
+        });
+        h.step();
+    };
+    // Drag freehand from (100, 100) to (300, 100)
+    let (a, b) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 300.0, 100.0));
+    h.hover_at(a);
+    press(&mut h, a, true, Modifiers::NONE);
+    for i in 1..=4 {
+        h.event(egui::Event::PointerMoved(a + (b - a) * (i as f32 / 4.0)));
+        h.step();
+    }
+    // Let go with Alt held: no selection yet
+    h.event(egui::Event::ModifiersChanged(Modifiers::ALT));
+    press(&mut h, b, false, Modifiers::ALT);
+    h.run_steps(2);
+    assert!(active(&h).doc.selection().is_none());
+    assert!(active(&h).lasso.as_ref().is_some_and(|l| l.held));
+    // Alt-click a corner at (300, 400), then release Alt to close
+    let c = doc_point(&h, 300.0, 400.0);
+    h.event(egui::Event::PointerMoved(c));
+    h.step();
+    press(&mut h, c, true, Modifiers::ALT);
+    press(&mut h, c, false, Modifiers::ALT);
+    h.event(egui::Event::ModifiersChanged(Modifiers::NONE));
+    h.run_steps(3);
+    let bounds = active(&h).doc.selection().and_then(|s| s.bounds());
+    let (x0, y0, x1, y1) = bounds.expect("a selection");
+    assert!(
+        x0 <= 101 && y0 <= 101 && x1 >= 299 && y1 >= 399,
+        "{:?}",
+        bounds
+    );
+    assert_eq!(last_history(&h), "Lasso");
 }

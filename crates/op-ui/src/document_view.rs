@@ -803,7 +803,8 @@ fn lasso_input(
     let mut close = false;
 
     if tool == Tool::Lasso {
-        if response.drag_started_by(PointerButton::Primary)
+        if state.lasso.is_none()
+            && response.drag_started_by(PointerButton::Primary)
             && let Some(p) = ui.input(|i| i.pointer.press_origin())
         {
             let (op, _, _) = selection_op(mods, has_selection, mode);
@@ -811,20 +812,33 @@ fn lasso_input(
                 points: vec![to_doc(state, p, ppp)],
                 op,
                 polygonal: false,
+                held: false,
             });
         }
         if let Some(lasso) = &mut state.lasso {
-            if let Some(p) = pointer
-                && lasso
-                    .points
-                    .last()
-                    .is_none_or(|l| l.distance(p) * state.view.zoom >= ppp)
-            {
-                lasso.points.push(p);
-            }
-            if response.drag_stopped() || !ui.input(|i| i.pointer.primary_down()) {
-                close = true;
+            let down = ui.input(|i| i.pointer.primary_down());
+            if down {
+                // Dragging draws freehand (also between Alt-clicked corners)
+                if let Some(p) = pointer
+                    && lasso
+                        .points
+                        .last()
+                        .is_none_or(|l| l.distance(p) * state.view.zoom >= ppp)
+                {
+                    lasso.points.push(p);
+                }
+            } else if mods.alt {
+                // Let go with Alt: clicks add straight edges until Alt is up
+                lasso.held = true;
+                if response.clicked()
+                    && let Some(p) = pointer
+                {
+                    lasso.points.push(p);
+                }
             } else {
+                close = true;
+            }
+            if !close {
                 ui.ctx().request_repaint();
             }
         } else if response.clicked() && has_selection && !mods.shift && !mods.alt {
@@ -875,6 +889,7 @@ fn lasso_input(
                 points: vec![p],
                 op,
                 polygonal: true,
+                held: false,
             });
         }
     }
@@ -1410,7 +1425,7 @@ fn draw_selection(
             .map(|&p| to_screen(state, p, ppp))
             .collect();
         // The Polygonal Lasso's next edge follows the pointer
-        if lasso.polygonal
+        if (lasso.polygonal || lasso.held)
             && let Some(p) = ui.input(|i| i.pointer.hover_pos())
         {
             pts.push(p);

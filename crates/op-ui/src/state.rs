@@ -846,6 +846,9 @@ pub struct LassoPath {
     pub points: Vec<egui::Pos2>,
     pub op: op_core::SelectionOp,
     pub polygonal: bool,
+    /// The Lasso let go with Alt held: straight edges by clicking until
+    /// Alt is released (Photoshop's temporary Polygonal Lasso).
+    pub held: bool,
 }
 
 /// Eyedropper options.

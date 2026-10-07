@@ -417,8 +417,7 @@ fn flyout(button: &egui::Response, group: &[Tool], shown: Tool, app: &mut AppSta
     let held = button.is_pointer_button_down_on()
         && button.ctx.input(|i| {
             i.pointer.primary_down()
-                && i
-                    .pointer
+                && i.pointer
                     .press_start_time()
                     .is_some_and(|t| i.time - t >= HOLD_SECONDS)
         });
@@ -428,7 +427,10 @@ fn flyout(button: &egui::Response, group: &[Tool], shown: Tool, app: &mut AppSta
         button.ctx.data_mut(|d| d.insert_temp(held_id, true));
     }
     let released_hold = !button.is_pointer_button_down_on()
-        && button.ctx.data_mut(|d| d.remove_temp::<bool>(held_id)).unwrap_or(false);
+        && button
+            .ctx
+            .data_mut(|d| d.remove_temp::<bool>(held_id))
+            .unwrap_or(false);
     if button.is_pointer_button_down_on() && !held {
         // Wake up when the hold is long enough
         button
