@@ -1243,6 +1243,7 @@ mod tests {
                 diameter: 2.0,
                 hardness: 1.0,
                 aliased: false,
+                square: false,
             },
             crate::paint::StrokeKind::Paint([0, 0, 0]),
             1.0,

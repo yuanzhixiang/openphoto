@@ -24,9 +24,24 @@ pub struct BrushTip {
     pub hardness: f32,
     /// Pencil: no anti-aliasing, a pixel is fully in or out.
     pub aliased: bool,
+    /// A square tip (the Eraser's Block mode) instead of a round one.
+    pub square: bool,
 }
 
 impl BrushTip {
+    /// Coverage (0..1) at (`dx`, `dy`) from the dab's center.
+    fn coverage(&self, dx: f32, dy: f32) -> f32 {
+        if self.square {
+            let r = self.diameter / 2.0;
+            return if dx.abs() <= r && dy.abs() <= r {
+                1.0
+            } else {
+                0.0
+            };
+        }
+        self.alpha((dx * dx + dy * dy).sqrt())
+    }
+
     /// Coverage (0..1) at distance `d` from the dab's center.
     fn alpha(&self, d: f32) -> f32 {
         let r = self.diameter / 2.0;
@@ -76,6 +91,18 @@ impl ToneRange {
             Self::Highlights => v * v,
         }
     }
+}
+
+/// How the Brush and Pencil lay their color on the layer (their "Mode"):
+/// a blend mode with the layer's pixels as backdrop, Behind (only where
+/// the layer is transparent, as if painted under it) or Clear (erasing).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum PaintMode {
+    #[default]
+    Normal,
+    Blend(crate::layer::BlendMode),
+    Behind,
+    Clear,
 }
 
 /// What a stroke does to the pixels it covers.
@@ -152,6 +179,7 @@ pub struct Stroke {
     flow: f32,
     /// Paint the background color instead of erasing / keep alpha.
     preserve_alpha: bool,
+    mode: PaintMode,
     last: Option<(f32, f32)>,
     /// Distance travelled since the last dab.
     since_dab: f32,
@@ -216,9 +244,16 @@ impl Stroke {
             opacity: opacity.clamp(0.0, 1.0),
             flow: flow.clamp(0.0, 1.0),
             preserve_alpha: on_mask || layer.is_background || doc.transparency_locked(id),
+            mode: PaintMode::Normal,
             last: None,
             since_dab: 0.0,
         })
+    }
+
+    /// Paints in `mode` (the Brush's and Pencil's Mode).
+    pub fn with_mode(mut self, mode: PaintMode) -> Self {
+        self.mode = mode;
+        self
     }
 
     /// Distance between dabs: 25% of the diameter, Photoshop's default spacing.
@@ -277,7 +312,7 @@ impl Stroke {
         for y in y0..y1 {
             for x in x0..x1 {
                 let (px, py) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
-                let a = self.tip.alpha((px * px + py * py).sqrt());
+                let a = self.tip.coverage(px, py);
                 if a <= 0.0 {
                     continue;
                 }
@@ -295,6 +330,9 @@ impl Stroke {
                 let amount = *c * self.opacity * selected;
                 let base = self.base.pixel(x, y);
                 let px = match &self.kind {
+                    &StrokeKind::Paint(color) if self.mode != PaintMode::Normal => {
+                        paint_mode(base, amount, color, self.mode, self.preserve_alpha, (x, y))
+                    }
                     StrokeKind::Paint(_) | StrokeKind::Erase { .. } => {
                         apply(base, amount, &self.kind, self.preserve_alpha)
                     }
@@ -398,6 +436,52 @@ fn mix(base: [u8; 4], target: [u8; 4], amount: f32, preserve_alpha: bool) -> [u8
     out
 }
 
+/// One pixel of a Brush or Pencil stroke in a mode other than Normal.
+fn paint_mode(
+    base: [u8; 4],
+    amount: f32,
+    color: [u8; 3],
+    mode: PaintMode,
+    preserve_alpha: bool,
+    (x, y): (u32, u32),
+) -> [u8; 4] {
+    let f = |v: u8| v as f32 / 255.0;
+    let dst = [f(base[0]), f(base[1]), f(base[2]), f(base[3])];
+    let src = [f(color[0]), f(color[1]), f(color[2])];
+    let out = match mode {
+        PaintMode::Normal => {
+            crate::blend::composite(crate::BlendMode::Normal, dst, src, amount, x, y)
+        }
+        PaintMode::Blend(m) => crate::blend::composite(m, dst, src, amount, x, y),
+        // The layer over the color: only its transparent parts take paint
+        PaintMode::Behind => {
+            let under = [src[0], src[1], src[2], amount];
+            crate::blend::composite(
+                crate::BlendMode::Normal,
+                under,
+                [dst[0], dst[1], dst[2]],
+                dst[3],
+                x,
+                y,
+            )
+        }
+        PaintMode::Clear => [dst[0], dst[1], dst[2], dst[3] * (1.0 - amount)],
+    };
+    let to = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+    if preserve_alpha {
+        // The background and locked transparency keep their alpha (Clear
+        // and Behind change nothing there)
+        if matches!(mode, PaintMode::Clear | PaintMode::Behind) {
+            return base;
+        }
+        return [to(out[0]), to(out[1]), to(out[2]), base[3]];
+    }
+    if out[3] <= 0.0 {
+        return [0; 4];
+    }
+    [to(out[0]), to(out[1]), to(out[2]), to(out[3])]
+}
+
 /// One pixel of the stroke: the pre-stroke pixel `base` changed by `amount`
 /// (coverage × opacity × selection).
 fn apply(base: [u8; 4], amount: f32, kind: &StrokeKind, preserve_alpha: bool) -> [u8; 4] {
@@ -470,6 +554,7 @@ mod tests {
         diameter: 10.0,
         hardness: 1.0,
         aliased: false,
+        square: false,
     };
 
     #[test]
@@ -562,6 +647,7 @@ mod tests {
             diameter: 7.0,
             hardness: 1.0,
             aliased: true,
+            square: false,
         };
         let mut s = Stroke::begin(&doc, tip, StrokeKind::Paint([0, 0, 0]), 1.0, 1.0).unwrap();
         s.add_point(&mut doc, 20.0, 20.0);
@@ -691,5 +777,55 @@ mod tests {
         s.add_point(&mut doc, 20.5, 20.5);
         assert_eq!(pixel(&doc, id, 20, 20), [255, 0, 0, 255]);
         assert_eq!(pixel(&doc, id, 21, 20), [100, 100, 100, 255]);
+    }
+
+    #[test]
+    fn paint_modes_blend_with_the_layer() {
+        use crate::BlendMode;
+        let (mut doc, id) = doc_with_layer();
+        // A gray layer, then Multiply with half red
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 0..40 {
+            for x in 0..40 {
+                image.set_pixel(x, y, [128, 128, 128, 255]);
+            }
+        }
+        let mut s = Stroke::begin(&doc, HARD, StrokeKind::Paint([255, 0, 0]), 1.0, 1.0)
+            .unwrap()
+            .with_mode(PaintMode::Blend(BlendMode::Multiply));
+        s.add_point(&mut doc, 20.0, 20.0);
+        assert_eq!(pixel(&doc, id, 20, 20), [128, 0, 0, 255]);
+        // Behind paints only transparent pixels; Clear erases
+        let (mut doc, id) = doc_with_layer();
+        doc.layer_mut(id)
+            .unwrap()
+            .image_mut()
+            .unwrap()
+            .set_pixel(20, 20, [0, 0, 255, 255]);
+        let mut s = Stroke::begin(&doc, HARD, StrokeKind::Paint([255, 0, 0]), 1.0, 1.0)
+            .unwrap()
+            .with_mode(PaintMode::Behind);
+        s.add_point(&mut doc, 20.0, 20.0);
+        assert_eq!(pixel(&doc, id, 20, 20), [0, 0, 255, 255]);
+        assert_eq!(pixel(&doc, id, 21, 20), [255, 0, 0, 255]);
+        let mut s = Stroke::begin(&doc, HARD, StrokeKind::Paint([0, 255, 0]), 1.0, 1.0)
+            .unwrap()
+            .with_mode(PaintMode::Clear);
+        s.add_point(&mut doc, 20.0, 20.0);
+        assert_eq!(pixel(&doc, id, 20, 20)[3], 0);
+    }
+
+    #[test]
+    fn a_square_tip_covers_a_block() {
+        let (mut doc, id) = doc_with_layer();
+        let tip = BrushTip {
+            square: true,
+            ..HARD
+        };
+        let mut s = Stroke::begin(&doc, tip, StrokeKind::Paint([0, 0, 0]), 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 20.0, 20.0);
+        // The corner of the 10 px square is painted, unlike a round tip's
+        assert_eq!(pixel(&doc, id, 16, 16)[3], 255);
+        assert_eq!(pixel(&doc, id, 26, 20)[3], 0);
     }
 }

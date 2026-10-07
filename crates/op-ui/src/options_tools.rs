@@ -2146,3 +2146,39 @@ fn picker_key(tool: Tool) -> &'static str {
         _ => "brush.size",
     }
 }
+
+/// The Eraser's Mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EraserMode {
+    Brush,
+    Pencil,
+    Block,
+}
+
+pub fn eraser_mode(app: &mut AppState) -> EraserMode {
+    match choice(app, "eraser.mode") {
+        1 => EraserMode::Pencil,
+        2 => EraserMode::Block,
+        _ => EraserMode::Brush,
+    }
+}
+
+/// The Brush's or Pencil's Mode as chosen in its bar.
+pub fn paint_mode(app: &mut AppState, tool: Tool) -> op_core::paint::PaintMode {
+    use op_core::paint::PaintMode;
+    let key = match tool {
+        Tool::Brush => "brush.mode",
+        Tool::Pencil => "pencil.mode",
+        _ => return PaintMode::Normal,
+    };
+    match BLEND.get(choice(app, key)).copied() {
+        Some("Behind") => PaintMode::Behind,
+        Some("Clear") => PaintMode::Clear,
+        Some("Normal") | None => PaintMode::Normal,
+        Some(label) => op_core::BlendMode::GROUPS
+            .iter()
+            .flat_map(|g| g.iter())
+            .find(|m| m.label() == label)
+            .map_or(PaintMode::Normal, |m| PaintMode::Blend(*m)),
+    }
+}

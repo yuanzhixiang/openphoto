@@ -147,6 +147,9 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let move_options = app.move_options;
     let type_options = app.type_options;
     let crop_options = app.crop_options.clone();
+    // The Brush's and Pencil's Mode, and the Eraser's (Brush, Pencil, Block)
+    let paint_mode = crate::options_tools::paint_mode(app, tool);
+    let eraser_mode = crate::options_tools::eraser_mode(app);
     // The Zoom tool's Zoom Out button swaps what a click and Alt-click do
     let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
     let mut straightened = false;
@@ -446,6 +449,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         opts,
                         colors: (foreground, background),
                         retouch,
+                        mode: paint_mode,
+                        eraser_mode,
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
                 }
@@ -1146,6 +1151,8 @@ struct StrokeSettings {
     opts: crate::state::PaintOptions,
     colors: (op_core::Color, op_core::Color),
     retouch: crate::state::RetouchOptions,
+    mode: op_core::paint::PaintMode,
+    eraser_mode: crate::options_tools::EraserMode,
 }
 
 fn paint_input(
@@ -1160,7 +1167,11 @@ fn paint_input(
         opts,
         colors,
         retouch,
+        mode,
+        eraser_mode,
     } = settings;
+    use crate::options_tools::EraserMode;
+    let eraser = (tool == Tool::Eraser).then_some(eraser_mode);
     use op_core::paint::{BrushTip, Stroke};
     let pointer = ui
         .input(|i| i.pointer.interact_pos())
@@ -1168,10 +1179,17 @@ fn paint_input(
     let pressed = response.is_pointer_button_down_on() && ui.input(|i| i.pointer.primary_down());
 
     if pressed && state.stroke.is_none() {
+        // The Eraser's Block is a 16 screen-pixel square at full strength
+        let block = eraser == Some(EraserMode::Block);
         let tip = BrushTip {
-            diameter: opts.size,
+            diameter: if block {
+                16.0 / state.view.zoom.max(0.01)
+            } else {
+                opts.size
+            },
             hardness: opts.hardness,
-            aliased: tool == Tool::Pencil,
+            aliased: tool == Tool::Pencil || eraser == Some(EraserMode::Pencil),
+            square: block,
         };
         let just_pressed = ui.input(|i| i.pointer.primary_pressed());
         let start = ui
@@ -1186,10 +1204,17 @@ fn paint_input(
                 return (just_pressed && !message.is_empty()).then_some(message);
             }
         };
-        let flow = if tool == Tool::Pencil { 1.0 } else { opts.flow };
+        let hard = tool == Tool::Pencil || eraser.is_some_and(|m| m != EraserMode::Brush);
+        let flow = if hard { 1.0 } else { opts.flow };
+        let opacity = if block { 1.0 } else { opts.opacity };
         let (label, _) = stroke_names(tool);
-        match Stroke::begin(&state.doc, tip, kind, opts.opacity, flow) {
-            Ok(mut stroke) => {
+        match Stroke::begin(&state.doc, tip, kind, opacity, flow) {
+            Ok(stroke) => {
+                let mut stroke = if matches!(tool, Tool::Brush | Tool::Pencil) {
+                    stroke.with_mode(mode)
+                } else {
+                    stroke
+                };
                 let start = ui
                     .input(|i| i.pointer.press_origin())
                     .map(|p| to_doc(state, p, ppp));

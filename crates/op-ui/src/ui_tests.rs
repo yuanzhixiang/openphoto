@@ -4902,3 +4902,36 @@ fn new_document_dialog_presets_recent_and_saved() {
     assert!(h.state().state.new_document_dialog.is_none());
     assert_eq!(h.state().state.docs.len(), docs);
 }
+
+#[test]
+fn brush_modes_and_eraser_block() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    h.state_mut().state.select_tool(op_tools::Tool::Brush);
+    // Multiply (the fifth entry of the Mode menu: Normal, Dissolve, Behind,
+    // Clear, Darken, Multiply)
+    *h.state_mut().state.setting("brush.mode", "0") = "5".into();
+    h.run_steps(2);
+    let (a, b) = (doc_point(&h, 100.0, 300.0), doc_point(&h, 500.0, 300.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    // Red multiplied into the dark gray keeps only its red channel
+    assert_eq!(composite_pixel(&mut h, 300, 300), [0x14, 0, 0, 255]);
+
+    // The Eraser's Block: a hard square of 16 screen pixels, painting the
+    // background color (white) on the background layer
+    h.state_mut().state.background = Color::WHITE;
+    h.state_mut().state.select_tool(op_tools::Tool::Eraser);
+    *h.state_mut().state.setting("eraser.mode", "0") = "2".into();
+    h.run_steps(2);
+    let zoom = active(&h).view.zoom;
+    let p = doc_point(&h, 300.0, 600.0);
+    click(&mut h, p);
+    assert_eq!(composite_pixel(&mut h, 300, 600), [255, 255, 255, 255]);
+    // The square's corner is erased too; outside it isn't
+    let half = 8.0 / zoom;
+    let corner = (300.0 + half - 1.0) as u32;
+    assert_eq!(composite_pixel(&mut h, corner, corner + 300)[0], 255);
+    let outside = (300.0 + half + 2.0) as u32;
+    assert_eq!(composite_pixel(&mut h, outside, 600), [0x14, 0x14, 0x14, 255]);
+}
