@@ -798,6 +798,12 @@ pub struct Extra {
     pub lut_ids: std::collections::HashMap<usize, u32>,
     /// Displace's map, once chosen (after OK).
     pub displace_map: Option<u32>,
+    /// Levels' and Curves' Auto: the layer's pixels (`op_core::auto::samples`)
+    /// and the Auto Color Correction Options in use.
+    pub auto_samples: Vec<[u8; 3]>,
+    pub auto_options: op_core::auto::Options,
+    /// Options... was clicked: the app opens Auto Color Correction Options.
+    pub wants_auto_options: bool,
 }
 
 impl Extra {
@@ -962,6 +968,23 @@ impl AdjustDialog {
                 Kind::Curves => Some(Custom::Curves(Box::new(curves::Dialog::new([[0; 256]; 3])))),
                 _ => None,
             },
+        }
+    }
+
+    /// Options...: the Auto Color Correction Options to open with.
+    pub fn take_auto_options_request(&mut self) -> Option<op_core::auto::Options> {
+        std::mem::take(&mut self.extra.wants_auto_options).then_some(self.extra.auto_options)
+    }
+
+    /// Auto Color Correction Options' OK: the options take effect at once
+    /// (Auto runs with them).
+    pub fn set_auto_options(&mut self, options: op_core::auto::Options) {
+        self.extra.auto_options = options;
+        let channels = op_core::auto::compute(&self.extra.auto_samples, &options);
+        match &mut self.custom {
+            Some(Custom::Levels(d)) => d.auto(channels),
+            Some(Custom::Curves(d)) => d.auto(channels),
+            _ => {}
         }
     }
 
@@ -1602,8 +1625,28 @@ impl AdjustDialog {
             }
             Some(Custom::ColorBalance(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),
             Some(Custom::HueSaturation(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),
-            Some(Custom::Levels(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),
-            Some(Custom::Curves(d)) => d.ui(ui, frame, &mut self.preview),
+            Some(Custom::Levels(d)) => {
+                let pressed = d.ui(ui, frame, self.first_frame, &mut self.preview);
+                if std::mem::take(&mut d.wants_auto) {
+                    d.auto(op_core::auto::compute(
+                        &self.extra.auto_samples,
+                        &self.extra.auto_options,
+                    ));
+                }
+                self.extra.wants_auto_options |= std::mem::take(&mut d.wants_options);
+                pressed
+            }
+            Some(Custom::Curves(d)) => {
+                let pressed = d.ui(ui, frame, &mut self.preview);
+                if std::mem::take(&mut d.wants_auto) {
+                    d.auto(op_core::auto::compute(
+                        &self.extra.auto_samples,
+                        &self.extra.auto_options,
+                    ));
+                }
+                self.extra.wants_auto_options |= std::mem::take(&mut d.wants_options);
+                pressed
+            }
             Some(Custom::ChannelMixer(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),
             Some(Custom::SelectiveColor(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),
             Some(Custom::Vibrance(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),

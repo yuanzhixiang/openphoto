@@ -1,6 +1,7 @@
 //! Image > Adjustments applied to the active layer's pixels, limited to the
 //! selection.
 
+use crate::auto;
 use crate::document::Document;
 use crate::fill::FillError;
 
@@ -79,11 +80,12 @@ pub enum Adjustment {
         method: crate::gradient::Method,
     },
     /// Image > Auto Tone: each channel stretched to the full range,
-    /// ignoring the darkest and lightest 0.1%.
-    AutoTone,
+    /// ignoring the darkest and lightest 0.1% (the clipping and target
+    /// colors of Auto Color Correction Options).
+    AutoTone(crate::auto::Targets),
     /// Image > Auto Contrast: all channels stretched together, so colors
     /// keep their balance.
-    AutoContrast,
+    AutoContrast(crate::auto::Targets),
     /// Curves for the composite RGB channel and the red, green and blue
     /// channels: up to 16 (input, output) points each, the first
     /// `counts[c]` of `points[c]` used. Each channel's own curve applies
@@ -109,9 +111,9 @@ pub enum Adjustment {
         colors: [[i32; 4]; 9],
         absolute: bool,
     },
-    /// Image > Auto Color: here each channel stretched like Auto Tone
-    /// (Photoshop also neutralizes the midtones).
-    AutoColor,
+    /// Image > Auto Color: Find Dark & Light Colors with Snap Neutral
+    /// Midtones (`auto.rs`).
+    AutoColor(crate::auto::Targets),
     /// Replace Color: pixels near `color` (by Fuzziness, 0–200) get the
     /// hue (−180–180), saturation and lightness (−100–100) shift.
     ReplaceColor {
@@ -157,9 +159,9 @@ impl Adjustment {
             Self::Vibrance { .. } => "Vibrance",
             Self::PhotoFilter { .. } => "Photo Filter",
             Self::GradientMap { .. } => "Gradient Map",
-            Self::AutoTone => "Auto Tone",
-            Self::AutoContrast => "Auto Contrast",
-            Self::AutoColor => "Auto Color",
+            Self::AutoTone(_) => "Auto Tone",
+            Self::AutoContrast(_) => "Auto Contrast",
+            Self::AutoColor(_) => "Auto Color",
             Self::Curves { .. } | Self::CurveTables(_) => "Curves",
             Self::ChannelMixer { .. } => "Channel Mixer",
             Self::SelectiveColor { .. } => "Selective Color",
@@ -739,72 +741,6 @@ fn selective_color(px: [u8; 4], colors: &[[i32; 4]; 9], absolute: bool) -> [u8; 
     out
 }
 
-/// Auto Tone / Auto Contrast lookup tables: a channel's range without its
-/// darkest and lightest 0.1% stretched to 0–255.
-fn auto_tables(doc: &Document, per_channel: bool) -> [[u8; 256]; 3] {
-    let mut hists = [[0u64; 256]; 3];
-    if let Some(image) = doc
-        .active_layer
-        .and_then(|id| doc.layer(id))
-        .and_then(|l| l.image())
-    {
-        let selection = doc.selection();
-        for y in 0..doc.height {
-            for x in 0..doc.width {
-                if selection.is_some_and(|s| s.get(x, y) == 0) {
-                    continue;
-                }
-                let px = image.pixel(x, y);
-                if px[3] == 0 {
-                    continue;
-                }
-                for c in 0..3 {
-                    hists[c][px[c] as usize] += 1;
-                }
-            }
-        }
-    }
-    let range = |hist: &[u64; 256]| -> (usize, usize) {
-        let total: u64 = hist.iter().sum();
-        let clip = total / 1000;
-        let mut acc = 0;
-        let lo = (0..256).find(|&i| {
-            acc += hist[i];
-            acc > clip
-        });
-        acc = 0;
-        let hi = (0..256).rev().find(|&i| {
-            acc += hist[i];
-            acc > clip
-        });
-        (lo.unwrap_or(0), hi.unwrap_or(255))
-    };
-    let table = |(lo, hi): (usize, usize)| {
-        let mut t = [0u8; 256];
-        for (i, v) in t.iter_mut().enumerate() {
-            *v = if hi <= lo {
-                i as u8
-            } else {
-                ((i as f32 - lo as f32) / (hi - lo) as f32 * 255.0)
-                    .round()
-                    .clamp(0.0, 255.0) as u8
-            };
-        }
-        t
-    };
-    if per_channel {
-        hists.map(|h| table(range(&h)))
-    } else {
-        let mut all = [0u64; 256];
-        for h in &hists {
-            for (a, v) in all.iter_mut().zip(h) {
-                *a += v;
-            }
-        }
-        [table(range(&all)); 3]
-    }
-}
-
 /// One of Hue/Saturation's six color ranges: where it starts fading in,
 /// where it is at full strength, where full strength ends and where it has
 /// faded out (degrees, going around the hue circle), and its settings.
@@ -1148,8 +1084,9 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
         Adjustment::Equalize | Adjustment::EqualizeEntireImage => {
             Some([equalize_table(&channel_histogram(doc)); 3])
         }
-        Adjustment::AutoTone | Adjustment::AutoColor => Some(auto_tables(doc, true)),
-        Adjustment::AutoContrast => Some(auto_tables(doc, false)),
+        Adjustment::AutoTone(t) => Some(auto::tables(doc, &auto::Options::auto_tone(t))),
+        Adjustment::AutoContrast(t) => Some(auto::tables(doc, &auto::Options::auto_contrast(t))),
+        Adjustment::AutoColor(t) => Some(auto::tables(doc, &auto::Options::auto_color(t))),
         other => other.tables(),
     };
     let lut = match adjustment {
@@ -1182,9 +1119,9 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
             | Adjustment::ColorBalance { .. }
             | Adjustment::Curves { .. }
             | Adjustment::CurveTables(_)
-            | Adjustment::AutoTone
-            | Adjustment::AutoContrast
-            | Adjustment::AutoColor => {
+            | Adjustment::AutoTone(_)
+            | Adjustment::AutoContrast(_)
+            | Adjustment::AutoColor(_) => {
                 let t = tables.as_ref().expect("computed above");
                 [t[0][r as usize], t[1][g as usize], t[2][b as usize], a]
             }
@@ -1473,7 +1410,7 @@ mod tests {
         let id = d.active_layer.unwrap();
         let image = d.layer_mut(id).unwrap().image_mut().unwrap();
         image.set_pixel(1, 0, [100, 200, 250, 255]);
-        apply(&mut d, Adjustment::AutoTone).unwrap();
+        apply(&mut d, Adjustment::AutoTone(Default::default())).unwrap();
         assert_eq!(first(&d), [0, 0, 0, 255]);
         assert_eq!(&d.composite_rgba8()[4..8], [255, 255, 255, 255]);
     }

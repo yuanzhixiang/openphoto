@@ -230,7 +230,7 @@ Select All, Deselect, Reselect and Inverse each record one history entry, named 
 
 ## Adjustment commands
 
-- Invert, Desaturate, Equalize, Auto Tone, Auto Contrast, Auto Color: apply immediately to the current layer (within the selection) (`adjust.md` in `op-core`), recording history under the same name; when the layer is hidden or its pixels are locked, Photoshop's alert is shown (e.g. "Could not complete the Invert command because the target layer is hidden.").
+- Invert, Desaturate, Equalize, Auto Tone, Auto Contrast, Auto Color (the last three with the clipping and target colors of `AppState::auto_defaults`): apply immediately to the current layer (within the selection) (`adjust.md` in `op-core`), recording history under the same name; when the layer is hidden or its pixels are locked, Photoshop's alert is shown (e.g. "Could not complete the Invert command because the target layer is hidden.").
 - The other adjustments with dialogs (Threshold, Posterize, Levels, Curves, Hue/Saturation, Exposure, Brightness/Contrast, Color Balance, Black & White, Vibrance, Channel Mixer, Selective Color, Photo Filter, Gradient Map): perform the same checks first, showing an alert on failure; if they pass, compute the histogram (Threshold and others use the luminance histogram), save a document snapshot, and open the dialog (see `dialogs/adjust.md`; see `lib.md` for the preview flow); Gradient Map takes the foreground and background colors, Hue/Saturation's Colorize starts from the foreground color's hue; Levels and Curves additionally take the histograms of the red, green and blue channels (`adjust::rgb_histograms`).
 
 ## Filter commands

@@ -768,13 +768,23 @@ fn h_adjust_equalize_entire(s: &mut AppState, a: &Value) -> Result<Value, String
     apply_adjust(s, a, Adjustment::EqualizeEntireImage, "Equalize")
 }
 fn h_adjust_auto_tone(s: &mut AppState, a: &Value) -> Result<Value, String> {
-    apply_adjust(s, a, Adjustment::AutoTone, "Auto Tone")
+    apply_adjust(s, a, Adjustment::AutoTone(Default::default()), "Auto Tone")
 }
 fn h_adjust_auto_contrast(s: &mut AppState, a: &Value) -> Result<Value, String> {
-    apply_adjust(s, a, Adjustment::AutoContrast, "Auto Contrast")
+    apply_adjust(
+        s,
+        a,
+        Adjustment::AutoContrast(Default::default()),
+        "Auto Contrast",
+    )
 }
 fn h_adjust_auto_color(s: &mut AppState, a: &Value) -> Result<Value, String> {
-    apply_adjust(s, a, Adjustment::AutoColor, "Auto Color")
+    apply_adjust(
+        s,
+        a,
+        Adjustment::AutoColor(Default::default()),
+        "Auto Color",
+    )
 }
 
 fn parse_levels_obj(v: Option<&Value>) -> Result<Levels, String> {

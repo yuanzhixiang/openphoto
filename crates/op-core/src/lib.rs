@@ -5,6 +5,7 @@
 
 pub mod adjust;
 pub mod align;
+pub mod auto;
 pub mod blend;
 pub mod clipboard;
 pub mod color;

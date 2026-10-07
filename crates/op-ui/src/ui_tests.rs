@@ -899,6 +899,45 @@ fn levels_dialog_sets_the_black_point() {
 }
 
 #[test]
+fn auto_color_correction_options_from_levels() {
+    use crate::theme::pt;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::L);
+    h.run_steps(3);
+    // Options... opens Auto Color Correction Options with Photoshop's
+    // default algorithm
+    let corner = h.state().state.adjust_dialog.as_ref().unwrap().rect.min;
+    click(&mut h, corner + egui::vec2(pt(358.0), pt(170.5)));
+    let dialog = h.state().state.auto_options_dialog.as_ref().expect("open");
+    assert_eq!(
+        dialog.options.algorithm,
+        op_core::auto::Algorithm::BrightnessContrast
+    );
+    shot(&mut h, "auto_color_options");
+    // Enhance Per Channel Contrast, Save as defaults, OK
+    let corner = h.ctx.content_rect().center() - crate::dialogs::auto_options::SIZE / 2.0;
+    let at = |x: f32, y: f32| corner + egui::vec2(pt(x), pt(y));
+    click(&mut h, at(36.0, 88.0));
+    click(&mut h, at(24.0, 324.0));
+    click(&mut h, at(347.0, 51.5));
+    assert!(h.state().state.auto_options_dialog.is_none());
+    let saved = h.state().state.auto_saved.expect("saved as defaults");
+    assert_eq!(saved.algorithm, op_core::auto::Algorithm::PerChannel);
+    let adjust = h.state().state.adjust_dialog.as_ref().unwrap();
+    assert_eq!(adjust.extra.auto_options, saved);
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    // Curves opens with the saved options
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::M);
+    h.run_steps(3);
+    let adjust = h.state().state.adjust_dialog.as_ref().unwrap();
+    assert_eq!(adjust.extra.auto_options, saved);
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+}
+
+#[test]
 fn levels_and_curves_eyedroppers_sample_the_image() {
     use crate::theme::pt;
     let mut h = harness(Vec::new());

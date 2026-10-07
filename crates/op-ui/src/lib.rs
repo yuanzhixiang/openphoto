@@ -246,11 +246,18 @@ impl OpenPhotoApp {
         let Some(mut dialog) = self.state.adjust_dialog.take() else {
             return;
         };
-        dialog.blocked = self.state.color_picker.is_some() || self.state.gradient_editor.is_some();
+        dialog.blocked = self.state.color_picker.is_some()
+            || self.state.gradient_editor.is_some()
+            || self.state.auto_options_dialog.is_some();
         let outcome = dialog.show(ctx);
         if let Some(rgb) = dialog.take_color_request() {
             self.state
                 .open_color_picker(state::PickerTarget::PhotoFilter(rgb));
+        }
+        // Levels' and Curves' Options... open Auto Color Correction Options
+        if let Some(options) = dialog.take_auto_options_request() {
+            self.state.auto_options_dialog =
+                Some(dialogs::auto_options::AutoOptionsDialog::new(options));
         }
         // Gradient Map's gradient opens the Gradient Editor
         if let Some(g) = dialog.take_editor_request() {
@@ -416,6 +423,33 @@ impl OpenPhotoApp {
         }
         if self.state.quit_approved {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+    }
+
+    /// Auto Color Correction Options: its OK runs Levels' or Curves' Auto
+    /// with the options (and keeps them as the defaults when asked); its
+    /// target colors use the Color Picker.
+    fn auto_options_dialog(&mut self, ctx: &egui::Context) {
+        let Some(mut dialog) = self.state.auto_options_dialog.take() else {
+            return;
+        };
+        let active = self.state.color_picker.is_none();
+        let outcome = dialog.show(ctx, active);
+        if let Some((k, rgb)) = dialog.take_color_request() {
+            self.state
+                .open_color_picker(state::PickerTarget::AutoTarget(k, rgb));
+        }
+        match outcome {
+            dialogs::auto_options::Outcome::Open => self.state.auto_options_dialog = Some(dialog),
+            dialogs::auto_options::Outcome::Cancel => {}
+            dialogs::auto_options::Outcome::Ok(options, save) => {
+                if save {
+                    self.state.auto_saved = Some(options);
+                }
+                if let Some(adjust) = &mut self.state.adjust_dialog {
+                    adjust.set_auto_options(options);
+                }
+            }
         }
     }
 
@@ -787,6 +821,12 @@ impl OpenPhotoApp {
                         dialog.set_color(color);
                     }
                 }
+                state::PickerTarget::AutoTarget(k, _) => {
+                    if let Some(dialog) = &mut self.state.auto_options_dialog {
+                        let [r, g, b, _] = color.to_rgba8();
+                        dialog.set_target(k, [r, g, b]);
+                    }
+                }
                 state::PickerTarget::GradientStop(_) => {
                     if let Some((editor, _)) = &mut self.state.gradient_editor {
                         let [r, g, b, _] = color.to_rgba8();
@@ -979,6 +1019,7 @@ impl eframe::App for OpenPhotoApp {
         self.image_size_dialog(&ctx);
         self.crop_preset_dialogs(&ctx);
         self.gradient_editor(&ctx);
+        self.auto_options_dialog(&ctx);
         self.new_guide_dialog(&ctx);
         self.new_layer_dialog(&ctx);
         self.duplicate_dialog(&ctx);

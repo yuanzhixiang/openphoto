@@ -40,6 +40,9 @@ pub struct Dialog {
     /// The Set Black, Gray or White Point eyedropper chosen: a click on
     /// the image sets that point (`sample`).
     pub eyedropper: Option<usize>,
+    /// Auto or Options... was clicked (`AdjustDialog` runs them).
+    pub wants_auto: bool,
+    pub wants_options: bool,
 }
 
 impl Dialog {
@@ -61,6 +64,8 @@ impl Dialog {
             histograms: [composite, channels[0], channels[1], channels[2]],
             drag: None,
             eyedropper: None,
+            wants_auto: false,
+            wants_options: false,
         }
     }
 
@@ -160,36 +165,26 @@ impl Dialog {
         }
     }
 
-    /// Auto: each channel's darkest and lightest 0.1% become black and
-    /// white (Photoshop's "Enhance Per Channel Contrast").
-    pub fn auto(&mut self) {
-        self.values[0] = DEFAULTS.map(String::from);
-        for c in 1..4 {
-            let hist = &self.histograms[c];
-            let total: u64 = hist.iter().sum();
-            if total == 0 {
-                continue;
+    /// Auto (with the Auto Color Correction Options' algorithm, computed
+    /// by `op_core::auto`): the same values for all three channels go on
+    /// the composite, otherwise on each channel.
+    pub fn auto(&mut self, channels: [op_core::auto::Channel; 3]) {
+        let row = |c: &op_core::auto::Channel| {
+            [
+                format!("{}", c.black.round()),
+                format!("{:.2}", c.gamma),
+                format!("{}", c.white.round()),
+                c.out_black.to_string(),
+                c.out_white.to_string(),
+            ]
+        };
+        self.values = std::array::from_fn(|_| DEFAULTS.map(String::from));
+        if channels[0] == channels[1] && channels[1] == channels[2] {
+            self.values[0] = row(&channels[0]);
+        } else {
+            for (values, c) in self.values[1..].iter_mut().zip(&channels) {
+                *values = row(c);
             }
-            let clip = total / 1000;
-            let mut acc = 0;
-            let lo = (0..256).find(|&i| {
-                acc += hist[i];
-                acc > clip
-            });
-            acc = 0;
-            let hi = (0..256).rev().find(|&i| {
-                acc += hist[i];
-                acc > clip
-            });
-            let (lo, hi) = (lo.unwrap_or(0), hi.unwrap_or(255));
-            let (lo, hi) = if hi < lo + 2 { (0, 255) } else { (lo, hi) };
-            self.values[c] = [
-                lo.to_string(),
-                "1.00".into(),
-                hi.to_string(),
-                "0".into(),
-                "255".into(),
-            ];
         }
     }
 
@@ -330,7 +325,9 @@ impl Dialog {
         let ok = button(ui, 38.5, "OK", true);
         let cancel = button(ui, 73.5, "Cancel", false);
         let auto = button(ui, 115.5, "Auto", false);
-        button(ui, 157.5, "Options...", false);
+        if button(ui, 157.5, "Options...", false).clicked() {
+            self.wants_options = true;
+        }
         for (k, (x, icon)) in [
             (328.5, Icon::EyedropperBlack),
             (358.5, Icon::EyedropperGray),
@@ -350,7 +347,7 @@ impl Dialog {
             return Some(super::uxp::Button::Cancel);
         }
         if auto.clicked() {
-            self.auto();
+            self.wants_auto = true;
         }
         let valid = self.adjustment().is_some();
         let enter = ui.input(|i| i.key_pressed(Key::Enter));
@@ -487,14 +484,23 @@ mod tests {
     }
 
     #[test]
-    fn auto_stretches_each_channel() {
-        let mut red = [0u64; 256];
-        red[40] = 100;
-        red[200] = 100;
-        let mut d = Dialog::new([red, red, red]);
-        d.auto();
+    fn auto_fills_the_composite_or_each_channel() {
+        use op_core::auto::{Channel, Options, Targets, compute};
+        let mut d = Dialog::new([[0; 256]; 3]);
+        let px: Vec<[u8; 3]> = (0..1000).map(|i| [40 + (i % 160) as u8, 60, 80]).collect();
+        d.auto(compute(&px, &Options::auto_tone(Targets::default())));
         assert_eq!(d.values[1][0], "40");
-        assert_eq!(d.values[1][2], "200");
+        assert_eq!(d.values[1][2], "199");
         assert_eq!(d.values[0][0], "0");
+        let same = Channel {
+            black: 10.0,
+            gamma: 1.2,
+            white: 240.0,
+            out_black: 0,
+            out_white: 255,
+        };
+        d.auto([same; 3]);
+        assert_eq!(d.values[0][..3], ["10", "1.20", "240"]);
+        assert_eq!(d.values[1][0], "0");
     }
 }

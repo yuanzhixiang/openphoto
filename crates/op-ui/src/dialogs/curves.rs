@@ -64,6 +64,9 @@ pub struct Dialog {
     /// Show Clipping while an end-point pin is dragged: the preview shows
     /// what clips to black (false) or white (true).
     pub clipping: Option<bool>,
+    /// Auto or Options... was clicked (`AdjustDialog` runs them).
+    pub wants_auto: bool,
+    pub wants_options: bool,
 }
 
 fn identity() -> Vec<(f32, f32)> {
@@ -102,6 +105,8 @@ impl Dialog {
             output_text: String::new(),
             shown_point: None,
             clipping: None,
+            wants_auto: false,
+            wants_options: false,
         }
     }
 
@@ -249,33 +254,30 @@ impl Dialog {
         self.selected = None;
     }
 
-    /// Auto: each channel's darkest and lightest 0.1% become black and
-    /// white (as Levels' Auto).
-    pub fn auto(&mut self) {
-        self.points[0] = identity();
-        for c in 1..4 {
-            let hist = &self.histograms[c];
-            let total: u64 = hist.iter().sum();
-            if total == 0 {
-                continue;
+    /// Auto (computed by `op_core::auto` with the Auto Color Correction
+    /// Options): each channel's black and white become end points and its
+    /// gamma a point halfway between them; the same curve for all three
+    /// channels goes on the composite.
+    pub fn auto(&mut self, channels: [op_core::auto::Channel; 3]) {
+        let curve = |c: &op_core::auto::Channel| {
+            let mut p = vec![
+                (c.black.round(), c.out_black as f32),
+                (c.white.round(), c.out_white as f32),
+            ];
+            if (c.gamma - 1.0).abs() > 0.005 {
+                let x = ((c.black + c.white) / 2.0).round();
+                p.insert(1, (x, c.map(x).round()));
             }
-            let clip = total / 1000;
-            let mut acc = 0;
-            let lo = (0..256).find(|&i| {
-                acc += hist[i];
-                acc > clip
-            });
-            acc = 0;
-            let hi = (0..256).rev().find(|&i| {
-                acc += hist[i];
-                acc > clip
-            });
-            let (lo, hi) = (lo.unwrap_or(0) as f32, hi.unwrap_or(255) as f32);
-            self.points[c] = if hi > lo {
-                vec![(lo, 0.0), (hi, 255.0)]
-            } else {
-                identity()
-            };
+            p
+        };
+        self.points = std::array::from_fn(|_| identity());
+        self.tables = None;
+        if channels[0] == channels[1] && channels[1] == channels[2] {
+            self.points[0] = curve(&channels[0]);
+        } else {
+            for (points, c) in self.points[1..].iter_mut().zip(&channels) {
+                *points = curve(c);
+            }
         }
         self.selected = None;
     }
@@ -567,14 +569,16 @@ impl Dialog {
             self.smooth();
         }
         let auto = button(ui, 164.0, "Auto", false, true);
-        button(ui, 199.0, "Options...", false, true);
+        if button(ui, 199.0, "Options...", false, true).clicked() {
+            self.wants_options = true;
+        }
         appkit::checkbox(ui, at(563.5, 243.5), "Preview", preview);
 
         if cancel.clicked() {
             return Some(Button::Cancel);
         }
         if auto.clicked() {
-            self.auto();
+            self.wants_auto = true;
         }
         let enter = ui.input(|i| i.key_pressed(Key::Enter));
         (ok.clicked() || enter).then_some(Button::Ok)
@@ -974,12 +978,17 @@ mod tests {
 
     #[test]
     fn auto_moves_each_channels_end_points() {
-        let mut h = [0u64; 256];
-        h[30] = 10;
-        h[220] = 10;
-        let mut d = Dialog::new([h, h, h]);
-        d.auto();
+        use op_core::auto::{Options, Targets, compute};
+        let mut d = Dialog::new([[0; 256]; 3]);
+        let px: Vec<[u8; 3]> = (0..1000)
+            .map(|i| [30 + (i % 191) as u8, 60 + (i % 100) as u8, 90])
+            .collect();
+        d.auto(compute(&px, &Options::auto_tone(Targets::default())));
         assert_eq!(d.points[1], vec![(30.0, 0.0), (220.0, 255.0)]);
         assert_eq!(d.points[0], identity());
+        // The default (Enhance Brightness and Contrast): one curve on RGB
+        d.auto(compute(&px, &Options::default()));
+        assert_eq!(d.points[1], identity());
+        assert!(d.points[0].len() >= 2);
     }
 }

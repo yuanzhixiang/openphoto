@@ -1288,9 +1288,9 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
             let adjustment = match command {
                 Command::Invert => Adjustment::Invert,
                 Command::Desaturate => Adjustment::Desaturate,
-                Command::AutoTone => Adjustment::AutoTone,
-                Command::AutoContrast => Adjustment::AutoContrast,
-                Command::AutoColor => Adjustment::AutoColor,
+                Command::AutoTone => Adjustment::AutoTone(app.auto_defaults().targets),
+                Command::AutoContrast => Adjustment::AutoContrast(app.auto_defaults().targets),
+                Command::AutoColor => Adjustment::AutoColor(app.auto_defaults().targets),
                 _ => Adjustment::Equalize,
             };
             if let Some(state) = app.active_doc.and_then(|id| app.docs.get_mut(&id)) {
@@ -1507,6 +1507,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                         .map(|p| [p[0], p[1], p[2]]),
                 )
             };
+            let auto_defaults = app.auto_defaults();
             let match_sources: Vec<(String, [f32; 6])> = if kind == AdjustKind::MatchColor {
                 app.doc_order
                     .iter()
@@ -1555,6 +1556,10 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                             dialog.recall(last);
                         }
                         dialog.set_channel_histograms(adjust::rgb_histograms(&state.doc));
+                        if matches!(kind, AdjustKind::Levels | AdjustKind::Curves) {
+                            dialog.extra.auto_samples = op_core::auto::samples(&state.doc);
+                            dialog.extra.auto_options = auto_defaults;
+                        }
                         app.adjust_dialog = Some(dialog);
                     }
                     Err(e) => app.alert = Some(e.message(name)),

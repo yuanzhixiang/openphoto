@@ -4,6 +4,7 @@ mod adjust;
 mod adjust_presets;
 pub mod alert;
 mod appkit;
+pub(crate) mod auto_options;
 pub(crate) mod auto_resolution;
 mod black_white;
 mod brightness_contrast;

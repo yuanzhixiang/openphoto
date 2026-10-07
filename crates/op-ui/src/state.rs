@@ -1172,6 +1172,9 @@ pub enum PickerTarget {
     PhotoFilter([u8; 3]),
     /// The Gradient Editor's selected color stop.
     GradientStop([u8; 3]),
+    /// Auto Color Correction Options' target color (0 shadows, 1
+    /// midtones, 2 highlights).
+    AutoTarget(usize, [u8; 3]),
 }
 
 /// What the Gradient Editor edits.
@@ -1304,6 +1307,10 @@ pub struct AppState {
     /// gradients made with the editor's New, and the editor while open.
     pub gradient_preset: Option<op_core::gradient::Gradient>,
     pub gradient_made: Vec<op_core::gradient::Gradient>,
+    /// Auto Color Correction Options while open, and the options saved
+    /// with "Save as defaults" (this session).
+    pub auto_options_dialog: Option<crate::dialogs::auto_options::AutoOptionsDialog>,
+    pub auto_saved: Option<op_core::auto::Options>,
     pub gradient_editor: Option<(
         crate::dialogs::gradient_editor::GradientEditor,
         EditorTarget,
@@ -1472,6 +1479,8 @@ impl Default for AppState {
             crop_presets: Default::default(),
             gradient_preset: None,
             gradient_made: Vec::new(),
+            auto_options_dialog: None,
+            auto_saved: None,
             gradient_editor: None,
             new_crop_preset: None,
             delete_crop_preset: None,
@@ -1650,6 +1659,7 @@ impl AppState {
             || self.image_size_dialog.is_some()
             || self.new_crop_preset.is_some()
             || self.gradient_editor.is_some()
+            || self.auto_options_dialog.is_some()
             || self.delete_crop_preset.is_some()
             || self.new_guide_dialog.is_some()
             || self.new_layer_dialog.is_some()
@@ -1694,6 +1704,14 @@ impl AppState {
             PickerTarget::Background => ("Color Picker (Background Color)", self.background),
             PickerTarget::CanvasExtension => ("Color Picker", self.background),
             PickerTarget::FillColor => ("Color Picker (Fill Color)", self.foreground),
+            PickerTarget::AutoTarget(k, [r, g, b]) => (
+                [
+                    "Select target shadow color:",
+                    "Select target midtone color:",
+                    "Select target highlight color:",
+                ][k.min(2)],
+                Color::from_rgba8([r, g, b, 255]),
+            ),
             PickerTarget::GradientStop([r, g, b]) => (
                 "Color Picker (Stop Color)",
                 Color::from_rgba8([r, g, b, 255]),
@@ -1730,6 +1748,13 @@ impl AppState {
         let k: usize = self.setting("gradient.method", "3").parse().unwrap_or(3);
         g.method = op_core::gradient::Method::ALL[k.min(3)];
         g
+    }
+
+    /// The Auto Color Correction Options in effect: the saved defaults, or
+    /// Photoshop's (Enhance Brightness and Contrast, black, 50% gray and
+    /// white targets, 0.10% clipping).
+    pub fn auto_defaults(&self) -> op_core::auto::Options {
+        self.auto_saved.unwrap_or_default()
     }
 
     /// The editor's and the options bar's presets: Photoshop's basics

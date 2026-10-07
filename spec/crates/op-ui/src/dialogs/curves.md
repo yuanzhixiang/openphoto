@@ -33,15 +33,15 @@ The dialog for Image › Adjustments › Curves... (⌘M), rebuilt after Photosh
 - Curve graph: on press, if there is a point within 5 pt it is selected, otherwise a point is added at the pointer (the curve jumps to that point); while dragging, the horizontal coordinate is limited to between the two neighboring points; releasing after dragging more than 20 pt outside the graph deletes the point (end points are not deleted).
 - With a point selected: arrow keys move it by 1 (Shift 10), Delete / Backspace deletes it (except end points).
 - Dragging the end point sliders below moves the input values of the first and last points (not past the neighboring points).
-- Auto: RGB returns to default, and each of the three channels uses its darkest and brightest 0.1% as end points.
+- Auto: computed by `op_core::auto` as in Levels (`levels.md`): all curves return to default (pencil tables are dropped); each channel's input black and white become end points at the output black and white, and a gamma other than 1 adds a point halfway between them at its mapped value; when the three channels are identical the curve goes on RGB. Options... opens Auto Color Correction Options, whose OK runs Auto with the new options.
 - Enter / OK applies and records "Curves"; Esc / Cancel cancels.
 
 ## Known limitations
 
-- The targeted adjustment hand, Options... and the gear menu are not implemented. With the pencil the ramps and end-point pins are not drawn.
+- The targeted adjustment hand and the gear menu are not implemented. With the pencil the ramps and end-point pins are not drawn.
 
 ## Test coverage
 
-- `channels_keep_their_curves`, `pigment_shows_ink_percent`, `auto_moves_each_channels_end_points`, `photoshops_presets`, `pencil_smooth_and_show_clipping` (a drawn step becomes `CurveTables`, Smooth eases it, back to points gives nine points; Show Clipping with the black pin at 50 maps 40 to 0 and 60 to 255).
+- `channels_keep_their_curves`, `pigment_shows_ink_percent`, `auto_moves_each_channels_end_points` (Per Channel moves each channel's end points; the default puts one curve on RGB), `photoshops_presets`, `pencil_smooth_and_show_clipping` (a drawn step becomes `CurveTables`, Smooth eases it, back to points gives nine points; Show Clipping with the black pin at 50 maps 40 to 0 and 60 to 255).
 - `ui_tests::levels_and_curves_eyedroppers_sample_the_image`: Levels' white eyedropper on an orange patch turns it white (and OK keeps it); Curves' gray eyedropper makes it neutral.
 - `ui_tests::curves_dialog_adds_points`, `ui_tests::levels_and_curves_edit_one_channel` (after ⌥4 only green changes). Screenshots `curves_dialog.png`, `curves_green.png`.

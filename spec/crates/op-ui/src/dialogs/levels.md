@@ -29,14 +29,16 @@ The dialog for Image › Adjustments › Levels... (⌘L), rebuilt pixel by pixe
 - On open, the input black point field gets focus with everything selected.
 - The Channel menu or ⌥2–⌥5 switches between RGB, Red, Green, Blue; each channel keeps its own values.
 - Dragging sliders: pressing in a slider's row selects the nearest slider; the black point does not exceed the white point − 2, and the white point does not go below the black point + 2; the gray slider's position is converted back to gamma (two decimals).
-- Auto: the composite channel is restored to defaults, and each of the three channels sets its darkest and brightest 0.1% as the black and white points (Photoshop's "Enhance Per Channel Contrast"; Photoshop 2026's default Auto algorithm and the Options... dialog are not implemented).
+- Auto: computed by `op_core::auto` from the layer's pixels (`AdjustDialog::extra.auto_samples`, gathered on open) with the Auto Color Correction Options in effect (`extra.auto_options`: the saved defaults, else Photoshop's Enhance Brightness and Contrast). All values return to defaults first; when the three channels come out identical (Monochromatic, Brightness and Contrast without snapping, with neutral targets) the values go on the composite RGB channel, otherwise on Red, Green and Blue (input black, gamma with two decimals, input white, output black and white from the target colors).
+- Options... opens Auto Color Correction Options (`auto_options.md`); its OK replaces `extra.auto_options` and runs Auto with them at once.
 - Enter / OK applies, recording "Levels"; Esc / Cancel cancels.
 
 ## Known limitations
 
-- Options... (Auto Color Correction Options) and the gear menu (save/load presets) have no behavior.
+- The gear menu (save/load presets) has no behavior.
+- Changing Auto Color Correction Options does not preview live in the document while that dialog is open (Photoshop updates the preview as you choose); it takes effect on its OK.
 
 ## Test coverage
 
-- `channels_keep_their_levels`, `auto_stretches_each_channel`, `photoshops_presets`; `ui_tests::levels_and_curves_eyedroppers_sample_the_image` (see `curves.md`).
+- `channels_keep_their_levels`, `auto_fills_the_composite_or_each_channel`; `ui_tests::auto_color_correction_options_from_levels`, `photoshops_presets`; `ui_tests::levels_and_curves_eyedroppers_sample_the_image` (see `curves.md`).
 - `ui_tests::levels_dialog_sets_the_black_point`, `ui_tests::levels_and_curves_edit_one_channel` (after ⌥3 only red changes). Screenshots `levels_dialog.png`, `levels_red.png`.
