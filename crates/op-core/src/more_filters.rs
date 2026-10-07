@@ -396,7 +396,7 @@ impl BlurShape {
     }
 
     /// Whether (u, v) in −1..1 is inside the shape.
-    fn contains(self, u: f32, v: f32) -> bool {
+    pub fn contains(self, u: f32, v: f32) -> bool {
         match self {
             Self::Circle => u * u + v * v <= 1.0,
             Self::Square => u.abs() <= 0.8 && v.abs() <= 0.8,

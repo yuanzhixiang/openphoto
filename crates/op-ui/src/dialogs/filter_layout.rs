@@ -524,29 +524,6 @@ pub const OFFSET: &Layout = &Layout {
     ],
 };
 
-pub const SHAPE_BLUR: &Layout = &Layout {
-    size: (324.0, 372.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: true,
-    rows: &[
-        number(
-            "Radius:",
-            135.0,
-            [140.0, 287.0, 200.5, 306.0],
-            "Pixels",
-            205.5,
-            Some((21.0, 303.0, 313.0)),
-            Scale::Linear,
-        ),
-        Row::Popup {
-            label: "Shape:",
-            label_right: 135.0,
-            rect: [140.0, 336.0, 300.0, 357.0],
-        },
-    ],
-};
-
 pub const SHADOWS_HIGHLIGHTS: &Layout = &Layout {
     size: (324.0, 560.0),
     button_width: 59.5,

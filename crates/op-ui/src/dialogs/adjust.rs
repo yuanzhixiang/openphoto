@@ -651,7 +651,6 @@ impl Kind {
             Self::Offset => l::OFFSET,
             Self::TraceContour => l::TRACE_CONTOUR,
             Self::Diffuse => l::DIFFUSE,
-            Self::ShapeBlur => l::SHAPE_BLUR,
             Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
             Self::HdrToning => l::HDR_TONING,
             Self::ReplaceColor => l::REPLACE_COLOR,
@@ -907,6 +906,8 @@ pub struct Extra {
     /// Smart Sharpen: Shadows / Highlights open, the saved preset chosen.
     pub ss_open: bool,
     pub ss_preset: Option<String>,
+    /// Shape Blur's shapes, white on black.
+    pub shape_thumbs: Vec<egui::TextureHandle>,
     /// The document's size in pixels (Lens Flare's center needs it).
     pub doc_size: (f32, f32),
 }
@@ -1788,6 +1789,7 @@ impl AdjustDialog {
                     None if self.kind == Kind::ReduceNoise => reduce_noise::SIZE,
                     None if self.kind == Kind::SmartSharpen => self.smart_sharpen_size(),
                     None if self.kind == Kind::OilPaint => oil_paint::SIZE,
+                    None if self.kind == Kind::ShapeBlur => shape_blur::SIZE,
                     None => self
                         .layout()
                         .map_or_else(|| self.kind.size(), |l| vec2(pt(l.size.0), pt(l.size.1))),
@@ -1806,6 +1808,8 @@ impl AdjustDialog {
                     self.smart_sharpen_ui(ui, rect)
                 } else if self.kind == Kind::OilPaint {
                     self.oil_paint_ui(ui, rect)
+                } else if self.kind == Kind::ShapeBlur {
+                    self.shape_blur_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
                     self.classic_ui(ui, rect, layout)
                 } else if let Some(layout) = self.kind.plain() {
@@ -3047,6 +3051,7 @@ mod legacy;
 mod lens_blur;
 mod oil_paint;
 mod reduce_noise;
+mod shape_blur;
 mod smart_sharpen;
 
 /// A flat 13 pt button as the plug-in dialogs' Randomize (`#454545`,

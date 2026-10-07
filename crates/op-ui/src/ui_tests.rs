@@ -8871,3 +8871,27 @@ fn oil_paint_dialog_lighting_and_bristles() {
     h.run_steps(3);
     assert_eq!(last_history(&h), "Oil Paint");
 }
+
+#[test]
+fn shape_blur_dialog_picks_a_shape() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::ShapeBlur);
+    h.run_steps(4);
+    shot_dialog(&mut h, "shape_blur", 359.0, 485.0);
+    let (x, y) = dialog_origin(&mut h);
+    let pt = crate::theme::pt;
+    // The fourth row is Heart
+    click(&mut h, egui::pos2(pt(x + 100.0), pt(y + 344.0 + 29.0 * 3.5)));
+    h.run_steps(2);
+    match h.state().state.adjust_dialog.as_ref().unwrap().effect() {
+        Some(crate::dialogs::Effect::Filter(op_core::filter::Filter::ShapeBlur { shape, .. })) => {
+            assert_eq!(shape, op_core::more_filters::BlurShape::Heart);
+        }
+        other => panic!("{other:?}"),
+    }
+    shot_dialog(&mut h, "shape_blur_heart", 359.0, 485.0);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Shape Blur");
+}
