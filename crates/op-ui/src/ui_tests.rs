@@ -1594,6 +1594,23 @@ fn warp_splits_grids_and_styles() {
     h.run_steps(2);
     assert_eq!((mesh(&h).cols, mesh(&h).rows), (4, 4));
     shot(&mut h, "warp_grid");
+    // Grid: Custom... asks for rows and columns; Enter there doesn't commit
+    click(&mut h, at_pt(349.0, 45.25));
+    h.get_by_label("Custom...").click();
+    h.run_steps(2);
+    let corner = h.ctx.content_rect().center() - crate::dialogs::grid_size::SIZE / 2.0;
+    let at = |x: f32, y: f32| corner + egui::vec2(crate::theme::pt(x), crate::theme::pt(y));
+    shot(&mut h, "warp_custom_grid");
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("2".into()));
+    click(&mut h, at(123.0, 81.5));
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("6".into()));
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert!(active(&h).free_transform.is_some());
+    assert_eq!((mesh(&h).cols, mesh(&h).rows), (6, 2));
     // Warp: Arc at 50% Bend bows the top; typing Bend 100 bows it more
     click(&mut h, at_pt(473.5, 45.25));
     h.get_by_label("Arc").click();

@@ -948,6 +948,8 @@ pub struct FreeTransform {
     pub applied: op_core::transform::Projective,
     pub applied_interpolation: op_core::transform::Interpolation,
     pub applied_warp: Option<op_core::transform::WarpMesh>,
+    /// Warp's Grid › Custom... dialog while open.
+    pub grid_dialog: Option<crate::dialogs::grid_size::GridSizeDialog>,
 }
 
 impl FreeTransform {
@@ -974,6 +976,7 @@ impl FreeTransform {
             applied: op_core::transform::Projective::IDENTITY,
             applied_interpolation: op_core::transform::Interpolation::Bicubic,
             applied_warp: None,
+            grid_dialog: None,
         }
     }
 

@@ -1520,10 +1520,12 @@ fn warp_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
         .iter()
         .find(|(n, _)| (*n, *n) == (cols, rows))
         .map_or("Custom".to_owned(), |(_, l)| (*l).to_owned());
-    let grid_entries: Vec<_> = grids
+    let mut grid_entries: Vec<_> = grids
         .iter()
         .map(|(n, l)| crate::native_popup::Entry::item(*l, (*n, *n) == (cols, rows)))
         .collect();
+    let custom = !grids.iter().any(|(n, _)| (*n, *n) == (cols, rows));
+    grid_entries.push(crate::native_popup::Entry::item("Custom...", custom));
     let mut grid_pick = None;
     ui.scope_builder(egui::UiBuilder::new().max_rect(span(319.5, 378.5)), |ui| {
         grid_pick = widgets::dropdown_entries(
@@ -1536,8 +1538,13 @@ fn warp_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
         );
     });
     if let (Some(k), Some(mesh)) = (grid_pick, t.warp.as_mut()) {
-        let n = grids[k].0;
-        *mesh = mesh.regrid(n, n);
+        match grids.get(k) {
+            Some(&(n, _)) => *mesh = mesh.regrid(n, n),
+            // Custom...: the rows and columns are asked for
+            None => {
+                t.grid_dialog = Some(crate::dialogs::grid_size::GridSizeDialog::new(cols, rows))
+            }
+        }
     }
     separator(&painter, bar, 386.5);
     label(395.0, "Warp:", color::TEXT);

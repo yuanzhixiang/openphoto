@@ -14,7 +14,7 @@ The session is stored in `DocState::free_transform` (`FreeTransform`): the docum
 - While in progress, `preview` runs every frame: when the box mapping differs from `applied`, it first restores the snapshot and then applies the new mapping to the document, so the document shows the result live. The preview records no history.
 - Commit (`commit`): Enter, double-clicking inside the box, or the ✓ button in the options bar. When the mapping is not the identity, it records "Free Transform" (Photoshop 2026 records this name whichever mode it started from, as measured) and stores the mapping as `AppState::last_transform` (for Transform › Again); the identity is treated as a cancel.
 - Cancel (`cancel`): Esc or the ⦸ button in the options bar restores the snapshot.
-- When an input field has keyboard focus, Enter and Esc do not act on the transform.
+- When an input field has keyboard focus, Enter and Esc do not act on the transform. While Warp's Custom Grid Size dialog is open (`FreeTransform::grid_dialog`, `dialogs/grid_size.md`), the canvas takes no input at all.
 - During the session `AppState::transforming()` is true, and so is `modal_open()`: menu commands and single-key tool shortcuts have no effect, as in Photoshop.
 
 ## Warp

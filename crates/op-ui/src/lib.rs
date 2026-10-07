@@ -509,6 +509,26 @@ impl OpenPhotoApp {
     }
 
     /// The Crop tool's New Crop Preset... and Delete Crop Preset... dialogs.
+    /// Warp's Custom Grid Size: OK regrids the warp.
+    fn warp_grid_dialog(&mut self, ctx: &egui::Context) {
+        use dialogs::grid_size::Outcome;
+        let Some(t) = self.state.active().and_then(|s| s.free_transform.as_mut()) else {
+            return;
+        };
+        let Some(mut dialog) = t.grid_dialog.take() else {
+            return;
+        };
+        match dialog.show(ctx) {
+            Outcome::Open => t.grid_dialog = Some(dialog),
+            Outcome::Cancel => {}
+            Outcome::Ok(columns, rows) => {
+                if let Some(mesh) = t.warp.as_mut() {
+                    *mesh = mesh.regrid(columns, rows);
+                }
+            }
+        }
+    }
+
     fn crop_preset_dialogs(&mut self, ctx: &egui::Context) {
         use dialogs::new_preset::Outcome;
         use dialogs::size_presets::DeleteOutcome;
@@ -1039,6 +1059,7 @@ impl eframe::App for OpenPhotoApp {
         self.crop_preset_dialogs(&ctx);
         self.gradient_editor(&ctx);
         self.auto_options_dialog(&ctx);
+        self.warp_grid_dialog(&ctx);
         self.new_guide_dialog(&ctx);
         self.new_layer_dialog(&ctx);
         self.duplicate_dialog(&ctx);

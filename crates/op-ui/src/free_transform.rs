@@ -444,6 +444,14 @@ pub fn input(
     background: [u8; 3],
     ppp: f32,
 ) -> Option<Outcome> {
+    // Warp's Custom Grid Size dialog takes the keys and clicks meanwhile
+    if state
+        .free_transform
+        .as_ref()
+        .is_some_and(|t| t.grid_dialog.is_some())
+    {
+        return None;
+    }
     // Keys typed into a text field are not for the canvas
     let typing = ui.ctx().egui_wants_keyboard_input();
     let (enter, escape) = ui.input_mut(|i| {
