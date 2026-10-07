@@ -14,7 +14,7 @@
 4. 工具预设：图标中心 x 68.5；移动工具画 Photoshop 的四向箭头，其它工具暂用 Phosphor Bold 图标。下拉箭头中心 x 90.25。
 5. 分隔线：x 102。
 6. 当前工具的选项，从 x 110 开始（见下文）。
-7. 靠右，中心到窗口右边的距离：Share 200、Notifications 163.5（铃铛为较暗的 `#b9b9b9`）、Search 131、Discover 98.5、Workspace 69.5、下拉箭头 48、头像占位圆 21.5（直径 24）。
+7. 靠右，中心到窗口右边的距离：Share 200、Notifications 163.5（铃铛为较暗的 `#b9b9b9`）、Search 131、Discover 98.5、Workspace 69.5、下拉箭头 48、头像占位圆 21.5（直径 24）。输入文字期间这一组换成取消（⦸）与确认（✓）按钮。
 
 分隔线都是 1 pt 宽、22.5 pt 高的 `#3e3e3e` 竖线（顶部下方 6 pt 起）。图标颜色 `#dddddd`，按钮热区 24 pt 见方，悬停时有圆角底色。图标都是照 Photoshop 描出的矢量图形（见 `ps_icons.md`），不是图标字体。
 
@@ -29,35 +29,14 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
   - **魔棒**：运算按钮 (110)；分隔线 222；「Sample Size:」(231.5) 与下拉 (298–413.5，Point Sample 到 101 by 101 Average)；「Tolerance:」(422.5) 与输入框 (476.5–524.5，0–255)；Anti-alias (532.5)、Contiguous (606.5)、Sample All Layers (690)；分隔线 803.5；Select Subject (815–906，不可用) 与其菜单按钮 (907–926)；「Select and Mask...」(945–1055)。
   - **对象选择**：运算按钮 (104 起)；分隔线 212；「Select people」菜单按钮 (217.5–305.5，右下角小三角)；刷新 (中心 323)、显示全部对象开关 (353)、齿轮 (383)；分隔线 400；模式下拉 (405–483，Rectangle / Lasso)；分隔线 487；Sample All Layers (492)、Hard Edge (602，默认勾选)；分隔线 677；反馈 (696)；分隔线 712；Select Subject (717.5–808.5) 与菜单按钮 (813.5–832.5)；「Select and Mask...」(837.5–947.5)。
   - **快速选择**：三个模式按钮（新选区 / 添加 / 减去，中心 129、157、185）；分隔线 202；笔刷选择器 (中心 221.5，大小 30)；分隔线 253；角度图标 (266) 与输入框 (277–318.5，0°)；分隔线 322.5；Sample All Layers (327.5)、Enhance Edge (437)；分隔线 530；Select Subject (543.5–634.5) 与菜单按钮；「Select and Mask...」(669.5–779.5)。
-  - **画笔类工具**（`options_tools.rs` 里的控件表，见 `options_tools.md`）：画笔、铅笔、颜色替换、混合器画笔、橡皮擦、背景橡皮擦、魔术橡皮擦、仿制图章、图案图章、历史记录画笔、历史记录艺术画笔、模糊、锐化、涂抹、减淡、加深、海绵，各控件的坐标见该文件。
+  - **其余工具**（`options_tools.rs` 里的控件表，见 `options_tools.md`）：绘画、修饰、修复、填充、取样与测量工具，钢笔与锚点工具，文字工具，路径选择，形状工具，抓手、旋转视图、缩放，画板、透视裁剪、切片、切片选择、画框；各控件的坐标与绑定见该文件。
   - 选区运算、Feather、Anti-alias（`AppState::marquee`，选框与套索共用；对象选择也用它的运算方式）与魔棒的 Tolerance、Anti-alias、Contiguous、Sample All Layers（`AppState::wand`）生效；其余设置（选框的固定宽高、磁性套索的参数与压感、魔棒的 Sample Size、对象选择与快速选择的各项）保存在 `AppState::tool_settings`，可以修改并保留，但还没有效果。Select Subject 不可用；Select and Mask 有选区时可点但还没有效果。
-- **吸管**：
-  - 「Sample Size:」下拉：Point Sample、3 by 3 Average、5 by 5 Average、11 by 11 Average、31 by 31 Average、51 by 51 Average、101 by 101 Average，默认 Point Sample。
-  - 「Sample:」下拉：Current Layer / All Layers，默认 All Layers。
-  - 「Show Sampling Ring」复选框：勾选但置灰（取样环尚未实现）。
-  值保存在 `AppState::eyedropper`。
-- **渐变工具**（经典渐变）：渐变色样（110 × 26，当前前景色到背景色，勾选 Reverse 时反过来）与下拉箭头（没有效果）；五个类型按钮（Linear、Radial、Angle、Reflected、Diamond，悬停提示为「Linear Gradient」等）；「Mode:」全部混合模式；「Opacity:」百分比；Reverse 复选框。值保存在 `AppState::gradient`。
-- **横排文字工具**：字体下拉（只有 Source Sans 3）、样式下拉（Regular / Semibold）、字号图标与字号（0.5–1296 pt，默认 12 pt）、置灰的消除锯齿下拉（Sharp）、三个对齐按钮（只有左对齐可用且为按下状态）、颜色色块（当前前景色）。输入文字期间右侧显示取消（⦸）与确认（✓）按钮。值保存在 `AppState::type_options`。
-- **形状工具**：置灰的模式下拉（Shape）、「Fill:」色块（当前前景色）、「Stroke:」色块（白底红斜线，表示无描边）；多边形还有多边形图标与边数（3–100，默认 5），直线还有「Weight:」粗细（1–1000 px，默认 1 px）。边数与粗细保存在 `AppState::shape`。
-- **画笔、铅笔、橡皮擦**：
-  - 笔刷预设按钮：白色圆点，下方是当前大小数字，旁边一个下拉箭头。点击弹出 Size 滑块（1–5000 px，对数刻度）和 Hardness 滑块（铅笔没有）。
-  - 分隔线后是「Mode:」下拉（画笔、铅笔显示 Normal，橡皮擦显示 Brush），目前置灰。
-  - 「Opacity:」百分比；画笔和橡皮擦还有「Flow:」百分比。
-- **修饰工具**（笔刷选择器同画笔）：
-  - 减淡、加深：「Range:」下拉（Shadows / Midtones / Highlights，默认 Midtones，两个工具各自保存）、「Exposure:」百分比（默认 50%）、勾选且置灰的「Protect Tones」。
-  - 海绵：「Mode:」下拉（Desaturate / Saturate，默认 Desaturate）、「Flow:」百分比（默认 50%）、勾选且置灰的「Vibrance」。
-  - 模糊、锐化：置灰的「Mode: Normal」、「Strength:」百分比（默认 50%）、置灰的「Sample All Layers」；锐化还有勾选且置灰的「Protect Detail」。
-  - 仿制图章：置灰的「Mode: Normal」、Opacity、Flow、「Aligned」复选框（默认勾选）、置灰的「Sample: Current Layer」。
-  - 历史记录画笔：置灰的「Mode: Normal」、Opacity、Flow。
-  每个工具的笔刷（大小、硬度、不透明度/强度、流量）分开保存在 `AppState` 中；Range、海绵模式、Aligned 保存在 `AppState::retouch`。
-- **油漆桶**：Fill（Foreground，置灰）、Mode（全部混合模式）、Opacity、Tolerance（0–255）、Anti-alias、Contiguous、All Layers，都会生效。
 - **移动工具**（按 Photoshop 2026 逐像素对齐）：
   - 「Auto-Select:」复选框，后接「Layer」下拉（55 pt 宽，目前只有 Layer 一项，没有 Group）。
   - 分隔线后是「Show Transform Controls」复选框。
   - 分隔线后两组对齐与分布按钮：Align left edges、Align horizontal centers、Align right edges、Distribute vertically，分隔线，Align top edges、Align vertical centers、Align bottom edges、Distribute horizontally。它们与 Photoshop 一样在条件满足时可用：对齐需要两个以上可移动的选中图层（或有像素选区），分布需要三个以上；不可用时画成 Photoshop 禁用时的 `#989898`。点击执行对应的 `Command::Align` / `Command::Distribute`（第一组第四个是 Distribute Vertically 等间距，第二组第四个是 Distribute Horizontally）。
   - 分隔线后是「•••」（More options，只有外观）、分隔线、齿轮（Set additional options，右下带白色小三角，只有外观）。
   两个复选框都默认关闭，值保存在 `AppState::move_options` 并生效，行为见 `document_view.md`「移动工具」。
-- **抓手、缩放工具**：「100%」和「Fit Screen」两个按钮，作用于当前文档。
 - **裁剪工具**（`crop_bar`，绝对定位，坐标为距选项栏左边的 pt，Photoshop 2026 实测，与截图相差 1–2 px）：比例菜单 (110–201，显示「W x H x Reso...」或预设名)；W 输入框 (205–272.5)；交换按钮（实心双箭头，中心 290.25）；H 输入框 (310–376)；W x H x Resolution 类时分隔线 380、分辨率框 (385–439.5)、单位下拉「px/in / px/cm」(442.5–496.5)、分隔线 500.5；Clear (506–552.5，`#454545` 底 `#666666` 边)；Straighten 图标（中心 574）与文字（x 592）；分隔线 649.5；叠加菜单（网格图标，中心 670.75：六种叠加、Auto/Always/Never Show Overlay、Cycle Overlay、置灰的 Cycle Orientation）；齿轮菜单（中心 705：Use Classic Mode、Show Cropped Area、Auto Center Preview、Enable Crop Shield、Opacity、Auto Adjust Opacity）；分隔线 726.5；「Delete Cropped Pixels」复选框 (735)；「Fill:」(870.5) 与下拉 (892–1023.5，Background (default)，Generative Expand 与 Content-Aware Fill 置灰)；ⓘ (1042)；复位 (1070.5，框没变时置灰)；框改变后出现取消 ⦸ (1103.75) 与确认 ✓ (1138.5)。Ratio 类没有分辨率框，Clear 及其后的元素左移 121 pt。这一栏比 1350 pt 的窗口宽，所以右侧的 Share 等应用按钮整体右移（Share 在 1166.5，头像被窗口裁掉一半），与 Photoshop 一致。
 - **自由变换进行中**（不论当前工具，`transform_bar`，绝对定位，Photoshop 2026 实测，坐标为距选项栏左边的 pt）：
   - Home、工具预设（换成暗色的变换图标：带控制点的框与箭头）、右侧的 Share 和 Workspace 都变暗、不可点，Bell、Search、Discover 照常。
@@ -68,9 +47,9 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
   - 分隔线 763.5；「Interpolation:」(770) 与下拉 (839.5–901.5)：Nearest Neighbor、Bilinear、Bicubic（默认）、Bicubic Smoother、Bicubic Sharper、Bicubic Automatic。
   - 变形切换按钮（919，点击进入 Warp 模式）；分隔线 935；取消 ⦸ (983) 与确认 ✓ (1011.5)。
 - **变形进行中**（`warp_bar`，Photoshop 2026 的位置）：暗色的参考点开关；分隔线 161.5；「Split:」(171.5) 与三个拆分按钮（208.5、234、260，暗色，还没有拆分）；分隔线 282；「Grid:」(290.5) 与暗色的「Default」下拉 (319.5–378.5)；分隔线 386.5；「Warp:」(395) 与样式下拉 (428.5–518.5，只有 Custom 可选，Arc、Flag 等 15 种置灰)；暗色的方向与 Bend/H/V 框（Bend 631–678、H 713–760、V 793–840，后面是「%」）；打开状态的变形切换按钮 (907–931，`#383838` 底，点击回到自由变换)；分隔线 935；复位 (951.5，网格回到平整)；取消 (983)；确认 (1013)。
-  - 输入框（`value_box`）：获得焦点时保留输入的文字，按 Enter 或失去焦点时提交（可带「px」「%」「°」），提交用的 Enter 不再传给画布（否则会确认变换）。W、H、角度、斜切的修改以参考点为轴（`FreeTransform::pivoting`）；链接时 W 与 H 按比例一起变。有自由四角（扭曲后）时输入框不可用。
-- **其它工具**：不显示工具选项。
+  - 输入框（`value_box`）：获得焦点时保留输入的文字，按 Enter 或失去焦点时提交（`typed_number` 取开头的数字，后面可带任意单位，如「px」「pt」「%」「°」），提交用的 Enter 不再传给画布（否则会确认变换）。W、H、角度、斜切的修改以参考点为轴（`FreeTransform::pivoting`）；链接时 W 与 H 按比例一起变。有自由四角（扭曲后）时输入框不可用。
+- **其它工具**（选择画笔、移除工具、调整画笔）：不显示工具选项（测量用的 Photoshop 里没有这几个工具，还没有实测数据）。
 
 ## 已知限制
 
-除选框工具的组合方式、羽化、消除锯齿，绘画工具的大小、硬度、不透明度、流量，移动工具的两个复选框，以及抓手和缩放工具的两个按钮外，选项栏的设置目前都没有实际效果。外框部分和移动工具的选项已与 Photoshop 逐像素对齐；其余工具的选项内容（控件尺寸、间距、下拉框样式）尚未对齐，只是复选框已统一为 Photoshop 样式（`widgets::checkbox`）。
+选项栏的外框、各工具的选项（除上面三个未测量的工具）、裁剪、自由变换与变形的栏都已按 Photoshop 2026 实测定位。哪些设置真正生效、哪些只保存在 `tool_settings` 里，见 `options_tools.md` 与上文各工具的说明。

@@ -20,7 +20,7 @@
 
 ## 已知限制
 
-- 只描了选项栏外框、移动工具选项、折叠条和图标列用到的图标；工具栏底部的图形直接画在 `toolbar.rs` 里；其它工具的选项栏和工具栏的工具图标仍用 Phosphor 图标。
+- 工具栏的工具图标在 `tool_icons.rs` 里画；工具栏底部的图形直接画在 `toolbar.rs` 里。
 - 头像是占位的纯色圆，不是 Photoshop 的账户头像。
 - 裁剪工具选项栏的图标（照 Photoshop 2026 的 2x 截图描出）：Straighten（水平仪：上方的点、两侧方块与带气泡的杯形）、CropOverlay（3 × 3 网格加裁切标记和菜单小三角）、Info（圆圈里的 i）、CropReset（转动的箭头加底线）、CropCancel（⦸）、CropCommit（✓）、Swap（上下两个相反的实心箭头）。
 - Hue/Saturation 对话框的图标（描自 Photoshop 2026 的 2x 截图）：`TargetedHand`（目标调整手形，两侧小三角）、`Eyedropper`、`EyedropperPlus`、`EyedropperMinus`（空心管身、斜向的箍和顶端圆球，后两者右下角加「+」「−」）、`PresetMenu`（三条横线与右下角的小三角）。
@@ -29,3 +29,5 @@
 ## 选项栏图标（按 Photoshop 2026 截图近似重画）
 
 `PenPressure`（压感）、`Refresh`、`ObjectFinder`、`Feedback`（对象选择）、`QuickNew` / `QuickAdd` / `QuickSubtract`（快速选择的模式）、`Angle`（笔刷角度）、`BrushPanel` / `CloneSourcePanel`（面板开关：实心方块挖出画笔或图章）、`OpacityPressure`、`Airbrush`、`Symmetry`（带菜单小三角的蝴蝶）、`IgnoreAdjustments`、`SampleContinuous` / `SampleOnce` / `SampleSwatch`（取样方式）、`MixerLoad` / `MixerClean`、五个渐变类型（14 pt 方框里的灰度渐变：线性、径向、角度、对称、菱形）、`NotesPanel`。
+
+钢笔、文字、形状、视图等工具：`PathOperations`（两个方块，后一个挖空）与 `PathCombine`（实心方块，形状与路径选择工具没有可组合的路径时）、`PathAlignment`、`PathArrangement`、`GearMenu`（齿轮），四者右下角都有菜单小三角（`menu_mark`）；`TextOrientation`、`FontSize`、`TextLeft` / `TextCenter` / `TextRight`（横排对齐的长短横线）与 `TextTop` / `TextMiddle` / `TextBottom`（直排对齐的竖线）、`WarpText`、`Text3d`、`CharacterPanels`；`Link`（链环）、`CornerRadius`（四分之一圆弧）、`PolygonSides`（六边形里的 #）；`ZoomIn` / `ZoomOut`；`ArrangeFront` / `ArrangeForward` / `ArrangeBackward` / `ArrangeBack`（四层菱形，实心的那层表示目标位置，左侧上下箭头）；`ArtboardPortrait` / `ArtboardLandscape`（折角页面与角上的刻线）、`AddArtboard`（折角页面里的 +）；画框的 `FrameRect` / `FrameEllipse` / `FrameTriangle` / `FrameHexagon` / `FrameCustom`（灰色填充 `#6f6f6f`、浅色轮廓与叉）；`StrokeCenter`（带四角控制点的方框）。

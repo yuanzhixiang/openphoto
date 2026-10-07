@@ -8,7 +8,7 @@
 
 - `sep(x)`：1 pt 分隔线，`#3e3e3e`，y 6.5–29。
 - `label(x, text, enabled)`：面板字体文字，`#dddddd`，不可用时 `#878787`，纵向中心 17.25；Source Sans 3 比 Adobe Clean 起笔靠右，所以向左偏 0.75 pt。
-- `check(x, label, value, enabled)`：Photoshop 样式复选框（`widgets::checkbox`），方框从 `x` 起，标签在方框右 8 pt。
+- `check(x, label, value, enabled)`：Photoshop 样式复选框（`widgets::checkbox`），方框从 `x` 起，标签在方框右 8 pt。不可用时关闭 egui 对禁用控件的淡化（`disabled_alpha = 1`），由复选框自己画 Photoshop 的禁用色。
 - `field` / `value(x0, x1, …)`：输入框，y 9–25.5，`#454545` 底、1 pt `#666666` 边（不可用 `#4d4d4d` / `#5e5e5e`），文字左缩进 4.5 pt；`value` 在输入结束（失去焦点或 Enter）时返回所输入的文字，Enter 不再传给画布。
 - `popup` / `choice(x0, x1, …)`：下拉框，y 8–27（`widgets::dropdown_with`）。
 - `button(x0, x1, text, enabled)`：按钮，y 5.5–29.5，`#454545` 底、`#666666` 边，文字居中；不可用时 `#4d4d4d` 底、`#5e5e5e` 边、`#878787` 字。`menu_button` 高一点（4.5–30.5）并在右下角画小三角；`chevron_button`（y 5–30）里是 12.5 pt 宽、1 pt 线的下拉箭头。
@@ -20,6 +20,12 @@
 
 - `segmented(edges, labels, chosen, enabled)`：分段按钮（y 5–30，`#454545` 底、`#666666` 边，所选段为 `#383838`），返回点击的段。
 - `color_box`（无边框颜色块）、`empty_pattern`（不可用的空图案框与箭头框）、`gradient_swatch`（渐变色块与箭头框）。
+- `field_off(x0, x1)`：不可用的空输入框，y 8–26（Photoshop 禁用的输入框比可用的高一点）。
+- `combo(x0, x1, x2, id, shown, options, enabled)`：输入框（y 8–26）与它右侧共用边框的箭头框（到 `x2`），点箭头框弹出 `options`；返回输入的文字或所选的项。用于字体、字体样式、字号、描边宽度。不可用时两部分都画成禁用色，不响应。
+- `framed_swatch(x0, x1, fill)`：形状的 Fill / Stroke 色块：外框 y 7.5–27.5（`#666666` 1 pt 边），颜色内缩 3 pt；`None` 为「无颜色」（白底红斜线）。
+- `line_popup(x0, x1, id, options, value)`：显示线型（实线、虚线、点线）的下拉框。
+- `framed_color(x0, x1, y, fill)`：带 1 pt `#363636` 深色边的颜色块（文字颜色 y 8.5–26.5，画板背景 y 9–26）。
+- `centered_label(cx, text)`：以 `cx` 为中心的文字；`width()` 返回选项栏宽度（pt），用于居中提示。
 
 ## 测试覆盖
 

@@ -84,3 +84,4 @@
 - `selection_options_bars_edit_their_settings`：在选框栏的 Feather 输入 5 并回车生效、点第二个运算按钮切到 Add；魔棒 Tolerance 改为 60、Contiguous 取消勾选；磁性套索的 Frequency 改为 80 后保存在 `tool_settings`。
 - `brush_options_bars_edit_their_settings`：见 `options_tools.md`。
 - `fill_and_sample_options_bars_edit_their_settings`：见 `options_tools.md`。
+- `type_shape_and_view_options_bars_edit_their_settings`：见 `options_tools.md`。

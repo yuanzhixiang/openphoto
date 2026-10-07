@@ -13,7 +13,6 @@
 | `TAB_BAR` | `#424242` | 标签栏 |
 | `TAB_INACTIVE` | `#4c4c4c` | 文档标签悬停 |
 | `FIELD` / `FIELD_BORDER` | `#454545` / `#3a3a3a` | 输入框 |
-| `BUTTON` | `#636363` | 普通按钮（如「Select and Mask...」） |
 | `TOOL_ACTIVE` | `#383838` | 当前工具、按下状态 |
 | `HOVER` | `#5e5e5e` | 悬停 |
 | `LIST_BG` / `ROW_SELECTED` | `#4d4d4d` / `#6b6b6b` | 列表底色、选中行 |
