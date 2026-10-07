@@ -1677,8 +1677,9 @@ fn filtered(
                             for pass in 0..passes_at(k) {
                                 let from = (k + pass * 10).min(w);
                                 for x in from..(from + 10).min(w) {
-                                    for c in 0..3 {
-                                        row[x][c] = row[x][c].max(row[x - 1][c]);
+                                    let before = row[x - 1];
+                                    for (v, b) in row[x].iter_mut().zip(before).take(3) {
+                                        *v = (*v).max(b);
                                     }
                                 }
                             }
@@ -1690,11 +1691,11 @@ fn filtered(
                             for _ in 0..passes_at(k) {
                                 for x in k..w {
                                     let mut changed = false;
-                                    for c in 0..3 {
-                                        let avg =
-                                            ((row[x - 1][c] as u16 + row[x][c] as u16) / 2) as u8;
-                                        if avg > row[x][c] {
-                                            row[x][c] = avg;
+                                    let before = row[x - 1];
+                                    for (v, b) in row[x].iter_mut().zip(before).take(3) {
+                                        let avg = ((b as u16 + *v as u16) / 2) as u8;
+                                        if avg > *v {
+                                            *v = avg;
                                             changed = true;
                                         }
                                     }
