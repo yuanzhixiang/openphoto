@@ -24,8 +24,6 @@ pub mod color {
     /// Text field background.
     pub const FIELD: Color32 = gray(0x45);
     pub const FIELD_BORDER: Color32 = gray(0x3a);
-    /// Buttons (e.g. "Select and Mask...").
-    pub const BUTTON: Color32 = gray(0x63);
     /// Selected tool in the toolbar.
     pub const TOOL_ACTIVE: Color32 = gray(0x38);
     pub const HOVER: Color32 = gray(0x5e);

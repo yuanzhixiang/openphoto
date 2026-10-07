@@ -113,6 +113,56 @@ pub enum Icon {
     GradientDiamond,
     /// The Notes panel (a note with lines).
     NotesPanel,
+    /// Path operations, alignment and arrangement (each with a menu).
+    PathOperations,
+    /// Path operations with nothing to combine yet (a filled square).
+    PathCombine,
+    PathAlignment,
+    PathArrangement,
+    /// The gear with a menu.
+    GearMenu,
+    /// Type: toggle the orientation; the font size; the three
+    /// alignments; warp text; 3D; the Character and Paragraph panels.
+    TextOrientation,
+    FontSize,
+    TextLeft,
+    TextCenter,
+    TextRight,
+    WarpText,
+    Text3d,
+    CharacterPanels,
+    /// Link width and height (a chain link).
+    Link,
+    /// Corner radius (a quarter circle).
+    CornerRadius,
+    /// The number of polygon sides (a hexagon with #).
+    PolygonSides,
+    /// Zoom in and zoom out (magnifiers with + and −).
+    ZoomIn,
+    ZoomOut,
+    /// Vertical type's alignments: top, center, bottom.
+    TextTop,
+    TextMiddle,
+    TextBottom,
+    /// Bring to front, bring forward, send backward, send to back (the
+    /// Slice Select tool).
+    ArrangeFront,
+    ArrangeForward,
+    ArrangeBackward,
+    ArrangeBack,
+    /// The Artboard tool: make portrait or landscape; add an artboard.
+    ArtboardPortrait,
+    ArtboardLandscape,
+    AddArtboard,
+    /// The Frame tool's shapes: rectangle, ellipse, triangle, hexagon and
+    /// custom, each crossed.
+    FrameRect,
+    FrameEllipse,
+    FrameTriangle,
+    FrameHexagon,
+    FrameCustom,
+    /// A stroke centered on its edge (a square with handles).
+    StrokeCenter,
     Eye,
     /// A partly locked layer's lock (and the background's): hollow.
     LayerLock,
@@ -230,6 +280,11 @@ impl Pen<'_> {
         self.painter
             .circle_filled(self.p(x, y), self.w(r), self.color);
     }
+}
+
+/// The small triangle at an icon's bottom right that marks a menu.
+fn menu_mark(pen: &Pen) {
+    pen.poly(&[(10.0, 15.5), (17.5, 15.5), (13.75, 19.0)]);
 }
 
 /// Paints `icon` centered on `center`. `background` is the color behind it,
@@ -1146,6 +1201,351 @@ pub fn paint_scaled(
             hole.rect(-12.0, -6.0, 12.0, 12.0);
             for y in [-2.0, 3.0, 8.0] {
                 pen.rect(-8.0, y, 8.0, y + 2.0);
+            }
+        }
+        Icon::PathOperations => {
+            pen.rect(-13.0, -13.0, 5.0, 5.0);
+            pen.rect(-6.0, -6.0, 12.0, 12.0);
+            let hole = Pen {
+                color: background,
+                ..pen
+            };
+            hole.rect(-5.0, -5.0, 4.0, 4.0);
+            menu_mark(&pen);
+        }
+        Icon::PathCombine => {
+            pen.rect(-9.0, -9.0, 9.0, 9.0);
+            menu_mark(&pen);
+        }
+        Icon::PathAlignment => {
+            pen.rect(-12.0, -15.0, -10.0, 14.0);
+            pen.rect(-8.0, -9.0, 6.0, -2.0);
+            pen.rect(-8.0, 3.0, 13.0, 10.0);
+            menu_mark(&pen);
+        }
+        Icon::PathArrangement => {
+            pen.line(
+                &[
+                    (5.0, -16.0),
+                    (17.0, -10.0),
+                    (5.0, -4.0),
+                    (-7.0, -10.0),
+                    (5.0, -16.0),
+                ],
+                2.0,
+            );
+            pen.poly(&[(5.0, -6.0), (17.0, 0.0), (5.0, 6.0), (-7.0, 0.0)]);
+            pen.line(&[(-6.0, 4.0), (5.0, 10.0), (17.0, 4.0)], 2.0);
+            pen.line(&[(-6.0, 9.0), (5.0, 15.0), (17.0, 9.0)], 2.0);
+            pen.rect(-14.5, -5.0, -12.5, 7.0);
+            pen.poly(&[(-13.5, -11.0), (-9.0, -4.0), (-18.0, -4.0)]);
+            menu_mark(&pen);
+        }
+        Icon::GearMenu => {
+            paint_scaled(
+                pen.painter,
+                pen.center,
+                Icon::Gear,
+                pen.color,
+                background,
+                pen.scale,
+            );
+            menu_mark(&pen);
+        }
+        Icon::TextOrientation => {
+            let dim = Pen {
+                color: pen.color.gamma_multiply(0.6),
+                ..pen
+            };
+            dim.rect(-7.0, -14.0, 12.0, -11.0);
+            dim.rect(1.0, -14.0, 4.0, 4.0);
+            dim.rect(-3.0, 3.0, 8.0, 5.0);
+            dim.rect(-14.0, -14.0, -12.0, 6.0);
+            dim.poly(&[(-18.0, 4.0), (-8.0, 4.0), (-13.0, 10.0)]);
+            dim.rect(-7.0, 11.0, 13.0, 13.0);
+            dim.poly(&[(11.0, 7.0), (11.0, 17.0), (16.0, 12.0)]);
+        }
+        Icon::FontSize => {
+            pen.rect(-8.0, -13.0, 16.0, -10.0);
+            pen.rect(-8.0, -10.0, -5.0, -6.0);
+            pen.rect(13.0, -10.0, 16.0, -6.0);
+            pen.rect(2.0, -13.0, 6.0, 12.0);
+            pen.rect(-3.0, 10.0, 11.0, 13.0);
+            pen.rect(-16.0, 0.0, -4.0, 2.0);
+            pen.rect(-11.0, 0.0, -9.0, 12.0);
+            pen.rect(-14.0, 11.0, -6.0, 13.0);
+        }
+        Icon::TextLeft | Icon::TextCenter | Icon::TextRight => {
+            for (k, y) in [-10.0, -5.0, 0.0, 5.0, 10.0].into_iter().enumerate() {
+                let w = if k % 2 == 0 { 28.0 } else { 20.0 };
+                let x0 = match icon {
+                    Icon::TextLeft => -14.0,
+                    Icon::TextCenter => -w / 2.0,
+                    _ => 14.0 - w,
+                };
+                pen.rect(x0, y - 1.0, x0 + w, y + 1.0);
+            }
+        }
+        Icon::WarpText => {
+            pen.rect(-17.0, -14.0, 11.0, -10.0);
+            pen.rect(-17.0, -10.0, -13.0, -7.0);
+            pen.rect(7.0, -10.0, 11.0, -7.0);
+            pen.rect(-5.0, -14.0, -1.0, 13.0);
+            pen.rect(-9.0, 10.0, 3.0, 13.0);
+            pen.poly(&[
+                (13.0, -3.0),
+                (17.0, 0.0),
+                (15.0, 10.0),
+                (10.0, 12.0),
+                (8.0, 9.0),
+            ]);
+        }
+        Icon::Text3d => {
+            let dim = Pen {
+                color: pen.color.gamma_multiply(0.55),
+                ..pen
+            };
+            dim.line(&[(-1.0, -16.0), (-1.0, 5.0)], 2.0);
+            dim.line(&[(-9.0, -10.0), (6.0, -16.0)], 2.0);
+            dim.line(
+                &[
+                    (-17.0, 16.0),
+                    (-11.0, 10.0),
+                    (-4.0, 7.0),
+                    (2.0, 7.0),
+                    (9.0, 10.0),
+                    (15.0, 16.0),
+                ],
+                2.0,
+            );
+        }
+        Icon::CharacterPanels => {
+            pen.rect(-16.0, -14.0, 16.0, 18.0);
+            let hole = Pen {
+                color: background,
+                ..pen
+            };
+            for y in [0.0, 6.0, 12.0] {
+                hole.rect(-11.0, y, -9.0, y + 2.0);
+                hole.rect(-6.0, y, 11.0, y + 2.0);
+            }
+            hole.rect(0.0, -14.0, 16.0, -9.0);
+            pen.rect(1.0, -14.0, 16.0, -11.0);
+        }
+        Icon::Link => {
+            pen.line(
+                &[
+                    (-2.0, -4.0),
+                    (-10.0, -4.0),
+                    (-13.0, -1.0),
+                    (-13.0, 1.0),
+                    (-10.0, 4.0),
+                    (-2.0, 4.0),
+                ],
+                2.0,
+            );
+            pen.line(
+                &[
+                    (2.0, -4.0),
+                    (10.0, -4.0),
+                    (13.0, -1.0),
+                    (13.0, 1.0),
+                    (10.0, 4.0),
+                    (2.0, 4.0),
+                ],
+                2.0,
+            );
+            pen.rect(-6.0, -1.0, 6.0, 1.0);
+        }
+        Icon::CornerRadius => pen.arc(9.0, 12.0, 20.0, (3.15, 4.71), 2.4),
+        Icon::PolygonSides => {
+            pen.line(
+                &[
+                    (-8.0, -15.0),
+                    (8.0, -15.0),
+                    (16.0, 0.0),
+                    (8.0, 15.0),
+                    (-8.0, 15.0),
+                    (-16.0, 0.0),
+                    (-8.0, -15.0),
+                ],
+                2.0,
+            );
+            pen.rect(-5.0, -8.0, -3.0, 8.0);
+            pen.rect(3.0, -8.0, 5.0, 8.0);
+            pen.rect(-8.0, -4.0, 8.0, -2.0);
+            pen.rect(-8.0, 2.0, 8.0, 4.0);
+        }
+        Icon::ZoomIn | Icon::ZoomOut => {
+            pen.ring(-3.0, -3.0, 10.0, 2.2);
+            pen.round_line((4.5, 4.5), (13.0, 13.0), 4.0);
+            pen.rect(-8.0, -4.0, 2.0, -2.0);
+            if icon == Icon::ZoomIn {
+                pen.rect(-4.0, -8.0, -2.0, 2.0);
+            }
+        }
+        Icon::TextTop | Icon::TextMiddle | Icon::TextBottom => {
+            for (k, x) in [-12.0, -8.0, -4.0, 0.0, 4.0, 8.0, 12.0]
+                .into_iter()
+                .enumerate()
+            {
+                let h = [22.0, 28.0, 26.0, 28.0, 20.0, 26.0, 24.0][k];
+                let y0 = match icon {
+                    Icon::TextTop => -14.0,
+                    Icon::TextMiddle => -h / 2.0,
+                    _ => 14.0 - h,
+                };
+                pen.rect(x - 1.0, y0, x + 1.0, y0 + h);
+            }
+        }
+        Icon::ArrangeFront | Icon::ArrangeForward | Icon::ArrangeBackward | Icon::ArrangeBack => {
+            let filled = match icon {
+                Icon::ArrangeFront => 0,
+                Icon::ArrangeForward => 1,
+                Icon::ArrangeBackward => 2,
+                _ => 3,
+            };
+            for k in (0..4).rev() {
+                let y = -11.0 + 6.0 * k as f32;
+                let d = [(4.0, y - 5.0), (15.0, y), (4.0, y + 5.0), (-7.0, y)];
+                if k == filled {
+                    pen.poly(&d);
+                } else {
+                    let hole = Pen {
+                        color: background,
+                        ..pen
+                    };
+                    hole.poly(&d);
+                    pen.line(&[d[0], d[1], d[2], d[3], d[0]], 1.5);
+                }
+            }
+            let up = filled < 2;
+            // The arrow: a shaft and a head pointing up or down
+            let (tip, dir, y0, y1): (f32, f32, f32, f32) = if up {
+                (-3.0, 1.0, 0.0, 7.0)
+            } else {
+                (7.0, -1.0, -3.0, 4.0)
+            };
+            pen.rect(-13.75, y0, -12.25, y1);
+            pen.poly(&[
+                (-13.0, tip),
+                (-9.0, tip + 4.0 * dir),
+                (-17.0, tip + 4.0 * dir),
+            ]);
+        }
+        Icon::ArtboardPortrait | Icon::ArtboardLandscape | Icon::AddArtboard => {
+            let (w, h) = if icon == Icon::ArtboardLandscape {
+                (12.0, 9.0)
+            } else {
+                (9.0, 12.0)
+            };
+            let (cx, cy) = if icon == Icon::AddArtboard {
+                (2.0, 2.0)
+            } else {
+                (0.0, 0.0)
+            };
+            let fold = 4.0;
+            pen.line(
+                &[
+                    (cx + w - fold, cy - h),
+                    (cx - w, cy - h),
+                    (cx - w, cy + h),
+                    (cx + w, cy + h),
+                    (cx + w, cy - h + fold),
+                    (cx + w - fold, cy - h),
+                ],
+                1.5,
+            );
+            pen.poly(&[
+                (cx + w - fold, cy - h),
+                (cx + w, cy - h + fold),
+                (cx + w - fold, cy - h + fold),
+            ]);
+            if icon == Icon::AddArtboard {
+                pen.rect(cx - 0.75, cy - 4.0, cx + 0.75, cy + 4.0);
+                pen.rect(cx - 4.0, cy - 0.75, cx + 4.0, cy + 0.75);
+                pen.rect(-12.75, -16.0, -11.25, -12.0);
+                pen.rect(-16.0, -12.75, -12.0, -11.25);
+            } else {
+                // Tick marks off each corner
+                for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                    let (x, y) = (w * sx, h * sy);
+                    pen.rect(x - 0.75, y + 3.0 * sy, x + 0.75, y + 5.0 * sy);
+                    pen.rect(x + 3.0 * sx, y - 0.75, x + 5.0 * sx, y + 0.75);
+                }
+            }
+        }
+        Icon::FrameRect
+        | Icon::FrameEllipse
+        | Icon::FrameTriangle
+        | Icon::FrameHexagon
+        | Icon::FrameCustom => {
+            let shade = Pen {
+                color: Color32::from_gray(0x6f),
+                ..pen
+            };
+            let outline: Vec<(f32, f32)> = match icon {
+                Icon::FrameRect => vec![(-13.0, -13.0), (13.0, -13.0), (13.0, 13.0), (-13.0, 13.0)],
+                Icon::FrameEllipse => (0..32)
+                    .map(|i| {
+                        let a = i as f32 / 32.0 * std::f32::consts::TAU;
+                        (14.0 * a.cos(), 14.0 * a.sin())
+                    })
+                    .collect(),
+                Icon::FrameTriangle => vec![(0.0, -14.0), (16.0, 14.0), (-16.0, 14.0)],
+                Icon::FrameHexagon => vec![
+                    (-7.0, -13.0),
+                    (7.0, -13.0),
+                    (15.0, 0.0),
+                    (7.0, 13.0),
+                    (-7.0, 13.0),
+                    (-15.0, 0.0),
+                ],
+                _ => (0..40)
+                    .map(|i| {
+                        let a = i as f32 / 40.0 * std::f32::consts::TAU;
+                        let r = 10.0 + 4.0 * (4.0 * a + 0.4).sin();
+                        (r * a.cos(), r * a.sin())
+                    })
+                    .collect(),
+            };
+            if icon == Icon::FrameCustom {
+                for w in outline.windows(2) {
+                    shade.poly(&[(0.0, 0.0), w[0], w[1]]);
+                }
+                shade.poly(&[(0.0, 0.0), outline[outline.len() - 1], outline[0]]);
+            } else {
+                shade.poly(&outline);
+            }
+            let mut ring = outline.clone();
+            ring.push(outline[0]);
+            pen.line(&ring, 1.5);
+            let (a, b) = match icon {
+                Icon::FrameTriangle => (8.0, 6.0),
+                Icon::FrameRect => (13.0, 13.0),
+                _ => (9.5, 9.5),
+            };
+            let oy = if icon == Icon::FrameTriangle {
+                6.0
+            } else {
+                0.0
+            };
+            pen.line(&[(-a, oy - b), (a, oy + b)], 1.5);
+            pen.line(&[(a, oy - b), (-a, oy + b)], 1.5);
+        }
+        Icon::StrokeCenter => {
+            pen.line(
+                &[
+                    (-8.0, -8.0),
+                    (8.0, -8.0),
+                    (8.0, 8.0),
+                    (-8.0, 8.0),
+                    (-8.0, -8.0),
+                ],
+                3.0,
+            );
+            for (x, y) in [(-10.0, -10.0), (10.0, -10.0), (-10.0, 10.0), (10.0, 10.0)] {
+                pen.rect(x - 2.0, y - 2.0, x + 2.0, y + 2.0);
             }
         }
         Icon::Swap => {

@@ -914,14 +914,6 @@ pub enum MarqueeStyle {
 
 impl MarqueeStyle {
     pub const ALL: [Self; 3] = [Self::Normal, Self::FixedRatio, Self::FixedSize];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Normal => "Normal",
-            Self::FixedRatio => "Fixed Ratio",
-            Self::FixedSize => "Fixed Size",
-        }
-    }
 }
 
 pub struct MarqueeOptions {
@@ -1224,7 +1216,6 @@ impl AppState {
         }
     }
 
-    /// Makes `tool` current and the tool shown in its toolbar slot.
     /// An options bar setting nothing reads yet, starting at `default`.
     pub fn setting(&mut self, key: &'static str, default: &str) -> &mut String {
         self.tool_settings
@@ -1241,6 +1232,7 @@ impl AppState {
         *self.setting(key, "0") = if on { "1" } else { "0" }.to_owned();
     }
 
+    /// Makes `tool` current and the tool shown in its toolbar slot.
     pub fn select_tool(&mut self, tool: Tool) {
         self.tool = tool;
         self.tool_slots[tool.slot()] = tool;

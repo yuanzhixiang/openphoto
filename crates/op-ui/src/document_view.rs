@@ -68,6 +68,15 @@ pub fn fit_on_screen(state: &mut DocState, ppp: f32) {
     state.view.offset = Vec2::ZERO;
 }
 
+/// The Hand and Zoom tools' Fill Screen: the zoom at which the document
+/// covers the whole window.
+pub fn fill_screen(state: &mut DocState, ppp: f32) {
+    let avail = state.view.viewport.size() * ppp;
+    let z = (avail.x / state.doc.width as f32).max(avail.y / state.doc.height as f32);
+    state.view.zoom = z.clamp(MIN_ZOOM, MAX_ZOOM);
+    state.view.offset = Vec2::ZERO;
+}
+
 /// View > 100%.
 pub fn actual_pixels(state: &mut DocState, _ppp: f32) {
     state.view.zoom = 1.0;
@@ -138,6 +147,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let move_options = app.move_options;
     let type_options = app.type_options;
     let crop_options = app.crop_options.clone();
+    // The Zoom tool's Zoom Out button swaps what a click and Alt-click do
+    let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
     let mut straightened = false;
     let mut paint_error = None;
     let Some(state) = app.docs.get_mut(&id) else {
@@ -308,7 +319,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
         match tool {
             Tool::Zoom if response.clicked() => {
                 if let Some(p) = response.interact_pointer_pos() {
-                    let z = next_zoom_step(state.view.zoom, !alt);
+                    let z = next_zoom_step(state.view.zoom, alt == zoom_out);
                     zoom_at(state, z, p, ppp);
                 }
             }
@@ -479,7 +490,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             crate::crop_tool::cursor(state, p, ppp)
         } else {
             match tool {
-                Tool::Zoom if alt => CursorIcon::ZoomOut,
+                Tool::Zoom if alt != zoom_out => CursorIcon::ZoomOut,
                 Tool::Zoom => CursorIcon::ZoomIn,
                 // Painting tools draw their own brush outline instead
                 _ if paint.is_some_and(|p| p.size * state.view.zoom / ppp >= 4.0) => {

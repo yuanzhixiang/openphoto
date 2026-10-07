@@ -48,61 +48,6 @@ pub fn icon_button_font(
     response
 }
 
-/// A bare icon without a background.
-pub fn icon(ui: &mut Ui, icon: &str, size: f32, tint: Color32) -> Response {
-    let (rect, response) = ui.allocate_exact_size(Vec2::splat(size + 4.0), Sense::click());
-    ui.painter().text(
-        rect.center(),
-        Align2::CENTER_CENTER,
-        icon,
-        theme::icon(size),
-        tint,
-    );
-    response
-}
-
-/// A read-only field that looks like a text input (for values that aren't
-/// editable yet, such as size and resolution).
-pub fn field(ui: &mut Ui, text: &str, width: f32, enabled: bool) -> Response {
-    let (rect, response) =
-        ui.allocate_exact_size(Vec2::new(width, theme::size::FIELD_HEIGHT), Sense::hover());
-    let (fill, stroke, text_color) = if enabled {
-        (color::FIELD, color::FIELD_BORDER, color::TEXT)
-    } else {
-        (
-            Color32::TRANSPARENT,
-            color::SEPARATOR_LIGHT,
-            color::TEXT_DISABLED,
-        )
-    };
-    ui.painter().rect(
-        rect,
-        CornerRadius::same(2),
-        fill,
-        Stroke::new(1.0, stroke),
-        StrokeKind::Inside,
-    );
-    ui.painter().text(
-        rect.left_center() + Vec2::new(6.0, 0.0),
-        Align2::LEFT_CENTER,
-        text,
-        theme::body(),
-        text_color,
-    );
-    response
-}
-
-/// Vertical separator between groups in the options bar: a 1 pt line in
-/// `#3e3e3e`, as in Photoshop.
-pub fn vseparator(ui: &mut Ui, height: f32) {
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(9.0, height), Sense::hover());
-    ui.painter().rect_filled(
-        Rect::from_center_size(rect.center(), Vec2::new(theme::pt(1.0), height)),
-        0,
-        color::OPTIONS_SEPARATOR,
-    );
-}
-
 /// Photoshop's checkbox: a 10 pt light-gray rounded square with a dark
 /// check mark when on, an outlined square when off, the label 7.5 pt to
 /// its right. Clicking the box or the label toggles it.
@@ -110,10 +55,11 @@ pub fn checkbox(ui: &mut Ui, checked: &mut bool, label: &str) -> Response {
     use theme::pt;
     let enabled = ui.is_enabled();
     let font = theme::body();
+    // Disabled, Photoshop dims the label to #878787
     let text_color = if enabled {
         color::TEXT_BRIGHT
     } else {
-        color::TEXT_DISABLED
+        Color32::from_gray(0x87)
     };
     let galley = ui
         .painter()
@@ -134,8 +80,18 @@ pub fn checkbox(ui: &mut Ui, checked: &mut bool, label: &str) -> Response {
             egui::pos2(rect.left(), rect.center().y - pt(5.0)),
             Vec2::splat(pt(10.0)),
         );
+        if !enabled {
+            // Measured: a #4d4d4d box in a 1 pt #5e5e5e frame
+            painter.rect(
+                b,
+                CornerRadius::same(pt(2.5) as u8),
+                Color32::from_gray(0x4d),
+                Stroke::new(pt(1.0), Color32::from_gray(0x5e)),
+                StrokeKind::Inside,
+            );
+        }
         let fill = if !enabled {
-            color::TEXT_DISABLED
+            Color32::from_gray(0x5e)
         } else if response.hovered() {
             Color32::from_gray(0xe6)
         } else {
@@ -148,7 +104,7 @@ pub fn checkbox(ui: &mut Ui, checked: &mut bool, label: &str) -> Response {
                 vec![p(2.75, 4.75), p(4.5, 6.75), p(8.0, 2.75)],
                 Stroke::new(pt(1.7), color::CHECK_MARK),
             ));
-        } else {
+        } else if enabled {
             painter.rect_stroke(
                 b.shrink(pt(0.5)),
                 CornerRadius::same(pt(2.5) as u8),
@@ -294,23 +250,6 @@ pub fn checkerboard(painter: &egui::Painter, rect: Rect, cell: f32) {
             }
         }
     }
-}
-
-/// Shows/edits a 0..=1 value as a percentage.
-pub fn percent_drag(ui: &mut Ui, value: &mut f32) -> Response {
-    let mut pct = *value * 100.0;
-    let response = ui.add_sized(
-        [64.0, theme::size::FIELD_HEIGHT],
-        egui::DragValue::new(&mut pct)
-            .range(0.0..=100.0)
-            .speed(0.5)
-            .max_decimals(0)
-            .suffix("%"),
-    );
-    if response.changed() {
-        *value = pct / 100.0;
-    }
-    response
 }
 
 /// An editable options-bar field at `rect`: Photoshop's `#454545` box with

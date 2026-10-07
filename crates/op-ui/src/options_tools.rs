@@ -53,6 +53,49 @@ pub enum Item {
     GradientSwatch(f32, f32, f32),
     /// The four selection combine modes from x, chosen by a setting.
     Modes(f32, &'static str),
+    /// An icon centered at x that can't be used.
+    IconOff(f32, Icon),
+    /// An icon centered at x that only marks the next control.
+    Glyph(f32, Icon),
+    /// Text starting at x, dimmed.
+    LabelOff(f32, &'static str),
+    /// An empty field from x0 to x1 that can't be used.
+    FieldOff(f32, f32),
+    /// An unusable field from x0 to x1 joined to its chevron box (to x2).
+    ComboOff(f32, f32, f32),
+    /// A field from x0 to x1 joined to a chevron box ending at x2 that
+    /// offers the options: its key and default.
+    Combo(
+        f32,
+        f32,
+        f32,
+        &'static str,
+        &'static str,
+        &'static [&'static str],
+    ),
+    /// A note centered in the bar ("No options for the … Tool.").
+    Notice(&'static str),
+    /// The foreground color in a frame from x0 to x1 (a shape's Fill).
+    FillSwatch(f32, f32),
+    /// No color in a frame from x0 to x1 (the shapes draw no stroke).
+    NoStroke(f32, f32),
+    /// The stroke's line style: a pop-up from x0 to x1.
+    LineStyle(f32, f32, &'static str),
+    /// A color box from x0 to x1, y0 to y1: the foreground ("fg") or an
+    /// artboard's background.
+    ColorFrame(f32, f32, f32, f32, &'static str),
+    /// A push button from x0 to x1 that does what its label says (100%,
+    /// Fit Screen, Fill Screen, Reset View, Front Image, Clear).
+    Action(f32, f32, &'static str),
+    /// The view rotation dial centered at x, showing a setting's angle.
+    Dial(f32, &'static str),
+    /// The custom shape: its box from x0 to x1, the chevron box to x2.
+    ShapePicker(f32, f32, f32),
+    /// A pop-up from x0 to x1 with an icon before its value.
+    IconPopup(f32, f32, Icon, &'static str, &'static [&'static str]),
+    /// A Slice tool size: its label at lx and field from x0 to x1, usable
+    /// once a style other than Normal is chosen.
+    SliceSize(f32, &'static str, f32, f32, &'static str),
 }
 
 use Item::*;
@@ -107,6 +150,157 @@ const EYEDROPPER_SAMPLE: &[&str] = &[
     "All Layers No Adjustments",
     "Current & Below No Adjustments",
 ];
+
+const FONTS: &[&str] = &["Source Sans 3"];
+const FONT_STYLES: &[&str] = &["Regular", "Semibold"];
+const FONT_SIZES: &[&str] = &[
+    "6 pt", "8 pt", "9 pt", "10 pt", "11 pt", "12 pt", "14 pt", "18 pt", "24 pt", "30 pt", "36 pt",
+    "48 pt", "60 pt", "72 pt",
+];
+const STROKE_WIDTHS: &[&str] = &["0.5 px", "1 px", "2 px", "3 px", "5 px", "10 px"];
+const LINE_STYLES: &[&str] = &["Solid", "Dashed", "Dotted"];
+const DRAW_MODES: &[&str] = &["Shape", "Path", "Pixels"];
+const ARTBOARD_SIZES: &[&str] = &[
+    "Custom",
+    "iPhone 8/7/6",
+    "iPhone 8/7/6 Plus",
+    "iPhone X",
+    "iPad Pro",
+    "Web 1280",
+    "Web 1920",
+];
+
+/// The pen tools' shared start: the mode, Make, path operations,
+/// alignment and arrangement, the gear.
+macro_rules! pen_bar {
+    ($($rest:expr),* $(,)?) => {
+        &[
+            Popup(110.0, 180.0, "pen.mode", DRAW_MODES),
+            Sep(183.0),
+            Label(188.0, "Make:"),
+            Button(220.5, 295.5, "Selection...", false),
+            Button(299.5, 346.0, "Mask", false),
+            Button(350.0, 401.0, "Shape", false),
+            Sep(404.5),
+            Icon(421.5, Icon::PathOperations, "Path operations"),
+            Sep(437.5),
+            Icon(454.0, Icon::PathAlignment, "Path alignment"),
+            Sep(470.5),
+            Icon(487.5, Icon::PathArrangement, "Path arrangement"),
+            Sep(503.5),
+            Icon(520.5, Icon::GearMenu, "Set additional pen and path options"),
+            $($rest),*
+        ]
+    };
+}
+
+/// The type tools: orientation, font, style, size, alignment (the
+/// vertical tools' icons given), color, warp, 3D and the panels.
+macro_rules! type_bar {
+    ($a:expr, $b:expr, $c:expr) => {
+        &[
+            Icon(125.75, Icon::TextOrientation, "Toggle text orientation"),
+            Sep(146.0),
+            Combo(152.0, 296.5, 311.0, "type.font", "Source Sans 3", FONTS),
+            Combo(320.0, 462.0, 476.5, "type.style", "Regular", FONT_STYLES),
+            Sep(482.5),
+            Glyph(498.5, Icon::FontSize),
+            Combo(516.5, 580.0, 594.5, "type.size", "12 pt", FONT_SIZES),
+            Sep(600.5),
+            Radio(620.5, $a, "Align text left or top", "type.align", 0),
+            Radio(646.5, $b, "Center text", "type.align", 1),
+            Radio(672.5, $c, "Align text right or bottom", "type.align", 2),
+            Sep(691.5),
+            ColorFrame(697.5, 725.5, 8.5, 26.5, "fg"),
+            Sep(730.5),
+            Icon(750.0, Icon::WarpText, "Create warped text"),
+            IconOff(784.5, Icon::Text3d),
+            Sep(807.5),
+            Icon(
+                831.5,
+                Icon::CharacterPanels,
+                "Toggle the Character and Paragraph panels",
+            ),
+            Sep(851.5),
+        ]
+    };
+}
+
+/// The shape tools' shared start: mode, Fill, Stroke, W and H, path
+/// operations, alignment and arrangement, the gear.
+macro_rules! shape_bar {
+    ($($rest:expr),* $(,)?) => {
+        &[
+            Popup(110.0, 180.0, "shape.mode", DRAW_MODES),
+            Sep(183.0),
+            Label(190.0, "Fill:"),
+            FillSwatch(207.0, 237.0),
+            Label(241.5, "Stroke:"),
+            NoStroke(276.0, 306.0),
+            Combo(310.0, 361.5, 376.0, "shape.stroke_width", "1 px", STROKE_WIDTHS),
+            LineStyle(381.5, 430.5, "shape.stroke_type"),
+            Sep(435.0),
+            Label(437.5, "W:"),
+            Field(453.5, 499.0, "shape.w", "0 px"),
+            Toggle(515.5, Icon::Link, "Link width and height", "shape.link"),
+            Label(535.0, "H:"),
+            Field(548.5, 594.0, "shape.h", "0 px"),
+            Sep(603.0),
+            Icon(620.0, Icon::PathCombine, "Path operations"),
+            Sep(636.0),
+            Icon(652.75, Icon::PathAlignment, "Path alignment"),
+            Sep(669.0),
+            Icon(686.0, Icon::PathArrangement, "Path arrangement"),
+            Sep(702.0),
+            Icon(719.0, Icon::GearMenu, "Set additional shape and path options"),
+            $($rest),*
+        ]
+    };
+}
+
+/// The path selection tools.
+const PATH_SELECTION: &[Item] = &[
+    Label(110.0, "Select:"),
+    Popup(
+        148.0,
+        247.5,
+        "pathselect.select",
+        &["Active Layers", "All Layers"],
+    ),
+    Sep(255.5),
+    Label(267.5, "Fill:"),
+    FillSwatch(284.0, 314.0),
+    Label(318.5, "Stroke:"),
+    NoStroke(353.5, 383.5),
+    ComboOff(387.5, 439.0, 453.5),
+    PopupOff(459.0, 508.0, ""),
+    Sep(512.5),
+    LabelOff(515.0, "W:"),
+    FieldOff(531.0, 576.5),
+    IconOff(593.25, Icon::Link),
+    LabelOff(612.5, "H:"),
+    FieldOff(626.0, 671.5),
+    Sep(685.0),
+    Icon(707.0, Icon::PathCombine, "Path operations"),
+    Sep(728.0),
+    Icon(749.75, Icon::PathAlignment, "Path alignment"),
+    Sep(771.0),
+    Icon(793.0, Icon::PathArrangement, "Path arrangement"),
+    Sep(814.0),
+    CheckOff(823.5, "Align Edges"),
+    Sep(908.5),
+    Icon(930.5, Icon::GearMenu, "Set additional path options"),
+    Check(
+        951.5,
+        "Constrain Path Dragging",
+        "pathselect.constrain",
+        false,
+    ),
+];
+
+/// The type tools (the masks share them).
+const HORIZONTAL_TYPE: &[Item] = type_bar!(Icon::TextLeft, Icon::TextCenter, Icon::TextRight);
+const VERTICAL_TYPE: &[Item] = type_bar!(Icon::TextTop, Icon::TextMiddle, Icon::TextBottom);
 
 /// The tools' bars, measured on Photoshop 2026.
 pub fn layout(tool: Tool) -> Option<&'static [Item]> {
@@ -953,6 +1147,225 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             Sep(491.0),
             Icon(515.0, Icon::NotesPanel, "Toggle the Notes panel"),
         ],
+        Pen => pen_bar!(
+            Check(536.5, "Auto Add/Delete", "pen.auto_add", true),
+            CheckOff(639.0, "Align Edges"),
+        ),
+        FreeformPen => pen_bar!(
+            Check(536.5, "Magnetic", "freeform.magnetic", false),
+            CheckOff(605.0, "Align Edges"),
+        ),
+        CurvaturePen => pen_bar!(CheckOff(537.0, "Align Edges")),
+        AddAnchorPoint => &[Notice("No options for the Add Anchor Point Tool.")],
+        DeleteAnchorPoint => &[Notice("No options for the Delete Anchor Point Tool.")],
+        ConvertPoint => &[Notice("No options for the Convert Point Tool.")],
+        HorizontalType | HorizontalTypeMask => HORIZONTAL_TYPE,
+        VerticalType | VerticalTypeMask => VERTICAL_TYPE,
+        PathSelection | DirectSelection => PATH_SELECTION,
+        Rectangle | Triangle => shape_bar!(
+            Sep(735.0),
+            Glyph(749.0, Icon::CornerRadius),
+            Field(759.0, 804.5, "shape.radius", "0 px"),
+            Sep(807.0),
+            Check(811.0, "Align Edges", "shape.align_edges", true),
+        ),
+        Ellipse => shape_bar!(Check(735.0, "Align Edges", "shape.align_edges", true)),
+        Polygon => shape_bar!(
+            Sep(735.0),
+            Glyph(749.0, Icon::PolygonSides),
+            Field(761.0, 806.5, "shape.sides", "5"),
+            Sep(809.0),
+            Glyph(823.0, Icon::CornerRadius),
+            Field(833.0, 878.5, "shape.radius", "0 px"),
+            Sep(881.5),
+            Check(885.5, "Align Edges", "shape.align_edges", true),
+        ),
+        Line => shape_bar!(
+            Label(736.5, "Weight:"),
+            Field(776.5, 822.0, "shape.weight", "1 px"),
+            Check(825.0, "Align Edges", "shape.align_edges", true),
+        ),
+        CustomShape => shape_bar!(
+            Label(736.5, "Shape:"),
+            ShapePicker(772.0, 802.0, 814.0),
+            Check(817.0, "Align Edges", "shape.align_edges", true),
+        ),
+        Hand => &[
+            Check(110.0, "Scroll All Windows", "hand.scroll_all", false),
+            Sep(227.0),
+            Action(239.0, 287.0, "100%"),
+            Action(296.0, 365.5, "Fit Screen"),
+            Action(374.5, 445.5, "Fill Screen"),
+            Sep(454.0),
+        ],
+        RotateView => &[
+            Label(112.0, "Rotation Angle:"),
+            Field(188.5, 234.0, "rotate.angle", "0°"),
+            Dial(252.0, "rotate.angle"),
+            Action(272.0, 346.0, "Reset View"),
+            Check(354.5, "Rotate All Windows", "rotate.all", false),
+        ],
+        Zoom => &[
+            Radio(123.0, Icon::ZoomIn, "Zoom in", "zoom.out", 0),
+            Radio(152.0, Icon::ZoomOut, "Zoom out", "zoom.out", 1),
+            Sep(169.0),
+            Check(178.0, "Resize Windows to Fit", "zoom.resize", true),
+            Check(312.0, "Zoom All Windows", "zoom.all", false),
+            Check(429.5, "Scrubby Zoom", "zoom.scrubby", true),
+            Action(524.5, 572.5, "100%"),
+            Action(581.5, 651.5, "Fit Screen"),
+            Action(660.0, 731.5, "Fill Screen"),
+        ],
+        Artboard => &[
+            Label(110.5, "Size:"),
+            Popup(138.5, 379.0, "artboard.size", ARTBOARD_SIZES),
+            Label(388.5, "Width:"),
+            Field(423.5, 499.0, "artboard.w", "750 px"),
+            Label(509.0, "Height:"),
+            Field(547.0, 622.5, "artboard.h", "1334 px"),
+            ColorFrame(630.5, 647.5, 9.0, 26.0, "artboard.bg"),
+            Popup(
+                652.0,
+                734.5,
+                "artboard.bg",
+                &["White", "Black", "Transparent"],
+            ),
+            Sep(742.5),
+            IconOff(764.5, Icon::ArtboardPortrait),
+            IconOff(798.5, Icon::ArtboardLandscape),
+            Sep(819.5),
+            Icon(841.0, Icon::AddArtboard, "Add new artboard"),
+            Sep(862.5),
+            Icon(884.25, Icon::PathAlignment, "Align artboards"),
+            Sep(905.5),
+            Icon(927.5, Icon::GearMenu, "Set additional artboard options"),
+        ],
+        PerspectiveCrop => &[
+            Label(111.5, "W:"),
+            Field(126.5, 200.5, "pcrop.w", ""),
+            Icon(215.5, Icon::Swap, "Swap height and width"),
+            Label(232.5, "H:"),
+            Field(245.0, 319.0, "pcrop.h", ""),
+            Sep(323.0),
+            Label(330.0, "Resolution:"),
+            Field(385.5, 459.5, "pcrop.res", ""),
+            Popup(462.5, 533.5, "pcrop.unit", &["Pixels/in", "Pixels/cm"]),
+            Sep(537.0),
+            Action(544.5, 623.5, "Front Image"),
+            Action(632.5, 678.5, "Clear"),
+            Sep(685.0),
+            Check(690.0, "Show Grid", "pcrop.grid", true),
+        ],
+        Slice => &[
+            Label(110.5, "Style:"),
+            Popup(
+                142.5,
+                257.0,
+                "slice.style",
+                &["Normal", "Fixed Aspect Ratio", "Fixed Size"],
+            ),
+            SliceSize(266.5, "Width:", 301.5, 362.0, "slice.w"),
+            SliceSize(372.0, "Height:", 410.0, 470.5, "slice.h"),
+            Sep(478.5),
+            Button(488.0, 601.5, "Slices From Guides", false),
+        ],
+        SliceSelect => &[
+            Icon(123.0, Icon::ArrangeFront, "Bring to front"),
+            Icon(149.0, Icon::ArrangeForward, "Bring forward"),
+            Icon(174.75, Icon::ArrangeBackward, "Send backward"),
+            Icon(200.75, Icon::ArrangeBack, "Send to back"),
+            Button(222.5, 284.5, "Promote", false),
+            Button(293.5, 353.5, "Divide...", false),
+            Sep(362.0),
+            Icon(383.75, Icon::AlignLeft, "Align left edges"),
+            Icon(
+                409.75,
+                Icon::AlignHorizontalCenter,
+                "Align horizontal centers",
+            ),
+            Icon(435.75, Icon::AlignRight, "Align right edges"),
+            Icon(
+                470.0,
+                Icon::DistributeVertically,
+                "Distribute vertical centers",
+            ),
+            Sep(491.0),
+            Icon(513.0, Icon::AlignTop, "Align top edges"),
+            Icon(539.0, Icon::AlignVerticalCenter, "Align vertical centers"),
+            Icon(565.0, Icon::AlignBottom, "Align bottom edges"),
+            Icon(
+                599.0,
+                Icon::DistributeHorizontally,
+                "Distribute horizontal centers",
+            ),
+            Sep(620.0),
+            Icon(642.0, Icon::More, "More distribute options"),
+            Sep(663.0),
+            Button(672.5, 772.5, "Hide Auto Slices", true),
+            Sep(781.0),
+            Icon(
+                803.0,
+                Icon::CharacterPanels,
+                "Set options for current slice",
+            ),
+        ],
+        Frame => &[
+            Radio(
+                123.0,
+                Icon::FrameRect,
+                "Create rectangular frame",
+                "frame.shape",
+                0,
+            ),
+            Radio(
+                149.0,
+                Icon::FrameEllipse,
+                "Create elliptical frame",
+                "frame.shape",
+                1,
+            ),
+            Radio(
+                175.0,
+                Icon::FrameTriangle,
+                "Create triangular frame",
+                "frame.shape",
+                2,
+            ),
+            Radio(
+                201.0,
+                Icon::FrameHexagon,
+                "Create polygonal frame",
+                "frame.shape",
+                3,
+            ),
+            Radio(
+                227.0,
+                Icon::FrameCustom,
+                "Create custom frame",
+                "frame.shape",
+                4,
+            ),
+            Sep(250.0),
+            Label(255.5, "Stroke:"),
+            NoStroke(290.5, 320.5),
+            Combo(
+                324.5,
+                376.0,
+                390.5,
+                "frame.stroke_width",
+                "1 px",
+                STROKE_WIDTHS,
+            ),
+            IconPopup(
+                395.5,
+                490.5,
+                Icon::StrokeCenter,
+                "frame.stroke_align",
+                &["Inside", "Center", "Outside"],
+            ),
+            Glyph(508.5, Icon::CornerRadius),
+            Field(518.5, 564.0, "frame.radius", "0 px"),
+        ],
         Count => &[
             Label(110.5, "Count:"),
             Label(151.5, "0"),
@@ -986,6 +1399,13 @@ fn text(app: &mut AppState, key: &'static str, default: &str) -> String {
         "paint.flow" => app.paint_options(tool).map(|o| percent(o.flow)),
         "bucket.opacity" => Some(percent(app.bucket.fill.opacity)),
         "bucket.tolerance" => Some(app.bucket.tolerance.to_string()),
+        "type.style" => Some(FONT_STYLES[app.type_options.semibold as usize].to_owned()),
+        "type.size" => Some(format!(
+            "{} pt",
+            (app.type_options.size_pt * 10.0).round() / 10.0
+        )),
+        "shape.sides" => Some(app.shape.sides.to_string()),
+        "shape.weight" => Some(format!("{} px", (app.shape.weight * 10.0).round() / 10.0)),
         _ => None,
     }
     .unwrap_or_else(|| app.setting(key, default).clone())
@@ -1014,6 +1434,38 @@ fn set_text(app: &mut AppState, key: &'static str, default: &str, typed: String)
         "bucket.tolerance" => {
             if let Some(v) = number {
                 app.bucket.tolerance = v.clamp(0.0, 255.0) as u8;
+            }
+        }
+        // Only the bundled family can be set
+        "type.font" => {}
+        "type.style" => {
+            if let Some(i) = FONT_STYLES
+                .iter()
+                .position(|s| s.eq_ignore_ascii_case(typed.trim()))
+            {
+                app.type_options.semibold = i == 1;
+            }
+        }
+        "type.size" => {
+            if let Some(v) = number {
+                app.type_options.size_pt = v.clamp(0.5, 1296.0);
+            }
+        }
+        "shape.sides" => {
+            if let Some(v) = number {
+                app.shape.sides = (v.round() as u32).clamp(3, 100);
+            }
+        }
+        "shape.weight" => {
+            if let Some(v) = number {
+                app.shape.weight = v.clamp(1.0, 1000.0);
+            }
+        }
+        "rotate.angle" => {
+            if let Some(v) = number {
+                // Photoshop keeps the angle within ±180°
+                let a = (v + 180.0).rem_euclid(360.0) - 180.0;
+                *app.setting(key, default) = format!("{}°", a.round());
             }
         }
         _ => {
@@ -1070,6 +1522,7 @@ fn default_choice(key: &str) -> &'static str {
         "colorreplace.mode" => "2",
         "colorreplace.limits" | "bgeraser.limits" => "1",
         "gradient.method" => "3",
+        "pen.mode" | "frame.stroke_align" | "artboard.size" => "1",
         _ => "0",
     }
 }
@@ -1207,10 +1660,6 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 b.color_box(x0, x1, egui::Color32::from_rgb(r, g, bl));
             }
             GradientSwatch(x0, x1, x2) => {
-                let to32 = |c: op_core::Color| {
-                    let [r, g, b, _] = c.to_rgba8();
-                    egui::Color32::from_rgb(r, g, b)
-                };
                 let (a, z) = if app.gradient.reverse {
                     (app.background, app.foreground)
                 } else {
@@ -1234,6 +1683,163 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                     set_choice(app, key, j);
                 }
             }
+            IconOff(x, icon) => {
+                b.icon(x, icon, "", false, false);
+            }
+            Glyph(x, icon) => crate::ps_icons::paint(
+                b.ui.painter(),
+                b.at(x, 17.5),
+                icon,
+                crate::theme::color::OPTIONS_ICON,
+                crate::theme::color::OPTIONS_BAR,
+            ),
+            LabelOff(x, t) => b.label(x, t, false),
+            FieldOff(x0, x1) => b.field_off(x0, x1),
+            ComboOff(x0, x1, x2) => {
+                b.combo(x0, x1, x2, "off", String::new(), &[], false);
+            }
+            Combo(x0, x1, x2, key, default, options) => {
+                let shown = text(app, key, default);
+                if let Some(t) = b.combo(x0, x1, x2, key, shown, options, true) {
+                    set_text(app, key, default, t);
+                }
+            }
+            Notice(t) => {
+                // Centered in what's left of the bar after the presets
+                let cx = (b.width() + 124.5) / 2.0;
+                b.centered_label(cx, t);
+            }
+            FillSwatch(x0, x1) => {
+                b.framed_swatch(x0, x1, Some(to32(app.foreground)))
+                    .on_hover_text("Set shape fill type");
+            }
+            NoStroke(x0, x1) => {
+                b.framed_swatch(x0, x1, None)
+                    .on_hover_text("Set shape stroke type");
+            }
+            LineStyle(x0, x1, key) => {
+                let mut i = choice(app, key).min(LINE_STYLES.len() - 1);
+                let before = i;
+                b.line_popup(x0, x1, key, LINE_STYLES, &mut i);
+                if i != before {
+                    set_choice(app, key, i);
+                }
+            }
+            ColorFrame(x0, x1, y0, y1, key) => {
+                let fill = if key == "fg" {
+                    to32(app.foreground)
+                } else {
+                    match choice(app, key) {
+                        1 => egui::Color32::BLACK,
+                        2 => egui::Color32::from_gray(0xcc),
+                        _ => egui::Color32::WHITE,
+                    }
+                };
+                b.framed_color(x0, x1, (y0, y1), fill);
+            }
+            Action(x0, x1, label) => {
+                if b.button(x0, x1, label, true).clicked() {
+                    let ppp = b.ui.ctx().pixels_per_point();
+                    action(app, label, ppp);
+                }
+            }
+            Dial(cx, key) => {
+                let angle = crate::options_bar::typed_number(&text(app, key, "0°")).unwrap_or(0.0);
+                let c = b.at(cx, 17.5);
+                let ink = crate::theme::color::OPTIONS_ICON;
+                let p = b.ui.painter();
+                p.circle_stroke(
+                    c,
+                    crate::theme::pt(10.5),
+                    egui::Stroke::new(crate::theme::pt(1.0), ink),
+                );
+                // A tick from the rim toward the center, and a dot there
+                let a = (angle - 90.0).to_radians();
+                let dir = egui::vec2(a.cos(), a.sin());
+                p.line_segment(
+                    [
+                        c + dir * crate::theme::pt(10.0),
+                        c + dir * crate::theme::pt(4.0),
+                    ],
+                    egui::Stroke::new(crate::theme::pt(1.0), ink),
+                );
+                p.circle_filled(c, crate::theme::pt(1.25), ink);
+            }
+            ShapePicker(x0, x1, x2) => {
+                // The current shape in white on black, then its menu
+                let frame =
+                    |x0: f32, x1: f32| egui::Rect::from_min_max(b.at(x0, 5.0), b.at(x1, 30.0));
+                let border =
+                    egui::Stroke::new(crate::theme::pt(1.0), egui::Color32::from_gray(0x66));
+                let round = egui::CornerRadius::same(crate::theme::pt(2.0) as u8);
+                let p = b.ui.painter();
+                p.rect(
+                    frame(x0, x1),
+                    round,
+                    egui::Color32::BLACK,
+                    border,
+                    egui::StrokeKind::Inside,
+                );
+                crate::ps_icons::paint(
+                    p,
+                    b.at((x0 + x1) / 2.0, 17.5),
+                    Icon::FrameCustom,
+                    egui::Color32::WHITE,
+                    egui::Color32::BLACK,
+                );
+                p.rect(
+                    frame(x1 - 1.0, x2),
+                    round,
+                    crate::theme::color::FIELD,
+                    border,
+                    egui::StrokeKind::Inside,
+                );
+                crate::ps_icons::paint(
+                    p,
+                    b.at((x1 - 1.0 + x2) / 2.0, 18.0),
+                    Icon::Caret,
+                    crate::theme::color::OPTIONS_ICON,
+                    crate::theme::color::FIELD,
+                );
+            }
+            IconPopup(x0, x1, icon, key, options) => {
+                let mut i = choice(app, key).min(options.len() - 1);
+                let mut chosen = i;
+                b.popup(x0, x1, key, "", true, |ui| {
+                    for (k, o) in options.iter().enumerate() {
+                        ui.selectable_value(&mut chosen, k, *o);
+                    }
+                });
+                crate::ps_icons::paint(
+                    b.ui.painter(),
+                    b.at(x0 + 13.0, 17.5),
+                    icon,
+                    crate::theme::color::OPTIONS_ICON,
+                    crate::theme::color::FIELD,
+                );
+                b.label(x0 + 25.5, options[i], true);
+                if chosen != i {
+                    i = chosen;
+                    set_choice(app, key, i);
+                }
+            }
+            SliceSize(lx, label, x0, x1, key) => {
+                let on = choice(app, "slice.style") != 0;
+                b.label(lx, label, on);
+                if on {
+                    let default = if choice(app, "slice.style") == 1 {
+                        "1"
+                    } else {
+                        "64 px"
+                    };
+                    let shown = text(app, key, default);
+                    if let Some(t) = b.value(x0, x1, key, shown, true) {
+                        set_text(app, key, default, t);
+                    }
+                } else {
+                    b.field_off(x0, x1);
+                }
+            }
             Swatch(x0, x1, x2, white) => {
                 let fill = if white {
                     egui::Color32::WHITE
@@ -1243,6 +1849,46 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 // The pattern's chevron sits in a box after it
                 let chevron_box = (!white).then_some((x1 - 1.0, x2));
                 b.swatch(x0, x1, fill, chevron_box);
+            }
+        }
+    }
+}
+
+fn to32(c: op_core::Color) -> egui::Color32 {
+    let [r, g, b, _] = c.to_rgba8();
+    egui::Color32::from_rgb(r, g, b)
+}
+
+/// What the bars' push buttons do.
+fn action(app: &mut AppState, label: &str, ppp: f32) {
+    use crate::document_view as view;
+    match label {
+        "Reset View" => *app.setting("rotate.angle", "0°") = "0°".to_owned(),
+        "Clear" => {
+            for key in ["pcrop.w", "pcrop.h", "pcrop.res"] {
+                app.setting(key, "").clear();
+            }
+        }
+        "Front Image" => {
+            let Some((w, h, res)) = app
+                .active()
+                .map(|d| (d.doc.width, d.doc.height, d.doc.resolution))
+            else {
+                return;
+            };
+            *app.setting("pcrop.w", "") = format!("{w} px");
+            *app.setting("pcrop.h", "") = format!("{h} px");
+            *app.setting("pcrop.res", "") = format!("{}", res.round());
+        }
+        _ => {
+            let Some(doc) = app.active() else {
+                return;
+            };
+            match label {
+                "100%" => view::actual_pixels(doc, ppp),
+                "Fit Screen" => view::fit_on_screen(doc, ppp),
+                "Fill Screen" => view::fill_screen(doc, ppp),
+                _ => {}
             }
         }
     }

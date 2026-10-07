@@ -18,6 +18,9 @@ pub const LABEL_OFF: Color32 = Color32::from_gray(0x87);
 /// Vertical extents, measured: fields 9–25.5, pop-up menus 8–27, buttons
 /// 5.5–29.5, checkboxes 12.5–22.5, framed toggles 4–31.
 const FIELD_Y: (f32, f32) = (9.0, 25.5);
+/// Fields joined to a chevron box (the font, its size) and disabled
+/// fields: 8–26.
+const COMBO_Y: (f32, f32) = (8.0, 26.0);
 const POPUP_Y: (f32, f32) = (8.0, 27.0);
 const BUTTON_Y: (f32, f32) = (5.5, 29.5);
 const TOGGLE_Y: (f32, f32) = (4.0, 31.0);
@@ -30,6 +33,8 @@ pub struct Bar<'a> {
     /// The bar's left edge and its measuring origin's top on screen.
     left: f32,
     top: f32,
+    /// The bar's width in points.
+    width: f32,
 }
 
 impl<'a> Bar<'a> {
@@ -37,6 +42,7 @@ impl<'a> Bar<'a> {
         Self {
             left: bar.left(),
             top: bar.top() - pt(0.5),
+            width: bar.width() / pt(1.0),
             ui,
         }
     }
@@ -70,6 +76,22 @@ impl<'a> Bar<'a> {
         );
     }
 
+    /// The bar's width in points.
+    pub fn width(&self) -> f32 {
+        self.width
+    }
+
+    /// Text centered on `cx` (the anchor point tools' note).
+    pub fn centered_label(&mut self, cx: f32, text: &str) {
+        self.ui.painter().text(
+            self.at(cx, TEXT_Y),
+            Align2::CENTER_CENTER,
+            text,
+            theme::body(),
+            LABEL,
+        );
+    }
+
     /// A checkbox whose box starts at `x`, its label 8 pt after the box.
     pub fn check(
         &mut self,
@@ -81,23 +103,190 @@ impl<'a> Bar<'a> {
         let rect = Rect::from_min_max(self.at(x, 8.0), self.at(x + 200.0, 27.0));
         self.ui
             .scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                // The checkbox draws its own disabled look, unfaded
+                ui.visuals_mut().disabled_alpha = 1.0;
                 ui.add_enabled_ui(enabled, |ui| widgets::checkbox(ui, value, label))
                     .inner
             })
             .inner
     }
 
-    /// A text field from `x0` to `x1`.
-    pub fn field(
+    /// A text field from `x0` to `x1`, `y` its top and bottom.
+    fn field_y(
         &mut self,
         x0: f32,
         x1: f32,
+        y: (f32, f32),
         id: &str,
         text: &mut String,
         enabled: bool,
     ) -> egui::Response {
-        let rect = self.rect(x0, FIELD_Y, x1);
+        let rect = self.rect(x0, y, x1);
         widgets::text_box_inset(self.ui, rect, text, ("options-field", id), enabled, pt(4.5))
+    }
+
+    /// An empty field that can't be used (8–26, like Photoshop's).
+    pub fn field_off(&mut self, x0: f32, x1: f32) {
+        self.ui.painter().rect(
+            self.rect(x0, COMBO_Y, x1),
+            CornerRadius::same(pt(2.0) as u8),
+            Color32::from_gray(0x4d),
+            Stroke::new(pt(1.0), Color32::from_gray(0x5e)),
+            StrokeKind::Inside,
+        );
+    }
+
+    /// A field from `x0` to `x1` joined to a chevron box ending at `x2`
+    /// whose menu offers `options` (the font, its style and size, the
+    /// stroke width): returns the text typed or the option picked.
+    #[allow(clippy::too_many_arguments)]
+    pub fn combo(
+        &mut self,
+        x0: f32,
+        x1: f32,
+        x2: f32,
+        id: &str,
+        shown: String,
+        options: &[&str],
+        enabled: bool,
+    ) -> Option<String> {
+        let typed = self.value_y(x0, x1, COMBO_Y, id, shown, enabled);
+        let rect = self.rect(x1 - 1.0, COMBO_Y, x2);
+        let (fill, border, tint) = if enabled {
+            (color::FIELD, Color32::from_gray(0x66), color::OPTIONS_ICON)
+        } else {
+            (
+                Color32::from_gray(0x4d),
+                Color32::from_gray(0x5e),
+                Color32::from_gray(0x6a),
+            )
+        };
+        self.ui.painter().rect(
+            rect,
+            CornerRadius::same(pt(2.0) as u8),
+            fill,
+            Stroke::new(pt(1.0), border),
+            StrokeKind::Inside,
+        );
+        crate::ps_icons::paint(
+            self.ui.painter(),
+            rect.center() + egui::vec2(0.0, pt(0.5)),
+            Icon::Caret,
+            tint,
+            fill,
+        );
+        if !enabled {
+            return typed;
+        }
+        let response = self.ui.interact(
+            rect,
+            self.ui.id().with(("options-combo", id)),
+            Sense::click(),
+        );
+        let mut picked = None;
+        egui::Popup::menu(&response)
+            .id(self.ui.id().with(("options-combo-menu", id)))
+            .show(|ui| {
+                for o in options {
+                    if ui.button(*o).clicked() {
+                        picked = Some((*o).to_owned());
+                    }
+                }
+            });
+        typed.or(picked)
+    }
+
+    /// A color in a frame (the shapes' Fill and Stroke): the frame from
+    /// `x0` to `x1` (y 7.5–27.5), the color inset 3 pt; `None` is no
+    /// color (white with a red diagonal).
+    pub fn framed_swatch(&mut self, x0: f32, x1: f32, fill: Option<Color32>) -> egui::Response {
+        let frame = self.rect(x0, (7.5, 27.5), x1);
+        let p = self.ui.painter();
+        p.rect(
+            frame,
+            CornerRadius::same(pt(2.0) as u8),
+            color::OPTIONS_BAR,
+            Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+            StrokeKind::Inside,
+        );
+        let inner = frame.shrink(pt(3.0));
+        match fill {
+            Some(c) => {
+                p.rect_filled(inner, 0, c);
+            }
+            None => {
+                p.rect_filled(inner, 0, Color32::WHITE);
+                let mid = inner.center();
+                let d = egui::vec2(pt(6.0), -pt(3.0));
+                p.line_segment(
+                    [mid - d, mid + d],
+                    Stroke::new(pt(2.0), Color32::from_rgb(0xe0, 0x30, 0x30)),
+                );
+            }
+        }
+        self.ui.interact(
+            frame,
+            self.ui.id().with(("framed-swatch", x0 as i32)),
+            Sense::click(),
+        )
+    }
+
+    /// A pop-up menu from `x0` to `x1` showing a line style (the stroke's
+    /// type), choosing one of `options`.
+    pub fn line_popup(&mut self, x0: f32, x1: f32, id: &str, options: &[&str], value: &mut usize) {
+        let mut chosen = *value;
+        self.popup(x0, x1, id, "", true, |ui| {
+            for (i, o) in options.iter().enumerate() {
+                ui.selectable_value(&mut chosen, i, *o);
+            }
+        });
+        let dash = match chosen {
+            1 => 3.0,
+            2 => 1.0,
+            _ => 0.0,
+        };
+        let y = 17.5;
+        let (a, b) = (x0 + 7.0, x1 - 18.0);
+        let ink = Stroke::new(pt(1.5), LABEL);
+        if dash == 0.0 {
+            self.ui
+                .painter()
+                .line_segment([self.at(a, y), self.at(b, y)], ink);
+        } else {
+            let mut x = a;
+            while x < b {
+                let e = (x + dash).min(b);
+                self.ui
+                    .painter()
+                    .line_segment([self.at(x, y), self.at(e, y)], ink);
+                x += dash * 2.0;
+            }
+        }
+        *value = chosen;
+    }
+
+    /// A color box from `x0` to `x1` in a dark 1 pt frame (the type
+    /// color, an artboard's background).
+    pub fn framed_color(
+        &mut self,
+        x0: f32,
+        x1: f32,
+        y: (f32, f32),
+        fill: Color32,
+    ) -> egui::Response {
+        let rect = self.rect(x0, y, x1);
+        self.ui.painter().rect(
+            rect,
+            0,
+            fill,
+            Stroke::new(pt(1.0), Color32::from_gray(0x36)),
+            StrokeKind::Inside,
+        );
+        self.ui.interact(
+            rect,
+            self.ui.id().with(("text-color", x0 as i32)),
+            Sense::click(),
+        )
     }
 
     /// A field showing `shown` that can be typed in: returns the typed
@@ -110,12 +299,24 @@ impl<'a> Bar<'a> {
         shown: String,
         enabled: bool,
     ) -> Option<String> {
+        self.value_y(x0, x1, FIELD_Y, id, shown, enabled)
+    }
+
+    fn value_y(
+        &mut self,
+        x0: f32,
+        x1: f32,
+        y: (f32, f32),
+        id: &str,
+        shown: String,
+        enabled: bool,
+    ) -> Option<String> {
         let key = self.ui.id().with(("options-value", id));
         let mut text = self
             .ui
             .data(|d| d.get_temp::<String>(key))
             .unwrap_or_else(|| shown.clone());
-        let response = self.field(x0, x1, id, &mut text, enabled);
+        let response = self.field_y(x0, x1, y, id, &mut text, enabled);
         if response.has_focus() {
             self.ui.data_mut(|d| d.insert_temp(key, text));
             None

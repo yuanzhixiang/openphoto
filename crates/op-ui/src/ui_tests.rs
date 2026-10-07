@@ -4125,6 +4125,163 @@ const PS_BAR_MARKS: &[BarMarks] = &[
         &[223.0, 542.0],
         &[232.0, 381.0, 480.5, 532.5, 652.0, 690.5, 757.0, 795.5],
     ),
+    (
+        "Pen",
+        &[183.0, 404.5, 437.5, 470.5, 503.5],
+        &[110.0, 179.0, 220.5, 294.5, 299.5, 345.0, 350.0, 400.0],
+    ),
+    (
+        "FreeformPen",
+        &[183.0, 404.5, 437.5, 470.5, 503.5],
+        &[110.0, 179.0, 220.5, 294.5, 299.5, 345.0, 350.0, 400.0],
+    ),
+    (
+        "CurvaturePen",
+        &[183.0, 404.5, 437.5, 470.5, 503.5],
+        &[110.0, 179.0, 220.5, 294.5, 299.5, 345.0, 350.0, 400.0],
+    ),
+    ("AddAnchorPoint", &[], &[]),
+    ("DeleteAnchorPoint", &[], &[]),
+    ("ConvertPoint", &[], &[]),
+    (
+        "HorizontalType",
+        &[146.0, 482.5, 600.5, 691.5, 730.5, 807.5, 851.5],
+        &[
+            152.0, 295.5, 310.0, 320.0, 461.0, 475.5, 516.5, 579.0, 593.5, 607.5, 632.5,
+        ],
+    ),
+    (
+        "VerticalType",
+        &[146.0, 482.5, 600.5, 691.5, 730.5, 807.5, 851.5],
+        &[
+            152.0, 295.5, 310.0, 320.0, 461.0, 475.5, 516.5, 579.0, 593.5, 607.5, 632.5,
+        ],
+    ),
+    (
+        "HorizontalTypeMask",
+        &[146.0, 482.5, 600.5, 691.5, 730.5, 807.5, 851.5],
+        &[
+            152.0, 295.5, 310.0, 320.0, 461.0, 475.5, 516.5, 579.0, 593.5, 607.5, 632.5,
+        ],
+    ),
+    (
+        "VerticalTypeMask",
+        &[146.0, 482.5, 600.5, 691.5, 730.5, 807.5, 851.5],
+        &[
+            152.0, 295.5, 310.0, 320.0, 461.0, 475.5, 516.5, 579.0, 593.5, 607.5, 632.5,
+        ],
+    ),
+    (
+        "PathSelection",
+        &[255.5, 512.5, 685.0, 728.0, 771.0, 814.0, 908.5],
+        &[
+            148.0, 246.5, 284.0, 313.0, 353.5, 382.5, 387.5, 438.0, 452.5, 459.0, 507.0, 531.0,
+            575.5, 626.0, 670.5,
+        ],
+    ),
+    (
+        "DirectSelection",
+        &[255.5, 512.5, 685.0, 728.0, 771.0, 814.0, 908.5],
+        &[
+            148.0, 246.5, 284.0, 313.0, 353.5, 382.5, 387.5, 438.0, 452.5, 459.0, 507.0, 531.0,
+            575.5, 626.0, 670.5,
+        ],
+    ),
+    (
+        "Rectangle",
+        &[183.0, 435.0, 603.0, 636.0, 669.0, 702.0, 735.0, 807.0],
+        &[
+            110.0, 179.0, 207.0, 236.0, 276.0, 305.0, 310.0, 360.5, 375.0, 381.5, 429.5, 453.5,
+            498.0, 548.5, 593.0, 759.0, 803.5,
+        ],
+    ),
+    (
+        "Ellipse",
+        &[183.0, 435.0, 603.0, 636.0, 669.0, 702.0],
+        &[
+            110.0, 179.0, 207.0, 236.0, 276.0, 305.0, 310.0, 360.5, 375.0, 381.5, 429.5, 453.5,
+            498.0, 548.5, 593.0,
+        ],
+    ),
+    (
+        "Triangle",
+        &[183.0, 435.0, 603.0, 636.0, 669.0, 702.0, 735.0, 807.0],
+        &[
+            110.0, 179.0, 207.0, 236.0, 276.0, 305.0, 310.0, 360.5, 375.0, 381.5, 429.5, 453.5,
+            498.0, 548.5, 593.0, 759.0, 803.5,
+        ],
+    ),
+    (
+        "Polygon",
+        &[
+            183.0, 435.0, 603.0, 636.0, 669.0, 702.0, 735.0, 809.0, 881.5,
+        ],
+        &[
+            110.0, 179.0, 207.0, 236.0, 276.0, 305.0, 310.0, 360.5, 375.0, 381.5, 429.5, 453.5,
+            498.0, 548.5, 593.0, 761.0, 805.5, 833.0, 877.5,
+        ],
+    ),
+    (
+        "Line",
+        &[183.0, 435.0, 603.0, 636.0, 669.0, 702.0],
+        &[
+            110.0, 179.0, 207.0, 236.0, 276.0, 305.0, 310.0, 360.5, 375.0, 381.5, 429.5, 453.5,
+            498.0, 548.5, 593.0, 776.5, 821.0,
+        ],
+    ),
+    (
+        "CustomShape",
+        &[183.0, 435.0, 603.0, 636.0, 669.0, 702.0],
+        &[
+            110.0, 179.0, 207.0, 236.0, 276.0, 305.0, 310.0, 360.5, 375.0, 381.5, 429.5, 453.5,
+            498.0, 548.5, 593.0, 772.0, 801.0, 813.0,
+        ],
+    ),
+    (
+        "Hand",
+        &[227.0, 454.0],
+        &[238.5, 285.5, 295.5, 364.5, 374.0, 444.5],
+    ),
+    ("RotateView", &[], &[188.5, 233.0, 271.5, 345.0]),
+    (
+        "Zoom",
+        &[169.0],
+        &[110.0, 135.0, 524.5, 571.5, 581.5, 650.0, 660.0, 730.5],
+    ),
+    (
+        "Artboard",
+        &[742.5, 819.5, 862.5, 905.5],
+        &[138.5, 378.0, 423.5, 498.0, 547.0, 621.5, 651.5, 733.5],
+    ),
+    (
+        "PerspectiveCrop",
+        &[323.0, 537.0, 685.0],
+        &[
+            126.5, 199.5, 245.0, 318.0, 385.5, 458.5, 462.5, 532.0, 544.5, 622.0, 632.0, 677.5,
+        ],
+    ),
+    (
+        "Slice",
+        &[478.5],
+        &[142.5, 256.0, 301.5, 361.0, 410.0, 469.5, 488.0, 600.5],
+    ),
+    (
+        "SliceSelect",
+        &[362.0, 491.0, 620.0, 663.0, 781.0],
+        &[222.5, 283.5, 293.0, 352.5, 672.5, 771.5],
+    ),
+    (
+        "Frame",
+        &[250.0],
+        &[
+            110.0, 135.0, 290.5, 319.5, 324.5, 375.0, 389.5, 395.5, 489.5, 518.5, 563.0,
+        ],
+    ),
+    (
+        "Move",
+        &[253.5, 404.5, 521.5, 638.5, 673.5],
+        &[195.0, 248.5],
+    ),
 ];
 
 /// The x (bar points) of separators and of frame edges in an options bar
@@ -4317,4 +4474,86 @@ fn fill_and_sample_options_bars_edit_their_settings() {
             .map(String::as_str),
         Some("1")
     );
+}
+
+/// Types `text` into the options bar field at bar point `x`.
+fn type_in_bar(h: &mut Harness<'_, OpenPhotoApp>, x: f32, text: &str) {
+    click(h, at_pt(x, 45.25));
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text(text.into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+}
+
+fn setting(h: &Harness<'_, OpenPhotoApp>, key: &str) -> Option<String> {
+    h.state().state.tool_settings.get(key).cloned()
+}
+
+#[test]
+fn type_shape_and_view_options_bars_edit_their_settings() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let select = |h: &mut Harness<'_, OpenPhotoApp>, tool| {
+        h.state_mut().state.select_tool(tool);
+        h.run_steps(2);
+    };
+    // Type: the style (320–462) and size (516.5–580) fields
+    select(&mut h, Tool::HorizontalType);
+    type_in_bar(&mut h, 380.0, "Semibold");
+    assert!(h.state().state.type_options.semibold);
+    type_in_bar(&mut h, 540.0, "24 pt");
+    assert_eq!(h.state().state.type_options.size_pt, 24.0);
+    // Center text (646.5)
+    click(&mut h, at_pt(646.5, 45.5));
+    assert_eq!(setting(&h, "type.align").as_deref(), Some("1"));
+    // Polygon sides (761–806.5) and the Line's weight (776.5–822)
+    select(&mut h, Tool::Polygon);
+    type_in_bar(&mut h, 780.0, "7");
+    assert_eq!(h.state().state.shape.sides, 7);
+    select(&mut h, Tool::Line);
+    type_in_bar(&mut h, 795.0, "3 px");
+    assert_eq!(h.state().state.shape.weight, 3.0);
+    // Pen: Auto Add/Delete starts on
+    select(&mut h, Tool::Pen);
+    click(&mut h, at_pt(541.5, 45.25));
+    assert_eq!(setting(&h, "pen.auto_add").as_deref(), Some("0"));
+    // Hand: 100%, Fit Screen and Fill Screen
+    select(&mut h, Tool::Hand);
+    click(&mut h, at_pt(263.0, 45.5));
+    assert_eq!(active(&h).view.zoom, 1.0);
+    click(&mut h, at_pt(330.0, 45.5));
+    let fit = active(&h).view.zoom;
+    click(&mut h, at_pt(410.0, 45.5));
+    let fill = active(&h).view.zoom;
+    assert!(fit != 1.0 && fill > fit, "fit {fit}, fill {fill}");
+    // Zoom: with Zoom Out pressed (152) a click zooms out
+    select(&mut h, Tool::Zoom);
+    click(&mut h, at_pt(152.0, 45.5));
+    assert_eq!(setting(&h, "zoom.out").as_deref(), Some("1"));
+    let before = active(&h).view.zoom;
+    let p = doc_point(&h, 367.0, 405.0);
+    click(&mut h, p);
+    assert!(active(&h).view.zoom < before);
+    // Rotate View: the angle wraps into ±180°; Reset View clears it
+    select(&mut h, Tool::RotateView);
+    type_in_bar(&mut h, 210.0, "200");
+    assert_eq!(setting(&h, "rotate.angle").as_deref(), Some("-160°"));
+    click(&mut h, at_pt(309.0, 45.5));
+    assert_eq!(setting(&h, "rotate.angle").as_deref(), Some("0°"));
+    // Perspective Crop: Front Image takes the document's size
+    select(&mut h, Tool::PerspectiveCrop);
+    click(&mut h, at_pt(584.0, 45.5));
+    assert_eq!(setting(&h, "pcrop.w").as_deref(), Some("734 px"));
+    assert_eq!(setting(&h, "pcrop.h").as_deref(), Some("811 px"));
+    click(&mut h, at_pt(655.0, 45.5));
+    assert_eq!(setting(&h, "pcrop.w").as_deref(), Some(""));
+    // Slice: Width can be typed only once a fixed style is chosen
+    select(&mut h, Tool::Slice);
+    type_in_bar(&mut h, 330.0, "100");
+    assert_eq!(setting(&h, "slice.w"), None);
+    *h.state_mut().state.setting("slice.style", "0") = "2".into();
+    h.run_steps(2);
+    type_in_bar(&mut h, 330.0, "100");
+    assert_eq!(setting(&h, "slice.w").as_deref(), Some("100"));
 }

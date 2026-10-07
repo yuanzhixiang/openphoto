@@ -6,7 +6,7 @@ use op_tools::Tool;
 use crate::commands::Command;
 use crate::icons;
 use crate::ps_icons::Icon;
-use crate::state::{AppState, MarqueeStyle, SelectionMode};
+use crate::state::{AppState, MarqueeStyle};
 use crate::theme::{self, color, pt, size};
 use crate::widgets;
 
@@ -547,127 +547,12 @@ fn ps_button_tinted(ui: &mut Ui, rect: Rect, icon: Icon, tint: Color32) -> egui:
     .inner
 }
 
-/// The four combine-mode buttons of the selection tools.
-fn mode_buttons(ui: &mut Ui, current: &mut SelectionMode) {
-    for (mode, icon, tip) in [
-        (SelectionMode::New, icons::SQUARE, "New selection"),
-        (
-            SelectionMode::Add,
-            icons::SELECTION_PLUS,
-            "Add to selection",
-        ),
-        (
-            SelectionMode::Subtract,
-            icons::SELECTION_SLASH,
-            "Subtract from selection",
-        ),
-        (
-            SelectionMode::Intersect,
-            icons::SELECTION_INVERSE,
-            "Intersect with selection",
-        ),
-    ] {
-        if widgets::icon_button(ui, icon, 34.0, *current == mode)
-            .on_hover_text(tip)
-            .clicked()
-        {
-            *current = mode;
-        }
-    }
-    widgets::vseparator(ui, 34.0);
-}
-
-fn select_and_mask_button(ui: &mut Ui) {
-    let button = egui::Button::new(egui::RichText::new("Select and Mask...").font(theme::body()))
-        .fill(color::BUTTON)
-        .min_size(Vec2::new(0.0, 32.0));
-    ui.add(button);
-}
-
 /// Marquee and Lasso tools: mode, Feather, Anti-alias; the marquees also
 /// have Style with Width and Height.
 fn tool_options(ui: &mut Ui, app: &mut AppState) {
-    match app.tool {
-        Tool::RectangularMarquee
-        | Tool::EllipticalMarquee
-        | Tool::SingleRowMarquee
-        | Tool::SingleColumnMarquee
-        | Tool::Lasso
-        | Tool::PolygonalLasso
-        | Tool::MagneticLasso => marquee_options(ui, app),
-        Tool::Move => move_options(ui, app),
-        Tool::Brush
-        | Tool::Pencil
-        | Tool::Eraser
-        | Tool::Dodge
-        | Tool::Burn
-        | Tool::Sponge
-        | Tool::Blur
-        | Tool::Sharpen
-        | Tool::CloneStamp
-        | Tool::HistoryBrush => paint_options(ui, app),
-        Tool::PaintBucket => bucket_options(ui, app),
-        Tool::Eyedropper => eyedropper_options(ui, app),
-        Tool::Gradient => gradient_options(ui, app),
-        Tool::HorizontalType => type_options(ui, app),
-        Tool::Rectangle | Tool::Ellipse | Tool::Triangle | Tool::Polygon | Tool::Line => {
-            shape_options(ui, app)
-        }
-        Tool::MagicWand => wand_options(ui, app),
-        Tool::Hand | Tool::Zoom => view_options(ui, app),
-        _ => {}
+    if app.tool == Tool::Move {
+        move_options(ui, app);
     }
-}
-
-/// Type tool: font family, style, size, anti-aliasing, alignment and
-/// color (the foreground color).
-fn type_options(ui: &mut Ui, app: &mut AppState) {
-    let opts = &mut app.type_options;
-    egui::ComboBox::from_id_salt("type-family")
-        .width(150.0)
-        .selected_text("Source Sans 3")
-        .show_ui(ui, |ui| {
-            let _ = ui.selectable_label(true, "Source Sans 3");
-        });
-    egui::ComboBox::from_id_salt("type-style")
-        .width(96.0)
-        .selected_text(if opts.semibold { "Semibold" } else { "Regular" })
-        .show_ui(ui, |ui| {
-            ui.selectable_value(&mut opts.semibold, false, "Regular");
-            ui.selectable_value(&mut opts.semibold, true, "Semibold");
-        });
-    widgets::icon(ui, icons::TEXT_AA, 16.0, color::ICON);
-    ui.add_sized(
-        [70.0, size::FIELD_HEIGHT],
-        egui::DragValue::new(&mut opts.size_pt)
-            .range(0.5..=1296.0)
-            .max_decimals(1)
-            .suffix(" pt"),
-    );
-    ui.add_enabled_ui(false, |ui| {
-        egui::ComboBox::from_id_salt("type-aa")
-            .width(70.0)
-            .selected_text("Sharp")
-            .show_ui(ui, |_| {});
-    });
-    widgets::vseparator(ui, 34.0);
-    widgets::icon_button(ui, icons::TEXT_ALIGN_LEFT, 30.0, true).on_hover_text("Left align text");
-    ui.add_enabled_ui(false, |ui| {
-        widgets::icon_button(ui, icons::TEXT_ALIGN_CENTER, 30.0, false)
-            .on_hover_text("Center text");
-        widgets::icon_button(ui, icons::TEXT_ALIGN_RIGHT, 30.0, false)
-            .on_hover_text("Right align text");
-    });
-    widgets::vseparator(ui, 34.0);
-    let [r, g, b, _] = app.foreground.to_rgba8();
-    let (swatch, _) = ui.allocate_exact_size(Vec2::new(26.0, 26.0), Sense::hover());
-    ui.painter().rect(
-        swatch,
-        2,
-        egui::Color32::from_rgb(r, g, b),
-        egui::Stroke::new(1.0, color::SEPARATOR),
-        egui::StrokeKind::Outside,
-    );
 }
 
 /// While typing: Cancel (Esc) and Commit (Cmd+Enter).
@@ -687,63 +572,6 @@ fn type_buttons(ui: &mut Ui, app: &mut AppState) {
         .clicked()
     {
         crate::type_tool::cancel(state);
-    }
-}
-
-/// Shape tools: the mode (Shape, the only one), Fill (the foreground
-/// color) and Stroke (none), plus the Polygon's sides or the Line's weight.
-fn shape_options(ui: &mut Ui, app: &mut AppState) {
-    ui.add_enabled_ui(false, |ui| {
-        egui::ComboBox::from_id_salt("shape-mode")
-            .width(80.0)
-            .selected_text("Shape")
-            .show_ui(ui, |_| {});
-    });
-    ui.add_space(8.0);
-    ui.label("Fill:");
-    let [r, g, b, _] = app.foreground.to_rgba8();
-    let (swatch, _) = ui.allocate_exact_size(Vec2::new(26.0, 26.0), Sense::hover());
-    ui.painter().rect(
-        swatch,
-        2,
-        egui::Color32::from_rgb(r, g, b),
-        egui::Stroke::new(1.0, color::SEPARATOR),
-        egui::StrokeKind::Outside,
-    );
-    ui.add_space(8.0);
-    ui.label("Stroke:");
-    let (none, _) = ui.allocate_exact_size(Vec2::new(26.0, 26.0), Sense::hover());
-    ui.painter().rect(
-        none,
-        2,
-        egui::Color32::WHITE,
-        egui::Stroke::new(1.0, color::SEPARATOR),
-        egui::StrokeKind::Outside,
-    );
-    // "No color": a red diagonal
-    ui.painter().line_segment(
-        [none.left_bottom(), none.right_top()],
-        egui::Stroke::new(2.0, egui::Color32::from_rgb(0xe0, 0x30, 0x30)),
-    );
-    widgets::vseparator(ui, 34.0);
-    match app.tool {
-        Tool::Polygon => {
-            widgets::icon(ui, icons::POLYGON, 16.0, color::ICON);
-            ui.add_sized(
-                [48.0, size::FIELD_HEIGHT],
-                egui::DragValue::new(&mut app.shape.sides).range(3..=100),
-            );
-        }
-        Tool::Line => {
-            ui.label("Weight:");
-            ui.add_sized(
-                [64.0, size::FIELD_HEIGHT],
-                egui::DragValue::new(&mut app.shape.weight)
-                    .range(1.0..=1000.0)
-                    .suffix(" px"),
-            );
-        }
-        _ => {}
     }
 }
 
@@ -1109,13 +937,13 @@ fn value_box(ui: &mut Ui, rect: Rect, id: &str, shown: String, enabled: bool) ->
 
 /// A number typed with or without its unit ("60 px", "50%", "15°").
 pub fn typed_number(text: &str) -> Option<f32> {
-    let t = text
-        .trim()
-        .trim_end_matches("px")
-        .trim_end_matches('%')
-        .trim_end_matches('°')
-        .trim();
-    t.parse().ok()
+    // The number up to its unit (px, pt, %, °, …)
+    let t = text.trim();
+    let end = t
+        .char_indices()
+        .find(|&(i, c)| !(c.is_ascii_digit() || c == '.' || (i == 0 && (c == '-' || c == '+'))))
+        .map_or(t.len(), |(i, _)| i);
+    t[..end].parse().ok()
 }
 
 /// Free Transform's options, at Photoshop 2026's positions (points from
@@ -1594,375 +1422,6 @@ fn warp_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
     }
 }
 
-fn marquee_options(ui: &mut Ui, app: &mut AppState) {
-    let opts = &mut app.marquee;
-    mode_buttons(ui, &mut opts.mode);
-
-    ui.label("Feather:");
-    ui.add_sized(
-        [74.0, size::FIELD_HEIGHT],
-        egui::DragValue::new(&mut opts.feather)
-            .range(0.0..=1000.0)
-            .speed(0.2)
-            .custom_formatter(|v, _| format!("{}", (v * 10.0).round() / 10.0))
-            .suffix(" px"),
-    );
-    ui.add_space(6.0);
-    // Anti-alias only applies to curved edges, so it's disabled for the
-    // rectangular and single row/column marquees, as in Photoshop
-    ui.add_enabled_ui(
-        !matches!(
-            app.tool,
-            Tool::RectangularMarquee | Tool::SingleRowMarquee | Tool::SingleColumnMarquee
-        ),
-        |ui| widgets::checkbox(ui, &mut opts.anti_alias, "Anti-alias"),
-    );
-    ui.add_space(6.0);
-    if matches!(
-        app.tool,
-        Tool::Lasso | Tool::PolygonalLasso | Tool::MagneticLasso
-    ) {
-        select_and_mask_button(ui);
-        return;
-    }
-
-    ui.label("Style:");
-    egui::ComboBox::from_id_salt("marquee-style")
-        .width(104.0)
-        .selected_text(opts.style.label())
-        .show_ui(ui, |ui| {
-            for s in MarqueeStyle::ALL {
-                ui.selectable_value(&mut opts.style, s, s.label());
-            }
-        });
-    let fixed = opts.style != MarqueeStyle::Normal;
-    ui.add_enabled_ui(fixed, |ui| {
-        ui.label("Width:");
-        widgets::field(ui, "", 58.0, fixed);
-        widgets::icon(ui, icons::ARROWS_LEFT_RIGHT, 16.0, color::TEXT_DISABLED);
-        ui.label("Height:");
-        widgets::field(ui, "", 58.0, fixed);
-    });
-    ui.add_space(6.0);
-    select_and_mask_button(ui);
-}
-
-/// Eyedropper: Sample Size, Sample, Show Sampling Ring.
-fn eyedropper_options(ui: &mut Ui, app: &mut AppState) {
-    use crate::state::EyedropperOptions;
-    let opts = &mut app.eyedropper;
-    ui.label("Sample Size:");
-    let label = EyedropperOptions::SIZES
-        .iter()
-        .find(|(s, _)| *s == opts.size)
-        .map_or("Point Sample", |(_, l)| l);
-    egui::ComboBox::from_id_salt("eyedropper-size")
-        .width(130.0)
-        .selected_text(label)
-        .show_ui(ui, |ui| {
-            for (size, label) in EyedropperOptions::SIZES {
-                ui.selectable_value(&mut opts.size, size, label);
-            }
-        });
-    ui.add_space(6.0);
-    ui.label("Sample:");
-    egui::ComboBox::from_id_salt("eyedropper-sample")
-        .width(110.0)
-        .selected_text(if opts.all_layers {
-            "All Layers"
-        } else {
-            "Current Layer"
-        })
-        .show_ui(ui, |ui| {
-            ui.selectable_value(&mut opts.all_layers, false, "Current Layer");
-            ui.selectable_value(&mut opts.all_layers, true, "All Layers");
-        });
-    ui.add_space(6.0);
-    let mut ring = true;
-    ui.add_enabled_ui(false, |ui| {
-        widgets::checkbox(ui, &mut ring, "Show Sampling Ring")
-    });
-}
-
-/// Gradient (classic): the gradient swatch (foreground to background), the
-/// five kinds, Mode, Opacity and Reverse.
-fn gradient_options(ui: &mut Ui, app: &mut AppState) {
-    use op_core::gradient::GradientKind;
-    // Swatch: the current two-color gradient
-    let (r, _) = ui.allocate_exact_size(Vec2::new(110.0, 26.0), Sense::hover());
-    let to32 = |c: op_core::Color| {
-        let [r, g, b, _] = c.to_rgba8();
-        egui::Color32::from_rgb(r, g, b)
-    };
-    let (start, end) = if app.gradient.reverse {
-        (app.background, app.foreground)
-    } else {
-        (app.foreground, app.background)
-    };
-    let mut mesh = egui::Mesh::default();
-    mesh.colored_vertex(r.left_top(), to32(start));
-    mesh.colored_vertex(r.right_top(), to32(end));
-    mesh.colored_vertex(r.right_bottom(), to32(end));
-    mesh.colored_vertex(r.left_bottom(), to32(start));
-    mesh.add_triangle(0, 1, 2);
-    mesh.add_triangle(0, 2, 3);
-    ui.painter().add(egui::Shape::mesh(mesh));
-    ui.painter().rect_stroke(
-        r,
-        0,
-        egui::Stroke::new(1.0, color::SEPARATOR),
-        egui::StrokeKind::Outside,
-    );
-    widgets::icon(ui, icons::CARET_DOWN, 13.0, color::ICON);
-    widgets::vseparator(ui, 34.0);
-    let opts = &mut app.gradient;
-    for kind in GradientKind::ALL {
-        let icon = match kind {
-            GradientKind::Linear => icons::GRADIENT,
-            GradientKind::Radial => icons::CIRCLE_HALF,
-            GradientKind::Angle => icons::SPIRAL,
-            GradientKind::Reflected => icons::ARROWS_IN_LINE_HORIZONTAL,
-            GradientKind::Diamond => icons::DIAMOND,
-        };
-        if widgets::icon_button(ui, icon, 34.0, opts.kind == kind)
-            .on_hover_text(kind.label())
-            .clicked()
-        {
-            opts.kind = kind;
-        }
-    }
-    widgets::vseparator(ui, 34.0);
-    ui.label("Mode:");
-    egui::ComboBox::from_id_salt("gradient-mode")
-        .width(110.0)
-        .selected_text(opts.mode.label())
-        .show_ui(ui, |ui| {
-            for (gi, group) in op_core::BlendMode::GROUPS.iter().enumerate() {
-                if gi > 0 {
-                    ui.separator();
-                }
-                for &m in *group {
-                    ui.selectable_value(&mut opts.mode, m, m.label());
-                }
-            }
-        });
-    ui.add_space(6.0);
-    ui.label("Opacity:");
-    widgets::percent_drag(ui, &mut opts.opacity);
-    ui.add_space(6.0);
-    widgets::checkbox(ui, &mut opts.reverse, "Reverse");
-}
-
-/// Magic Wand: mode, Tolerance, Anti-alias, Contiguous, Sample All Layers.
-fn wand_options(ui: &mut Ui, app: &mut AppState) {
-    let opts = &mut app.wand;
-    mode_buttons(ui, &mut opts.mode);
-    ui.label("Tolerance:");
-    ui.add_sized(
-        [48.0, size::FIELD_HEIGHT],
-        egui::DragValue::new(&mut opts.region.tolerance).range(0..=255),
-    );
-    ui.add_space(6.0);
-    widgets::checkbox(ui, &mut opts.region.anti_alias, "Anti-alias");
-    widgets::checkbox(ui, &mut opts.region.contiguous, "Contiguous");
-    widgets::checkbox(ui, &mut opts.region.all_layers, "Sample All Layers");
-    ui.add_space(6.0);
-    select_and_mask_button(ui);
-}
-
-/// Brush, Pencil and Eraser: the brush preset picker (a dot with the size
-/// below it; clicking opens Size and Hardness), Mode, Opacity and Flow.
-fn paint_options(ui: &mut Ui, app: &mut AppState) {
-    let tool = app.tool;
-    let mut retouch = app.retouch;
-    let Some(opts) = app.paint_options(tool) else {
-        return;
-    };
-    let (rect, response) =
-        ui.allocate_exact_size(Vec2::new(44.0, size::OPTIONS_BAR), Sense::click());
-    let dot = rect.center_top() + Vec2::new(0.0, size::OPTIONS_BAR * 0.36);
-    ui.painter().circle_filled(dot, 9.0, color::TEXT);
-    ui.painter().text(
-        rect.center_bottom() - Vec2::new(0.0, 6.0),
-        egui::Align2::CENTER_BOTTOM,
-        format!("{:.0}", opts.size),
-        theme::small(),
-        color::TEXT,
-    );
-    widgets::icon(ui, icons::CARET_DOWN, 13.0, color::ICON);
-    egui::Popup::from_response(&response)
-        .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
-        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-        .show(|ui| {
-            ui.set_min_width(240.0);
-            ui.label("Size:");
-            ui.add(
-                egui::Slider::new(&mut opts.size, 1.0..=crate::state::PaintOptions::MAX_SIZE)
-                    .logarithmic(true)
-                    .max_decimals(0)
-                    .suffix(" px"),
-            );
-            if tool != Tool::Pencil {
-                ui.label("Hardness:");
-                let mut pct = opts.hardness * 100.0;
-                if ui
-                    .add(
-                        egui::Slider::new(&mut pct, 0.0..=100.0)
-                            .max_decimals(0)
-                            .suffix("%"),
-                    )
-                    .changed()
-                {
-                    opts.hardness = pct / 100.0;
-                }
-            }
-        });
-    widgets::vseparator(ui, 34.0);
-    retouch_options(ui, tool, opts, &mut retouch);
-    app.retouch = retouch;
-}
-
-/// The options after the brush picker, per tool, as in Photoshop. Disabled
-/// controls are shown for what isn't implemented.
-fn retouch_options(
-    ui: &mut Ui,
-    tool: Tool,
-    opts: &mut crate::state::PaintOptions,
-    retouch: &mut crate::state::RetouchOptions,
-) {
-    use op_core::paint::ToneRange;
-    let disabled_combo = |ui: &mut Ui, id: &str, text: &str, width: f32| {
-        ui.add_enabled_ui(false, |ui| {
-            egui::ComboBox::from_id_salt(id)
-                .width(width)
-                .selected_text(text)
-                .show_ui(ui, |_| {});
-        });
-    };
-    let disabled_check = |ui: &mut Ui, label: &str, on: bool| {
-        let mut on = on;
-        ui.add_enabled_ui(false, |ui| widgets::checkbox(ui, &mut on, label));
-    };
-    match tool {
-        Tool::Dodge | Tool::Burn => {
-            let range = if tool == Tool::Dodge {
-                &mut retouch.dodge_range
-            } else {
-                &mut retouch.burn_range
-            };
-            ui.label("Range:");
-            egui::ComboBox::from_id_salt("tone-range")
-                .width(100.0)
-                .selected_text(range.label())
-                .show_ui(ui, |ui| {
-                    for r in ToneRange::ALL {
-                        ui.selectable_value(range, r, r.label());
-                    }
-                });
-            ui.add_space(8.0);
-            ui.label("Exposure:");
-            widgets::percent_drag(ui, &mut opts.opacity);
-            ui.add_space(8.0);
-            disabled_check(ui, "Protect Tones", true);
-        }
-        Tool::Sponge => {
-            ui.label("Mode:");
-            egui::ComboBox::from_id_salt("sponge-mode")
-                .width(110.0)
-                .selected_text(if retouch.sponge_saturate {
-                    "Saturate"
-                } else {
-                    "Desaturate"
-                })
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut retouch.sponge_saturate, false, "Desaturate");
-                    ui.selectable_value(&mut retouch.sponge_saturate, true, "Saturate");
-                });
-            ui.add_space(8.0);
-            ui.label("Flow:");
-            widgets::percent_drag(ui, &mut opts.flow);
-            ui.add_space(8.0);
-            disabled_check(ui, "Vibrance", true);
-        }
-        Tool::Blur | Tool::Sharpen => {
-            ui.label("Mode:");
-            disabled_combo(ui, "retouch-mode", "Normal", 110.0);
-            ui.add_space(8.0);
-            ui.label("Strength:");
-            widgets::percent_drag(ui, &mut opts.opacity);
-            ui.add_space(8.0);
-            disabled_check(ui, "Sample All Layers", false);
-            if tool == Tool::Sharpen {
-                disabled_check(ui, "Protect Detail", true);
-            }
-        }
-        _ => {
-            ui.label("Mode:");
-            let mode = if tool == Tool::Eraser {
-                "Brush"
-            } else {
-                "Normal"
-            };
-            disabled_combo(ui, "paint-mode", mode, 110.0);
-            ui.add_space(8.0);
-            ui.label("Opacity:");
-            widgets::percent_drag(ui, &mut opts.opacity);
-            if tool != Tool::Pencil {
-                ui.add_space(8.0);
-                ui.label("Flow:");
-                widgets::percent_drag(ui, &mut opts.flow);
-            }
-            if tool == Tool::CloneStamp {
-                ui.add_space(8.0);
-                widgets::checkbox(ui, &mut retouch.clone_aligned, "Aligned");
-                ui.label("Sample:");
-                disabled_combo(ui, "clone-sample", "Current Layer", 110.0);
-            }
-        }
-    }
-}
-
-/// Paint Bucket: Fill source, Mode, Opacity, Tolerance, Anti-alias,
-/// Contiguous, All Layers.
-fn bucket_options(ui: &mut Ui, app: &mut AppState) {
-    let opts = &mut app.bucket;
-    ui.label("Fill:");
-    ui.add_enabled_ui(false, |ui| {
-        egui::ComboBox::from_id_salt("bucket-fill")
-            .width(100.0)
-            .selected_text("Foreground")
-            .show_ui(ui, |_| {});
-    });
-    ui.add_space(6.0);
-    ui.label("Mode:");
-    egui::ComboBox::from_id_salt("bucket-mode")
-        .width(110.0)
-        .selected_text(opts.fill.mode.label())
-        .show_ui(ui, |ui| {
-            for (gi, group) in op_core::BlendMode::GROUPS.iter().enumerate() {
-                if gi > 0 {
-                    ui.separator();
-                }
-                for &m in *group {
-                    ui.selectable_value(&mut opts.fill.mode, m, m.label());
-                }
-            }
-        });
-    ui.add_space(6.0);
-    ui.label("Opacity:");
-    widgets::percent_drag(ui, &mut opts.fill.opacity);
-    ui.add_space(6.0);
-    ui.label("Tolerance:");
-    ui.add_sized(
-        [48.0, size::FIELD_HEIGHT],
-        egui::DragValue::new(&mut opts.tolerance).range(0..=255),
-    );
-    ui.add_space(6.0);
-    widgets::checkbox(ui, &mut opts.anti_alias, "Anti-alias");
-    widgets::checkbox(ui, &mut opts.contiguous, "Contiguous");
-    widgets::checkbox(ui, &mut opts.all_layers, "All Layers");
-}
-
 /// Move: Auto-Select (Layer), Show Transform Controls, and the align and
 /// distribute buttons (disabled: they need two or more layers selected).
 fn move_options(ui: &mut Ui, app: &mut AppState) {
@@ -2070,27 +1529,6 @@ fn sep(ui: &mut Ui) {
     ui.painter().rect_filled(rect, 0, color::OPTIONS_SEPARATOR);
 }
 
-fn view_options(ui: &mut Ui, app: &mut AppState) {
-    let ppp = ui.ctx().pixels_per_point();
-    let Some(doc) = app.active() else {
-        return;
-    };
-    for (label, f) in [
-        (
-            "100%",
-            crate::document_view::actual_pixels as fn(&mut _, f32),
-        ),
-        ("Fit Screen", crate::document_view::fit_on_screen),
-    ] {
-        let b = egui::Button::new(label)
-            .fill(color::BUTTON)
-            .min_size(Vec2::new(0.0, 30.0));
-        if ui.add(b).clicked() {
-            f(doc, ppp);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2101,6 +1539,7 @@ mod tests {
         assert_eq!(typed_number("50%"), Some(50.0));
         assert_eq!(typed_number(" 15° "), Some(15.0));
         assert_eq!(typed_number("-2.5"), Some(-2.5));
+        assert_eq!(typed_number("12 pt"), Some(12.0));
         assert_eq!(typed_number("abc"), None);
     }
 }
