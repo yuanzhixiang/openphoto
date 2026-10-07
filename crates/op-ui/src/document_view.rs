@@ -564,7 +564,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                             [r, g, b],
                             bucket,
                         ) {
-                            Ok(true) => state.record("Paint Bucket"),
+                            Ok(true) => state.record_fadeable("Paint Bucket"),
                             Ok(false) => {}
                             Err(e) => paint_error = Some(e.message("Paint Bucket")),
                         }
@@ -1009,7 +1009,7 @@ fn gradient_input(
     );
     match result {
         Ok(()) => {
-            state.record("Gradient");
+            state.record_fadeable("Gradient");
             None
         }
         Err(e) => Some(e.message("Gradient")),
@@ -1725,7 +1725,7 @@ fn paint_input(
             let (_, name) = stroke_names(*stroke_tool);
             state.last_paint_point = stroke.last_point();
             state.stroke = None;
-            state.record(name);
+            state.record_fadeable(name);
         } else {
             ui.ctx().request_repaint();
         }

@@ -90,6 +90,10 @@ On OK, calls `actions::create_document`.
 
 On OK, adds the guide to the current document and records "New Guide".
 
+## Wiring the Fade dialog
+
+`fade_dialog` keeps the layer previewing while the dialog is open: whenever the opacity, mode or Preview changes it sets the layer's pixels to `op_core::fade::fade` of the edit's before and after (or to the after with Preview off) and marks the document dirty; Cancel restores the after; OK sets the faded pixels and records "Fade <edit>". See `dialogs/fade.md`.
+
 ## Wiring the Trim dialog
 
 On OK, applies `image_ops::trim` to the current document and records "Trim" if the canvas changed; if there is no edge to trim, nothing is recorded.

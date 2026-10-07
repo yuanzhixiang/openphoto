@@ -9,6 +9,7 @@ pub mod blend;
 pub mod clipboard;
 pub mod color;
 pub mod document;
+pub mod fade;
 pub mod fill;
 pub mod filter;
 pub mod gradient;

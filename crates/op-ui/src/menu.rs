@@ -165,6 +165,7 @@ const ALL_COMMANDS: &[Command] = &[
     Command::Zoom200,
     Command::PrintSize,
     Command::ActualSize,
+    Command::Fade,
     Command::ToggleRulers,
     Command::ToggleExtras,
     Command::ToggleGuides,
@@ -390,7 +391,7 @@ impl NativeMenu {
                 &item("Redo", Command::Redo),
                 &item("Toggle Last State", Command::ToggleLastState),
                 &sep(),
-                &todo("Fade...", Some("CmdOrCtrl+Shift+F")),
+                &item("Fade...", Command::Fade),
                 &sep(),
                 // With a text field focused these pass the edit on to it
                 &item("Cut", Command::Cut),
@@ -1221,6 +1222,11 @@ impl NativeMenu {
                         .into(),
                     )
                 }
+                // "Fade Blur..." for the edit it would fade
+                Command::Fade => Some(match doc.and_then(|d| d.fade.as_ref()) {
+                    Some((_, name)) if command.enabled(app) => format!("Fade {name}..."),
+                    _ => "Fade...".into(),
+                }),
                 // Like Photoshop, the item names the last filter used
                 Command::LastFilter => Some(
                     app.last_filter

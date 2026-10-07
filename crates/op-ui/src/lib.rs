@@ -212,7 +212,7 @@ impl OpenPhotoApp {
                 let [r, g, b, _] = color.to_rgba8();
                 if let Some(state) = self.state.active() {
                     match op_core::fill::fill(&mut state.doc, [r, g, b], options) {
-                        Ok(()) => state.record("Fill"),
+                        Ok(()) => state.record_fadeable("Fill"),
                         Err(e) => self.state.alert = Some(e.message("Fill")),
                     }
                 }
@@ -265,7 +265,7 @@ impl OpenPhotoApp {
                 }
                 match effect.apply(&mut state.doc, background) {
                     Ok(()) => {
-                        state.record(effect.name());
+                        state.record_fadeable(effect.name());
                         if let dialogs::Effect::Filter(filter) = effect {
                             self.state.last_filter = Some(filter);
                         }
@@ -474,6 +474,56 @@ impl OpenPhotoApp {
         }
     }
 
+    /// Edit › Fade: the layer previews the faded result while the dialog
+    /// is open (Preview on); Cancel puts the edit's result back, OK keeps
+    /// the faded pixels as a new "Fade <edit>" state.
+    fn fade_dialog(&mut self, ctx: &egui::Context) {
+        let Some(mut fade) = self.state.fade_dialog.take() else {
+            return;
+        };
+        let outcome = fade.dialog.show(ctx);
+        let Some(state) = self.state.active() else {
+            return;
+        };
+        let layer = fade.source.layer;
+        let set = |state: &mut state::DocState, image: op_core::tile::TiledImage| {
+            if let Some(slot) = state.doc.layer_mut(layer).and_then(|l| l.image_mut()) {
+                *slot = image;
+            }
+            state.doc.mark_dirty();
+        };
+        let faded = |fade: &state::FadeState, opacity: f32| {
+            op_core::fade::fade(
+                &fade.source.before,
+                &fade.source.after,
+                opacity,
+                fade.dialog.mode,
+            )
+        };
+        match outcome {
+            dialogs::FadeOutcome::Open => {
+                let opacity = fade.dialog.opacity().unwrap_or(1.0);
+                let now = (opacity, fade.dialog.mode, fade.dialog.preview);
+                if fade.shown != Some(now) {
+                    let image = if fade.dialog.preview {
+                        faded(&fade, opacity)
+                    } else {
+                        fade.source.after.clone()
+                    };
+                    set(state, image);
+                    fade.shown = Some(now);
+                }
+                self.state.fade_dialog = Some(fade);
+            }
+            dialogs::FadeOutcome::Cancel => set(state, fade.source.after.clone()),
+            dialogs::FadeOutcome::Apply => {
+                let opacity = fade.dialog.opacity().unwrap_or(1.0);
+                set(state, faded(&fade, opacity));
+                state.record(&format!("Fade {}", fade.source.name));
+            }
+        }
+    }
+
     fn trim_dialog(&mut self, ctx: &egui::Context) {
         let Some(mut dialog) = self.state.trim_dialog.take() else {
             return;
@@ -506,7 +556,7 @@ impl OpenPhotoApp {
                 };
                 if let Some(state) = self.state.active() {
                     match op_core::adjust::apply(&mut state.doc, adjustment) {
-                        Ok(()) => state.record("Equalize"),
+                        Ok(()) => state.record_fadeable("Equalize"),
                         Err(e) => self.state.alert = Some(e.message("Equalize")),
                     }
                 }
@@ -710,6 +760,7 @@ impl eframe::App for OpenPhotoApp {
         self.canvas_size_dialog(&ctx);
         self.fill_dialog(&ctx);
         self.trim_dialog(&ctx);
+        self.fade_dialog(&ctx);
         self.equalize_dialog(&ctx);
         self.image_size_dialog(&ctx);
         self.new_guide_dialog(&ctx);

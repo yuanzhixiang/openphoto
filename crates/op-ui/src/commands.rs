@@ -216,6 +216,8 @@ pub enum Command {
     PrintSize,
     /// View > Actual Size.
     ActualSize,
+    /// Edit > Fade (opens the dialog for the last fadeable edit).
+    Fade,
     /// View > Rulers.
     ToggleRulers,
     /// View > Extras.
@@ -572,6 +574,7 @@ impl Command {
                 key: Key::F,
             },
             Self::Desaturate => shift_cmd(Key::U),
+            Self::Fade => shift_cmd(Key::F),
             Self::FitLayers
             | Self::Zoom200
             | Self::PrintSize
@@ -907,6 +910,7 @@ impl Command {
             | Self::ActualSize
             | Self::NewGuide
             | Self::QuickMask => doc.is_some(),
+            Self::Fade => doc.is_some_and(|d| d.can_fade()),
         }
     }
 }
@@ -938,6 +942,7 @@ const SHORTCUT_ORDER: &[Command] = &[
     Command::FillBackground,
     Command::Reselect,
     Command::SelectInverse,
+    Command::Fade,
     Command::Desaturate,
     Command::AutoTone,
     Command::AutoColor,
@@ -1122,7 +1127,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
             if let Some(state) = app.active() {
                 let result = op_core::fill::fill(&mut state.doc, [r, g, b], Default::default());
                 match result {
-                    Ok(()) => state.record("Fill"),
+                    Ok(()) => state.record_fadeable("Fill"),
                     Err(e) => app.alert = Some(e.message("Fill")),
                 }
             }
@@ -1192,7 +1197,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                     return;
                 }
                 match adjust::apply(&mut state.doc, adjustment) {
-                    Ok(()) => state.record(adjustment.name()),
+                    Ok(()) => state.record_fadeable(adjustment.name()),
                     Err(e) => app.alert = Some(e.message(adjustment.name())),
                 }
             }
@@ -1227,7 +1232,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
             {
                 match op_core::filter::apply(&mut state.doc, filter, [r, g, b]) {
                     Ok(()) => {
-                        state.record(filter.name());
+                        state.record_fadeable(filter.name());
                         app.last_filter = Some(filter);
                     }
                     Err(e) => app.alert = Some(e.message(filter.name())),
@@ -1438,6 +1443,15 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::LockGuides => app.view.lock_guides = !app.view.lock_guides,
         Command::ToggleSnap => app.view.snap = !app.view.snap,
         Command::ScreenMode(mode) => app.set_screen_mode(mode),
+        Command::Fade => {
+            if let Some(source) = app.active().and_then(|d| d.fade_source()) {
+                app.fade_dialog = Some(crate::state::FadeState {
+                    dialog: Default::default(),
+                    source,
+                    shown: None,
+                });
+            }
+        }
         Command::StatusInfo(info) => app.status_info = info,
         Command::RulerUnits(unit) => app.ruler_units = unit,
         Command::SnapToGuides => app.view.snap_guides = !app.view.snap_guides,

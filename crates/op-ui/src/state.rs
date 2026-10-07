@@ -86,6 +86,8 @@ pub struct DocState {
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
     /// What the drag in progress snaps to (View › Snap).
     pub snap: Option<crate::snap::Targets>,
+    /// The last fadeable edit: the history state it made and its name.
+    pub fade: Option<(u64, String)>,
     /// A Selection Brush stroke under way, and the overlay texture showing
     /// the selection with that tool (keyed by selection revision and color).
     pub selection_stroke: Option<op_core::selection_brush::SelectionStroke>,
@@ -221,6 +223,7 @@ impl DocState {
             quick: None,
             object_drag: None,
             snap: None,
+            fade: None,
             selection_stroke: None,
             overlay: None,
             color_samplers: Vec::new(),
@@ -261,6 +264,58 @@ impl DocState {
     pub fn record(&mut self, name: &str) {
         self.history.record(&self.doc, name);
         self.pending_edit = false;
+    }
+
+    /// Records an edit Edit › Fade can blend back (a filter, adjustment,
+    /// fill, gradient or brush stroke on the active layer), until anything
+    /// else changes the history.
+    pub fn record_fadeable(&mut self, name: &str) {
+        self.record(name);
+        self.fade = Some((self.history.current_id(), name.to_owned()));
+    }
+
+    /// What Edit › Fade would fade: the last state, if it was a fadeable
+    /// edit and is still current, with the active layer's pixels before it
+    /// and now. `None` otherwise.
+    pub fn fade_source(&self) -> Option<FadeSource> {
+        let (name, layer, before, after) = self.fade_parts()?;
+        Some(FadeSource {
+            name: name.to_owned(),
+            layer,
+            before: before.clone(),
+            after: after.clone(),
+        })
+    }
+
+    /// Whether Edit › Fade is available (without copying any pixels).
+    pub fn can_fade(&self) -> bool {
+        self.fade_parts().is_some()
+    }
+
+    fn fade_parts(
+        &self,
+    ) -> Option<(
+        &str,
+        op_core::LayerId,
+        &op_core::tile::TiledImage,
+        &op_core::tile::TiledImage,
+    )> {
+        let (id, name) = self.fade.as_ref()?;
+        if *id != self.history.current_id() {
+            return None;
+        }
+        let layer = self.doc.active_layer?;
+        let after = self.doc.layer(layer)?.image()?;
+        let previous = self
+            .history
+            .snapshot(self.history.current().checked_sub(1)?)?;
+        let before = op_core::Document::snapshot_layer(previous, layer)?.image()?;
+        (before.width() == after.width() && before.height() == after.height()).then_some((
+            name.as_str(),
+            layer,
+            before,
+            after,
+        ))
     }
 
     /// Marks an in-progress edit that will be recorded by [`Self::commit_pending`].
@@ -1210,6 +1265,8 @@ pub struct AppState {
     pub full_screen_prompt: Option<crate::dialogs::alert::Alert>,
     /// "Don't show again" was ticked in that warning.
     pub skip_full_screen_prompt: bool,
+    /// Edit › Fade's dialog while open.
+    pub fade_dialog: Option<FadeState>,
     /// Layer > Flatten Image's "Discard hidden layers?" while asked.
     pub flatten_prompt: Option<crate::dialogs::alert::Alert>,
     /// "Don't show again" was ticked in that prompt.
@@ -1353,6 +1410,7 @@ impl Default for AppState {
             hide_panels: false,
             full_screen_prompt: None,
             skip_full_screen_prompt: false,
+            fade_dialog: None,
             flatten_prompt: None,
             skip_flatten_prompt: false,
             delete_group_prompt: None,
@@ -1488,6 +1546,7 @@ impl AppState {
             || self.new_layer_dialog.is_some()
             || self.flatten_prompt.is_some()
             || self.full_screen_prompt.is_some()
+            || self.fade_dialog.is_some()
             || self.delete_group_prompt.is_some()
             || self.duplicate_dialog.is_some()
             || self.lock_dialog.is_some()
@@ -1650,4 +1709,22 @@ impl AppState {
             self.hide_panels = !all;
         }
     }
+}
+
+/// Edit › Fade's material: the faded edit's name, its layer, and the
+/// layer's pixels before and after it.
+#[derive(Clone)]
+pub struct FadeSource {
+    pub name: String,
+    pub layer: op_core::LayerId,
+    pub before: op_core::tile::TiledImage,
+    pub after: op_core::tile::TiledImage,
+}
+
+/// The Fade dialog while open, with what it fades and what its preview
+/// last showed.
+pub struct FadeState {
+    pub dialog: crate::dialogs::FadeDialog,
+    pub source: FadeSource,
+    pub shown: Option<(f32, op_core::BlendMode, bool)>,
 }

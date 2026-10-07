@@ -6047,3 +6047,56 @@ fn selection_brush_paints_the_selection() {
     );
     assert_eq!(sel(&h, 200, 500), 0);
 }
+
+#[test]
+fn fade_blends_the_last_edit_back() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let px = |h: &Harness<'_, OpenPhotoApp>| layer_pixel(h, 0, 10, 10);
+    // Nothing to fade at first
+    assert!(!Command::Fade.enabled(&h.state().state));
+    // Invert #141414 → #ebebeb, then Fade it to 50%
+    run_command(&mut h, Command::Invert);
+    assert_eq!(px(&h), [0xeb, 0xeb, 0xeb, 255]);
+    assert!(Command::Fade.enabled(&h.state().state));
+    run_command(&mut h, Command::Fade);
+    assert!(h.state().state.fade_dialog.is_some());
+    // The opacity field starts selected: typing replaces it, and the
+    // layer previews the result
+    h.event(egui::Event::Text("50".into()));
+    h.run_steps(3);
+    assert_eq!(px(&h), [0x80, 0x80, 0x80, 255]);
+    // Cancel puts the inverted pixels back
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert!(h.state().state.fade_dialog.is_none());
+    assert_eq!(px(&h), [0xeb, 0xeb, 0xeb, 255]);
+    assert_eq!(last_history(&h), "Invert");
+    // Again, with OK: a new "Fade Invert" state
+    run_command(&mut h, Command::Fade);
+    h.event(egui::Event::Text("25".into()));
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(px(&h), [0x4a, 0x4a, 0x4a, 255]);
+    assert_eq!(last_history(&h), "Fade Invert");
+    // A fade can't be faded; undoing it makes the Invert fadeable again
+    assert!(!Command::Fade.enabled(&h.state().state));
+    run_command(&mut h, Command::Undo);
+    assert!(Command::Fade.enabled(&h.state().state));
+    // Anything else in between ends it
+    run_command(&mut h, Command::SelectAll);
+    assert!(!Command::Fade.enabled(&h.state().state));
+}
+
+#[test]
+#[ignore]
+fn screenshot_fade_dialog() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::Invert);
+    run_command(&mut h, crate::commands::Command::Fade);
+    h.run_steps(3);
+    shot_dialog(&mut h, "fade", 291.0, 144.0);
+}
