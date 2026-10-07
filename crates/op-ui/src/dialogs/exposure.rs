@@ -70,6 +70,28 @@ impl Dialog {
         }
     }
 
+    /// The settings as an Exposure preset file (None while a field is
+    /// invalid).
+    fn encoded(&self) -> Option<Vec<u8>> {
+        Some(super::preset_files::encode_exposure([
+            parse(&self.values[0], EXPOSURE)?,
+            parse(&self.values[1], OFFSET)?,
+            parse(&self.values[2], GAMMA)?,
+        ]))
+    }
+
+    /// A preset file's settings into the dialog, shown as Photoshop's
+    /// presets are.
+    fn load_preset(&mut self, bytes: &[u8]) {
+        if let Some([exposure, offset, gamma]) = super::preset_files::decode_exposure(bytes) {
+            let signed = |v: f32| {
+                let t = trimmed(v, 2);
+                if v > 0.0 { format!("+{t}") } else { t }
+            };
+            self.values = [signed(exposure), trimmed(offset, 4), signed(gamma)];
+        }
+    }
+
     fn preset(&self) -> &'static str {
         if self.adjustment() == Self::default().adjustment() {
             return "Default";
@@ -91,9 +113,14 @@ impl Dialog {
         let painter = ui.painter().clone();
 
         uxp::label(ui, at(20.0, 61.0), "Preset");
-        let preset = self.preset();
+        use super::preset_files as files;
+        let encoded = self.encoded();
+        let saved_name = files::shown(files::EXPOSURE, encoded.as_deref());
+        let preset = saved_name.as_deref().unwrap_or(self.preset());
+        let saved = files::EXPOSURE.saved();
         let mut reset = false;
         let mut picked = None;
+        let mut picked_saved = None;
         common::ps_dropdown(
             ui,
             r(56.0, 48.5, 231.0, 73.5),
@@ -118,6 +145,15 @@ impl Dialog {
                         picked = Some(k);
                     }
                 }
+                // The saved presets
+                if !saved.is_empty() {
+                    ui.separator();
+                }
+                for (k, (name, _)) in saved.iter().enumerate() {
+                    if ui.selectable_label(preset == name, name).clicked() {
+                        picked_saved = Some(k);
+                    }
+                }
             },
         );
         if reset {
@@ -133,6 +169,15 @@ impl Dialog {
             uxp::TEXT,
             color::PANEL,
         );
+        if let Some(bytes) =
+            picked_saved.and_then(|k| files::load_saved(files::EXPOSURE, &saved[k]))
+        {
+            self.load_preset(&bytes);
+        }
+        let gear = Rect::from_center_size(at(248.0, 61.0), vec2(pt(18.0), pt(18.0)));
+        if let Some(bytes) = files::gear(ui, gear, "exposure-gear", files::EXPOSURE, encoded) {
+            self.load_preset(&bytes);
+        }
 
         // Label, top, range, decimals, slider step
         type Row = (&'static str, f32, (f32, f32), usize, f32);
@@ -226,6 +271,14 @@ impl Dialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preset_files_round_trip() {
+        let d = Dialog::preset_dialog(0);
+        let mut e = Dialog::default();
+        e.load_preset(&d.encoded().unwrap());
+        assert_eq!(e.values, d.values);
+    }
 
     #[test]
     fn photoshops_presets() {

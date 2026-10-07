@@ -215,6 +215,41 @@ impl Dialog {
     }
 
     /// "Default" until anything changes, then "Custom".
+    /// The settings as a Hue/Saturation preset file (None while a field
+    /// is invalid).
+    fn encoded(&self) -> Option<Vec<u8>> {
+        let three = |t: &[String; 3], ranges: [(f32, f32); 3]| -> Option<[i32; 3]> {
+            Some([
+                parse(&t[0], ranges[0])?,
+                parse(&t[1], ranges[1])?,
+                parse(&t[2], ranges[2])?,
+            ])
+        };
+        let mut values = [[0; 3]; 7];
+        for (v, t) in values.iter_mut().zip(&self.values) {
+            *v = three(t, [HUE, AMOUNT, AMOUNT])?;
+        }
+        let colorize = [COLORIZE_HUE, COLORIZE_SATURATION, AMOUNT];
+        Some(super::preset_files::encode_hue_saturation(
+            &super::preset_files::HueSaturation {
+                colorize: self.colorize,
+                colorize_values: three(&self.colorize_values, colorize)?,
+                values,
+                bounds: self.bounds,
+            },
+        ))
+    }
+
+    /// A preset file's settings into the dialog.
+    fn load_preset(&mut self, bytes: &[u8]) {
+        if let Some(h) = super::preset_files::decode_hue_saturation(bytes) {
+            self.colorize = h.colorize;
+            self.colorize_values = h.colorize_values.map(|v| v.to_string());
+            self.values = h.values.map(|t| t.map(|v| v.to_string()));
+            self.bounds = h.bounds;
+        }
+    }
+
     fn preset(&self) -> &'static str {
         let untouched = !self.colorize
             && self.bounds == HUE_RANGES
@@ -386,9 +421,14 @@ impl Dialog {
 
         // Preset
         uxp::label(ui, at(20.0, 61.0), "Preset");
-        let preset = self.preset();
+        use super::preset_files as files;
+        let encoded = self.encoded();
+        let saved_name = files::shown(files::HUE_SATURATION, encoded.as_deref());
+        let preset = saved_name.as_deref().unwrap_or(self.preset());
+        let saved = files::HUE_SATURATION.saved();
         let mut reset = false;
         let mut picked = None;
+        let mut picked_saved = None;
         common::ps_dropdown(
             ui,
             r(56.0, 48.5, 266.0, 73.5),
@@ -413,6 +453,15 @@ impl Dialog {
                         picked = Some(k);
                     }
                 }
+                // The saved presets
+                if !saved.is_empty() {
+                    ui.separator();
+                }
+                for (k, (name, _)) in saved.iter().enumerate() {
+                    if ui.selectable_label(preset == name, name).clicked() {
+                        picked_saved = Some(k);
+                    }
+                }
             },
         );
         if reset {
@@ -420,6 +469,15 @@ impl Dialog {
         }
         if let Some(k) = picked {
             self.apply_preset(k);
+        }
+        if let Some(bytes) =
+            picked_saved.and_then(|k| files::load_saved(files::HUE_SATURATION, &saved[k]))
+        {
+            self.load_preset(&bytes);
+        }
+        let gear = Rect::from_center_size(at(284.0, 61.0), vec2(pt(18.0), pt(18.0)));
+        if let Some(bytes) = files::gear(ui, gear, "hs-gear", files::HUE_SATURATION, encoded) {
+            self.load_preset(&bytes);
         }
         ps_icons::paint(
             &painter,
@@ -841,6 +899,20 @@ fn swatch(painter: &egui::Painter, center: Pos2, fill: Option<[u8; 3]>, chosen: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preset_files_round_trip() {
+        let mut d = Dialog::new(0);
+        d.values[2] = ["10", "-20", "5"].map(String::from);
+        d.colorize = true;
+        d.colorize_values = ["215", "25", "0"].map(String::from);
+        let mut e = Dialog::new(0);
+        e.load_preset(&d.encoded().unwrap());
+        assert_eq!(
+            (e.values.clone(), e.colorize, e.colorize_values.clone()),
+            (d.values.clone(), true, d.colorize_values.clone())
+        );
+    }
 
     #[test]
     fn eyedroppers_invert_and_the_hand() {

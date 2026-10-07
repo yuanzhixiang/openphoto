@@ -13,7 +13,7 @@ The dialog for Image › Adjustments › Curves... (⌘M), rebuilt after Photosh
 
 ## Layout (Photoshop points)
 
-- "Preset:" (11, 56.25), popup menu (56, 46)–(345, 67), gear (365.5, 56.5) (drawn only).
+- "Preset:" (11, 56.25), popup menu (56, 46)–(345, 67), gear (365.5, 56.5), whose menu saves, loads and deletes preset files (`preset_files.md`); saved presets are listed at the end of the Preset pop-up.
 - Left group box (11, 87.5)–(368, 434.5), "Channel:" (30.5, 86.75), popup menu (85, 76.5)–(170, 97.5).
 - Tools: point tool button (20, 107.5)–(50, 133.5) (selected, `#383838` fill), pencil (64.5, 120) (drawn only).
 - Curve graph (89, 108)–(346, 365): `#454545` fill; the current channel's histogram (`#868686`); grid lines `#383838`; diagonal baseline `#808080`; other channels' changed curves drawn 1 pt in the channel color (Channel Overlays); the current curve 1.75 pt (white for RGB, otherwise the channel color); control points are 4 pt squares, the selected one filled. While dragging a point, horizontal and vertical crosshair lines through it are drawn (Intersection Line).
@@ -40,7 +40,7 @@ The dialog for Image › Adjustments › Curves... (⌘M), rebuilt after Photosh
 
 ## Known limitations
 
-- The gear menu is not implemented. The hand reads RGB's value as the mean of the three channels (Photoshop's exact composite value is not measured), only adjusts the current channel (⌘⇧-click setting points on each channel is not implemented), and draws no circle on the curve while hovering the image. With the pencil the ramps and end-point pins are not drawn.
+- The hand reads RGB's value as the mean of the three channels (Photoshop's exact composite value is not measured), only adjusts the current channel (⌘⇧-click setting points on each channel is not implemented), and draws no circle on the curve while hovering the image. With the pencil the ramps and end-point pins are not drawn.
 
 ## Test coverage
 

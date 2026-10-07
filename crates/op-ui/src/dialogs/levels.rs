@@ -116,6 +116,32 @@ impl Dialog {
         })
     }
 
+    /// The values as a Levels preset file (None while a field is invalid).
+    fn encoded(&self) -> Option<Vec<u8>> {
+        let mut levels = [[0f32; 5]; 4];
+        for (l, v) in levels.iter_mut().zip(&self.values) {
+            for (x, t) in l.iter_mut().zip(v) {
+                *x = t.trim().parse().ok()?;
+            }
+        }
+        Some(super::preset_files::encode_levels(&levels))
+    }
+
+    /// A preset file's values into the fields.
+    fn load_preset(&mut self, bytes: &[u8]) {
+        if let Some(levels) = super::preset_files::decode_levels(bytes) {
+            self.values = levels.map(|[black, gamma, white, out_black, out_white]| {
+                [
+                    black.to_string(),
+                    format!("{gamma:.2}"),
+                    white.to_string(),
+                    out_black.to_string(),
+                    out_white.to_string(),
+                ]
+            });
+        }
+    }
+
     /// "Default" or the preset the values match, else "Custom".
     fn preset(&self) -> &'static str {
         let same = |want: &[[String; 5]; 4]| {
@@ -211,8 +237,11 @@ impl Dialog {
 
         // Preset
         appkit::label(ui, at(11.0, 50.0), "Preset:");
-        let preset = self.preset();
-        // Default, Custom, then Photoshop's presets
+        use super::preset_files as files;
+        let encoded = self.encoded();
+        let saved_name = files::shown(files::LEVELS, encoded.as_deref());
+        let preset = saved_name.as_deref().unwrap_or(self.preset());
+        // Default, Custom, then Photoshop's presets, then the saved ones
         let mut entries = vec![
             Entry::item("Default", preset == "Default"),
             Entry::item("Custom", preset == "Custom").enabled(false),
@@ -223,6 +252,8 @@ impl Dialog {
                 .iter()
                 .map(|(name, _)| Entry::item(*name, preset == *name)),
         );
+        let before = entries.len();
+        let saved = files::add_saved(&mut entries, files::LEVELS, preset);
         match appkit::popup(
             ui,
             r(59.0, 39.5, 266.0, 60.5),
@@ -231,10 +262,20 @@ impl Dialog {
             &entries,
         ) {
             Some(0) => self.values = std::array::from_fn(|_| DEFAULTS.map(String::from)),
+            Some(k) if k >= before => {
+                if let Some(bytes) = files::picked_saved(k, before, &saved, files::LEVELS) {
+                    self.load_preset(&bytes);
+                }
+            }
             Some(k) if k >= 3 => {
                 self.values = Self::preset_values(&super::adjust_presets::LEVELS[k - 3].1);
             }
             _ => {}
+        }
+        // The gear: Save Preset..., Load Preset..., Delete Current Preset
+        let gear = Rect::from_center_size(at(283.5, 50.0), vec2(pt(18.0), pt(18.0)));
+        if let Some(bytes) = files::gear(ui, gear, "levels-gear", files::LEVELS, encoded) {
+            self.load_preset(&bytes);
         }
         ps_icons::paint_scaled(
             &painter,
@@ -443,6 +484,16 @@ impl Dialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preset_files_round_trip() {
+        let mut d = Dialog::new([[0; 256]; 3]);
+        d.values[0] = ["15", "1.20", "240", "5", "250"].map(String::from);
+        let bytes = d.encoded().unwrap();
+        let mut e = Dialog::new([[0; 256]; 3]);
+        e.load_preset(&bytes);
+        assert_eq!(e.adjustment(), d.adjustment());
+    }
 
     #[test]
     fn photoshops_presets() {

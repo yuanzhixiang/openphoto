@@ -13,7 +13,7 @@ The dialog for Image › Adjustments › Levels... (⌘L), rebuilt pixel by pixe
 
 ## Layout (Photoshop points)
 
-- "Preset:" (11, 50), pop-up menu (59, 39.5)–(266, 60.5), gear (283.5, 50) (drawn only).
+- "Preset:" (11, 50), pop-up menu (59, 39.5)–(266, 60.5), gear (283.5, 50), whose menu saves, loads and deletes preset files (`preset_files.md`); saved presets are listed at the end of the Preset pop-up.
 - Channel group box (11, 90.5)–(295.5, 359.5), broken at the title; "Channel:" (30.5, 90.5), pop-up menu (85, 80)–(206.5, 101).
 - "Input Levels:" (20.5, 118.5); histogram (25, 131)–(281, 230), `#454545` background, a 1 pt wide `#d0d0d0` vertical bar per level, normalized to the maximum count; shows the current channel's histogram.
 - Input sliders: tips at y 233, with 0 and 255 at x 25.75 and 279.25 respectively; three sliders: black (hollow), gray, white. The gray slider sits between the black and white sliders at `0.5^gamma`.
@@ -35,7 +35,6 @@ The dialog for Image › Adjustments › Levels... (⌘L), rebuilt pixel by pixe
 
 ## Known limitations
 
-- The gear menu (save/load presets) has no behavior.
 - Changing Auto Color Correction Options does not preview live in the document while that dialog is open (Photoshop updates the preview as you choose); it takes effect on its OK.
 
 ## Test coverage

@@ -56,6 +56,29 @@ impl Default for Dialog {
     }
 }
 
+/// The hue (degrees) and saturation (percent) whose [`tint_color`] is
+/// `rgb`: its HSB hue and saturation.
+pub fn tint_of([r, g, b]: [u8; 3]) -> (i32, i32) {
+    let [r, g, b] = [r, g, b].map(|v| v as f32 / 255.0);
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let d = max - min;
+    if max <= 0.0 || d <= 0.0 {
+        return (0, 0);
+    }
+    let h = if max == r {
+        ((g - b) / d).rem_euclid(6.0)
+    } else if max == g {
+        (b - r) / d + 2.0
+    } else {
+        (r - g) / d + 4.0
+    };
+    (
+        (h * 60.0).round() as i32 % 360,
+        (d / max * 100.0).round() as i32,
+    )
+}
+
 impl Dialog {
     /// Auto: the weights `op_core::auto::black_white` picked (the tint is
     /// kept).
@@ -110,6 +133,31 @@ impl Dialog {
         Some(Adjustment::BlackWhite { weights, tint })
     }
 
+    /// The settings as a Black & White preset file (None while a field is
+    /// invalid).
+    fn encoded(&self) -> Option<Vec<u8>> {
+        let mut weights = [0; 6];
+        for (w, t) in weights.iter_mut().zip(&self.weights) {
+            *w = parse(t, WEIGHT)?;
+        }
+        let color = tint_color(parse(&self.hue, HUE)?, parse(&self.saturation, SATURATION)?);
+        Some(super::preset_files::encode_black_white(
+            weights, self.tint, color,
+        ))
+    }
+
+    /// A preset file's settings into the dialog; the tint color becomes
+    /// the hue and saturation that make it.
+    fn load_preset(&mut self, bytes: &[u8]) {
+        if let Some((weights, tint, color)) = super::preset_files::decode_black_white(bytes) {
+            self.weights = weights.map(|w| w.to_string());
+            self.tint = tint;
+            let (hue, saturation) = tint_of(color);
+            self.hue = hue.to_string();
+            self.saturation = saturation.to_string();
+        }
+    }
+
     fn preset(&self) -> &'static str {
         let untouched = self
             .weights
@@ -145,9 +193,14 @@ impl Dialog {
         let painter = ui.painter().clone();
 
         uxp::label(ui, at(20.0, 61.0), "Preset:");
-        let preset = self.preset();
+        use super::preset_files as files;
+        let encoded = self.encoded();
+        let saved_name = files::shown(files::BLACK_WHITE, encoded.as_deref());
+        let preset = saved_name.as_deref().unwrap_or(self.preset());
+        let saved = files::BLACK_WHITE.saved();
         let mut reset = false;
         let mut picked = None;
+        let mut picked_saved = None;
         common::ps_dropdown(
             ui,
             r(59.0, 48.5, 231.0, 73.5),
@@ -172,6 +225,15 @@ impl Dialog {
                         picked = Some(k);
                     }
                 }
+                // The saved presets
+                if !saved.is_empty() {
+                    ui.separator();
+                }
+                for (k, (name, _)) in saved.iter().enumerate() {
+                    if ui.selectable_label(preset == name, name).clicked() {
+                        picked_saved = Some(k);
+                    }
+                }
             },
         );
         if let Some(k) = picked {
@@ -191,6 +253,15 @@ impl Dialog {
             uxp::TEXT,
             color::PANEL,
         );
+        if let Some(bytes) =
+            picked_saved.and_then(|k| files::load_saved(files::BLACK_WHITE, &saved[k]))
+        {
+            self.load_preset(&bytes);
+        }
+        let gear = Rect::from_center_size(at(248.0, 61.0), vec2(pt(18.0), pt(18.0)));
+        if let Some(bytes) = files::gear(ui, gear, "bw-gear", files::BLACK_WHITE, encoded) {
+            self.load_preset(&bytes);
+        }
 
         let focus = first_frame || std::mem::take(&mut self.focus);
         let percent = |ui: &Ui, field: Rect, text: &str, suffix: &str, tint: Color32| {
@@ -351,6 +422,21 @@ impl Dialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tint_round_trips_through_its_color() {
+        // Photoshop's presets store the default tint, 42° at 20%, as
+        // (225, 211, 179)
+        assert_eq!(tint_of([225, 211, 179]), (42, 20));
+        // Within the 8-bit color's rounding
+        for (h, sat) in [(42, 20), (200, 60), (330, 90)] {
+            let (h2, s2) = tint_of(tint_color(h, sat));
+            assert!(
+                (h2 - h).abs() <= 1 && (s2 - sat).abs() <= 1,
+                "{h} {sat}: {h2} {s2}"
+            );
+        }
+    }
 
     #[test]
     fn photoshops_presets() {

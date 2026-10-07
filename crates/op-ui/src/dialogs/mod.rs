@@ -38,6 +38,7 @@ mod new_layer;
 pub(crate) mod new_preset;
 mod photo_filter;
 mod plain_filter;
+mod preset_files;
 mod rotate_canvas;
 pub mod save_changes;
 pub(crate) mod save_options;

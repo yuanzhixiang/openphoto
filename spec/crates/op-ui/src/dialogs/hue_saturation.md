@@ -13,7 +13,7 @@ The dialog for Image › Adjustments › Hue/Saturation... (⌘U), rebuilt after
 
 ## Layout
 
-- "Preset" label at (20, 61), dropdown (56, 48.5)–(266, 73.5), and the preset menu icon to its right at (284, 61) (drawn only).
+- "Preset" label at (20, 61), dropdown (56, 48.5)–(266, 73.5), and the preset menu icon to its right at (284, 61), whose menu saves, loads and deletes preset files (`preset_files.md`); saved presets are listed at the end of the Preset pop-up.
 - At (32.5, 95) is the targeted adjustment hand, a toggle (pressed `#383838` box while on; not with Colorize).
 - Seven 24 pt dots, centers at y 96, x starting at 68 and every 36 pt: Master is a color wheel divided into eight segments, the rest are Photoshop's range colors; the selected one is drawn as in Color Balance. With Colorize, only one selected dot remains, filled with the Colorize color (that hue and saturation, lightness 50%).
 - Three slider rows: labels at x 20; input boxes at x 251–295.5, y 120 / 175 / 230; tracks at y 156 / 211 / 266, x 20–296. Track colors: Hue is a hue ring, Saturation goes gray → color, Lightness goes black → gray → white (all taken from Photoshop screenshots); with Colorize the Hue track starts at 0 on the left end, and Saturation goes from `#767676` to the pure color of that hue.

@@ -127,6 +127,33 @@ impl Dialog {
         })
     }
 
+    /// The settings as a Channel Mixer preset file (None while a field is
+    /// invalid).
+    fn encoded(&self) -> Option<Vec<u8>> {
+        let four = |t: &[String; 4]| -> Option<[i32; 4]> {
+            Some([parse(&t[0])?, parse(&t[1])?, parse(&t[2])?, parse(&t[3])?])
+        };
+        let rows = [
+            four(&self.rows[0])?,
+            four(&self.rows[1])?,
+            four(&self.rows[2])?,
+        ];
+        Some(super::preset_files::encode_channel_mixer(
+            &rows,
+            &four(&self.gray)?,
+            self.monochrome,
+        ))
+    }
+
+    /// A preset file's settings into the dialog.
+    fn load_preset(&mut self, bytes: &[u8]) {
+        if let Some((rows, gray, monochrome)) = super::preset_files::decode_channel_mixer(bytes) {
+            self.rows = rows.map(|r| r.map(|v| v.to_string()));
+            self.gray = gray.map(|v| v.to_string());
+            self.monochrome = monochrome;
+        }
+    }
+
     fn preset(&self) -> &'static str {
         if self.rows == Self::default().rows && !self.monochrome {
             return "Default";
@@ -157,9 +184,14 @@ impl Dialog {
         let painter = ui.painter().clone();
 
         uxp::label(ui, at(20.0, 61.0), "Preset");
-        let preset = self.preset();
+        use super::preset_files as files;
+        let encoded = self.encoded();
+        let saved_name = files::shown(files::CHANNEL_MIXER, encoded.as_deref());
+        let preset = saved_name.as_deref().unwrap_or(self.preset());
+        let saved = files::CHANNEL_MIXER.saved();
         let mut reset = false;
         let mut picked = None;
+        let mut picked_saved = None;
         common::ps_dropdown(
             ui,
             r(56.0, 48.5, 231.0, 73.5),
@@ -184,6 +216,15 @@ impl Dialog {
                         picked = Some(k);
                     }
                 }
+                // The saved presets
+                if !saved.is_empty() {
+                    ui.separator();
+                }
+                for (k, (name, _)) in saved.iter().enumerate() {
+                    if ui.selectable_label(preset == name, name).clicked() {
+                        picked_saved = Some(k);
+                    }
+                }
             },
         );
         if reset {
@@ -202,6 +243,15 @@ impl Dialog {
             uxp::TEXT,
             color::PANEL,
         );
+        if let Some(bytes) =
+            picked_saved.and_then(|k| files::load_saved(files::CHANNEL_MIXER, &saved[k]))
+        {
+            self.load_preset(&bytes);
+        }
+        let gear = Rect::from_center_size(at(248.0, 61.0), vec2(pt(18.0), pt(18.0)));
+        if let Some(bytes) = files::gear(ui, gear, "mixer-gear", files::CHANNEL_MIXER, encoded) {
+            self.load_preset(&bytes);
+        }
 
         uxp::label(ui, at(20.0, 97.0), "Output channel");
         if self.monochrome {
@@ -278,6 +328,32 @@ impl Dialog {
             uxp::font(),
             uxp::TEXT,
         );
+        // Over 100% Photoshop warns that the mix may clip: a yellow
+        // caution triangle before the total
+        if total > 100 {
+            let width = painter
+                .layout_no_wrap(total.to_string(), uxp::font(), uxp::TEXT)
+                .size()
+                .x;
+            let c = at(238.5, 330.0) - vec2(width + pt(12.0), 0.0);
+            let (h, w) = (pt(11.0), pt(12.0));
+            painter.add(egui::Shape::convex_polygon(
+                vec![
+                    c + vec2(0.0, -h / 2.0),
+                    c + vec2(w / 2.0, h / 2.0),
+                    c + vec2(-w / 2.0, h / 2.0),
+                ],
+                Color32::from_rgb(0xf5, 0xc5, 0x18),
+                Stroke::NONE,
+            ));
+            painter.text(
+                c + vec2(0.0, pt(1.5)),
+                Align2::CENTER_CENTER,
+                "!",
+                crate::theme::uxp_bold(pt(8.5)),
+                Color32::BLACK,
+            );
+        }
         painter.line_segment(
             [at(20.0, 350.0), at(260.0, 350.0)],
             Stroke::new(pt(1.0), uxp::TRACK),
@@ -308,6 +384,15 @@ fn swatch(painter: &egui::Painter, center: Pos2, [r, g, b]: [u8; 3], chosen: boo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preset_files_round_trip() {
+        let mut d = Dialog::default();
+        d.rows[1] = ["10", "80", "10", "-5"].map(String::from);
+        let mut e = Dialog::default();
+        e.load_preset(&d.encoded().unwrap());
+        assert_eq!(e.rows, d.rows);
+    }
 
     #[test]
     fn photoshops_presets() {

@@ -179,6 +179,33 @@ impl Dialog {
         p.map(|c| c.iter().map(|&(i, o)| (i as f32, o as f32)).collect())
     }
 
+    /// The curves as a Curves preset file. Pencil-drawn curves go as the
+    /// points the point tool would turn them into.
+    fn encoded(&self) -> Vec<u8> {
+        let points = match self.tables {
+            Some(_) => {
+                let mut copy = Self {
+                    tables: self.tables,
+                    points: self.points.clone(),
+                    ..Self::new([[0; 256]; 3])
+                };
+                copy.set_pencil(false);
+                copy.points
+            }
+            None => self.points.clone(),
+        };
+        super::preset_files::encode_curves(&points)
+    }
+
+    /// A preset file's curves (the point tool again).
+    fn load_preset(&mut self, bytes: &[u8]) {
+        if let Some(points) = super::preset_files::decode_curves(bytes) {
+            self.tables = None;
+            self.points = points;
+            self.selected = None;
+        }
+    }
+
     /// "Default" or the preset the curves match, else "Custom".
     fn preset(&self) -> &'static str {
         if self.points.iter().all(|p| *p == identity()) {
@@ -355,7 +382,10 @@ impl Dialog {
 
         // Preset
         appkit::label(ui, at(11.0, 56.25), "Preset:");
-        let preset = self.preset();
+        use super::preset_files as files;
+        let encoded = self.encoded();
+        let saved_name = files::shown(files::CURVES, Some(&encoded));
+        let preset = saved_name.as_deref().unwrap_or(self.preset());
         // Default, Custom, then Photoshop's presets
         let mut entries = vec![
             Entry::item("Default", preset == "Default"),
@@ -367,6 +397,8 @@ impl Dialog {
                 .iter()
                 .map(|(name, _)| Entry::item(*name, preset == *name)),
         );
+        let before = entries.len();
+        let saved = files::add_saved(&mut entries, files::CURVES, preset);
         match appkit::popup(
             ui,
             r(56.0, 46.0, 345.0, 67.0),
@@ -377,6 +409,11 @@ impl Dialog {
             Some(0) => {
                 self.points = std::array::from_fn(|_| identity());
                 self.selected = None;
+            }
+            Some(k) if k >= before => {
+                if let Some(bytes) = files::picked_saved(k, before, &saved, files::CURVES) {
+                    self.load_preset(&bytes);
+                }
             }
             Some(k) if k >= 3 => {
                 self.points = Self::preset_points(&super::adjust_presets::CURVES[k - 3].1);
@@ -392,6 +429,10 @@ impl Dialog {
             color::PANEL,
             0.77,
         );
+        let gear = Rect::from_center_size(at(365.5, 56.5), vec2(pt(18.0), pt(18.0)));
+        if let Some(bytes) = files::gear(ui, gear, "curves-gear", files::CURVES, Some(encoded)) {
+            self.load_preset(&bytes);
+        }
 
         // The channel group
         appkit::group(
@@ -973,6 +1014,15 @@ impl Dialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preset_files_round_trip() {
+        let mut d = Dialog::new([[0; 256]; 3]);
+        d.points[2] = vec![(0.0, 20.0), (128.0, 150.0), (255.0, 255.0)];
+        let mut e = Dialog::new([[0; 256]; 3]);
+        e.load_preset(&d.encoded());
+        assert_eq!(e.points, d.points);
+    }
 
     #[test]
     fn pencil_smooth_and_show_clipping() {
