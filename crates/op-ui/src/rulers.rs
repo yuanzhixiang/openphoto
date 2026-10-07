@@ -481,7 +481,23 @@ pub fn drag(ui: &Ui, state: &mut DocState, canvas: Rect, ppp: f32) {
     };
     let pointer = ui.input(|i| i.pointer.interact_pos().or(i.pointer.latest_pos()));
     if let Some(p) = pointer {
-        let d = to_doc(state, p, ppp);
+        // View › Snap: the guide comes to the targets' lines (not to the
+        // guide being moved)
+        let raw = to_doc(state, p, ppp);
+        let d = match (&state.snap, ui.input(|i| i.modifiers.ctrl)) {
+            (Some(t), false) => {
+                let mut t = t.clone();
+                if let Some(i) = drag.index {
+                    let own = state.doc.guides[i];
+                    let lines = if own.vertical { &mut t.xs } else { &mut t.ys };
+                    if let Some(k) = lines.iter().position(|&v| v == own.position) {
+                        lines.remove(k);
+                    }
+                }
+                t.point(raw, crate::snap::tolerance(state, ppp))
+            }
+            _ => raw,
+        };
         drag.guide.position = if drag.guide.vertical { d.x } else { d.y };
         state.guide_drag = Some(drag);
     }

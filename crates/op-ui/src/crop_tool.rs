@@ -863,6 +863,7 @@ pub fn input(
                 (Some(_), true) if !mods.alt => dragged(drag, d * 2.0, mods, aspect),
                 _ => dragged(drag, d, mods, aspect),
             };
+            let new_rect = snap_box(ui, state, drag, new_rect, ppp);
             if let Some(c) = &mut state.crop {
                 c.rect = new_rect;
             }
@@ -894,6 +895,53 @@ pub fn input(
             .line_segment([a, b], Stroke::new(pt(1.0), LIGHT));
     }
     done
+}
+
+/// View › Snap for an unturned box (box space is the document's): moving
+/// the box pulls its edges or middle to the targets, and a handle pulls
+/// the edges it moves.
+fn snap_box(ui: &Ui, state: &DocState, drag: CropDrag, rect: Rect, ppp: f32) -> Rect {
+    if drag.angle != 0.0 || state.snap.is_none() || ui.input(|i| i.modifiers.ctrl) {
+        return rect;
+    }
+    let targets = state.snap.as_ref().expect("checked");
+    let tolerance = crate::snap::tolerance(state, ppp);
+    if drag.handle.is_none() {
+        let moving = crate::snap::Targets {
+            moving: Some((
+                drag.rect.min.x,
+                drag.rect.min.y,
+                drag.rect.max.x,
+                drag.rect.max.y,
+            )),
+            ..targets.clone()
+        };
+        let d = rect.min - drag.rect.min;
+        return drag.rect.translate(moving.offset(d, tolerance));
+    }
+    // Each edge the handle moved goes to its nearest target
+    let pull = |v: f32, lines: &[f32]| {
+        lines
+            .iter()
+            .copied()
+            .filter(|t| (t - v).abs() <= tolerance)
+            .min_by(|a, b| (a - v).abs().total_cmp(&(b - v).abs()))
+            .unwrap_or(v)
+    };
+    let mut r = rect;
+    if r.min.x != drag.rect.min.x {
+        r.min.x = pull(r.min.x, &targets.xs);
+    }
+    if r.max.x != drag.rect.max.x {
+        r.max.x = pull(r.max.x, &targets.xs);
+    }
+    if r.min.y != drag.rect.min.y {
+        r.min.y = pull(r.min.y, &targets.ys);
+    }
+    if r.max.y != drag.rect.max.y {
+        r.max.y = pull(r.max.y, &targets.ys);
+    }
+    r
 }
 
 /// Sets the box's angle, keeping its center on the same image point.

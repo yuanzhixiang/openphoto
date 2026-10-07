@@ -6796,6 +6796,62 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn guides_transforms_and_crops_snap() {
+    use crate::commands::Command;
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A layer whose pixels are (200, 300)–(300, 400), and guides at x 100
+    // and 350
+    run_command(&mut h, Command::NewLayerNoDialog);
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        for x in [100.0, 350.0] {
+            doc.guides.push(op_core::Guide {
+                vertical: true,
+                position: x,
+            });
+        }
+        let id = doc.active_layer.unwrap();
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 300..400 {
+            for x in 200..300 {
+                image.set_pixel(x, y, [255, 255, 255, 255]);
+            }
+        }
+        doc.mark_dirty();
+    }
+    h.state_mut().state.select_tool(Tool::Move);
+    h.run_steps(2);
+    // The guide at 100 dragged to 203 lands on the layer's edge at 200
+    let (a, b) = (doc_point(&h, 100.0, 600.0), doc_point(&h, 203.0, 600.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(active(&h).doc.guides[0].position, 200.0);
+    // Free Transform: moved 47 px right, the right edge comes to the guide
+    // at 350
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::T);
+    h.run_steps(2);
+    let (a, b) = (doc_point(&h, 250.0, 350.0), doc_point(&h, 297.0, 350.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let offset = active(&h).free_transform.as_ref().unwrap().offset;
+    assert!((offset.0 - 50.0).abs() < 0.01, "{offset:?}");
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    // The Crop tool (Classic): the right side dragged to 352 lands on 350
+    h.state_mut().state.crop_options.classic = true;
+    h.state_mut().state.select_tool(Tool::Crop);
+    h.run_steps(3);
+    let (w, hh) = (active(&h).doc.width as f32, active(&h).doc.height as f32);
+    let (a, b) = (
+        doc_point(&h, w - 1.0, hh / 2.0),
+        doc_point(&h, 351.0, hh / 2.0),
+    );
+    drag(&mut h, a, b, Modifiers::NONE);
+    let rect = active(&h).crop.as_ref().unwrap().rect;
+    assert_eq!(rect.max.x, 350.0, "{rect:?}");
+}
+
+#[test]
 fn snapping_to_guides_layers_and_bounds() {
     use crate::commands::Command;
     use op_tools::Tool;

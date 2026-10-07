@@ -521,6 +521,21 @@ pub fn input(
     let pointer = ui
         .input(|i| i.pointer.interact_pos())
         .map(|p| to_doc(state, p, ppp));
+    // View › Snap: moving pulls the box's edges or middle to the targets,
+    // a side or corner handle the pointer (not while turned or reshaped)
+    let pointer = match (
+        pointer,
+        state.free_transform.as_ref().and_then(|t| t.drag.clone()),
+    ) {
+        (Some(p), Some(drag)) if drag.angle == 0.0 && drag.quad.is_none() => match drag.handle {
+            TransformHandle::Move => {
+                Some(drag.start + crate::snap::offset(ui, state, p - drag.start, ppp))
+            }
+            TransformHandle::Scale(..) => Some(crate::snap::point(ui, state, p, ppp)),
+            _ => Some(p),
+        },
+        (p, _) => p,
+    };
     let t = state.free_transform.as_mut()?;
     if let Some(drag) = t.drag.clone() {
         if let Some(p) = pointer {

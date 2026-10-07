@@ -287,6 +287,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 && let Some(p) = r.interact_pointer_pos()
             {
                 crate::rulers::start_new(state, vertical, p, ppp);
+                crate::snap::begin(state, &view_options, false);
             }
             if r.hovered() {
                 ui.ctx().set_cursor_icon(if vertical {
@@ -310,10 +311,13 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 | Tool::Polygon
                 | Tool::Line
                 | Tool::CustomShape
-        );
+                | Tool::Crop
+        ) || state.free_transform.is_some();
         state.snap = None;
         if snapping {
-            crate::snap::begin(state, &view_options, tool == Tool::Move);
+            // (a transform leaves out the layers it moves, like the Move tool)
+            let moving = tool == Tool::Move || state.free_transform.is_some();
+            crate::snap::begin(state, &view_options, moving);
         }
     }
     // With the Move tool (or Cmd held), guides can be grabbed
@@ -331,6 +335,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             .and_then(|p| crate::rulers::guide_at(state, p, ppp))
     {
         crate::rulers::start_move(state, i);
+        crate::snap::begin(state, &view_options, false);
     }
     let (space, alt, zoom_delta, scroll) = ui.input(|i| {
         (

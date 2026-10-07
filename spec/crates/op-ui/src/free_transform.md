@@ -42,6 +42,7 @@ Select › Transform Selection (`start_selection`, available when there is a sel
   - Edge control points change the size in one direction only; the center in the other direction stays put.
   - The absolute scale factor is at least 1 / the longer side of the original bounds (the box never shrinks to 0); crossing the fixed point flips it.
   - After the box is rotated, scaling is computed along the box's own axes.
+- View › Snap: while the box is neither turned nor reshaped, moving it snaps its edges or middle and a side or corner handle snaps the pointer (`snap.md`).
 - Rotate: about the reference point (the box's center unless another was picked or the point was dragged), the angle following the pointer's angle relative to it; holding Shift snaps to multiples of 15°.
 - The reference point (when shown with the options bar's checkbox): dragging it (within 8 pt, before the box has free corners) moves it anywhere, a point of the box that then turns and scales with it (`reference_custom`); picking one of the nine in the options bar puts it back on the box. Its cursor is the crosshair.
 - Skew, distort, perspective (Photoshop's modifier keys; in Skew, Distort and Perspective modes the same happens without modifier keys):

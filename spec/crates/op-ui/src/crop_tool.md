@@ -48,6 +48,10 @@ The ratio menu (a native menu, `native_popup.md`) follows Photoshop 2026's group
 
 While the box is being dragged or differs from the whole canvas (`previewing`), Photoshop 2026 shows a temporary layer: the tab title reads "name @ zoom (Crop Preview, RGB/8...)" (`doc_tabs.md`) and the Layers panel lists only a selected "Crop Preview" row with the merged image as its thumbnail (`panels/layers.md`). Committing or cancelling brings the layers back.
 
+## Snapping
+
+While the box isn't turned, View › Snap pulls a moved box's edges or middle, and the edges a handle moves, to the snap targets (`snap_box`, `snap.md`; Control held: no snapping).
+
 ## Known limitations
 
 - During rotation or straightening, other canvas overlays such as the selection and guides are still drawn for the unrotated image.
