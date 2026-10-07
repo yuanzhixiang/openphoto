@@ -86,6 +86,10 @@ pub struct DocState {
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
     /// What the drag in progress snaps to (View › Snap).
     pub snap: Option<crate::snap::Targets>,
+    /// A Selection Brush stroke under way, and the overlay texture showing
+    /// the selection with that tool (keyed by selection revision and color).
+    pub selection_stroke: Option<op_core::selection_brush::SelectionStroke>,
+    pub overlay: Option<((u64, [u8; 3]), egui::TextureHandle)>,
     /// The Color Sampler tool's points (document pixels, at most
     /// `MAX_SAMPLERS`), and the one being dragged.
     pub color_samplers: Vec<egui::Pos2>,
@@ -217,6 +221,8 @@ impl DocState {
             quick: None,
             object_drag: None,
             snap: None,
+            selection_stroke: None,
+            overlay: None,
             color_samplers: Vec::new(),
             sampler_drag: None,
             ruler_origin: egui::Pos2::ZERO,
@@ -1167,6 +1173,8 @@ pub struct AppState {
     pub pattern_stamp: PaintOptions,
     pub background_eraser: PaintOptions,
     pub color_replacement: PaintOptions,
+    /// The Selection Brush (Photoshop's 200 px hard tip).
+    pub selection_brush: PaintOptions,
     pub healing_brush: PaintOptions,
     pub spot_healing: PaintOptions,
     pub retouch: RetouchOptions,
@@ -1285,7 +1293,10 @@ impl Default for AppState {
             doc_order: Vec::new(),
             active_doc: None,
             tool: Tool::RectangularMarquee,
-            tool_slots: op_tools::TOOLBAR.iter().map(|group| group[0]).collect(),
+            tool_slots: op_tools::TOOLBAR
+                .iter()
+                .map(|group| op_tools::default_in_group(group))
+                .collect(),
             foreground,
             background: Color::WHITE,
             marquee: MarqueeOptions::default(),
@@ -1307,6 +1318,10 @@ impl Default for AppState {
             pattern_stamp: PaintOptions::small(1.0),
             background_eraser: PaintOptions::small(1.0),
             color_replacement: PaintOptions::small(1.0),
+            selection_brush: PaintOptions {
+                size: 200.0,
+                ..PaintOptions::small(1.0)
+            },
             healing_brush: PaintOptions::small(1.0),
             spot_healing: PaintOptions::small(1.0),
             retouch: RetouchOptions::default(),
@@ -1393,6 +1408,7 @@ impl AppState {
             Tool::ColorReplacement => Some(&mut self.color_replacement),
             Tool::HealingBrush => Some(&mut self.healing_brush),
             Tool::SpotHealingBrush => Some(&mut self.spot_healing),
+            Tool::SelectionBrush => Some(&mut self.selection_brush),
             _ => None,
         }
     }

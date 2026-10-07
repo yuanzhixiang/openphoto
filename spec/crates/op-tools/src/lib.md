@@ -18,7 +18,7 @@ The toolbar's "slots" from top to bottom. Each slot is a group of tools sharing 
 |---|---|
 | 1 | Move, Artboard |
 | 2 | Rectangular / Elliptical / Single Row / Single Column Marquee |
-| 3 | Lasso, Polygonal Lasso, Magnetic Lasso, Selection Brush |
+| 3 | Selection Brush, Lasso, Polygonal Lasso, Magnetic Lasso |
 | 4 | Object Selection, Quick Selection, Magic Wand |
 | 5 | Crop, Perspective Crop, Slice, Slice Select |
 | 6 | Frame |
@@ -42,8 +42,9 @@ The toolbar's "slots" from top to bottom. Each slot is a group of tools sharing 
 ### `Tool::name()`, `Tool::shortcut()`, `Tool::slot()`
 
 - `name()`: the full English name, the same as Photoshop's, for example `"Elliptical Marquee Tool"`.
-- `shortcut()`: the single-key shortcut, matching Photoshop. Tools in the same group share the group's letter (V, M, L, W, C, K, I, J, B, S, Y, E, G, O, P, T, A, U, H, Z); Rotate View uses R on its own. Single Row/Column Marquee, the Blur group, Add/Delete Anchor Point, Convert Point, Selection Brush, and Adjustment Brush have no shortcut.
+- `shortcut()`: the single-key shortcut, matching Photoshop. Tools in the same group share the group's letter (V, M, L, W, C, K, I, J, B, S, Y, E, G, O, P, T, A, U, H, Z); Rotate View uses R on its own. Single Row/Column Marquee, the Blur group, Add/Delete Anchor Point, Convert Point, and Adjustment Brush have no shortcut; the Selection Brush shares the Lasso group's L, as in Photoshop 2026.
 - `slot()`: the slot the tool is in.
+- `default_in_group(group)`: the tool a slot shows before another is picked: the group's first, except the Lasso in its group (Photoshop 2026 lists the Selection Brush first but shows the Lasso).
 
 ### `tool_for_key(key, shift, active, current)`
 

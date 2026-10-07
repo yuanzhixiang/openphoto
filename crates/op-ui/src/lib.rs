@@ -24,6 +24,7 @@ mod options_tools;
 mod panels;
 mod ps_icons;
 mod rulers;
+mod selection_brush;
 mod snap;
 mod state;
 mod status_info;
@@ -739,7 +740,7 @@ impl eframe::App for OpenPhotoApp {
         }
 
         if let Some(msg) = self.state.alert.clone() {
-            let mut alert = dialogs::alert::Alert::error(msg);
+            let mut alert = dialogs::alert::Alert::for_message(msg);
             if dialogs::alert::show(&ctx, &mut alert).is_some() {
                 self.state.alert = None;
             }

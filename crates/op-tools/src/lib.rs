@@ -90,7 +90,9 @@ pub const TOOLBAR: &[&[Tool]] = &[
         SingleRowMarquee,
         SingleColumnMarquee,
     ],
-    &[Lasso, PolygonalLasso, MagneticLasso, SelectionBrush],
+    // Photoshop 2026 lists the Selection Brush first, though the Lasso is
+    // the one the slot shows at first
+    &[SelectionBrush, Lasso, PolygonalLasso, MagneticLasso],
     &[ObjectSelection, QuickSelection, MagicWand],
     &[Crop, PerspectiveCrop, Slice, SliceSelect],
     &[Frame],
@@ -130,6 +132,16 @@ pub const TOOLBAR: &[&[Tool]] = &[
     &[Hand, RotateView],
     &[Zoom],
 ];
+
+/// The tool a toolbar slot shows before another is picked: the group's
+/// first, except the Lasso in its group (as in Photoshop 2026).
+pub fn default_in_group(group: &[Tool]) -> Tool {
+    if group.contains(&Lasso) {
+        Lasso
+    } else {
+        group[0]
+    }
+}
 
 impl Tool {
     pub fn name(self) -> &'static str {
@@ -213,7 +225,7 @@ impl Tool {
         Some(match self {
             Move | Artboard => 'V',
             RectangularMarquee | EllipticalMarquee => 'M',
-            Lasso | PolygonalLasso | MagneticLasso => 'L',
+            SelectionBrush | Lasso | PolygonalLasso | MagneticLasso => 'L',
             ObjectSelection | QuickSelection | MagicWand => 'W',
             Crop | PerspectiveCrop | Slice | SliceSelect => 'C',
             Frame => 'K',
@@ -233,7 +245,7 @@ impl Tool {
             RotateView => 'R',
             Zoom => 'Z',
             SingleRowMarquee | SingleColumnMarquee | Blur | Sharpen | Smudge | AddAnchorPoint
-            | DeleteAnchorPoint | ConvertPoint | SelectionBrush | AdjustmentBrush => return None,
+            | DeleteAnchorPoint | ConvertPoint | AdjustmentBrush => return None,
         })
     }
 

@@ -5992,3 +5992,58 @@ fn screenshot_color_samplers() {
     h.run_steps(3);
     shot(&mut h, "color_samplers");
 }
+
+#[test]
+fn selection_brush_paints_the_selection() {
+    use crate::commands::Command;
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // The Lasso's slot shows the Lasso; Shift+L goes round to the
+    // Selection Brush, first in Photoshop's group
+    h.key_press(egui::Key::L);
+    h.run_steps(1);
+    assert_eq!(h.state().state.tool, Tool::Lasso);
+    for _ in 0..3 {
+        h.key_press_modifiers(Modifiers::SHIFT, egui::Key::L);
+        h.run_steps(1);
+    }
+    assert_eq!(h.state().state.tool, Tool::SelectionBrush);
+    h.state_mut().state.selection_brush.size = 20.0;
+    let sel =
+        |h: &Harness<'_, OpenPhotoApp>, x, y| active(h).doc.selection().map_or(0, |s| s.get(x, y));
+    // A stroke selects along its path
+    let (a, b) = (doc_point(&h, 100.0, 200.0), doc_point(&h, 300.0, 200.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(sel(&h, 200, 200), 255);
+    assert_eq!(sel(&h, 200, 230), 0);
+    assert_eq!(last_history(&h), "Selection Brush");
+    // Shown as Photoshop's magenta overlay at half strength, no ants
+    let image = h.render().unwrap();
+    let k = 2.0 * UI_SCALE;
+    let p = doc_point(&h, 200.0, 200.0);
+    let px = image.get_pixel((p.x * k) as u32, (p.y * k) as u32).0;
+    assert!(
+        (px[0] as i32 - 0x7d).abs() <= 2 && (px[2] as i32 - 0x60).abs() <= 2,
+        "{px:?}"
+    );
+    // Alt subtracts
+    let (a, b) = (doc_point(&h, 200.0, 150.0), doc_point(&h, 200.0, 250.0));
+    drag(&mut h, a, b, Modifiers::ALT);
+    assert_eq!(sel(&h, 200, 200), 0);
+    assert_eq!(sel(&h, 120, 200), 255);
+    // Opacity 50% selects half
+    h.state_mut().state.selection_brush.opacity = 0.5;
+    let (a, b) = (doc_point(&h, 100.0, 400.0), doc_point(&h, 300.0, 400.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(sel(&h, 200, 400), 128);
+    // Without a selected layer, Photoshop's alert with Learn More
+    run_command(&mut h, Command::DeselectLayers);
+    let (a, b) = (doc_point(&h, 100.0, 500.0), doc_point(&h, 300.0, 500.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(
+        h.state().state.alert.as_deref(),
+        Some(crate::selection_brush::NO_LAYER)
+    );
+    assert_eq!(sel(&h, 200, 500), 0);
+}

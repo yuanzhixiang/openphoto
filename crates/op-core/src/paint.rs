@@ -43,7 +43,7 @@ impl BrushTip {
     }
 
     /// Coverage (0..1) at distance `d` from the dab's center.
-    fn alpha(&self, d: f32) -> f32 {
+    pub(crate) fn alpha(&self, d: f32) -> f32 {
         let r = self.diameter / 2.0;
         if self.aliased {
             return if d <= r.max(0.5) { 1.0 } else { 0.0 };

@@ -44,9 +44,25 @@ pub struct Alert {
     /// The default button's label ("OK" unless renamed, e.g. "Full
     /// Screen").
     pub ok_label: &'static str,
+    /// The other button's label ("Cancel" unless renamed, e.g. "Learn
+    /// More").
+    pub cancel_label: &'static str,
 }
 
 impl Alert {
+    /// An error alert, with Photoshop's Learn More beside OK for the alerts
+    /// that have it (Learn More just closes it: there is no help site).
+    pub fn for_message(message: impl Into<String>) -> Self {
+        let message = message.into();
+        let learn_more = message == crate::selection_brush::NO_LAYER;
+        let mut alert = Self::error(message);
+        if learn_more {
+            alert.cancel = true;
+            alert.cancel_label = "Learn More";
+        }
+        alert
+    }
+
     /// An error or notice with only OK, like Photoshop's "Could not ..."
     pub fn error(message: impl Into<String>) -> Self {
         Self {
@@ -56,6 +72,7 @@ impl Alert {
             dont_show_again: None,
             choices: Vec::new(),
             ok_label: "OK",
+            cancel_label: "Cancel",
         }
     }
 
@@ -68,6 +85,7 @@ impl Alert {
             dont_show_again: Some(false),
             choices: Vec::new(),
             ok_label: "OK",
+            cancel_label: "Cancel",
         }
     }
 
@@ -81,6 +99,7 @@ impl Alert {
             dont_show_again: None,
             choices: choices.iter().map(|c| c.to_string()).collect(),
             ok_label: "OK",
+            cancel_label: "Cancel",
         }
     }
 }
@@ -275,7 +294,7 @@ fn draw(
             }
         }
     } else if alert.cancel {
-        if button(row(16.0, 126.0), "Cancel", CANCEL, TEXT, "cancel") {
+        if button(row(16.0, 126.0), alert.cancel_label, CANCEL, TEXT, "cancel") {
             answer = Some(Answer::Cancel);
         }
         if button(row(134.0, 244.0), alert.ok_label, OK, Color32::WHITE, "ok") {

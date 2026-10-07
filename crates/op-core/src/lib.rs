@@ -23,6 +23,7 @@ pub mod move_tool;
 pub mod paint;
 pub mod pixel;
 pub mod selection;
+pub mod selection_brush;
 pub mod shape;
 pub mod smart_select;
 pub mod text;

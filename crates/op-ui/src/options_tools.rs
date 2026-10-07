@@ -89,6 +89,9 @@ pub enum Item {
     Action(f32, f32, &'static str),
     /// The view rotation dial centered at x, showing a setting's angle.
     Dial(f32, &'static str),
+    /// The Selection Brush's gear: a popup with its overlay color
+    /// (`selbrush.overlay`).
+    OverlayGear(f32),
     /// The custom shape: its box from x0 to x1, the chevron box to x2.
     ShapePicker(f32, f32, f32),
     /// A pop-up from x0 to x1 with an icon before its value.
@@ -1430,9 +1433,9 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
                 1,
             ),
             Label(243.5, "Opacity:"),
-            Percent(288.0, 332.5, 347.0, "selbrush.opacity", "100%"),
+            Percent(288.0, 332.5, 347.0, "paint.opacity", "100%"),
             Picker(372.0),
-            Icon(423.0, Icon::GearMenu, "Set additional options"),
+            OverlayGear(423.0),
         ],
         Remove => &[
             Radio(
@@ -1755,6 +1758,45 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
             Picker(x) => picker(b, app, x),
             Icon(x, icon, tip) => {
                 b.icon(x, icon, tip, false, true);
+            }
+            OverlayGear(x) => {
+                let response = b.icon(x, Icon::GearMenu, "Set additional options", false, true);
+                let mut index = overlay_color(app);
+                egui::Popup::from_response(&response)
+                    .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
+                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                    .show(|ui| {
+                        ui.label("Overlay Option");
+                        ui.horizontal(|ui| {
+                            ui.label("Color:");
+                            let (name, _) = crate::selection_brush::OVERLAY_COLORS[index];
+                            egui::ComboBox::from_id_salt("selbrush-overlay")
+                                .selected_text(name)
+                                .show_ui(ui, |ui| {
+                                    for (i, (name, c)) in
+                                        crate::selection_brush::OVERLAY_COLORS.iter().enumerate()
+                                    {
+                                        let swatch = egui::RichText::new("■ ")
+                                            .color(egui::Color32::from_rgb(c[0], c[1], c[2]));
+                                        let mut job = egui::text::LayoutJob::default();
+                                        swatch.append_to(
+                                            &mut job,
+                                            ui.style(),
+                                            egui::FontSelection::Default,
+                                            egui::Align::Center,
+                                        );
+                                        egui::RichText::new(*name).append_to(
+                                            &mut job,
+                                            ui.style(),
+                                            egui::FontSelection::Default,
+                                            egui::Align::Center,
+                                        );
+                                        ui.selectable_value(&mut index, i, job);
+                                    }
+                                });
+                        });
+                    });
+                *app.setting("selbrush.overlay", "6") = index.to_string();
             }
             Toggle(x, icon, tip, key) => {
                 // The Mixer Brush loads and cleans after each stroke by default
@@ -2397,4 +2439,19 @@ pub fn object_options(app: &mut AppState) -> (bool, bool) {
 pub fn normalize_angle(v: f32) -> f32 {
     let a = (v + 180.0).rem_euclid(360.0) - 180.0;
     if a == -180.0 { 180.0 } else { a }
+}
+
+/// The Selection Brush's overlay color, an index into
+/// `selection_brush::OVERLAY_COLORS` (Magenta by default).
+pub fn overlay_color(app: &mut AppState) -> usize {
+    app.setting("selbrush.overlay", "6")
+        .parse::<usize>()
+        .ok()
+        .filter(|&i| i < crate::selection_brush::OVERLAY_COLORS.len())
+        .unwrap_or(crate::selection_brush::DEFAULT_OVERLAY)
+}
+
+/// Whether the Selection Brush is set to Subtract.
+pub fn selection_brush_subtracts(app: &mut AppState) -> bool {
+    app.setting("selbrush.mode", "0") == "1"
 }

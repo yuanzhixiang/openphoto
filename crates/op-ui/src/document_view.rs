@@ -185,6 +185,9 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let mut straightened = false;
     let mut paint_error = None;
     let status_info = app.status_info;
+    let overlay =
+        crate::selection_brush::OVERLAY_COLORS[crate::options_tools::overlay_color(app)].1;
+    let selbrush_subtract = crate::options_tools::selection_brush_subtracts(app);
     let ruler_units = app.ruler_units;
     let status_text = app
         .docs
@@ -399,6 +402,18 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 }
             }
             Tool::ColorSampler => sampler_input(ui, &response, state, alt, ppp),
+            Tool::SelectionBrush => {
+                if let Some(opts) = paint {
+                    paint_error = crate::selection_brush::input(
+                        ui,
+                        &response,
+                        state,
+                        opts,
+                        selbrush_subtract,
+                        ppp,
+                    );
+                }
+            }
             // Alt-click picks the background color
             Tool::Eyedropper if response.is_pointer_button_down_on() => {
                 if let Some(p) = response.interact_pointer_pos() {
@@ -733,7 +748,10 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
     // Extras or Show › Selection Edges off hides the selection edges (the
     // selection stays)
-    if view_options.extras && view_options.selection_edges {
+    if tool == Tool::SelectionBrush {
+        // This tool shows the selection as an overlay instead of edges
+        crate::selection_brush::draw_overlay(ui, state, canvas_rect, overlay, ppp);
+    } else if view_options.extras && view_options.selection_edges {
         draw_selection(ui, state, canvas_rect, ppp, tool, shape_options);
     }
     if view_options.guides_visible() || state.guide_drag.is_some() {
