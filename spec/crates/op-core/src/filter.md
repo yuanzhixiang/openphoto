@@ -93,4 +93,4 @@ Implements the filters in the Filter menu, acting on the active layer and limite
 ## Filters computed elsewhere
 
 - `ShadowsHighlights` and `HdrToning` (adjustments that look at surroundings) run `tone.rs` (`tone.md`).
-- `Wave`, `Shear`, `Displace`, `RadialBlur`, `SmartBlur`, `ShapeBlur`, `LensBlur`, `ReduceNoise`, `SmartSharpen`, `Fibers`, `LensFlare`, `Extrude`, `OilPaint` run `more_filters.rs` through `more` (`more_filters.md`). Fibers fills the layer from its colors; the others read the layer's pixels.
+- `Wave`, `Shear`, `Displace`, `RadialBlur`, `SmartBlur`, `ShapeBlur`, `LensBlur`, `ReduceNoise`, `SmartSharpen`, `Fibers`, `LensFlare`, `Extrude`, `OilPaint` run `more_filters.rs` through `more` (`more_filters.md`). Fibers fills the layer from its colors; the others read the layer's pixels. `LensBlur` carries `more_filters::LensBlur`; for its Layer Mask depth map `apply` reads the active layer's mask and passes it down through `filtered` and `more` (Transparency uses the layer's own alpha).

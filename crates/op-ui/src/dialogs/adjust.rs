@@ -249,8 +249,12 @@ const SHAPE_BLUR: &[Param] = &[
     ),
 ];
 
+/// In the dialog's order (`lens_blur`'s indexes).
 const LENS_BLUR: &[Param] = &[
-    param("Radius:", 0.0, 100.0, 15.0, 0),
+    choice("Preview", &["Faster", "More Accurate"], 0),
+    choice("Source:", &["None", "Transparency", "Layer Mask"], 0),
+    param("Blur Focal Distance", 0.0, 255.0, 0.0, 0),
+    check("Invert", false),
     choice(
         "Shape:",
         &[
@@ -263,9 +267,14 @@ const LENS_BLUR: &[Param] = &[
         ],
         3,
     ),
-    param("Brightness:", 0.0, 100.0, 0.0, 0),
-    param("Threshold:", 0.0, 255.0, 255.0, 0),
-    param("Noise Amount:", 0.0, 100.0, 0.0, 0),
+    param("Radius", 0.0, 100.0, 15.0, 0),
+    param("Blade Curvature", 0.0, 100.0, 0.0, 0),
+    param("Rotation", 0.0, 360.0, 0.0, 0),
+    param("Brightness", 0.0, 100.0, 0.0, 0),
+    param("Threshold", 0.0, 255.0, 255.0, 0),
+    param("Amount", 0.0, 100.0, 0.0, 0),
+    choice("Distribution", &["Uniform", "Gaussian"], 0),
+    check("Monochromatic", false),
 ];
 
 const REDUCE_NOISE: &[Param] = &[
@@ -624,7 +633,6 @@ impl Kind {
             Self::Diffuse => l::DIFFUSE,
             Self::SmartBlur => l::SMART_BLUR,
             Self::ShapeBlur => l::SHAPE_BLUR,
-            Self::LensBlur => l::LENS_BLUR,
             Self::ReduceNoise => l::REDUCE_NOISE,
             Self::SmartSharpen => l::SMART_SHARPEN,
             Self::Fibers => l::FIBERS,
@@ -868,6 +876,10 @@ pub struct Extra {
     /// being dragged.
     pub shear_points: Vec<(f32, f32)>,
     pub shear_drag: Option<usize>,
+    /// Lens Blur's Set Focal Point is on, and the document point clicked
+    /// in the preview (the app reads its depth, `set_focal_distance`).
+    pub lens_pick: bool,
+    pub lens_focal_at: Option<(f32, f32)>,
 }
 
 /// The active layer made small for a preview box `max` pixels at most
@@ -1305,6 +1317,7 @@ impl AdjustDialog {
     pub fn wants_pane(&self) -> bool {
         self.kind == Kind::Custom
             || self.kind == Kind::Shear
+            || self.kind == Kind::LensBlur
             || self.kind.distort().is_some()
             || self.layout().is_some_and(|l| l.pane)
     }
@@ -1413,13 +1426,24 @@ impl AdjustDialog {
                 radius: v[0],
                 shape: mf::BlurShape::ALL[pick(v[1])],
             },
-            Kind::LensBlur => Filter::LensBlur {
-                radius: v[0],
-                blades: v[1] as u32 + 3,
-                brightness: v[2],
-                threshold: v[3] as u8,
-                noise: v[4],
-            },
+            Kind::LensBlur => Filter::LensBlur(mf::LensBlur {
+                radius: v[lens_blur::RADIUS],
+                blades: v[lens_blur::SHAPE] as u32 + 3,
+                curvature: v[lens_blur::CURVATURE],
+                rotation: v[lens_blur::ROTATION],
+                brightness: v[lens_blur::BRIGHTNESS],
+                threshold: v[lens_blur::THRESHOLD] as u8,
+                noise: v[lens_blur::AMOUNT],
+                gaussian: v[lens_blur::DISTRIBUTION] == 1.0,
+                monochromatic: v[lens_blur::MONOCHROMATIC] == 1.0,
+                depth: [
+                    mf::DepthSource::None,
+                    mf::DepthSource::Transparency,
+                    mf::DepthSource::LayerMask,
+                ][pick(v[lens_blur::SOURCE]).min(2)],
+                focal: v[lens_blur::FOCAL] as u8,
+                invert: v[lens_blur::INVERT] == 1.0,
+            }),
             Kind::ReduceNoise => Filter::ReduceNoise {
                 strength: v[0],
                 preserve: v[1],
@@ -1699,6 +1723,7 @@ impl AdjustDialog {
                     Some(Custom::Threshold(_)) => threshold::SIZE,
                     Some(Custom::GradientMap(_)) => gradient_map::SIZE,
                     Some(Custom::Kernel(_)) => custom_filter::SIZE,
+                    None if self.kind == Kind::LensBlur => lens_blur::size(ctx.content_rect()),
                     None => self
                         .layout()
                         .map_or_else(|| self.kind.size(), |l| vec2(pt(l.size.0), pt(l.size.1))),
@@ -1707,6 +1732,8 @@ impl AdjustDialog {
                 self.rect = rect;
                 outcome = if self.custom.is_some() {
                     self.custom_ui(ui, rect)
+                } else if self.kind == Kind::LensBlur {
+                    self.lens_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
                     self.classic_ui(ui, rect, layout)
                 } else if let Some(layout) = self.kind.plain() {
@@ -2357,6 +2384,16 @@ impl AdjustDialog {
     pub fn pane_px(&self) -> (usize, usize) {
         if self.kind == Kind::Shear {
             (600, 300)
+        } else if self.kind == Kind::LensBlur {
+            // The preview's image area, at two pixels a point
+            let image = lens_blur::image_rect(self.rect);
+            if !image.is_positive() || !image.is_finite() {
+                return (800, 600);
+            }
+            (
+                (image.width() / pt(1.0) * 2.0) as usize,
+                (image.height() / pt(1.0) * 2.0) as usize,
+            )
         } else if self.kind.distort().is_some() {
             (512, 512)
         } else {
@@ -2777,6 +2814,11 @@ fn auto_brightness_contrast(histogram: &[u64; 256]) -> (i32, i32) {
     }
     best.1
 }
+
+mod lens_blur;
+#[cfg(test)]
+pub use lens_blur::image_rect as lens_image_rect;
+pub use lens_blur::source as lens_blur_source;
 
 #[cfg(test)]
 mod tests {

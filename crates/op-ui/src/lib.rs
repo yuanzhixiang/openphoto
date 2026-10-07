@@ -290,6 +290,29 @@ impl OpenPhotoApp {
                 state.doc.restore(&dialog.before);
             }
         };
+        // Lens Blur's Set Focal Point: the depth where the preview was
+        // clicked, read with the preview taken off (it comes back next
+        // frame)
+        if let Some((x, y)) = dialog.extra.lens_focal_at.take() {
+            undo_preview(state, &mut dialog);
+            let depth = state.doc.active_layer.and_then(|id| {
+                let layer = state.doc.layer(id)?;
+                let (x, y) = (x.floor(), y.floor());
+                if x < 0.0 || y < 0.0 || x >= state.doc.width as f32 || y >= state.doc.height as f32
+                {
+                    return None;
+                }
+                let (x, y) = (x as u32, y as u32);
+                match dialog.value_of(dialogs::lens_blur_source()) {
+                    Some(1.0) => layer.image().map(|i| i.pixel(x, y)[3]),
+                    Some(2.0) => layer.mask.as_ref().map(|m| m.value(x, y)),
+                    _ => None,
+                }
+            });
+            if let Some(depth) = depth {
+                dialog.set_focal_distance(depth);
+            }
+        }
         // An eyedropper chosen in Levels or Curves: a click on the image
         // (outside the dialog) samples it as it was before adjusting
         let click = ctx.input(|i| {

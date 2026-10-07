@@ -584,56 +584,6 @@ pub const SHAPE_BLUR: &Layout = &Layout {
     ],
 };
 
-pub const LENS_BLUR: &Layout = &Layout {
-    size: (324.0, 519.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: true,
-    rows: &[
-        number(
-            "Radius:",
-            135.0,
-            [140.0, 287.0, 200.5, 306.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 313.0)),
-            Scale::Linear,
-        ),
-        Row::Popup {
-            label: "Shape:",
-            label_right: 135.0,
-            rect: [140.0, 336.0, 300.0, 357.0],
-        },
-        number(
-            "Brightness:",
-            135.0,
-            [140.0, 369.0, 200.5, 388.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 395.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Threshold:",
-            135.0,
-            [140.0, 418.0, 200.5, 437.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 444.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Noise Amount:",
-            135.0,
-            [140.0, 467.0, 200.5, 486.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 493.0)),
-            Scale::Linear,
-        ),
-    ],
-};
-
 pub const REDUCE_NOISE: &Layout = &Layout {
     size: (324.0, 513.0),
     button_width: 59.5,

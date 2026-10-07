@@ -318,13 +318,7 @@ pub enum Filter {
         radius: f32,
         shape: crate::more_filters::BlurShape,
     },
-    LensBlur {
-        radius: f32,
-        blades: u32,
-        brightness: f32,
-        threshold: u8,
-        noise: f32,
-    },
+    LensBlur(crate::more_filters::LensBlur),
     ReduceNoise {
         strength: f32,
         preserve: f32,
@@ -379,7 +373,7 @@ impl Filter {
             Self::RadialBlur { .. } => "Radial Blur",
             Self::SmartBlur { .. } => "Smart Blur",
             Self::ShapeBlur { .. } => "Shape Blur",
-            Self::LensBlur { .. } => "Lens Blur",
+            Self::LensBlur(_) => "Lens Blur",
             Self::ReduceNoise { .. } => "Reduce Noise",
             Self::SmartSharpen { .. } => "Smart Sharpen",
             Self::Fibers { .. } => "Fibers",
@@ -1429,6 +1423,7 @@ fn filtered(
     selection: Option<&crate::selection::Selection>,
     background: Option<[u8; 3]>,
     paper: [u8; 3],
+    mask: Option<&[u8]>,
 ) -> Vec<[u8; 4]> {
     let src = Buffer::from_image(image);
     let (w, h) = (src.w, src.h);
@@ -1957,7 +1952,7 @@ fn filtered(
         | Filter::RadialBlur { .. }
         | Filter::SmartBlur { .. }
         | Filter::ShapeBlur { .. }
-        | Filter::LensBlur { .. }
+        | Filter::LensBlur(_)
         | Filter::ReduceNoise { .. }
         | Filter::SmartSharpen { .. }
         | Filter::Fibers { .. }
@@ -1965,7 +1960,14 @@ fn filtered(
         | Filter::Extrude { .. }
         | Filter::OilPaint { .. } => {
             let px: Vec<[u8; 4]> = src.px.iter().map(|&p| Buffer::straight(p)).collect();
-            more(&px, w, h, filter)
+            // Lens Blur's depth map from the transparency
+            let alpha: Option<Vec<u8>> = match filter {
+                Filter::LensBlur(o) if o.depth == crate::more_filters::DepthSource::Transparency => {
+                    Some(px.iter().map(|p| p[3]).collect())
+                }
+                _ => None,
+            };
+            more(&px, w, h, filter, alpha.as_deref().or(mask))
         }
         Filter::HsbHsl { input, output } => per_pixel(&|_, _, p| {
             let rgb = to_rgb(input, [p[0], p[1], p[2]]);
@@ -2019,7 +2021,15 @@ fn filtered(
 }
 
 /// The `more_filters` ones.
-fn more(px: &[[u8; 4]], w: usize, h: usize, filter: Filter) -> Vec<[u8; 4]> {
+/// The filters in `more_filters` (`depth`: Lens Blur's depth map from the
+/// layer mask, one value a pixel).
+fn more(
+    px: &[[u8; 4]],
+    w: usize,
+    h: usize,
+    filter: Filter,
+    depth: Option<&[u8]>,
+) -> Vec<[u8; 4]> {
     use crate::more_filters as m;
     match filter {
         Filter::Wave(s) => m::wave(px, w, h, s),
@@ -2060,13 +2070,7 @@ fn more(px: &[[u8; 4]], w: usize, h: usize, filter: Filter) -> Vec<[u8; 4]> {
             mode,
         } => m::smart_blur(px, w, h, radius, threshold, mode),
         Filter::ShapeBlur { radius, shape } => m::shape_blur(px, w, h, radius, shape),
-        Filter::LensBlur {
-            radius,
-            blades,
-            brightness,
-            threshold,
-            noise,
-        } => m::lens_blur(px, w, h, radius, blades, brightness, threshold, noise),
+        Filter::LensBlur(o) => m::lens_blur(px, w, h, &o, depth),
         Filter::ReduceNoise {
             strength,
             preserve,
@@ -2134,6 +2138,18 @@ pub fn apply(doc: &mut Document, filter: Filter, background: [u8; 3]) -> Result<
     let layer = doc.layer_mut(id).expect("checked");
     let keep_alpha = layer.is_background || transparency_locked;
     let is_background = layer.is_background;
+    // Lens Blur's depth map from the layer mask
+    let mask: Option<Vec<u8>> = match filter {
+        Filter::LensBlur(o) if o.depth == crate::more_filters::DepthSource::LayerMask => {
+            layer.mask.as_ref().map(|m| {
+                (0..h)
+                    .flat_map(|y| (0..w).map(move |x| (x, y)))
+                    .map(|(x, y)| m.value(x, y))
+                    .collect()
+            })
+        }
+        _ => None,
+    };
     let image = layer.image_mut().expect("checked: not a group");
     let out = filtered(
         image,
@@ -2141,6 +2157,7 @@ pub fn apply(doc: &mut Document, filter: Filter, background: [u8; 3]) -> Result<
         selection.as_ref(),
         is_background.then_some(background),
         background,
+        mask.as_deref(),
     );
     for y in 0..h {
         for x in 0..w {

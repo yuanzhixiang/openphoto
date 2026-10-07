@@ -8648,3 +8648,65 @@ fn shear_curve_grid_bends_the_line() {
     h.run_steps(3);
     assert_eq!(last_history(&h), "Shear");
 }
+
+#[test]
+fn lens_blur_dialog_picks_its_focal_point() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::LensBlur);
+    h.run_steps(4);
+    shot(&mut h, "lens_blur");
+    let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
+    let pt = crate::theme::pt;
+    // The column hangs from the window's right edge
+    let rt = |x: f32, y: f32| egui::pos2(rect.right() - pt(x), rect.top() + pt(y));
+    // Depth from Transparency: Set Focal Point, then a click in the preview
+    // reads the opaque document's depth, 255
+    h.state_mut()
+        .state
+        .adjust_dialog
+        .as_mut()
+        .unwrap()
+        .test_set_value(1, "1");
+    h.run_steps(2);
+    click(&mut h, rt(214.5, 227.5));
+    h.run_steps(2);
+    assert!(
+        h.state()
+            .state
+            .adjust_dialog
+            .as_ref()
+            .unwrap()
+            .extra
+            .lens_pick
+    );
+    let image = crate::dialogs::adjust_lens_image(rect);
+    click(&mut h, image.center());
+    h.run_steps(3);
+    let dialog = h.state().state.adjust_dialog.as_ref().unwrap();
+    assert_eq!(dialog.value_of(2), Some(255.0));
+    // Blade Curvature and Rotation reach the filter
+    h.state_mut()
+        .state
+        .adjust_dialog
+        .as_mut()
+        .unwrap()
+        .test_set_value(6, "50");
+    h.state_mut()
+        .state
+        .adjust_dialog
+        .as_mut()
+        .unwrap()
+        .test_set_value(7, "30");
+    h.run_steps(2);
+    match h.state().state.adjust_dialog.as_ref().unwrap().effect() {
+        Some(crate::dialogs::Effect::Filter(op_core::filter::Filter::LensBlur(o))) => {
+            assert_eq!((o.curvature, o.rotation, o.focal), (50.0, 30.0, 255));
+            assert_eq!(o.depth, op_core::more_filters::DepthSource::Transparency);
+        }
+        other => panic!("{other:?}"),
+    }
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Lens Blur");
+}

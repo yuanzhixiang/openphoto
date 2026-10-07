@@ -441,44 +441,108 @@ pub fn shape_blur(px: &[Px], w: usize, h: usize, radius: f32, shape: BlurShape) 
 
 // --------------------------------------------------------- Lens Blur
 
-/// Blur › Lens Blur (without a depth map): a disc (or polygonal iris of
-/// `blades` sides) of `radius`, with bright spots (above `threshold`)
-/// boosted by `brightness` (0–100) so they bloom as Photoshop's specular
-/// highlights do, and `noise` (0–100) added back.
-#[allow(clippy::too_many_arguments)] // one per control in the dialog
-pub fn lens_blur(
-    px: &[Px],
-    w: usize,
-    h: usize,
-    radius: f32,
-    blades: u32,
-    brightness: f32,
-    threshold: u8,
-    noise: f32,
-) -> Vec<Px> {
-    let r = radius.round().max(1.0) as i64;
-    let polygon = |u: f32, v: f32| {
-        if blades < 3 {
-            return u * u + v * v <= 1.0;
+/// Where Lens Blur's depth comes from: none (the whole image blurs
+/// evenly), the layer's transparency, or its layer mask.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DepthSource {
+    None,
+    Transparency,
+    LayerMask,
+}
+
+/// Lens Blur's settings, as its dialog has them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LensBlur {
+    /// Iris: Radius 0–100, the blades (3–8), Blade Curvature 0–100 (100 is
+    /// a circle) and Rotation in degrees.
+    pub radius: f32,
+    pub blades: u32,
+    pub curvature: f32,
+    pub rotation: f32,
+    /// Specular Highlights: Brightness 0–100 and Threshold 0–255.
+    pub brightness: f32,
+    pub threshold: u8,
+    /// Noise: Amount 0–100 (as Add Noise's), Gaussian or uniform,
+    /// Monochromatic.
+    pub noise: f32,
+    pub gaussian: bool,
+    pub monochromatic: bool,
+    /// Depth Map: its source, Blur Focal Distance (0–255: the depth that
+    /// stays sharp) and Invert.
+    pub depth: DepthSource,
+    pub focal: u8,
+    pub invert: bool,
+}
+
+impl Default for LensBlur {
+    /// Photoshop's: Hexagon, Radius 15, Threshold 255, no depth map.
+    fn default() -> Self {
+        Self {
+            radius: 15.0,
+            blades: 6,
+            curvature: 0.0,
+            rotation: 0.0,
+            brightness: 0.0,
+            threshold: 255,
+            noise: 0.0,
+            gaussian: false,
+            monochromatic: false,
+            depth: DepthSource::None,
+            focal: 0,
+            invert: false,
         }
-        let n = blades as f32;
-        let a = v.atan2(u);
+    }
+}
+
+impl LensBlur {
+    /// Whether (u, v), in units of the radius, is inside the iris: the
+    /// polygon of `blades` sides turned by Rotation, rounded toward the
+    /// circle by Blade Curvature.
+    pub fn inside(&self, u: f32, v: f32) -> bool {
+        let r = (u * u + v * v).sqrt();
+        if self.blades < 3 {
+            return r <= 1.0;
+        }
+        let n = self.blades as f32;
+        let a = v.atan2(u) - self.rotation.to_radians();
         let sector = (a / (TAU / n)).floor();
         let mid = (sector + 0.5) * TAU / n;
-        (u * u + v * v).sqrt() * (a - mid).cos() <= (PI / n).cos()
+        // The polygon's edge at this angle, then toward the circle
+        let edge = (PI / n).cos() / (a - mid).cos();
+        let k = (self.curvature / 100.0).clamp(0.0, 1.0);
+        r <= edge + (1.0 - edge) * k
+    }
+}
+
+/// Blur › Lens Blur: each pixel averages the iris-shaped neighborhood of
+/// its radius, pixels at or above Threshold counting more by Brightness
+/// (so they spread as highlights), then noise as Add Noise's. With a depth
+/// map (`depth`: 0–255 a pixel, from the transparency or the mask) the
+/// radius scales with how far a pixel's depth is from Blur Focal Distance
+/// (Invert flips the depths), so the focal depth stays sharp.
+pub fn lens_blur(px: &[Px], w: usize, h: usize, o: &LensBlur, depth: Option<&[u8]>) -> Vec<Px> {
+    let max_r = o.radius.round().max(0.0) as i64;
+    // Each radius's taps, made when first needed
+    let mut kernels: Vec<Option<Vec<(i64, i64)>>> = vec![None; max_r as usize + 1];
+    let mut kernel = |r: i64| -> Vec<(i64, i64)> {
+        kernels[r as usize]
+            .get_or_insert_with(|| {
+                if r == 0 {
+                    return vec![(0, 0)];
+                }
+                (-r..=r)
+                    .flat_map(|dy| (-r..=r).map(move |dx| (dx, dy)))
+                    .filter(|&(dx, dy)| o.inside(dx as f32 / r as f32, dy as f32 / r as f32))
+                    .collect()
+            })
+            .clone()
     };
-    let taps: Vec<(i64, i64, f32)> = (-r..=r)
-        .flat_map(|dy| (-r..=r).map(move |dx| (dx, dy)))
-        .filter(|&(dx, dy)| polygon(dx as f32 / r as f32, dy as f32 / r as f32))
-        .map(|(dx, dy)| (dx, dy, 1.0))
-        .collect();
-    // Bright spots count more, so they spread as highlights
-    let boost = 1.0 + brightness / 100.0 * 8.0;
+    let boost = 1.0 + o.brightness / 100.0 * 8.0;
     let boosted: Vec<[f32; 4]> = px
         .iter()
         .map(|&p| {
             let l = (p[0] as u32 + p[1] as u32 + p[2] as u32) / 3;
-            let k = if l >= threshold as u32 { boost } else { 1.0 };
+            let k = if l >= o.threshold as u32 { boost } else { 1.0 };
             [
                 p[0] as f32 * k,
                 p[1] as f32 * k,
@@ -487,12 +551,22 @@ pub fn lens_blur(
             ]
         })
         .collect();
-    let total = taps.len() as f32;
+    let radius_at = |i: usize| -> i64 {
+        let Some(d) = depth.and_then(|d| d.get(i)) else {
+            return max_r;
+        };
+        let d = if o.invert { 255 - *d } else { *d };
+        (o.radius * (d as f32 - o.focal as f32).abs() / 255.0).round() as i64
+    };
+    // Add Noise's strength (`filter.md`): uniform spans ±(amount% × 255 +
+    // 0.75), Gaussian has that standard deviation
+    let spread = o.noise / 100.0 * 255.0;
     (0..w * h)
         .map(|i| {
             let (x, y) = ((i % w) as i64, (i / w) as i64);
+            let taps = kernel(radius_at(i).min(max_r));
             let mut acc = [0f32; 4];
-            for &(dx, dy, _) in &taps {
+            for &(dx, dy) in &taps {
                 let xi = (x + dx).clamp(0, w as i64 - 1) as usize;
                 let yi = (y + dy).clamp(0, h as i64 - 1) as usize;
                 let q = boosted[yi * w + xi];
@@ -500,13 +574,22 @@ pub fn lens_blur(
                     acc[c] += q[c];
                 }
             }
-            let n = (hash(x, y, 9, 7) - 0.5) * noise * 0.5;
-            [
-                (acc[0] / total + n).round().clamp(0.0, 255.0) as u8,
-                (acc[1] / total + n).round().clamp(0.0, 255.0) as u8,
-                (acc[2] / total + n).round().clamp(0.0, 255.0) as u8,
-                (acc[3] / total).round().clamp(0.0, 255.0) as u8,
-            ]
+            let total = taps.len() as f32;
+            let mut out = [0u8; 4];
+            for c in 0..3 {
+                let channel = if o.monochromatic { 0 } else { c as u64 };
+                let n = if o.noise <= 0.0 {
+                    0.0
+                } else if o.gaussian {
+                    let s: f32 = (0..4).map(|k| hash(x, y, 20 + channel * 4 + k, 7)).sum();
+                    (s - 2.0) * 3f32.sqrt() * spread
+                } else {
+                    (hash(x, y, 10 + channel, 7) * 2.0 - 1.0) * (spread + 0.75)
+                };
+                out[c] = (acc[c] / total + n).round().clamp(0.0, 255.0) as u8;
+            }
+            out[3] = (acc[3] / total).round().clamp(0.0, 255.0) as u8;
+            out
         })
         .collect()
 }
@@ -1096,13 +1179,59 @@ mod tests {
     }
 
     #[test]
+    fn lens_blur_iris_and_depth() {
+        let hexagon = LensBlur::default();
+        // A hexagon's flat side is inside the circle; full curvature rounds it
+        let corner_gap = (0.95f32 * (PI / 6.0).cos(), 0.0);
+        assert!(hexagon.inside(corner_gap.0, corner_gap.1));
+        let flat = (PI / 6.0).cos() + 0.03;
+        assert!(!hexagon.inside(flat * (PI / 6.0).cos(), flat * (PI / 6.0).sin()));
+        let round = LensBlur {
+            curvature: 100.0,
+            ..hexagon
+        };
+        assert!(round.inside(flat * (PI / 6.0).cos(), flat * (PI / 6.0).sin()));
+        // Rotation turns the corners: a corner direction becomes a side's
+        let corner = (0.97, 0.0);
+        assert!(hexagon.inside(corner.0, corner.1));
+        let turned = LensBlur {
+            rotation: 30.0,
+            ..hexagon
+        };
+        assert!(!turned.inside(corner.0, corner.1));
+        // With a depth map, the focal depth stays sharp
+        let px = checker(16, 16);
+        let near = vec![0u8; 16 * 16];
+        let o = LensBlur {
+            radius: 4.0,
+            depth: DepthSource::Transparency,
+            focal: 0,
+            ..Default::default()
+        };
+        assert_eq!(lens_blur(&px, 16, 16, &o, Some(&near)), px);
+        let far = vec![255u8; 16 * 16];
+        assert_ne!(lens_blur(&px, 16, 16, &o, Some(&far)), px);
+        let inverted = LensBlur { invert: true, ..o };
+        assert_eq!(lens_blur(&px, 16, 16, &inverted, Some(&far)), px);
+    }
+
+    #[test]
     fn blurs_soften_and_keep_flat_areas() {
         let px = checker(32, 32);
         for out in [
             radial_blur(&px, 32, 32, 30.0, RadialMethod::Spin, 1, (0.5, 0.5)),
             radial_blur(&px, 32, 32, 30.0, RadialMethod::Zoom, 1, (0.5, 0.5)),
             shape_blur(&px, 32, 32, 3.0, BlurShape::Star),
-            lens_blur(&px, 32, 32, 3.0, 6, 0.0, 255, 0.0),
+            lens_blur(
+                &px,
+                32,
+                32,
+                &LensBlur {
+                    radius: 3.0,
+                    ..Default::default()
+                },
+                None,
+            ),
         ] {
             assert_ne!(out, px);
         }
