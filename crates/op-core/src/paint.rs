@@ -105,6 +105,31 @@ pub enum PaintMode {
     Clear,
 }
 
+/// Where the Background Eraser and Color Replacement tools take the color
+/// they act on ("Sampling").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sampling {
+    /// Under the brush's center at every dab.
+    Continuous,
+    /// Under the brush's center where the stroke starts.
+    Once,
+    /// A given color (the background swatch).
+    Swatch([u8; 3]),
+}
+
+/// Which pixels the Background Eraser and Color Replacement change: those
+/// within `tolerance` (0–1, of the largest channel difference) of the
+/// sampled color, either all of them under the brush or only those
+/// connected to its center (`contiguous`); `protect` keeps pixels close to
+/// that color (the Background Eraser's Protect Foreground Color).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ColorMatch {
+    pub sampling: Sampling,
+    pub tolerance: f32,
+    pub contiguous: bool,
+    pub protect: Option<[u8; 3]>,
+}
+
 /// What a stroke does to the pixels it covers.
 #[derive(Clone, Debug)]
 pub enum StrokeKind {
@@ -132,6 +157,21 @@ pub enum StrokeKind {
         image: TiledImage,
         dx: i64,
         dy: i64,
+    },
+    /// Paint a pattern tiled from the document's origin (Pattern Stamp,
+    /// Aligned).
+    Pattern(TiledImage),
+    /// Push the pixels along the stroke (Smudge): each dab pulls the
+    /// colors under the previous dab with this strength (0–1).
+    Smudge(f32),
+    /// Erase the pixels matching a sampled color (Background Eraser).
+    BackgroundErase(ColorMatch),
+    /// Give the pixels matching a sampled color the hue, saturation,
+    /// color or luminosity (`mode`) of `color` (Color Replacement).
+    ReplaceColor {
+        color: [u8; 3],
+        mode: crate::layer::BlendMode,
+        matching: ColorMatch,
     },
 }
 
@@ -180,6 +220,10 @@ pub struct Stroke {
     /// Paint the background color instead of erasing / keep alpha.
     preserve_alpha: bool,
     mode: PaintMode,
+    /// The color sampled once (Sampling: Once).
+    sampled: Option<[u8; 3]>,
+    /// Where the previous dab was (Smudge).
+    last_dab: Option<(f32, f32)>,
     last: Option<(f32, f32)>,
     /// Distance travelled since the last dab.
     since_dab: f32,
@@ -245,6 +289,8 @@ impl Stroke {
             flow: flow.clamp(0.0, 1.0),
             preserve_alpha: on_mask || layer.is_background || doc.transparency_locked(id),
             mode: PaintMode::Normal,
+            sampled: None,
+            last_dab: None,
             last: None,
             since_dab: 0.0,
         })
@@ -283,6 +329,10 @@ impl Stroke {
     }
 
     fn dab(&mut self, doc: &mut Document, cx: f32, cy: f32) {
+        if let StrokeKind::Smudge(strength) = self.kind {
+            self.smudge_dab(doc, cx, cy, strength);
+            return;
+        }
         let (w, h) = (doc.width, doc.height);
         let r = self.tip.diameter / 2.0 + 1.0;
         let x0 = (cx - r).floor().max(0.0) as u32;
@@ -309,11 +359,19 @@ impl Stroke {
                 },
             }
         };
+        // The Background Eraser and Color Replacement change only the
+        // pixels matching the sampled color
+        let matched = self.match_mask(cx, cy, (x0, y0, x1, y1));
         for y in y0..y1 {
             for x in x0..x1 {
                 let (px, py) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
                 let a = self.tip.coverage(px, py);
                 if a <= 0.0 {
+                    continue;
+                }
+                if let Some(m) = &matched
+                    && !m[((y - y0) * (x1 - x0) + (x - x0)) as usize]
+                {
                     continue;
                 }
                 let key = (x / TILE_SIZE, y / TILE_SIZE);
@@ -335,6 +393,10 @@ impl Stroke {
                     }
                     StrokeKind::Paint(_) | StrokeKind::Erase { .. } => {
                         apply(base, amount, &self.kind, self.preserve_alpha)
+                    }
+                    StrokeKind::BackgroundErase(_) => {
+                        let [r, g, b, a] = base;
+                        [r, g, b, (a as f32 * (1.0 - amount)).round() as u8]
                     }
                     other => {
                         let target = self.target(other, x, y, base);
@@ -395,8 +457,147 @@ impl Stroke {
                 }
                 image.pixel(sx as u32, sy as u32)
             }
-            StrokeKind::Paint(_) | StrokeKind::Erase { .. } => base,
+            StrokeKind::Pattern(image) => {
+                let (pw, ph) = (image.width().max(1), image.height().max(1));
+                let p = image.pixel(x % pw, y % ph);
+                [p[0], p[1], p[2], base[3].max(p[3])]
+            }
+            &StrokeKind::ReplaceColor { color, mode, .. } => {
+                let c = color.map(|v| v as f32 / 255.0);
+                out(crate::blend::blend(mode, rgb, c))
+            }
+            StrokeKind::Paint(_)
+            | StrokeKind::Erase { .. }
+            | StrokeKind::Smudge(_)
+            | StrokeKind::BackgroundErase(_) => base,
         }
+    }
+
+    /// For the Background Eraser and Color Replacement: which pixels of the
+    /// dab's box (`x0`, `y0`) to (`x1`, `y1`) match the sampled color, row
+    /// by row; `None` for the other strokes.
+    fn match_mask(
+        &mut self,
+        cx: f32,
+        cy: f32,
+        (x0, y0, x1, y1): (u32, u32, u32, u32),
+    ) -> Option<Vec<bool>> {
+        let matching = match &self.kind {
+            StrokeKind::BackgroundErase(m) => *m,
+            StrokeKind::ReplaceColor { matching, .. } => *matching,
+            _ => return None,
+        };
+        let (bw, bh) = (x1 - x0, y1 - y0);
+        let center = (
+            (cx.max(0.0) as u32).min(self.base.width().saturating_sub(1)),
+            (cy.max(0.0) as u32).min(self.base.height().saturating_sub(1)),
+        );
+        let at = |x: u32, y: u32| {
+            let p = self.base.pixel(x, y);
+            [p[0], p[1], p[2]]
+        };
+        let sample = match matching.sampling {
+            Sampling::Continuous => at(center.0, center.1),
+            Sampling::Once => *self.sampled.get_or_insert(at(center.0, center.1)),
+            Sampling::Swatch(c) => c,
+        };
+        let close = |p: [u8; 3], c: [u8; 3]| {
+            let d = (0..3)
+                .map(|i| (p[i] as i32 - c[i] as i32).unsigned_abs())
+                .max()
+                .unwrap_or(0);
+            d as f32 / 255.0 <= matching.tolerance
+        };
+        let ok = |x: u32, y: u32| {
+            let p = at(x, y);
+            self.base.pixel(x, y)[3] > 0
+                && close(p, sample)
+                && matching.protect.is_none_or(|f| !close(p, f))
+        };
+        let mut mask = vec![false; (bw * bh) as usize];
+        if !matching.contiguous {
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    mask[((y - y0) * bw + (x - x0)) as usize] = ok(x, y);
+                }
+            }
+            return Some(mask);
+        }
+        // Contiguous: flood from the center through matching pixels
+        if !(x0..x1).contains(&center.0) || !(y0..y1).contains(&center.1) || !ok(center.0, center.1)
+        {
+            return Some(mask);
+        }
+        let mut stack = vec![center];
+        mask[((center.1 - y0) * bw + (center.0 - x0)) as usize] = true;
+        while let Some((x, y)) = stack.pop() {
+            let neighbors = [
+                (x.wrapping_sub(1), y),
+                (x + 1, y),
+                (x, y.wrapping_sub(1)),
+                (x, y + 1),
+            ];
+            for (nx, ny) in neighbors {
+                if nx < x0 || ny < y0 || nx >= x1 || ny >= y1 {
+                    continue;
+                }
+                let i = ((ny - y0) * bw + (nx - x0)) as usize;
+                if !mask[i] && ok(nx, ny) {
+                    mask[i] = true;
+                    stack.push((nx, ny));
+                }
+            }
+        }
+        Some(mask)
+    }
+
+    /// One Smudge dab: the pixels under the tip take on the colors under
+    /// the previous dab, by `strength` × coverage (the first dab only
+    /// picks up).
+    fn smudge_dab(&mut self, doc: &mut Document, cx: f32, cy: f32, strength: f32) {
+        let Some((px, py)) = self.last_dab.replace((cx, cy)) else {
+            return;
+        };
+        let (dx, dy) = ((cx - px).round() as i64, (cy - py).round() as i64);
+        if dx == 0 && dy == 0 {
+            return;
+        }
+        let (w, h) = (doc.width, doc.height);
+        let r = self.tip.diameter / 2.0 + 1.0;
+        let x0 = (cx - r).floor().max(0.0) as u32;
+        let y0 = (cy - r).floor().max(0.0) as u32;
+        let x1 = ((cx + r).ceil().max(0.0) as u32).min(w);
+        let y1 = ((cy + r).ceil().max(0.0) as u32).min(h);
+        let selection = self.selection.clone();
+        let preserve = self.preserve_alpha;
+        let tip = self.tip;
+        let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
+            return;
+        };
+        // Read the dragged colors before writing any
+        let mut updates = Vec::new();
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let a = tip.coverage(x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+                if a <= 0.0 {
+                    continue;
+                }
+                let (sx, sy) = (x as i64 - dx, y as i64 - dy);
+                if sx < 0 || sy < 0 || sx >= w as i64 || sy >= h as i64 {
+                    continue;
+                }
+                let selected = selection
+                    .as_ref()
+                    .map_or(1.0, |s| s.get(x, y) as f32 / 255.0);
+                let amount = a * strength * selected;
+                let from = image.pixel(sx as u32, sy as u32);
+                updates.push((x, y, mix(image.pixel(x, y), from, amount, preserve)));
+            }
+        }
+        for (x, y, p) in updates {
+            image.set_pixel(x, y, p);
+        }
+        doc.mark_dirty();
     }
 
     /// The layer the stroke paints on.
@@ -827,5 +1028,97 @@ mod tests {
         // The corner of the 10 px square is painted, unlike a round tip's
         assert_eq!(pixel(&doc, id, 16, 16)[3], 255);
         assert_eq!(pixel(&doc, id, 26, 20)[3], 0);
+    }
+
+    #[test]
+    fn pattern_smudge_background_eraser_and_color_replacement() {
+        use crate::BlendMode;
+        // Pattern: a 2 × 2 checker tiled from the origin
+        let (mut doc, id) = doc_with_layer();
+        let mut pat = TiledImage::new(2, 2);
+        pat.set_pixel(0, 0, [255, 0, 0, 255]);
+        pat.set_pixel(1, 0, [0, 0, 255, 255]);
+        pat.set_pixel(0, 1, [0, 0, 255, 255]);
+        pat.set_pixel(1, 1, [255, 0, 0, 255]);
+        let mut s = Stroke::begin(&doc, HARD, StrokeKind::Pattern(pat), 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 20.0, 20.0);
+        assert_eq!(pixel(&doc, id, 20, 20), [255, 0, 0, 255]);
+        assert_eq!(pixel(&doc, id, 21, 20), [0, 0, 255, 255]);
+
+        // Smudge drags red rightward into the empty layer
+        let (mut doc, id) = doc_with_layer();
+        for y in 0..40 {
+            for x in 0..15 {
+                doc.layer_mut(id)
+                    .unwrap()
+                    .image_mut()
+                    .unwrap()
+                    .set_pixel(x, y, [255, 0, 0, 255]);
+            }
+        }
+        let mut s = Stroke::begin(&doc, HARD, StrokeKind::Smudge(1.0), 1.0, 1.0).unwrap();
+        for x in [10.0, 13.0, 16.0, 19.0] {
+            s.add_point(&mut doc, x, 20.0);
+        }
+        assert!(
+            pixel(&doc, id, 17, 20)[3] > 0,
+            "{:?}",
+            pixel(&doc, id, 17, 20)
+        );
+
+        // Background Eraser: removes the gray it samples, keeps the black
+        let (mut doc, id) = doc_with_layer();
+        for y in 0..40 {
+            for x in 0..40 {
+                let c = if x < 20 {
+                    [128, 128, 128, 255]
+                } else {
+                    [0, 0, 0, 255]
+                };
+                doc.layer_mut(id)
+                    .unwrap()
+                    .image_mut()
+                    .unwrap()
+                    .set_pixel(x, y, c);
+            }
+        }
+        let matching = ColorMatch {
+            sampling: Sampling::Continuous,
+            tolerance: 0.1,
+            contiguous: false,
+            protect: None,
+        };
+        let mut s =
+            Stroke::begin(&doc, HARD, StrokeKind::BackgroundErase(matching), 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 18.0, 20.0);
+        assert_eq!(pixel(&doc, id, 17, 20)[3], 0);
+        assert_eq!(pixel(&doc, id, 21, 20), [0, 0, 0, 255]);
+
+        // Color Replacement (Color): the gray takes red's hue, the black stays
+        let (mut doc, id) = doc_with_layer();
+        for y in 0..40 {
+            for x in 0..40 {
+                let c = if x < 20 {
+                    [128, 128, 128, 255]
+                } else {
+                    [0, 0, 0, 255]
+                };
+                doc.layer_mut(id)
+                    .unwrap()
+                    .image_mut()
+                    .unwrap()
+                    .set_pixel(x, y, c);
+            }
+        }
+        let kind = StrokeKind::ReplaceColor {
+            color: [255, 0, 0],
+            mode: BlendMode::Color,
+            matching,
+        };
+        let mut s = Stroke::begin(&doc, HARD, kind, 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 18.0, 20.0);
+        let p = pixel(&doc, id, 17, 20);
+        assert!(p[0] > p[1] && p[0] > p[2], "{p:?}");
+        assert_eq!(pixel(&doc, id, 21, 20), [0, 0, 0, 255]);
     }
 }

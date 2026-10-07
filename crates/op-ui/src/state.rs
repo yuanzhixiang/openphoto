@@ -1005,6 +1005,17 @@ impl PaintOptions {
         }
     }
 
+    /// A 13 px hard brush (the Smudge, Pattern Stamp, Background Eraser
+    /// and Color Replacement tools) with `opacity` (the Smudge's Strength).
+    const fn small(opacity: f32) -> Self {
+        Self {
+            size: 13.0,
+            hardness: 1.0,
+            opacity,
+            flow: 1.0,
+        }
+    }
+
     /// A retouching tool: the round brush with `opacity` as its strength
     /// (Exposure for Dodge and Burn, Strength for Blur and Sharpen) and
     /// `flow` (the Sponge's Flow).
@@ -1057,6 +1068,10 @@ pub struct AppState {
     pub sharpen: PaintOptions,
     pub clone_stamp: PaintOptions,
     pub history_brush: PaintOptions,
+    pub smudge: PaintOptions,
+    pub pattern_stamp: PaintOptions,
+    pub background_eraser: PaintOptions,
+    pub color_replacement: PaintOptions,
     pub retouch: RetouchOptions,
     pub shape: ShapeOptions,
     pub move_options: MoveOptions,
@@ -1171,6 +1186,10 @@ impl Default for AppState {
             sharpen: PaintOptions::retouch(0.5, 1.0),
             clone_stamp: PaintOptions::brush(),
             history_brush: PaintOptions::brush(),
+            smudge: PaintOptions::small(0.5),
+            pattern_stamp: PaintOptions::small(1.0),
+            background_eraser: PaintOptions::small(1.0),
+            color_replacement: PaintOptions::small(1.0),
             retouch: RetouchOptions::default(),
             shape: ShapeOptions::default(),
             move_options: MoveOptions::default(),
@@ -1239,6 +1258,10 @@ impl AppState {
             Tool::Sharpen => Some(&mut self.sharpen),
             Tool::CloneStamp => Some(&mut self.clone_stamp),
             Tool::HistoryBrush => Some(&mut self.history_brush),
+            Tool::Smudge => Some(&mut self.smudge),
+            Tool::PatternStamp => Some(&mut self.pattern_stamp),
+            Tool::BackgroundEraser => Some(&mut self.background_eraser),
+            Tool::ColorReplacement => Some(&mut self.color_replacement),
             _ => None,
         }
     }
@@ -1381,4 +1404,34 @@ impl AppState {
             self.foreground = c;
         }
     }
+}
+
+/// The Pattern Stamp's pattern: Photoshop's default, dots of green on dark
+/// green (18 × 22 pixels, tiled).
+pub fn default_pattern() -> op_core::TiledImage {
+    let (w, h) = (18u32, 22u32);
+    let mut image = op_core::TiledImage::new(w, h);
+    for y in 0..h {
+        for x in 0..w {
+            image.set_pixel(x, y, [0x16, 0x34, 0x18, 255]);
+        }
+    }
+    // Two rows of dots, the second shifted half a period
+    for (cx, cy) in [
+        (4.5f32, 5.5f32),
+        (13.5, 5.5),
+        (9.0, 16.5),
+        (0.0, 16.5),
+        (18.0, 16.5),
+    ] {
+        for y in 0..h {
+            for x in 0..w {
+                let (dx, dy) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+                if dx * dx + dy * dy <= 2.6 * 2.6 {
+                    image.set_pixel(x, y, [0x3f, 0x7a, 0x3a, 255]);
+                }
+            }
+        }
+    }
+    image
 }

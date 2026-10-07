@@ -151,6 +151,13 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let paint_mode = crate::options_tools::paint_mode(app, tool);
     let eraser_mode = crate::options_tools::eraser_mode(app);
     let clone_scope = crate::options_tools::clone_scope(app);
+    let rgb3 = |c: op_core::Color| {
+        let [r, g, b, _] = c.to_rgba8();
+        [r, g, b]
+    };
+    let matching =
+        crate::options_tools::color_match(app, tool, (rgb3(app.foreground), rgb3(app.background)));
+    let replace_mode = crate::options_tools::replace_mode(app);
     let sampling_ring = tool == Tool::Eyedropper && app.flag("eyedropper.ring", true);
     // The Zoom tool's Zoom Out button swaps what a click and Alt-click do
     let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
@@ -461,7 +468,11 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             | Tool::Blur
             | Tool::Sharpen
             | Tool::CloneStamp
-            | Tool::HistoryBrush => {
+            | Tool::HistoryBrush
+            | Tool::Smudge
+            | Tool::PatternStamp
+            | Tool::BackgroundEraser
+            | Tool::ColorReplacement => {
                 if let Some(opts) = paint {
                     let settings = StrokeSettings {
                         opts,
@@ -470,6 +481,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         mode: paint_mode,
                         eraser_mode,
                         clone_scope,
+                        matching,
+                        replace_mode,
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
                 }
@@ -1095,6 +1108,10 @@ fn stroke_names(tool: Tool) -> (&'static str, &'static str) {
         Tool::Sharpen => ("sharpen tool", "Sharpen Tool"),
         Tool::CloneStamp => ("clone stamp", "Clone Stamp"),
         Tool::HistoryBrush => ("history brush", "History Brush"),
+        Tool::Smudge => ("smudge tool", "Smudge Tool"),
+        Tool::PatternStamp => ("pattern stamp", "Pattern Stamp"),
+        Tool::BackgroundEraser => ("background eraser", "Background Eraser"),
+        Tool::ColorReplacement => ("color replacement tool", "Color Replacement Tool"),
         _ => ("brush tool", "Brush Tool"),
     }
 }
@@ -1107,6 +1124,11 @@ fn stroke_kind(
     start: Pos2,
     (foreground, background): (op_core::Color, op_core::Color),
     (retouch, clone_scope): (crate::state::RetouchOptions, op_core::SampleScope),
+    (matching, replace_mode, strength): (
+        Option<op_core::paint::ColorMatch>,
+        op_core::BlendMode,
+        f32,
+    ),
 ) -> Result<op_core::paint::StrokeKind, String> {
     use op_core::paint::StrokeKind;
     let rgb = |c: op_core::Color| {
@@ -1179,6 +1201,25 @@ fn stroke_kind(
                 dy: 0,
             }
         }
+        Tool::Smudge => StrokeKind::Smudge(strength),
+        Tool::PatternStamp => StrokeKind::Pattern(crate::state::default_pattern()),
+        Tool::BackgroundEraser => {
+            // Photoshop turns the background into a regular layer first
+            if state
+                .doc
+                .active_layer
+                .and_then(|id| state.doc.layer(id))
+                .is_some_and(|l| l.is_background)
+            {
+                op_core::layer_ops::layer_from_background(&mut state.doc);
+            }
+            StrokeKind::BackgroundErase(matching.ok_or("")?)
+        }
+        Tool::ColorReplacement => StrokeKind::ReplaceColor {
+            color: rgb(foreground),
+            mode: replace_mode,
+            matching: matching.ok_or("")?,
+        },
         _ => StrokeKind::Paint(rgb(foreground)),
     })
 }
@@ -1194,6 +1235,10 @@ struct StrokeSettings {
     eraser_mode: crate::options_tools::EraserMode,
     /// The Clone Stamp's Sample.
     clone_scope: op_core::SampleScope,
+    /// The Background Eraser's and Color Replacement's color matching.
+    matching: Option<op_core::paint::ColorMatch>,
+    /// The Color Replacement's Mode.
+    replace_mode: op_core::BlendMode,
 }
 
 fn paint_input(
@@ -1211,6 +1256,8 @@ fn paint_input(
         mode,
         eraser_mode,
         clone_scope,
+        matching,
+        replace_mode,
     } = settings;
     use crate::options_tools::EraserMode;
     let eraser = (tool == Tool::Eraser).then_some(eraser_mode);
@@ -1239,7 +1286,14 @@ fn paint_input(
             .map(|p| to_doc(state, p, ppp))
             .or(pointer)
             .unwrap_or_default();
-        let kind = match stroke_kind(tool, state, start, colors, (retouch, clone_scope)) {
+        let kind = match stroke_kind(
+            tool,
+            state,
+            start,
+            colors,
+            (retouch, clone_scope),
+            (matching, replace_mode, opts.opacity),
+        ) {
             Ok(kind) => kind,
             Err(message) => {
                 // Only once per press, and never an empty message
@@ -1248,7 +1302,12 @@ fn paint_input(
         };
         let hard = tool == Tool::Pencil || eraser.is_some_and(|m| m != EraserMode::Brush);
         let flow = if hard { 1.0 } else { opts.flow };
-        let opacity = if block { 1.0 } else { opts.opacity };
+        // The Smudge's Strength is its stroke's own, not an opacity
+        let opacity = if block || tool == Tool::Smudge {
+            1.0
+        } else {
+            opts.opacity
+        };
         let (label, _) = stroke_names(tool);
         match Stroke::begin(&state.doc, tip, kind, opacity, flow) {
             Ok(stroke) => {

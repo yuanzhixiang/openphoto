@@ -5115,3 +5115,41 @@ fn sampling_scopes_and_the_sampling_ring() {
     assert_eq!(pixel[..3], [255, 0, 0]);
     assert!(pixel[3] >= 250, "{pixel:?}");
 }
+
+#[test]
+fn smudge_pattern_background_eraser_and_color_replacement() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let stroke = |h: &mut Harness<'_, OpenPhotoApp>, tool: Tool, from: (f32, f32), to: (f32, f32)| {
+        h.state_mut().state.select_tool(tool);
+        h.run_steps(1);
+        let (a, b) = (doc_point(h, from.0, from.1), doc_point(h, to.0, to.1));
+        drag(h, a, b, Modifiers::NONE);
+    };
+    // Pattern Stamp paints the default green pattern
+    stroke(&mut h, Tool::PatternStamp, (100.0, 100.0), (200.0, 100.0));
+    let p = composite_pixel(&mut h, 150, 100);
+    assert!(p[1] > p[0] && p[1] > p[2], "{p:?}");
+    assert_eq!(last_history(&h), "Pattern Stamp");
+
+    // Color Replacement gives the dark gray the foreground's hue
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    stroke(&mut h, Tool::ColorReplacement, (100.0, 400.0), (200.0, 400.0));
+    let p = composite_pixel(&mut h, 150, 400);
+    assert!(p[0] > p[1] && p[0] > p[2], "{p:?}");
+
+    // Smudge pulls the green into the gray
+    stroke(&mut h, Tool::Smudge, (150.0, 100.0), (150.0, 140.0));
+    let p = composite_pixel(&mut h, 150, 125);
+    assert!(p[1] > 0x14, "{p:?}");
+
+    // The Background Eraser makes the background a layer and erases the gray
+    stroke(&mut h, Tool::BackgroundEraser, (400.0, 600.0), (600.0, 600.0));
+    let doc = &active(&h).doc;
+    assert!(!doc.layers[0].is_background);
+    assert_eq!(doc.layers[0].name, "Layer 0");
+    assert_eq!(doc.layers[0].image().unwrap().pixel(500, 600)[3], 0);
+    assert_eq!(doc.layers[0].image().unwrap().pixel(500, 700)[3], 255);
+    assert_eq!(last_history(&h), "Background Eraser");
+}

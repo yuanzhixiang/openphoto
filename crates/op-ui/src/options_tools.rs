@@ -436,14 +436,27 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
         BackgroundEraser => &[
             Picker(124.0),
             Sep(160.0),
-            Toggle(
+            Radio(
                 182.0,
                 Icon::SampleContinuous,
                 "Sampling: Continuous",
-                "bgeraser.continuous",
+                "bgeraser.sampling",
+                0,
             ),
-            Icon(208.0, Icon::SampleOnce, "Sampling: Once"),
-            Icon(234.5, Icon::SampleSwatch, "Sampling: Background Swatch"),
+            Radio(
+                208.0,
+                Icon::SampleOnce,
+                "Sampling: Once",
+                "bgeraser.sampling",
+                1,
+            ),
+            Radio(
+                234.5,
+                Icon::SampleSwatch,
+                "Sampling: Background Swatch",
+                "bgeraser.sampling",
+                2,
+            ),
             Sep(255.0),
             Label(261.0, "Limits:"),
             Popup(297.0, 390.5, "bgeraser.limits", LIMITS),
@@ -485,14 +498,27 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
                 &["Hue", "Saturation", "Color", "Luminosity"],
             ),
             Sep(277.5),
-            Toggle(
+            Radio(
                 295.5,
                 Icon::SampleContinuous,
                 "Sampling: Continuous",
-                "colorreplace.continuous",
+                "colorreplace.sampling",
+                0,
             ),
-            Icon(321.5, Icon::SampleOnce, "Sampling: Once"),
-            Icon(348.0, Icon::SampleSwatch, "Sampling: Background Swatch"),
+            Radio(
+                321.5,
+                Icon::SampleOnce,
+                "Sampling: Once",
+                "colorreplace.sampling",
+                1,
+            ),
+            Radio(
+                348.0,
+                Icon::SampleSwatch,
+                "Sampling: Background Swatch",
+                "colorreplace.sampling",
+                2,
+            ),
             Label(365.5, "Limits:"),
             Popup(401.5, 494.5, "colorreplace.limits", LIMITS),
             Label(499.5, "Tolerance:"),
@@ -1530,7 +1556,10 @@ fn percent(v: f32) -> String {
 fn text(app: &mut AppState, key: &'static str, default: &str) -> String {
     let tool = app.tool;
     match key {
-        "paint.opacity" => app.paint_options(tool).map(|o| percent(o.opacity)),
+        "paint.opacity" | "smudge.strength" | "pattern.opacity" => {
+            app.paint_options(tool).map(|o| percent(o.opacity))
+        }
+        "pattern.flow" => app.paint_options(tool).map(|o| percent(o.flow)),
         "paint.flow" => app.paint_options(tool).map(|o| percent(o.flow)),
         "bucket.opacity" => Some(percent(app.bucket.fill.opacity)),
         "bucket.tolerance" => Some(app.bucket.tolerance.to_string()),
@@ -1551,10 +1580,10 @@ fn set_text(app: &mut AppState, key: &'static str, default: &str, typed: String)
     let tool = app.tool;
     let number = crate::options_bar::typed_number(&typed);
     match key {
-        "paint.opacity" | "paint.flow" => {
+        "paint.opacity" | "paint.flow" | "smudge.strength" | "pattern.opacity" | "pattern.flow" => {
             if let (Some(o), Some(v)) = (app.paint_options(tool), number) {
                 let v = (v / 100.0).clamp(0.01, 1.0);
-                if key == "paint.opacity" {
+                if key != "paint.flow" && key != "pattern.flow" {
                     o.opacity = v;
                 } else {
                     o.flow = v;
@@ -1730,14 +1759,7 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 let on = flag(
                     app,
                     key,
-                    matches!(
-                        key,
-                        "mixer.load"
-                            | "mixer.clean"
-                            | "bgeraser.continuous"
-                            | "colorreplace.continuous"
-                            | "remove.pressure"
-                    ),
+                    matches!(key, "mixer.load" | "mixer.clean" | "remove.pressure"),
                 );
                 if b.icon(x, icon, tip, on, true).clicked() {
                     set_flag(app, key, !on);
@@ -2141,12 +2163,8 @@ fn picker_key(tool: Tool) -> &'static str {
     match tool {
         Tool::SelectionBrush => "selbrush.size",
         Tool::AdjustmentBrush => "adjbrush.size",
-        Tool::PatternStamp => "pattern.size",
         Tool::ArtHistoryBrush => "arthistory.size",
-        Tool::ColorReplacement => "colorreplace.size",
         Tool::MixerBrush => "mixer.size",
-        Tool::BackgroundEraser => "bgeraser.size",
-        Tool::Smudge => "smudge.size",
         _ => "brush.size",
     }
 }
@@ -2203,5 +2221,55 @@ pub fn clone_scope(app: &mut AppState) -> op_core::SampleScope {
         1 => op_core::SampleScope::CurrentAndBelow,
         2 => op_core::SampleScope::All,
         _ => op_core::SampleScope::Current,
+    }
+}
+
+/// What the Background Eraser and Color Replacement change: their
+/// Sampling, Limits (Contiguous and Find Edges flood from the brush's
+/// center), Tolerance and the Background Eraser's Protect Foreground
+/// Color; `None` for the other tools.
+pub fn color_match(
+    app: &mut AppState,
+    tool: Tool,
+    (foreground, background): ([u8; 3], [u8; 3]),
+) -> Option<op_core::paint::ColorMatch> {
+    use op_core::paint::{ColorMatch, Sampling};
+    let (sampling, limits, tolerance, protect) = match tool {
+        Tool::BackgroundEraser => (
+            "bgeraser.sampling",
+            "bgeraser.limits",
+            text(app, "bgeraser.tolerance", "50%"),
+            flag(app, "bgeraser.protect", false),
+        ),
+        Tool::ColorReplacement => (
+            "colorreplace.sampling",
+            "colorreplace.limits",
+            text(app, "colorreplace.tolerance", "30%"),
+            false,
+        ),
+        _ => return None,
+    };
+    let sampling = match choice(app, sampling) {
+        1 => Sampling::Once,
+        2 => Sampling::Swatch(background),
+        _ => Sampling::Continuous,
+    };
+    let tolerance = crate::options_bar::typed_number(&tolerance).unwrap_or(50.0) / 100.0;
+    Some(ColorMatch {
+        sampling,
+        tolerance: tolerance.clamp(0.0, 1.0),
+        contiguous: choice(app, limits) != 0,
+        protect: protect.then_some(foreground),
+    })
+}
+
+/// The Color Replacement tool's Mode.
+pub fn replace_mode(app: &mut AppState) -> op_core::BlendMode {
+    use op_core::BlendMode;
+    match choice(app, "colorreplace.mode") {
+        0 => BlendMode::Hue,
+        1 => BlendMode::Saturation,
+        3 => BlendMode::Luminosity,
+        _ => BlendMode::Color,
     }
 }
