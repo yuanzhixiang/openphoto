@@ -1159,7 +1159,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             Label(110.5, "Sample Size:"),
             Popup(177.0, 292.5, "sampler.size", SAMPLE_SIZES),
             Sep(300.0),
-            Button(310.0, 371.5, "Clear All", false),
+            Action(310.0, 371.5, "Clear All"),
             Sep(379.5),
         ],
         Ruler => &[
@@ -2080,6 +2080,12 @@ fn action(app: &mut AppState, label: &str, ppp: f32) {
         "Reset View" => {
             if let Some(doc) = app.active() {
                 doc.view.rotation = 0.0;
+            }
+        }
+        // The Color Sampler's Clear All
+        "Clear All" => {
+            if let Some(doc) = app.active() {
+                doc.color_samplers.clear();
             }
         }
         "Clear" => {

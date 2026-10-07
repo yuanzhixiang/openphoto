@@ -86,7 +86,7 @@ fn fs_main(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         }
     }
 
-    if u.doc.w > 0.5 && zoom >= 6.0 {
+    if u.doc.w > 0.5 && zoom > 8.0 {
         // The screen pixel whose left (top) edge lies within one screen
         // pixel after an image pixel's edge draws the line: one pixel wide
         // whether or not the image is aligned to screen pixels

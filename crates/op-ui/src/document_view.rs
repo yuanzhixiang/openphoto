@@ -398,6 +398,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     zoom_at(state, z, p, ppp);
                 }
             }
+            Tool::ColorSampler => sampler_input(ui, &response, state, alt, ppp),
             // Alt-click picks the background color
             Tool::Eyedropper if response.is_pointer_button_down_on() => {
                 if let Some(p) = response.interact_pointer_pos() {
@@ -658,6 +659,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     CursorIcon::None
                 }
                 Tool::Eyedropper
+                | Tool::ColorSampler
                 | Tool::Rectangle
                 | Tool::Ellipse
                 | Tool::Triangle
@@ -724,6 +726,10 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
     if view_options.extras && view_options.layer_edges {
         draw_layer_edges(ui, state, canvas_rect, ppp);
+    }
+    // The color samplers show with the tools that use them
+    if view_options.extras && matches!(tool, Tool::Eyedropper | Tool::ColorSampler) {
+        draw_samplers(ui, state, canvas_rect, ppp);
     }
     // Extras or Show › Selection Edges off hides the selection edges (the
     // selection stays)
@@ -2502,5 +2508,94 @@ fn draw_layer_edges(ui: &Ui, state: &DocState, clip: Rect, ppp: f32) {
         for i in 0..4 {
             painter.line_segment([corners[i], corners[(i + 1) % 4]], stroke);
         }
+    }
+}
+
+/// Photoshop allows ten color samplers.
+pub const MAX_SAMPLERS: usize = 10;
+
+/// The color sampler whose marker is under the screen point `p`.
+fn sampler_at(state: &DocState, p: Pos2, ppp: f32) -> Option<usize> {
+    state
+        .color_samplers
+        .iter()
+        .position(|&s| (sampler_screen(state, s, ppp) - p).length() <= pt(7.0))
+}
+
+/// Where a sampler's marker sits: the center of its pixel.
+fn sampler_screen(state: &DocState, s: Pos2, ppp: f32) -> Pos2 {
+    to_screen(state, s + Vec2::splat(0.5), ppp)
+}
+
+/// The Color Sampler tool: a click places a sampler on the pixel (up to
+/// ten) and can drag it on; pressing on a marker drags it, Alt-clicking one
+/// removes it, and one dragged off the canvas is removed. Samplers are not
+/// recorded in the history, as in Photoshop.
+fn sampler_input(ui: &Ui, response: &egui::Response, state: &mut DocState, alt: bool, ppp: f32) {
+    let (w, h) = (state.doc.width as f32, state.doc.height as f32);
+    let pixel = |d: Pos2| Pos2::new(d.x.floor(), d.y.floor());
+    let inside = |d: Pos2| d.x >= 0.0 && d.y >= 0.0 && d.x < w && d.y < h;
+    if ui.input(|i| i.pointer.primary_pressed())
+        && response.hovered()
+        && let Some(p) = ui.input(|i| i.pointer.interact_pos())
+    {
+        match sampler_at(state, p, ppp) {
+            Some(i) if alt => {
+                state.color_samplers.remove(i);
+            }
+            Some(i) => state.sampler_drag = Some(i),
+            None if !alt => {
+                let d = to_doc(state, p, ppp);
+                if inside(d) && state.color_samplers.len() < MAX_SAMPLERS {
+                    state.color_samplers.push(pixel(d));
+                    state.sampler_drag = Some(state.color_samplers.len() - 1);
+                }
+            }
+            None => {}
+        }
+    }
+    let Some(i) = state.sampler_drag else {
+        return;
+    };
+    let pointer = ui.input(|i| i.pointer.interact_pos());
+    if let Some(p) = pointer {
+        let d = to_doc(state, p, ppp);
+        if i < state.color_samplers.len() {
+            state.color_samplers[i] = pixel(d);
+        }
+    }
+    if !ui.input(|i| i.pointer.primary_down()) {
+        state.sampler_drag = None;
+        if i < state.color_samplers.len() && !inside(state.color_samplers[i]) {
+            state.color_samplers.remove(i);
+        }
+    } else {
+        ui.ctx().request_repaint();
+    }
+}
+
+/// Photoshop's sampler markers (measured on Photoshop 2026): a `#ececec`
+/// ring 6.75 pt in outer radius and 2 pt thick, a 2 pt dot at the center,
+/// 2 pt arms from the ring out to 11.75 pt, and the sampler's number below
+/// right (its digits from 4.5 to 11.5 pt below the center, 5.5 pt right of
+/// it).
+fn draw_samplers(ui: &Ui, state: &DocState, clip: Rect, ppp: f32) {
+    let painter = ui.painter().with_clip_rect(clip);
+    let ink = Color32::from_gray(0xec);
+    let stroke = egui::Stroke::new(pt(2.0), ink);
+    for (k, &s) in state.color_samplers.iter().enumerate() {
+        let c = sampler_screen(state, s, ppp);
+        painter.circle_stroke(c, pt(5.75), stroke);
+        painter.circle_filled(c, pt(1.0), ink);
+        for d in [Vec2::X, -Vec2::X, Vec2::Y, -Vec2::Y] {
+            painter.line_segment([c + d * pt(6.75), c + d * pt(11.75)], stroke);
+        }
+        painter.text(
+            c + Vec2::new(pt(5.1), pt(1.1)),
+            Align2::LEFT_TOP,
+            (k + 1).to_string(),
+            egui::FontId::proportional(pt(10.5)),
+            ink,
+        );
     }
 }

@@ -26,9 +26,16 @@ impl Floating {
         }
     }
 
-    fn size(self) -> Vec2 {
+    fn size(self, app: &AppState) -> Vec2 {
         match self {
-            Self::Info => Vec2::new(pt(250.0), pt(200.0)),
+            // Taller by three lines for each row of two color samplers
+            Self::Info => {
+                let rows = super::info::sampler_rows(app);
+                Vec2::new(
+                    pt(250.0),
+                    pt(200.0) + rows as f32 * super::info::SAMPLER_ROW,
+                )
+            }
             Self::Navigator => Vec2::new(pt(250.0), pt(230.0)),
             Self::Histogram => Vec2::new(pt(250.0), pt(150.0)),
         }
@@ -71,7 +78,7 @@ pub fn show(ctx: &egui::Context, app: &mut AppState, panel_column_left: f32, top
     // opened later never land on top of one another
     let mut y = top + pt(8.0);
     for panel in Floating::ALL {
-        let size = panel.size() + Vec2::new(0.0, HEADER);
+        let size = panel.size(app) + Vec2::new(0.0, HEADER);
         let default = Pos2::new(panel_column_left - size.x - pt(12.0), y);
         y += size.y + pt(8.0);
         if !app.floating.is_open(panel) {

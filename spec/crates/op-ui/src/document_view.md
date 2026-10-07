@@ -19,7 +19,7 @@ Sizes are measured 1:1 against Photoshop (pt):
 - The canvas area is filled with the pasteboard color `#282828`.
 - On the right is the vertical scrollbar column, 17 wide: on the left, a 1 pt `#2e2e2e` line followed by a 1 pt `#464646` line; on the right, a 1 pt `#454545` line; the track in between is `#4a4a4a`. The thumb is a 12-wide rounded bar, color `#696969`.
 - At the bottom is the 16-high status bar (see below).
-- The canvas is drawn on the pasteboard according to the view transform; transparent areas show a checkerboard, and a pixel grid appears from 600% up when View › Show › Pixel Grid and Extras are on (implemented by `op-render`).
+- The canvas is drawn on the pasteboard according to the view transform; transparent areas show a checkerboard, and a pixel grid appears above 800% when View › Show › Pixel Grid and Extras are on (implemented by `op-render`).
 - The screen position of the document's top-left corner is snapped to physical pixels so pixels are crisp at 100%.
 
 ## Zoom
@@ -60,6 +60,7 @@ The pasteboard is black in Full Screen Mode (Photoshop's default) and `PASTEBOAR
 - Dragging with Space held, dragging with the Hand tool, or dragging with the middle mouse button: pan.
 - Zoom tool: click zooms in one level, ⌥-click zooms out one level, centered on the click point. When Zoom Out is pressed in the options bar (sets `zoom.out`), the two are swapped: click zooms out, ⌥-click zooms in, and the cursor swaps accordingly.
 - Magic Eraser, Red Eye tool: a click runs `fill::magic_erase` / `fill::red_eye` according to the options bar (Magic Eraser's Tolerance, Anti-alias, Contiguous, Sample All Layers, Opacity, `options_tools::magic_eraser_options`; Red Eye's Pupil Size, Darken Amount, `red_eye_options`), and records "Magic Eraser" / "Red Eye" when something changed; when the layer is locked, hidden, etc., an alert "Could not use the magic eraser / red eye tool because …" appears.
+- Color Sampler: see "Color Sampler" below.
 - Eyedropper tool: on press or drag, samples a color according to the eyedropper options (`DocState::sample_average`: a Sample Size square centered on the point, clipped to the canvas, alpha-weighted average; Sample option: Current Layer samples the current layer, Current & Below samples the composite of the current layer and the layers below it, All Layers samples the full composite; the two "No Adjustments" options are the same as the corresponding plain options (there are no adjustment layers yet)), and sets it as the foreground color; with ⌥ held it sets the background color. The sampled color is always opaque; nothing changes when the point is outside the document or the sampled area is fully transparent. No history is recorded.
 - Sampling ring (options bar Show Sampling Ring, checked by default): while the Eyedropper is held down, a ring is drawn around the pointer (inner radius 38 pt, outer radius 58 pt, with a 2 pt gray line on both the inside and outside edge); the top half is the color being sampled, the bottom half is the original color at the time of the press (the background color with ⌥), drawn on the foreground layer, over the canvas.
 
@@ -94,6 +95,12 @@ When the current tool is the Crop tool, canvas input is handed to `crop_tool::in
 ## Free Transform
 
 While the document is in Free Transform, presses, drags, Enter, and Esc on the canvas all go to `free_transform::input` (see `free_transform.md`), not to the current tool; the cursor is determined by `free_transform::cursor`; the transform box is drawn after the selection marching ants; the brush outline is not shown. On commit, the mapping is recorded as `AppState::last_transform`.
+
+## Color Sampler
+
+- A click inside the image places a color sampler on the pixel under it (`DocState::color_samplers`, document pixels; at most ten, `MAX_SAMPLERS`, after which clicks place nothing) and keeps following the pointer until the button is released. Pressing on a marker (within 7 pt of its center) drags that sampler; ⌥-clicking a marker removes it; a sampler let go outside the image is removed. Samplers are not recorded in the history, as in Photoshop. The options bar's Clear All removes them all.
+- Markers show while the Eyedropper or the Color Sampler is the current tool and Extras is on, centered on their pixel (Photoshop puts them about a physical pixel from the pixel's corner at high zoom). Measured on Photoshop 2026: `#ececec`, a ring 6.75 pt in outer radius and 2 pt thick, a 2 pt dot in the middle, four 2 pt arms from the ring out to 11.75 pt, and the sampler's number (1–10, 10.5 pt) below right of the center.
+- The Info panel reads each sampler's color (see `panels/info.md`).
 
 ## Magic Wand
 

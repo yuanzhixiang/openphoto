@@ -8,7 +8,7 @@ Within a rectangular region of the egui interface, draws the document composite 
 
 - A checkerboard shows beneath transparent areas;
 - At zoom ≥ 100% it displays with nearest-neighbor sampling and sharp pixel edges; at zoom < 100% it uses the mip chain for smooth downscaling;
-- At zoom ≥ 600% a pixel grid is overlaid;
+- Above 800% a pixel grid is overlaid;
 - Nothing is drawn outside the document bounds, exposing the pasteboard background that egui draws underneath.
 
 ## Behavior rules
@@ -68,7 +68,7 @@ Two `vec4<f32>` (Rust side `Uniforms`, `#[repr(C)]` + `Pod`):
 
 ### Pixel grid
 
-- Drawn when `pixel_grid` is true and `zoom >= 6.0` (600%).
+- Drawn when `pixel_grid` is true and `zoom > 8.0`: Photoshop 2026 shows it at 1200% and not at 800% (measured at every Zoom In step).
 - A screen pixel draws the line when its left (top) edge lies less than one physical pixel after an image pixel's edge: `fract(d − 0.5 / zoom) × zoom < 1` in either direction, where `d` is the document coordinate of the fragment's center. Its color is mixed 35% toward gray `0.55`. The effect is a semi-transparent gray line exactly 1 physical pixel wide just right of (below) every pixel boundary, whether or not the image is aligned to screen pixels. (An earlier rule, "within 0.5 physical pixels of a boundary", drew nothing when the boundary fell exactly between two screen pixels, which is the usual case since the origin is aligned.)
 
 ### Outside the document

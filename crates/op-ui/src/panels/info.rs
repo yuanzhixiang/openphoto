@@ -12,6 +12,13 @@ use crate::theme::{color, pt};
 pub fn show(ui: &mut Ui, app: &mut AppState) {
     let rect = ui.max_rect();
     let app_units = app.ruler_units;
+    // The Color Sampler's Sample Size
+    let sampler_size = app
+        .setting("sampler.size", "0")
+        .parse::<usize>()
+        .ok()
+        .and_then(|i| crate::state::EyedropperOptions::SIZES.get(i))
+        .map_or(1, |s| s.0);
     let Some(state) = app.active() else {
         return;
     };
@@ -82,7 +89,44 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         crate::status_info::size(flat),
         crate::status_info::size(layered)
     );
-    text(doc, 0.0, y0 + 2.6 * line);
+    // The color samplers, two to a row as in Photoshop: "#1" and R, G, B
+    let samplers = state.color_samplers.clone();
+    let mut doc_y = y0 + 2.6 * line;
+    for (k, s) in samplers.iter().enumerate() {
+        let (col, row) = (k % 2, k / 2);
+        let x = if col == 0 { 0.0 } else { col2 - pt(18.0) };
+        let y = y0 + 2.6 * line + row as f32 * SAMPLER_ROW;
+        text(format!("#{}", k + 1), x, y);
+        let c = state
+            .sample_average(
+                s.x as u32,
+                s.y as u32,
+                sampler_size,
+                op_core::SampleScope::All,
+            )
+            .map(|c| c.to_rgba8());
+        for (i, label) in ["R:", "G:", "B:"].iter().enumerate() {
+            let value = c.map_or(String::new(), |c| c[i].to_string());
+            text(
+                format!("{label}  {value}"),
+                x + pt(18.0),
+                y + i as f32 * line,
+            );
+        }
+        doc_y = y + SAMPLER_ROW;
+    }
+    text(doc, 0.0, doc_y);
+}
+
+/// One row of color samplers: three lines and a gap.
+pub const SAMPLER_ROW: f32 = pt(16.0 * 3.0 + 8.0);
+
+/// How many rows of color samplers the Info panel shows for the active
+/// document.
+pub fn sampler_rows(app: &AppState) -> usize {
+    app.active_doc
+        .and_then(|id| app.docs.get(&id))
+        .map_or(0, |d| d.color_samplers.len().div_ceil(2))
 }
 
 /// A length in document pixels in the rulers' unit: whole pixels, inches

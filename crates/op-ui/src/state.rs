@@ -86,6 +86,10 @@ pub struct DocState {
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
     /// What the drag in progress snaps to (View › Snap).
     pub snap: Option<crate::snap::Targets>,
+    /// The Color Sampler tool's points (document pixels, at most
+    /// `MAX_SAMPLERS`), and the one being dragged.
+    pub color_samplers: Vec<egui::Pos2>,
+    pub sampler_drag: Option<usize>,
     /// The rulers' zero point, in document pixels (moved by dragging out of
     /// the rulers' corner).
     pub ruler_origin: egui::Pos2,
@@ -213,6 +217,8 @@ impl DocState {
             quick: None,
             object_drag: None,
             snap: None,
+            color_samplers: Vec::new(),
+            sampler_drag: None,
             ruler_origin: egui::Pos2::ZERO,
             origin_drag: None,
             free_transform: None,

@@ -5916,3 +5916,79 @@ fn ruler_units_and_origin() {
     double_click(&mut h, corner);
     assert_eq!(active(&h).ruler_origin, Pos2::ZERO);
 }
+
+#[test]
+fn color_sampler_places_moves_and_removes() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.select_tool(Tool::ColorSampler);
+    h.run_steps(1);
+    let samplers = |h: &Harness<'_, OpenPhotoApp>| active(h).color_samplers.clone();
+    // A click places a sampler on the pixel
+    let p = doc_point(&h, 100.4, 200.6);
+    click(&mut h, p);
+    assert_eq!(samplers(&h), [Pos2::new(100.0, 200.0)]);
+    let q = doc_point(&h, 300.5, 50.5);
+    click(&mut h, q);
+    assert_eq!(samplers(&h).len(), 2);
+    // Its marker: a light ring around the pixel
+    let image = h.render().unwrap();
+    let k = 2.0 * UI_SCALE;
+    let c = doc_point(&h, 100.5, 200.5) + Vec2::new(crate::theme::pt(6.0), 0.0);
+    let brightest = (-1..=1)
+        .flat_map(|dx| (-1..=1).map(move |dy| (dx, dy)))
+        .map(|(dx, dy)| {
+            let (x, y) = ((c.x * k) as i32 + dx, (c.y * k) as i32 + dy);
+            image.get_pixel(x as u32, y as u32).0[0]
+        })
+        .max()
+        .unwrap();
+    assert!(brightest >= 0xe0, "{brightest}");
+    // Dragging a marker moves its sampler
+    let (from, to) = (doc_point(&h, 100.5, 200.5), doc_point(&h, 150.5, 220.5));
+    drag(&mut h, from, to, Modifiers::NONE);
+    assert_eq!(samplers(&h)[0], Pos2::new(150.0, 220.0));
+    // Alt-clicking a marker removes it
+    let q = doc_point(&h, 300.5, 50.5);
+    click_with(&mut h, q, Modifiers::ALT);
+    assert_eq!(samplers(&h), [Pos2::new(150.0, 220.0)]);
+    // Dragged off the canvas, it goes too
+    let (from, off) = (doc_point(&h, 150.5, 220.5), doc_point(&h, -40.0, 220.0));
+    drag(&mut h, from, off, Modifiers::NONE);
+    assert!(samplers(&h).is_empty());
+    // At most ten; the Info panel grows a row for every two
+    for i in 0..12 {
+        let p = doc_point(&h, 30.0 + 40.0 * i as f32, 400.0);
+        click(&mut h, p);
+    }
+    assert_eq!(samplers(&h).len(), 10);
+    assert_eq!(crate::panels::info::sampler_rows(&h.state().state), 5);
+    // Clear All on the options bar
+    click(&mut h, at_pt(340.0, 45.5));
+    assert!(samplers(&h).is_empty());
+}
+
+#[test]
+#[ignore]
+fn screenshot_color_samplers() {
+    let mut h = harness(Vec::new());
+    probe_document(&mut h);
+    h.state_mut()
+        .state
+        .select_tool(op_tools::Tool::ColorSampler);
+    let doc = h.state_mut().state.active().unwrap();
+    // Photoshop's probe has a blue-gray gradient there
+    let id = doc.doc.layers[0].id;
+    let image = doc.doc.layer_mut(id).unwrap().image_mut().unwrap();
+    for y in 0..72 {
+        for x in 0..64 {
+            image.set_pixel(x, y, [0x5e, 0x61, 0x69, 255]);
+        }
+    }
+    doc.doc.mark_dirty();
+    doc.color_samplers = vec![Pos2::new(20.0, 30.0), Pos2::new(50.0, 10.0)];
+    doc.view.zoom = 6.0;
+    h.run_steps(3);
+    shot(&mut h, "color_samplers");
+}
