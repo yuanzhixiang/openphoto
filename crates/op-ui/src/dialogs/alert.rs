@@ -5,8 +5,7 @@
 //! in points from the alert's top-left corner.
 
 use egui::{
-    Align2, Color32, CornerRadius, Key, Modifiers, Pos2, Rect, Sense, Shape, Stroke, StrokeKind,
-    Ui, vec2,
+    Color32, CornerRadius, Key, Modifiers, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, vec2,
 };
 
 use crate::theme::{self, pt};
@@ -306,23 +305,33 @@ fn draw(
     answer
 }
 
-/// OpenPhoto's app icon: a rounded square with "Op" (its own design, not
-/// Photoshop's).
+/// OpenPhoto's app icon (its own design, not Photoshop's): the 256 px
+/// rendering of packaging/macos/OpenPhoto.icns. Like every macOS icon it
+/// has a transparent margin, 100 of 1024 on each side, so the image is
+/// drawn larger than `rect` to make the icon's rounded square fill it.
 fn app_icon(painter: &egui::Painter, rect: Rect) {
-    let radius = CornerRadius::same((rect.width() * 0.22) as u8);
-    painter.rect_filled(rect, radius, Color32::from_rgb(0x1b, 0x2b, 0x26));
-    painter.rect_stroke(
-        rect,
-        radius,
-        Stroke::new(pt(0.5), Color32::from_rgb(0x3d, 0x5a, 0x50)),
-        StrokeKind::Inside,
-    );
-    painter.text(
-        rect.center(),
-        Align2::CENTER_CENTER,
-        "Op",
-        theme::dialog_bold(rect.height() * 0.48),
-        Color32::from_rgb(0x7d, 0xe0, 0xb8),
+    const PNG: &[u8] = include_bytes!("../../assets/app-icon.png");
+    let ctx = painter.ctx();
+    let id = egui::Id::new("openphoto-app-icon");
+    let texture = match ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
+        Some(t) => t,
+        None => {
+            let image = image::load_from_memory(PNG)
+                .expect("bundled app icon")
+                .into_rgba8();
+            let size = [image.width() as usize, image.height() as usize];
+            let pixels = egui::ColorImage::from_rgba_unmultiplied(size, &image);
+            let t = ctx.load_texture("app-icon", pixels, egui::TextureOptions::LINEAR);
+            ctx.data_mut(|d| d.insert_temp(id, t.clone()));
+            t
+        }
+    };
+    let full = rect.expand(rect.width() * 100.0 / 824.0);
+    painter.image(
+        texture.id(),
+        full,
+        Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+        Color32::WHITE,
     );
 }
 
