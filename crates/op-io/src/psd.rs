@@ -690,6 +690,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                 guides.push(op_core::Guide {
                     vertical: direction == 0,
                     position: at,
+                    color: None,
                 });
             }
         }
@@ -973,10 +974,12 @@ mod tests {
             op_core::Guide {
                 vertical: true,
                 position: 12.5,
+                color: None,
             },
             op_core::Guide {
                 vertical: false,
                 position: 30.0,
+                color: None,
             },
         ];
         let back = read(&write(&doc), "g".into()).unwrap();

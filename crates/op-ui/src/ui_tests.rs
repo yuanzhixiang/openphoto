@@ -7233,10 +7233,12 @@ fn guides_select_edit_and_clear() {
         doc.guides.push(op_core::Guide {
             vertical: true,
             position: 100.0,
+            color: None,
         });
         doc.guides.push(op_core::Guide {
             vertical: false,
             position: 200.0,
+            color: None,
         });
     }
     h.state_mut().state.select_tool(op_tools::Tool::Move);
@@ -7342,6 +7344,7 @@ fn guides_transforms_and_crops_snap() {
             doc.guides.push(op_core::Guide {
                 vertical: true,
                 position: x,
+                color: None,
             });
         }
         let id = doc.active_layer.unwrap();
@@ -7394,10 +7397,12 @@ fn snapping_to_guides_layers_and_bounds() {
         doc.guides.push(op_core::Guide {
             vertical: true,
             position: 100.0,
+            color: None,
         });
         doc.guides.push(op_core::Guide {
             vertical: false,
             position: 200.0,
+            color: None,
         });
     }
     let bounds =
@@ -7436,6 +7441,7 @@ fn snapping_to_guides_layers_and_bounds() {
         doc.guides.push(op_core::Guide {
             vertical: true,
             position: 350.0,
+            color: None,
         });
         let id = doc.active_layer.unwrap();
         let image = doc.layer_mut(id).unwrap().image_mut().unwrap();

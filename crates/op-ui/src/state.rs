@@ -1414,6 +1414,8 @@ pub enum PickerTarget {
     /// Auto Color Correction Options' target color (0 shadows, 1
     /// midtones, 2 highlights).
     AutoTarget(usize, [u8; 3]),
+    /// New Guide's custom color.
+    GuideColor([u8; 3]),
 }
 
 /// What the Gradient Editor edits.
@@ -1715,6 +1717,8 @@ pub struct AppState {
     pub new_document_welcome_closed: bool,
     /// View > Guides > New Guide..., while open.
     pub new_guide_dialog: Option<crate::dialogs::NewGuideDialog>,
+    /// New Guide's last orientation and color.
+    pub new_guide_last: crate::dialogs::NewGuideRemembered,
     /// Layer > New > Layer... while open.
     pub new_layer_dialog: Option<crate::dialogs::NewLayerDialog>,
     /// Layer > Duplicate Layer... while open.
@@ -1839,6 +1843,7 @@ impl Default for AppState {
             image_size_dialog: None,
             image_size_extra: egui::Vec2::ZERO,
             new_guide_dialog: None,
+            new_guide_last: Default::default(),
             new_layer_dialog: None,
             ruler_units: Default::default(),
             ruler_menu: false,
@@ -2076,6 +2081,10 @@ impl AppState {
             ),
             PickerTarget::GradientStop([r, g, b]) => (
                 "Color Picker (Stop Color)",
+                Color::from_rgba8([r, g, b, 255]),
+            ),
+            PickerTarget::GuideColor([r, g, b]) => (
+                "Color Picker (Guide Color)",
                 Color::from_rgba8([r, g, b, 255]),
             ),
             PickerTarget::PhotoFilter([r, g, b]) => (

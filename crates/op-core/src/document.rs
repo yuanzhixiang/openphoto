@@ -43,10 +43,12 @@ impl Anchor {
 
 /// A ruler guide: a horizontal or vertical line at `position` document
 /// pixels (it may lie outside the canvas).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Guide {
     pub vertical: bool,
     pub position: f32,
+    /// Its own color (New Guide's Color), or None for the guides' color.
+    pub color: Option<[u8; 3]>,
 }
 
 /// The undoable part of a document. Cheap to clone because tiles are shared.

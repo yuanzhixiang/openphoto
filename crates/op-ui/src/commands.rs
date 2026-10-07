@@ -1876,7 +1876,11 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
             (v.snap_guides, v.snap_grid, v.snap_layers) = (on, on, on);
             (v.snap_slices, v.snap_bounds) = (on, on);
         }
-        Command::NewGuide => app.new_guide_dialog = Some(Default::default()),
+        Command::NewGuide => {
+            app.new_guide_dialog = Some(crate::dialogs::NewGuideDialog::remembered(
+                app.new_guide_last,
+            ));
+        }
         Command::NewGuideLayout => {
             if let Some(state) = app.active() {
                 let guides = state.doc.guides.clone();

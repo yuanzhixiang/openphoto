@@ -69,7 +69,7 @@ pub use new_document::{
     Contents as NewContents, NewDocumentDialog, Outcome as NewDocumentOutcome,
     Preset as DocumentPreset,
 };
-pub use new_guide::{NewGuideDialog, Outcome as NewGuideOutcome};
+pub use new_guide::{NewGuideDialog, Outcome as NewGuideOutcome, Remembered as NewGuideRemembered};
 pub use new_layer::{Kind as NewLayerKind, NewLayer, NewLayerDialog, Outcome as NewLayerOutcome};
 pub use rotate_canvas::{Outcome as RotateOutcome, RotateCanvasDialog};
 pub use save_changes::SaveChoice;

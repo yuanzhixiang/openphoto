@@ -81,32 +81,39 @@ pub fn reorient(doc: &mut Document, orientation: Orientation) {
             (Orientation::Rotate180, v) => Guide {
                 vertical: v,
                 position: if v { w - p } else { h - p },
+                ..g
             },
             // Clockwise: a vertical guide at x becomes horizontal at x;
             // a horizontal guide at y becomes vertical at h - y
             (Orientation::Rotate90Clockwise, true) => Guide {
                 vertical: false,
                 position: p,
+                ..g
             },
             (Orientation::Rotate90Clockwise, false) => Guide {
                 vertical: true,
                 position: h - p,
+                ..g
             },
             (Orientation::Rotate90CounterClockwise, true) => Guide {
                 vertical: false,
                 position: w - p,
+                ..g
             },
             (Orientation::Rotate90CounterClockwise, false) => Guide {
                 vertical: true,
                 position: p,
+                ..g
             },
             (Orientation::FlipHorizontal, true) => Guide {
                 vertical: true,
                 position: w - p,
+                ..g
             },
             (Orientation::FlipVertical, false) => Guide {
                 vertical: false,
                 position: h - p,
+                ..g
             },
             _ => g,
         }
@@ -1060,10 +1067,12 @@ mod tests {
             Guide {
                 vertical: true,
                 position: 1.0,
+                color: None,
             },
             Guide {
                 vertical: false,
                 position: 0.5,
+                color: None,
             },
         ];
         // 3×2 turned clockwise: x = 1 stays 1 as a row; y = 0.5 becomes column 1.5
@@ -1073,11 +1082,13 @@ mod tests {
             [
                 Guide {
                     vertical: false,
-                    position: 1.0
+                    position: 1.0,
+                    color: None,
                 },
                 Guide {
                     vertical: true,
-                    position: 1.5
+                    position: 1.5,
+                    color: None,
                 }
             ]
         );

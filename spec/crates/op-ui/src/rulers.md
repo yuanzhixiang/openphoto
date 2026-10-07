@@ -26,7 +26,7 @@ Measured on Photoshop 2026 (probe document at nine zoom levels and in every unit
 - Drag down from the top ruler to create a horizontal guide, and right from the left ruler to create a vertical guide; the cursor over a ruler is the resize cursor for the corresponding direction. While dragging, the guide follows the pointer, snapping to the View › Snap targets (`snap.md`; Control held: no snapping); releasing inside the canvas area adds it to the document and records "New Guide", and releasing outside the area discards it.
 - Moving: when the current tool is the Move tool, or while holding ⌘ (in Photoshop ⌘ temporarily switches to the Move tool), the resize cursor appears when the pointer is within 4 pt of a guide, and dragging moves it; releasing inside the canvas area records "Move Guide", and releasing after dragging outside the area (e.g. back onto a ruler) deletes it and records "Delete Guide". Guides cannot be dragged when locked (View › Guides › Lock Guides) or hidden.
 - Selecting: with the Move tool (or ⌘ held), clicking a guide without dragging selects it (`DocState::selected_guides`, by index; `guide_selection` drops indices of guides that are gone), Shift-click adds it or takes it out, and with the Move tool a click elsewhere drops the guide selection. View › Guides › Clear Selected Guides removes them ("Clear Selected Guides"), Edit Selected Guides... (one guide selected) opens the New guide dialog titled "Edit Guide" with its orientation and position, whose OK changes it ("Edit Guide"), and Clear Canvas Guides removes every guide ("Clear Canvas Guides"; with no artboards every guide is a canvas guide).
-- Drawing: a 1 pt cyan (`#4affff`, Photoshop's default Cyan) straight line across the entire canvas area (including the gray area outside the canvas). A guide being dragged is always drawn. A selected guide is drawn in `#2e7cf6`. The line is mapped from document space (`guide_line`), so it turns and flips with the view (Rotate View, Flip Horizontal); `guide_at` measures the pointer's distance in document space, scaled to screen points.
+- Drawing: a 1 pt line in the guide's own color (`Guide::color`, set by New Guide), or else cyan (`#4affff`, Photoshop's default Cyan), straight across the entire canvas area (including the gray area outside the canvas). A guide being dragged is always drawn. A selected guide is drawn in `#2e7cf6`. The line is mapped from document space (`guide_line`), so it turns and flips with the view (Rotate View, Flip Horizontal); `guide_at` measures the pointer's distance in document space, scaled to screen points.
 - Guides move with canvas changes: Canvas Size offsets them by the anchor, cropping by the crop origin, Image Size scales them proportionally, and Image Rotation and canvas flips transform them geometrically (see `image_ops.md` and `document.md` in `op-core`).
 
 ## Grid
@@ -40,7 +40,7 @@ Measured on Photoshop 2026 (probe document at nine zoom levels and in every unit
 
 ## Known limitations
 
-- No artboard guides, guide colors or grid settings (Preferences). Smart guides are in `smart_guides.md`, guide layouts in `dialogs/guide_layout.md`.
+- No artboard guides, and no default guide color or grid settings (Preferences, P3 #28); guides dragged from the rulers take the default cyan. Smart guides are in `smart_guides.md`, guide layouts in `dialogs/guide_layout.md`.
 - The only ruler unit is pixels; double-clicking a ruler does not change the unit, and the origin cannot be changed by dragging the top-left corner.
 
 ## Test coverage

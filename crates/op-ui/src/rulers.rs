@@ -431,8 +431,14 @@ pub fn draw_guides(ui: &Ui, state: &DocState, canvas: Rect, ppp: f32) {
         .map(|(i, g)| (*g, selected.contains(&i)))
         .chain(dragged.map(|g| (g, false)));
     for (g, chosen) in guides {
-        // A selected guide shows in the selection color
-        let color = if chosen { SELECTED_GUIDE } else { GUIDE };
+        // A selected guide shows in the selection color; others in their
+        // own color, if they have one
+        let color = if chosen {
+            SELECTED_GUIDE
+        } else {
+            g.color
+                .map_or(GUIDE, |[r, g, b]| Color32::from_rgb(r, g, b))
+        };
         painter.line_segment(guide_line(state, g, ppp), Stroke::new(1.0, color));
     }
 }
@@ -465,6 +471,7 @@ pub fn start_new(state: &mut DocState, vertical: bool, p: Pos2, ppp: f32) {
         guide: Guide {
             vertical,
             position: if vertical { d.x } else { d.y },
+            color: None,
         },
     });
 }

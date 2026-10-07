@@ -24,7 +24,7 @@ A position in the 3×3 anchor grid of the Canvas Size dialog, which decides wher
 
 ### `Guide`
 
-A guide: `vertical` (vertical or horizontal) and `position` (in document pixels; may be outside the canvas).
+A guide: `vertical` (vertical or horizontal), `position` (in document pixels; may be outside the canvas) and `color` (its own color from New Guide, or None for the guides' default color). Transforms of the canvas keep each guide's color.
 
 ### `Snapshot`
 

@@ -34,8 +34,20 @@ pub struct NewGuideDialog {
     position: String,
     /// Edit Selected Guides...: the guide being edited (its index).
     pub editing: Option<usize>,
-    /// An index into [`COLORS`]; guides are drawn in one color for now.
+    /// An index into [`COLORS`], or the custom color picked with the
+    /// swatch (shown as "Custom").
     color: usize,
+    custom: Option<[u8; 3]>,
+    /// The swatch was clicked: `lib.rs` opens the Color Picker.
+    wants_picker: bool,
+}
+
+/// What New Guide remembers for next time: the orientation and color.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Remembered {
+    pub vertical: bool,
+    pub color: usize,
+    pub custom: Option<[u8; 3]>,
 }
 
 impl Default for NewGuideDialog {
@@ -46,6 +58,8 @@ impl Default for NewGuideDialog {
             position: "0 px".into(),
             editing: None,
             color: 0,
+            custom: None,
+            wants_picker: false,
         }
     }
 }
@@ -54,11 +68,59 @@ impl NewGuideDialog {
     /// View › Guides › Edit Selected Guides...: the dialog filled in with
     /// guide `index`, titled "Edit Guide"; its OK changes that guide.
     pub fn editing(guide: Guide, index: usize) -> Self {
+        let (color, custom) = match guide.color {
+            None => (0, None),
+            Some(c) => match COLORS.iter().position(|(_, rgb)| *rgb == c) {
+                Some(k) => (k, None),
+                None => (0, Some(c)),
+            },
+        };
         Self {
             vertical: guide.vertical,
             position: format!("{} px", (guide.position * 32.0).round() / 32.0),
             editing: Some(index),
-            color: 0,
+            color,
+            custom,
+            wants_picker: false,
+        }
+    }
+
+    /// A new guide with the last orientation and color.
+    pub fn remembered(last: Remembered) -> Self {
+        Self {
+            vertical: last.vertical,
+            color: last.color.min(COLORS.len() - 1),
+            custom: last.custom,
+            ..Default::default()
+        }
+    }
+
+    /// The orientation and color to remember.
+    pub fn remember(&self) -> Remembered {
+        Remembered {
+            vertical: self.vertical,
+            color: self.color,
+            custom: self.custom,
+        }
+    }
+
+    /// The custom swatch asks for the Color Picker; its starting color, once.
+    pub fn take_picker_request(&mut self) -> Option<[u8; 3]> {
+        std::mem::take(&mut self.wants_picker).then(|| self.custom.unwrap_or(COLORS[self.color].1))
+    }
+
+    /// The Color Picker was confirmed for the custom color.
+    pub fn set_custom(&mut self, rgb: [u8; 3]) {
+        self.custom = Some(rgb);
+    }
+
+    /// The guide's color: None for Cyan (the guides' own color), else the
+    /// chosen or custom color.
+    fn guide_color(&self) -> Option<[u8; 3]> {
+        match (self.custom, self.color) {
+            (Some(c), _) => Some(c),
+            (None, 0) => None,
+            (None, k) => Some(COLORS[k].1),
         }
     }
 
@@ -73,25 +135,30 @@ impl NewGuideDialog {
         (position.abs() <= 30_000.0).then_some(Guide {
             vertical: self.vertical,
             position,
+            color: self.guide_color(),
         })
     }
 
-    pub fn show(&mut self, ctx: &egui::Context) -> Outcome {
+    /// `active` is false while the Color Picker is open on top.
+    pub fn show(&mut self, ctx: &egui::Context, active: bool) -> Outcome {
         let mut outcome = Outcome::Open;
         egui::Modal::new(egui::Id::new("new-guide"))
             .frame(egui::Frame::NONE)
             .backdrop_color(Color32::TRANSPARENT)
             .show(ctx, |ui| {
                 let (rect, _) = ui.allocate_exact_size(SIZE, Sense::hover());
-                outcome = self.ui(ui, rect);
+                outcome = self.ui(ui, rect, active);
             });
+        if !active {
+            return Outcome::Open;
+        }
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
             outcome = Outcome::Cancel;
         }
         outcome
     }
 
-    fn ui(&mut self, ui: &mut Ui, frame: Rect) -> Outcome {
+    fn ui(&mut self, ui: &mut Ui, frame: Rect, active: bool) -> Outcome {
         let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
         let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
         let title = if self.editing.is_some() {
@@ -133,8 +200,15 @@ impl NewGuideDialog {
         );
 
         right_label(ui, 156.5, "Color");
-        let (name, [cr, cg, cb]) = COLORS[self.color];
-        let mut chosen = self.color;
+        let (name, [cr, cg, cb]) = match self.custom {
+            Some(c) => ("Custom", c),
+            None => COLORS[self.color],
+        };
+        let mut chosen = if self.custom.is_some() {
+            usize::MAX
+        } else {
+            self.color
+        };
         common::ps_dropdown(
             ui,
             r(68.0, 144.0, 228.0, 168.0),
@@ -165,15 +239,26 @@ impl NewGuideDialog {
                 }
             },
         );
-        self.color = chosen;
-        // The custom color's swatch
+        if chosen < COLORS.len() && (self.custom.is_some() || chosen != self.color) {
+            self.color = chosen;
+            self.custom = None;
+        }
+        // The custom color's swatch: a click opens the Color Picker
+        let swatch = r(240.0, 144.0, 288.0, 168.0);
+        let [sr, sg, sb] = self.custom.unwrap_or([255, 255, 255]);
         ui.painter().rect(
-            r(240.0, 144.0, 288.0, 168.0),
+            swatch,
             CornerRadius::same(pt(3.0) as u8),
-            Color32::WHITE,
+            Color32::from_rgb(sr, sg, sb),
             Stroke::new(pt(1.0), Color32::from_gray(0xa9)),
             StrokeKind::Inside,
         );
+        if ui
+            .interact(swatch, ui.id().with("guide-custom"), Sense::click())
+            .clicked()
+        {
+            self.wants_picker = true;
+        }
 
         // No field has the focus: OK does, as in Photoshop
         let guide = self.guide();
@@ -194,7 +279,7 @@ impl NewGuideDialog {
         if cancel.clicked() {
             return Outcome::Cancel;
         }
-        let enter = ui.input(|i| i.key_pressed(Key::Enter));
+        let enter = active && ui.input(|i| i.key_pressed(Key::Enter));
         if (ok.clicked() || enter)
             && let Some(guide) = guide
         {
@@ -219,10 +304,33 @@ mod tests {
             d.guide(),
             Some(Guide {
                 vertical: true,
-                position: 120.0
+                position: 120.0,
+                color: None,
             })
         );
         d.position = "abc".into();
         assert_eq!(d.guide(), None);
+    }
+
+    #[test]
+    fn colors_and_memory() {
+        let mut d = NewGuideDialog::default();
+        // Cyan is the guides' own color
+        assert_eq!(d.guide().unwrap().color, None);
+        d.color = 2;
+        assert_eq!(d.guide().unwrap().color, Some(COLORS[2].1));
+        d.set_custom([1, 2, 3]);
+        assert_eq!(d.guide().unwrap().color, Some([1, 2, 3]));
+        d.vertical = true;
+        let again = NewGuideDialog::remembered(d.remember());
+        assert!(again.vertical);
+        assert_eq!(again.guide().unwrap().color, Some([1, 2, 3]));
+        // Editing a guide shows its color
+        let g = Guide {
+            vertical: false,
+            position: 5.0,
+            color: Some(COLORS[5].1),
+        };
+        assert_eq!(NewGuideDialog::editing(g, 0).color, 5);
     }
 }

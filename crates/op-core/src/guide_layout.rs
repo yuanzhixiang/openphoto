@@ -84,6 +84,7 @@ impl GuideLayout {
                 out.push(Guide {
                     vertical,
                     position: v,
+                    color: None,
                 });
             }
         };

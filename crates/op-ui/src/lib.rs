@@ -991,11 +991,20 @@ impl OpenPhotoApp {
         let Some(mut dialog) = self.state.new_guide_dialog.take() else {
             return;
         };
-        match dialog.show(ctx) {
+        let active = self.state.color_picker.is_none();
+        let outcome = dialog.show(ctx, active);
+        if let Some(rgb) = dialog.take_picker_request() {
+            self.state
+                .open_color_picker(state::PickerTarget::GuideColor(rgb));
+        }
+        match outcome {
             dialogs::NewGuideOutcome::Open => self.state.new_guide_dialog = Some(dialog),
             dialogs::NewGuideOutcome::Cancel => {}
             dialogs::NewGuideOutcome::Apply(guide) => {
                 let editing = dialog.editing;
+                if editing.is_none() {
+                    self.state.new_guide_last = dialog.remember();
+                }
                 if let Some(state) = self.state.active() {
                     match editing {
                         Some(i) if i < state.doc.guides.len() => {
@@ -1125,6 +1134,12 @@ impl OpenPhotoApp {
                 state::PickerTarget::FillColor => {
                     if let Some(dialog) = &mut self.state.fill_dialog {
                         dialog.set_color(color);
+                    }
+                }
+                state::PickerTarget::GuideColor(_) => {
+                    if let Some(dialog) = &mut self.state.new_guide_dialog {
+                        let [r, g, b, _] = color.to_rgba8();
+                        dialog.set_custom([r, g, b]);
                     }
                 }
                 state::PickerTarget::AutoTarget(k, _) => {
