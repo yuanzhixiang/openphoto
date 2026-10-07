@@ -29,6 +29,7 @@ rfd = "0.17"
 thiserror = "2"
 log = "0.4"
 env_logger = "0.11"
+serde_json = "1"
 
 # Pixel processing is too slow in plain debug builds: fully optimize
 # dependencies and lightly optimize our own crates.
