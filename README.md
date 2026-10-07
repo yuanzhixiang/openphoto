@@ -1,8 +1,10 @@
 <div align="center">
 
+<img src="crates/op-ui/assets/app-icon.png" alt="OpenPhoto icon" width="128">
+
 # OpenPhoto
 
-**An open-source image editor that works the way Photoshop does — written in Rust.**
+**A free, open-source Photoshop alternative for Mac that works the way Photoshop does — written in Rust.**
 
 The same layout, menus, shortcuts and dialogs as Photoshop 2026, measured point by point,<br>
 with image algorithms calibrated against Photoshop's own output.
@@ -12,7 +14,7 @@ with image algorithms calibrated against Photoshop's own output.
 [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey.svg?logo=apple)](#getting-started)
 [![Status](https://img.shields.io/badge/status-early%20development-yellow.svg)](#roadmap)
 
-English · [简体中文](README.zh-CN.md)
+**[openphoto.si](https://openphoto.si/)** · [Download](https://github.com/yuanzhixiang/openphoto/releases/latest) · English · [简体中文](README.zh-CN.md)
 
 <img src="docs/images/hero.png" alt="OpenPhoto editing a layered Photoshop document" width="100%">
 

@@ -1,8 +1,10 @@
 <div align="center">
 
+<img src="crates/op-ui/assets/app-icon.png" alt="OpenPhoto 图标" width="128">
+
 # OpenPhoto
 
-**用 Rust 编写、与 Photoshop 用法一致的开源图像编辑器。**
+**用 Rust 编写、与 Photoshop 用法一致的免费开源 Photoshop 替代品（macOS）。**
 
 布局、菜单、快捷键与对话框逐点对齐 Photoshop 2026，<br>
 图像算法用 Photoshop 自己的输出逐级校准。
@@ -12,7 +14,7 @@
 [![Platform](https://img.shields.io/badge/platform-macOS-lightgrey.svg?logo=apple)](#快速开始)
 [![Status](https://img.shields.io/badge/status-early%20development-yellow.svg)](#路线图)
 
-[English](README.md) · 简体中文
+**[openphoto.si](https://openphoto.si/)** · [下载](https://github.com/yuanzhixiang/openphoto/releases/latest) · [English](README.md) · 简体中文
 
 <img src="docs/images/hero.png" alt="OpenPhoto 编辑一个分层的 Photoshop 文档" width="100%">
 
