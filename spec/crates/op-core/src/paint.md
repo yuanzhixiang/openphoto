@@ -74,11 +74,20 @@ The stroke target is decided by priority Quick Mask > layer mask > pixels. In Qu
 
 ### Retouching tools
 
-The retouching tools first compute the "full strength" target value of the pre-stroke pixel, then mix from the original pixel toward the target in premultiplied alpha by `amount` (coverage × opacity × selection degree; the UI passes Exposure / Strength as opacity and the Sponge's Flow as flow); on the background layer or with locked transparent pixels only color is mixed, keeping alpha. Target values (v is a channel value in 0–1):
+Dodge, Burn, Sponge, Blur and Sharpen work dab by dab on the pixels as they are at that moment, so their effect builds up. Every overlapping dab, every pass back and forth within a stroke, and every airbrush dab (`build_up`) adds to the last, as Photoshop's do.
 
-- Dodge: `v + w(v) × (1 − v)`; Burn: `v − w(v) × v`. Weight w: Shadows `(1 − v)²`, Midtones `4v(1 − v)`, Highlights `v²`. Computed per channel; this approximates Photoshop's algorithm.
-- Sponge: in HSL, sets saturation to 0 (desaturate) or doubles it (saturate, at most 1).
-- Blur: the 3×3 premultiplied average of the pre-stroke pixels; Sharpen: `v + (v − 3×3 average)`. Because they are based on the pre-stroke pixels, scrubbing back and forth within one stroke does not keep accumulating blur/sharpening.
+Each dab works like this:
+
+- It reads the box it covers, plus one pixel of margin, before writing.
+- For each pixel it computes the "full strength" target value with `retouch_target`.
+- It mixes from the current pixel toward that target in premultiplied alpha by `amount`: the tip's coverage × flow (× pressure for flow) × opacity × selection degree. The UI passes Exposure or Strength as opacity, and the Sponge's Flow as flow.
+- On the background layer or with locked transparent pixels, only color is mixed and alpha is kept.
+
+The options (`Stroke::with_retouch(Retouch { protect_tones, vibrance, protect_detail })`) are described with the targets below. Target values (v is a channel value in 0–1):
+
+- Dodge: `v + w(v) × (1 − v)`; Burn: `v − w(v) × v`. Weight w: Shadows `(1 − v)²`, Midtones `4v(1 − v)`, Highlights `v²`. Computed per channel; this approximates Photoshop's algorithm. With Protect Tones the same curve moves the pixel's luminosity (0.299 R + 0.587 G + 0.114 B) instead, the color is scaled with it (keeping its hue), and a color that would pass white is pulled toward the gray of its luminosity until it fits.
+- Sponge: in HSL, sets saturation to 0 (desaturate) or doubles it (saturate, at most 1). With Vibrance, saturate gives `s + s(1 − s)` and desaturate `s²`, so colors near full or no saturation change least.
+- Blur: the 3×3 premultiplied average of the current pixels; Sharpen: `v + (v − 3×3 average)`. With Protect Detail, Sharpen adds half that difference, and nothing where it is under one level (noise).
 - Source: the pixel at the corresponding position in `image` (including alpha); outside the bounds of `image` the original pixel is kept.
 
 ## Known limitations
@@ -91,6 +100,7 @@ The retouching tools first compute the "full strength" target value of the pre-s
 
 ## Test coverage (brush shape and dynamics)
 
+- `retouching_builds_up_and_its_options`: a second Burn pass darkens further, `build_up` darkens in place, Protect Tones keeps a 2:1 red/green ratio that plain Dodge changes, Vibrance saturates a strong red less, Protect Detail sharpens an edge less.
 - `elliptical_tips_and_spacing`: a 30% round tip is wide at 0° and tall at 90°; 100% spacing places dabs a diameter apart.
 - `pressure_controls_size_and_opacity`: at 20% pressure a size-controlled line is thin; at 50% an opacity-controlled stroke stays at half coverage over four passes.
 

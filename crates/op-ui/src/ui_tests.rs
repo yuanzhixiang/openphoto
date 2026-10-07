@@ -5427,6 +5427,43 @@ fn brush_presets_pressure_and_smoothing() {
 }
 
 #[test]
+fn airbrush_builds_up_while_held() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.foreground = Color::from_rgba8([255, 255, 255, 255]);
+    h.state_mut().state.select_tool(op_tools::Tool::Brush);
+    h.state_mut().state.brush.flow = 0.1;
+    h.state_mut().state.brush.hardness = 1.0;
+    h.run_steps(2);
+    let hold = |h: &mut Harness<'_, OpenPhotoApp>, x: f32| {
+        let p = doc_point(h, x, 300.0);
+        h.hover_at(p);
+        h.event(egui::Event::PointerButton {
+            pos: p,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers: Modifiers::NONE,
+        });
+        h.run_steps(10);
+        h.event(egui::Event::PointerButton {
+            pos: p,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: Modifiers::NONE,
+        });
+        h.run_steps(2);
+    };
+    // Without the airbrush, holding still paints one dab at 10% flow
+    hold(&mut h, 100.0);
+    let once = composite_pixel(&mut h, 100, 300)[0];
+    // With it, the paint builds up
+    *h.state_mut().state.setting("brush.airbrush", "0") = "1".into();
+    hold(&mut h, 300.0);
+    let built = composite_pixel(&mut h, 300, 300)[0];
+    assert!(built > once + 40, "{once} {built}");
+}
+
+#[test]
 fn brush_options_bars_edit_their_settings() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);

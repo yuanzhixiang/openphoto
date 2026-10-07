@@ -34,6 +34,15 @@ pub struct BrushTip {
     pub spacing: f32,
 }
 
+/// The retouching tools' options: Dodge's and Burn's Protect Tones, the
+/// Sponge's Vibrance, the Sharpen tool's Protect Detail.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Retouch {
+    pub protect_tones: bool,
+    pub vibrance: bool,
+    pub protect_detail: bool,
+}
+
 /// Which of a stroke's settings follow the pen's pressure (Shape
 /// Dynamics' Size Jitter control and Transfer's Opacity and Flow Jitter
 /// controls set to Pen Pressure).
@@ -269,6 +278,7 @@ pub struct Stroke {
     dab_pressure: f32,
     /// Distance travelled since the last dab.
     since_dab: f32,
+    retouch: Retouch,
 }
 
 impl Stroke {
@@ -338,7 +348,22 @@ impl Stroke {
             pressure: Pressure::default(),
             last_pressure: 1.0,
             dab_pressure: 1.0,
+            retouch: Retouch::default(),
         })
+    }
+
+    /// The retouching tools' options.
+    pub fn with_retouch(mut self, retouch: Retouch) -> Self {
+        self.retouch = retouch;
+        self
+    }
+
+    /// Another dab where the stroke is (the airbrush building up while the
+    /// pointer holds still).
+    pub fn build_up(&mut self, doc: &mut Document) {
+        if let Some((x, y)) = self.last {
+            self.dab(doc, x, y);
+        }
     }
 
     /// Lets the pen's pressure control size, opacity and flow.
@@ -457,6 +482,52 @@ impl Stroke {
                 },
             }
         };
+        // The retouching tools work on the pixels as they are now, each dab
+        // adding to the last, as Photoshop's do
+        if matches!(
+            self.kind,
+            StrokeKind::Dodge(_)
+                | StrokeKind::Burn(_)
+                | StrokeKind::Sponge { .. }
+                | StrokeKind::Blur
+                | StrokeKind::Sharpen
+        ) {
+            let (mx0, my0) = (x0.saturating_sub(1), y0.saturating_sub(1));
+            let (mx1, my1) = ((x1 + 1).min(w), (y1 + 1).min(h));
+            let bw = mx1 - mx0;
+            let mut now = Vec::with_capacity((bw * (my1 - my0)) as usize);
+            for y in my0..my1 {
+                for x in mx0..mx1 {
+                    now.push(image.pixel(x, y));
+                }
+            }
+            let at = |x: i64, y: i64| {
+                let x = x.clamp(mx0 as i64, mx1 as i64 - 1) as u32;
+                let y = y.clamp(my0 as i64, my1 as i64 - 1) as u32;
+                now[((y - my0) * bw + (x - mx0)) as usize]
+            };
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    let (px, py) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+                    let a = tip.coverage(px, py);
+                    if a <= 0.0 {
+                        continue;
+                    }
+                    let selected = self
+                        .selection
+                        .as_ref()
+                        .map_or(1.0, |s| s.get(x, y) as f32 / 255.0);
+                    let amount = a * flow * cap * self.opacity * selected;
+                    let cur = at(x as i64, y as i64);
+                    let target = retouch_target(&self.kind, self.retouch, cur, |dx, dy| {
+                        at(x as i64 + dx, y as i64 + dy)
+                    });
+                    image.set_pixel(x, y, mix(cur, target, amount, self.preserve_alpha));
+                }
+            }
+            doc.mark_dirty();
+            return;
+        }
         // The Background Eraser and Color Replacement change only the
         // pixels matching the sampled color
         let matched = self.match_mask(cx, cy, (x0, y0, x1, y1));
@@ -518,38 +589,15 @@ impl Stroke {
             [r, g, b, base[3]]
         };
         match kind {
-            StrokeKind::Dodge(range) => out(rgb.map(|v| v + range.weight(v) * (1.0 - v))),
-            StrokeKind::Burn(range) => out(rgb.map(|v| v - range.weight(v) * v)),
-            StrokeKind::Sponge { saturate } => {
-                let [h, s, l] = crate::adjust::rgb_to_hsl(rgb);
-                let s = if *saturate { (s * 2.0).min(1.0) } else { 0.0 };
-                out(crate::adjust::hsl_to_rgb([h, s, l]))
-            }
-            StrokeKind::Blur | StrokeKind::Sharpen => {
-                // 3×3 average of the pre-stroke pixels, premultiplied
-                let mut sum = [0f32; 4];
-                for dy in -1i64..=1 {
-                    for dx in -1i64..=1 {
-                        let sx = (x as i64 + dx).clamp(0, self.base.width() as i64 - 1) as u32;
-                        let sy = (y as i64 + dy).clamp(0, self.base.height() as i64 - 1) as u32;
-                        let p = self.base.pixel(sx, sy);
-                        let a = p[3] as f32 / 255.0;
-                        for c in 0..3 {
-                            sum[c] += p[c] as f32 / 255.0 * a;
-                        }
-                        sum[3] += a;
-                    }
-                }
-                if sum[3] <= 0.0 {
-                    return base;
-                }
-                let blurred = [sum[0] / sum[3], sum[1] / sum[3], sum[2] / sum[3]];
-                if matches!(kind, StrokeKind::Blur) {
-                    out(blurred)
-                } else {
-                    out([0, 1, 2].map(|c| rgb[c] + (rgb[c] - blurred[c])))
-                }
-            }
+            StrokeKind::Dodge(_)
+            | StrokeKind::Burn(_)
+            | StrokeKind::Sponge { .. }
+            | StrokeKind::Blur
+            | StrokeKind::Sharpen => retouch_target(kind, self.retouch, base, |dx, dy| {
+                let sx = (x as i64 + dx).clamp(0, self.base.width() as i64 - 1) as u32;
+                let sy = (y as i64 + dy).clamp(0, self.base.height() as i64 - 1) as u32;
+                self.base.pixel(sx, sy)
+            }),
             StrokeKind::Source { image, dx, dy } => {
                 let (sx, sy) = (x as i64 - dx, y as i64 - dy);
                 if sx < 0 || sy < 0 || sx >= image.width() as i64 || sy >= image.height() as i64 {
@@ -897,6 +945,100 @@ fn apply(base: [u8; 4], amount: f32, kind: &StrokeKind, preserve_alpha: bool) ->
     }
 }
 
+/// What a retouching tool turns pixel `p` into at full strength; `near`
+/// gives the pixels around it (offsets −1–1) for Blur and Sharpen.
+fn retouch_target(
+    kind: &StrokeKind,
+    options: Retouch,
+    p: [u8; 4],
+    near: impl Fn(i64, i64) -> [u8; 4],
+) -> [u8; 4] {
+    let rgb = [p[0], p[1], p[2]].map(|v| v as f32 / 255.0);
+    let out = |c: [f32; 3]| {
+        let [r, g, b] = c.map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8);
+        [r, g, b, p[3]]
+    };
+    let lum = |c: [f32; 3]| 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+    // Protect Tones: the luminosity changes and the color is scaled with
+    // it, keeping its hue, and stays clear of clipping
+    let relit = |to: f32| {
+        let from = lum(rgb);
+        let to = to.clamp(0.0, 1.0);
+        let scaled = if from > 1e-4 {
+            rgb.map(|c| c * to / from)
+        } else {
+            [to; 3]
+        };
+        let over = scaled.iter().fold(0f32, |m, &c| m.max(c));
+        let scaled = if over > 1.0 {
+            // Pull toward the gray of the same luminosity until it fits
+            let t = (over - 1.0) / (over - to).max(1e-4);
+            scaled.map(|c| c + (to - c) * t)
+        } else {
+            scaled
+        };
+        out(scaled)
+    };
+    match kind {
+        StrokeKind::Dodge(range) if options.protect_tones => {
+            let l = lum(rgb);
+            relit(l + range.weight(l) * (1.0 - l))
+        }
+        StrokeKind::Burn(range) if options.protect_tones => {
+            let l = lum(rgb);
+            relit(l - range.weight(l) * l)
+        }
+        StrokeKind::Dodge(range) => out(rgb.map(|v| v + range.weight(v) * (1.0 - v))),
+        StrokeKind::Burn(range) => out(rgb.map(|v| v - range.weight(v) * v)),
+        StrokeKind::Sponge { saturate } => {
+            let [h, s, l] = crate::adjust::rgb_to_hsl(rgb);
+            // Vibrance: less on the colors near full (or no) saturation
+            let s = match (*saturate, options.vibrance) {
+                (true, false) => (s * 2.0).min(1.0),
+                (true, true) => s + s * (1.0 - s),
+                (false, false) => 0.0,
+                (false, true) => s * s,
+            };
+            out(crate::adjust::hsl_to_rgb([h, s, l]))
+        }
+        StrokeKind::Blur | StrokeKind::Sharpen => {
+            // 3×3 average, premultiplied
+            let mut sum = [0f32; 4];
+            for dy in -1i64..=1 {
+                for dx in -1i64..=1 {
+                    let q = near(dx, dy);
+                    let a = q[3] as f32 / 255.0;
+                    for c in 0..3 {
+                        sum[c] += q[c] as f32 / 255.0 * a;
+                    }
+                    sum[3] += a;
+                }
+            }
+            if sum[3] <= 0.0 {
+                return p;
+            }
+            let blurred = [sum[0] / sum[3], sum[1] / sum[3], sum[2] / sum[3]];
+            if matches!(kind, StrokeKind::Blur) {
+                out(blurred)
+            } else if options.protect_detail {
+                // Protect Detail: half the boost, and none below a level of
+                // difference (noise)
+                out([0, 1, 2].map(|c| {
+                    let d = rgb[c] - blurred[c];
+                    if d.abs() < 1.0 / 255.0 {
+                        rgb[c]
+                    } else {
+                        rgb[c] + d * 0.5
+                    }
+                }))
+            } else {
+                out([0, 1, 2].map(|c| rgb[c] + (rgb[c] - blurred[c])))
+            }
+        }
+        _ => p,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1115,6 +1257,67 @@ mod tests {
         one_dab(&mut doc, StrokeKind::Sponge { saturate: false }, 1.0);
         let gray = pixel(&doc, id, 20, 20);
         assert_eq!((gray[0], gray[1]), (gray[1], gray[2]));
+    }
+
+    #[test]
+    fn retouching_builds_up_and_its_options() {
+        // Scrubbing back and forth keeps darkening
+        let (mut doc, id) = doc_filled([128, 128, 128, 255]);
+        let mut s =
+            Stroke::begin(&doc, HARD, StrokeKind::Burn(ToneRange::Midtones), 0.2, 1.0).unwrap();
+        s.add_point(&mut doc, 5.0, 20.0);
+        s.add_point(&mut doc, 35.0, 20.0);
+        let once = pixel(&doc, id, 20, 20)[0];
+        s.add_point(&mut doc, 5.0, 20.0);
+        let twice = pixel(&doc, id, 20, 20)[0];
+        assert!(twice < once && once < 128, "{once} {twice}");
+        // The airbrush builds up in place
+        let held = pixel(&doc, id, 5, 20)[0];
+        s.build_up(&mut doc);
+        assert!(pixel(&doc, id, 5, 20)[0] < held);
+        // Protect Tones keeps a color's hue as it lightens
+        let protect = Retouch {
+            protect_tones: true,
+            ..Default::default()
+        };
+        let dodge = StrokeKind::Dodge(ToneRange::Highlights);
+        let none = |_: i64, _: i64| [0u8; 4];
+        let p = retouch_target(&dodge, protect, [80, 40, 20, 255], none);
+        let plain = retouch_target(&dodge, Retouch::default(), [80, 40, 20, 255], none);
+        let ratio = |q: [u8; 4]| q[0] as f32 / q[1] as f32;
+        assert!(p[0] > 80 && (ratio(p) - 2.0).abs() < 0.06, "{p:?}");
+        assert!((ratio(plain) - 2.0).abs() > 0.08, "{plain:?}");
+        // Vibrance saturates a nearly saturated color less
+        let vib = Retouch {
+            vibrance: true,
+            ..Default::default()
+        };
+        let sponge = StrokeKind::Sponge { saturate: true };
+        let a = retouch_target(&sponge, vib, [200, 60, 60, 255], |_, _| [0; 4]);
+        let b = retouch_target(&sponge, Retouch::default(), [200, 60, 60, 255], |_, _| {
+            [0; 4]
+        });
+        assert!(a[1] > b[1], "{a:?} {b:?}");
+        // Protect Detail sharpens half as hard
+        let edge = |dx: i64, _: i64| {
+            if dx < 0 {
+                [0, 0, 0, 255]
+            } else {
+                [200, 200, 200, 255]
+            }
+        };
+        let detail = Retouch {
+            protect_detail: true,
+            ..Default::default()
+        };
+        let soft = retouch_target(&StrokeKind::Sharpen, detail, [200, 200, 200, 255], edge);
+        let hard = retouch_target(
+            &StrokeKind::Sharpen,
+            Retouch::default(),
+            [200, 200, 200, 255],
+            edge,
+        );
+        assert!(soft[0] > 200 && soft[0] < hard[0], "{soft:?} {hard:?}");
     }
 
     #[test]

@@ -164,6 +164,8 @@ Applies to the Brush, Pencil, Eraser, and retouching tools (Dodge, Burn, Sponge,
 - Holding Shift on press: draws a straight line from where the previous stroke ended to the press point, then continues the stroke.
 - **Tip shape:** the tip takes the tool's angle, roundness and spacing (`PaintOptions`). The brush cursor is the tip's outline: a circle, or an ellipse turned by the angle.
 - **Pressure** (`paint_dynamics`): with a tablet (`AppState::pen_pressure` is Some), the stroke gets the pressure dynamics and each point the pen's pressure. With a mouse, points are at full pressure and nothing follows pressure. The dynamics are the brush preset's (`PaintOptions::pressure`), plus Size and Opacity when the options bar's "Always use pressure for size / opacity" toggles are on (Brush, Pencil, Eraser).
+- **Retouching options:** Dodge's and Burn's Protect Tones (`dodge.protect`, `burn.protect`), the Sponge's Vibrance (`sponge.vibrance`) and the Sharpen tool's Protect Detail (`sharpen.protect_detail`) are on by default and reach the stroke (`op_core::paint::Retouch`).
+- **Airbrush** (the airbrush toggles of the Brush, Eraser, Clone Stamp, Pattern Stamp, History Brush, Dodge, Burn and Sponge): while the button is held and the painted point doesn't move, each frame adds a dab there (`Stroke::build_up`), so paint and effects build up. Without it, holding still adds nothing.
 - **Smoothing** (Brush, Pencil, Eraser; `<tool>.smoothing`, 10%, 10% and 0% by default):
   - The painted point trails the pointer on a "string" of smoothing × 50 screen points, and catches up by a tenth of the remaining distance each frame (Photoshop's Stroke Catch-up).
   - When the button is let go, the stroke goes on to the pointer (Catch-up on Stroke End).

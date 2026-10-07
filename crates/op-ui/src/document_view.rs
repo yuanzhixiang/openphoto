@@ -1670,6 +1670,10 @@ struct Dynamics {
     pressure: op_core::paint::Pressure,
     /// Smoothing, 0–1.
     smoothing: f32,
+    /// The retouching tools' Protect Tones, Vibrance and Protect Detail.
+    retouch: op_core::paint::Retouch,
+    /// The airbrush: holding still keeps building up.
+    airbrush: bool,
 }
 
 /// The current tool's pen dynamics and smoothing.
@@ -1711,10 +1715,33 @@ fn paint_dynamics(app: &mut crate::state::AppState, tool: Tool) -> Dynamics {
             .parse::<f32>()
             .map_or(0.0, |v| (v / 100.0).clamp(0.0, 1.0));
     }
+    let retouch = op_core::paint::Retouch {
+        protect_tones: match tool {
+            Tool::Dodge => app.flag("dodge.protect", true),
+            Tool::Burn => app.flag("burn.protect", true),
+            _ => false,
+        },
+        vibrance: tool == Tool::Sponge && app.flag("sponge.vibrance", true),
+        protect_detail: tool == Tool::Sharpen && app.flag("sharpen.protect_detail", true),
+    };
+    let airbrush_key = match tool {
+        Tool::Brush => Some("brush.airbrush"),
+        Tool::Eraser => Some("eraser.airbrush"),
+        Tool::CloneStamp => Some("clone.airbrush"),
+        Tool::PatternStamp => Some("pattern.airbrush"),
+        Tool::HistoryBrush => Some("historybrush.airbrush"),
+        Tool::Dodge => Some("dodge.airbrush"),
+        Tool::Burn => Some("burn.airbrush"),
+        Tool::Sponge => Some("sponge.airbrush"),
+        _ => None,
+    };
+    let airbrush = airbrush_key.is_some_and(|k| app.flag(k, false));
     Dynamics {
         pen: app.pen_pressure,
         pressure,
         smoothing,
+        retouch,
+        airbrush,
     }
 }
 
@@ -1805,6 +1832,7 @@ fn paint_input(
                 if dynamics.pen.is_some() {
                     stroke = stroke.with_pressure(dynamics.pressure);
                 }
+                stroke = stroke.with_retouch(dynamics.retouch);
                 let start = ui
                     .input(|i| i.pointer.press_origin())
                     .map(|p| to_doc(state, p, ppp));
@@ -1847,8 +1875,15 @@ fn paint_input(
                 }
                 _ => (p.x, p.y),
             };
+            let still = state.paint_smooth == Some((x, y));
             state.paint_smooth = Some((x, y));
-            stroke.add_point_with_pressure(&mut state.doc, x, y, pen);
+            if still && dynamics.airbrush && !released {
+                // The airbrush keeps spraying where it is held, a dab a
+                // frame
+                stroke.build_up(&mut state.doc);
+            } else {
+                stroke.add_point_with_pressure(&mut state.doc, x, y, pen);
+            }
         }
         if released {
             let (_, name) = stroke_names(*stroke_tool);
