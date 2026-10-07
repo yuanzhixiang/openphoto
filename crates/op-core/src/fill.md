@@ -56,7 +56,17 @@ Edit › Fill、Edit › Clear 和油漆桶工具对当前图层像素的修改�
 
 当前图层是组时，Fill、油漆桶、调整（`adjust::check`）和滤镜返回 `FillError::Group`，提示「Could not complete the {命令} command because the target layer is a group.」。Photoshop 在这种情况下直接把这些菜单项置灰（Invert 已核对），界面层应据此禁用命令。魔棒、Grow/Similar 在当前图层是组且不取样所有图层时没有结果。
 
+## 魔术橡皮擦（`magic_erase`）
+
+在当前图层上擦除一次魔棒单击（同样的 Tolerance、Contiguous、Anti-alias、Sample All Layers 规则）会选中的区域，强度为 Opacity，有选区时只在选区内。当前图层是背景时先转为普通图层「Layer 0」（与 Photoshop 一致）；锁定透明像素时改为把区域填成背景色。像素锁定、隐藏、组与没有图层时返回对应的错误。返回是否有像素改变。
+
+## 红眼（`red_eye`）
+
+在单击点附近（图像短边的 3%，至少 8 像素）找「红色程度」（R − max(G, B)）最高且超过阈值的像素（阈值 = 40 + (1 − Pupil Size) × 60），从它出发四连通地取红色程度超过阈值 60% 的像素（不超过搜索范围的 4 倍）。这些像素的 R 变为 G、B 的平均值，三个通道再按 Darken Amount 压暗（最多 60%），有选区时按选区程度混合。附近找不到红色时不做任何事。
+
 ## 测试覆盖
+
+- `magic_eraser_and_red_eye`：红色圆点附近单击红眼后去红，角落单击不变；魔术橡皮擦在白色上单击，背景变成普通图层、白色被擦掉而圆点保留。
 
 - `fill_respects_selection_opacity_and_mode`：选区内按 50% 不透明度填充，选区外不变；Multiply 模式的结果。
 - `clear_erases_or_fills_background`：背景图层上清除得到背景色，普通图层上清除得到透明。

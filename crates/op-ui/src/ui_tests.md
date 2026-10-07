@@ -94,3 +94,4 @@
 - `lasso_with_alt_draws_straight_edges`：套索拖一段后按住 ⌥ 松开鼠标没有选区，⌥ 单击加一个角，松开 ⌥ 后闭合成选区，记录「Lasso」。
 - `sampling_scopes_and_the_sampling_ring`：顶层为空、下面一层有红色方块时，吸管 Current Layer 取不到颜色，Current & Below 取到红色；按住吸管时取样环上半是红色、下半是原来的蓝色；仿制图章 Sample 为 All Layers 时把红色仿制到空图层上。
 - `smudge_pattern_background_eraser_and_color_replacement`：图案图章画出绿色图案；颜色替换把深灰换成偏红；涂抹把绿色拉进灰色；背景橡皮擦把背景转成「Layer 0」并擦掉经过的灰色，记录「Background Eraser」。
+- `magic_eraser_and_red_eye_tools`：红眼在红色圆点上单击后去红并记录「Red Eye」；魔术橡皮擦单击深灰背景，背景变成图层、深灰被擦掉，记录「Magic Eraser」。

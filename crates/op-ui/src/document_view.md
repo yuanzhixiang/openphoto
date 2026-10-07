@@ -44,6 +44,7 @@
 - 普通滚动（触控板双指滑动、滚轮）：平移。
 - 按住空格拖动、使用抓手工具拖动、或用鼠标中键拖动：平移。
 - 缩放工具：单击放大一级，按住 ⌥ 单击缩小一级，以单击点为中心。选项栏按下 Zoom Out（设置 `zoom.out`）时两者对调：单击缩小、⌥ 单击放大，光标也随之对调。
+- 魔术橡皮擦、红眼工具：单击时按选项栏（魔术橡皮擦的 Tolerance、Anti-alias、Contiguous、Sample All Layers、Opacity，`options_tools::magic_eraser_options`；红眼的 Pupil Size、Darken Amount，`red_eye_options`）执行 `fill::magic_erase` / `fill::red_eye`，有改变时记录「Magic Eraser」「Red Eye」；图层锁定、隐藏等时弹出「Could not use the magic eraser / red eye tool because …」。
 - 吸管工具：按下或拖动时按吸管选项取色（`DocState::sample_average`：以该点为中心的 Sample Size 方块，裁到画布内，按 alpha 加权平均；Sample 选项：Current Layer 取当前图层，Current & Below 取当前图层及其下方图层的合成，All Layers 取全部合成；两个「No Adjustments」选项与对应的普通选项相同（还没有调整图层）），设为前景色；按住 ⌥ 时设为背景色。取到的颜色总是不透明；点在文档外或取样处全透明时不变。不记录历史。
 - 取样环（选项栏 Show Sampling Ring，默认勾选）：按住吸管时在指针周围画一个环（内半径 38 pt、外半径 58 pt，内外各一圈 2 pt 灰线），上半是正在取的颜色、下半是按下时原来的颜色（⌥ 时为背景色），画在前景层，盖在画布上。
 
