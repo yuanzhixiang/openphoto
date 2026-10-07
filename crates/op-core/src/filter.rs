@@ -134,6 +134,21 @@ pub enum Filter {
     Mosaic { cell: u32 },
     /// Stylize > Solarize: values above 127 are inverted.
     Solarize,
+    /// Render > Clouds: soft fractal noise between the foreground and
+    /// background colors, filling the layer opaquely; a new pattern each
+    /// time (`seed`).
+    Clouds {
+        foreground: [u8; 3],
+        background: [u8; 3],
+        seed: u32,
+    },
+    /// Render > Difference Clouds: the same clouds in Difference mode over
+    /// the layer.
+    DifferenceClouds {
+        foreground: [u8; 3],
+        background: [u8; 3],
+        seed: u32,
+    },
 }
 
 impl Filter {
@@ -171,8 +186,64 @@ impl Filter {
             Self::Pinch { .. } => "Pinch",
             Self::Spherize { .. } => "Spherize",
             Self::PolarCoordinates { .. } => "Polar Coordinates",
+            Self::Clouds { .. } => "Clouds",
+            Self::DifferenceClouds { .. } => "Difference Clouds",
         }
     }
+}
+
+/// `a` mixed toward `b` by `t` (0–1).
+fn mix_rgb(a: [u8; 3], b: [u8; 3], t: f32) -> [u8; 3] {
+    [0, 1, 2].map(|c| (a[c] as f32 + (b[c] as f32 - a[c] as f32) * t).round() as u8)
+}
+
+/// Render > Clouds' pattern: fractal value noise, 0–1 per pixel (row by
+/// row). Octaves from cells a quarter of the image's longer side (at least
+/// 32 pixels) down to 2 pixels, each half as strong as the one before,
+/// stretched to use the whole range.
+pub fn clouds(w: usize, h: usize, seed: u32) -> Vec<f32> {
+    let largest = (w.max(h) / 4).max(32).next_power_of_two() / 2;
+    let cells: Vec<usize> =
+        std::iter::successors(Some(largest.max(32)), |&c| (c > 2).then_some(c / 2)).collect();
+    let hash = |octave: u32, x: usize, y: usize| {
+        let mut v = seed
+            ^ octave.wrapping_mul(0x9e37_79b9)
+            ^ (x as u32).wrapping_mul(0x85eb_ca6b)
+            ^ (y as u32).wrapping_mul(0xc2b2_ae35);
+        v ^= v >> 16;
+        v = v.wrapping_mul(0x7feb_352d);
+        v ^= v >> 15;
+        v = v.wrapping_mul(0x846c_a68b);
+        v ^= v >> 16;
+        v as f32 / u32::MAX as f32
+    };
+    let smooth = |t: f32| t * t * (3.0 - 2.0 * t);
+    let mut out = vec![0f32; w * h];
+    for (octave, &cell) in cells.iter().enumerate() {
+        let amp = 0.5f32.powi(octave as i32);
+        for y in 0..h {
+            let (gy, fy) = (y / cell, smooth((y % cell) as f32 / cell as f32));
+            for x in 0..w {
+                let (gx, fx) = (x / cell, smooth((x % cell) as f32 / cell as f32));
+                let o = octave as u32;
+                let v00 = hash(o, gx, gy);
+                let v10 = hash(o, gx + 1, gy);
+                let v01 = hash(o, gx, gy + 1);
+                let v11 = hash(o, gx + 1, gy + 1);
+                let top = v00 + (v10 - v00) * fx;
+                let bottom = v01 + (v11 - v01) * fx;
+                out[y * w + x] += amp * (top + (bottom - top) * fy);
+            }
+        }
+    }
+    let (lo, hi) = out
+        .iter()
+        .fold((f32::MAX, f32::MIN), |(lo, hi), &v| (lo.min(v), hi.max(v)));
+    let span = (hi - lo).max(1e-6);
+    for v in &mut out {
+        *v = (*v - lo) / span;
+    }
+    out
 }
 
 /// Photoshop's Gaussian Blur kernels for radii 0.1–2.0 pixels (the center
@@ -1083,6 +1154,38 @@ fn filtered(
             }
             out
         }
+        Filter::Clouds {
+            foreground,
+            background,
+            seed,
+        } => {
+            let t = clouds(w, h, seed);
+            (0..w * h)
+                .map(|i| {
+                    let c = mix_rgb(foreground, background, t[i]);
+                    [c[0], c[1], c[2], 255]
+                })
+                .collect()
+        }
+        Filter::DifferenceClouds {
+            foreground,
+            background,
+            seed,
+        } => {
+            let t = clouds(w, h, seed);
+            (0..w * h)
+                .map(|i| {
+                    let px = Buffer::straight(src.px[i]);
+                    let c = mix_rgb(foreground, background, t[i]);
+                    [
+                        px[0].abs_diff(c[0]),
+                        px[1].abs_diff(c[1]),
+                        px[2].abs_diff(c[2]),
+                        px[3],
+                    ]
+                })
+                .collect()
+        }
         Filter::Solarize => per_pixel(&|_, _, px| {
             let s = |v: u8| if v > 127 { 255 - v } else { v };
             [s(px[0]), s(px[1]), s(px[2]), px[3]]
@@ -1508,5 +1611,27 @@ mod tests {
             );
             assert!(off <= 1, "{off} values differ");
         }
+    }
+
+    #[test]
+    fn clouds_span_the_colors_without_repeating() {
+        let t = clouds(512, 300, 7);
+        let (lo, hi) = t
+            .iter()
+            .fold((1f32, 0f32), |(a, b), &v| (a.min(v), b.max(v)));
+        assert_eq!((lo, hi), (0.0, 1.0));
+        let shifted = (0..300)
+            .filter(|y| t[y * 512 + 10] == t[y * 512 + 266])
+            .count();
+        assert!(shifted < 10, "{shifted}");
+        // The same seed makes the same clouds, another seed others
+        assert_eq!(t, clouds(512, 300, 7));
+        assert_ne!(t, clouds(512, 300, 8));
+        // Soft: neighbors differ little
+        let step = t
+            .chunks(512)
+            .flat_map(|row| row.windows(2).map(|w| (w[0] - w[1]).abs()))
+            .fold(0f32, f32::max);
+        assert!(step < 0.3, "{step}");
     }
 }

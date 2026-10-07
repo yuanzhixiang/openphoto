@@ -6142,3 +6142,53 @@ fn history_brush_source_can_be_any_state() {
     drag(&mut h, a, b, Modifiers::NONE);
     assert!((0x12..=0x14).contains(&layer_pixel(&h, 0, 150, 400)[0]));
 }
+
+#[test]
+fn render_clouds_and_difference_clouds() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let app = &mut h.state_mut().state;
+    app.seed_override = Some(42);
+    app.foreground = Color::from_rgba8([0, 0, 0, 255]);
+    app.background = Color::from_rgba8([255, 255, 255, 255]);
+    // On a new, empty layer: opaque clouds from black to white
+    run_command(&mut h, Command::NewLayerNoDialog);
+    run_command(&mut h, Command::Clouds);
+    assert_eq!(last_history(&h), "Clouds");
+    let layer = active(&h).doc.layers.len() - 1;
+    let values: Vec<u8> = (0..20)
+        .map(|i| layer_pixel(&h, layer, 30 * i, 17 * i))
+        .map(|p| {
+            assert_eq!(p[3], 255);
+            assert!(p[0] == p[1] && p[1] == p[2]);
+            p[0]
+        })
+        .collect();
+    assert!(
+        values.iter().max().unwrap() - values.iter().min().unwrap() > 60,
+        "{values:?}"
+    );
+    let before = layer_pixel(&h, layer, 100, 100);
+    // Difference Clouds with the same pattern cancel them out to black
+    run_command(&mut h, Command::DifferenceClouds);
+    assert_eq!(last_history(&h), "Difference Clouds");
+    assert_eq!(layer_pixel(&h, layer, 100, 100), [0, 0, 0, 255]);
+    assert_ne!(before, [0, 0, 0, 255]);
+    // Last Filter runs it again; Fade works on it
+    run_command(&mut h, Command::LastFilter);
+    assert_eq!(last_history(&h), "Difference Clouds");
+    assert!(Command::Fade.enabled(&h.state().state));
+}
+
+#[test]
+#[ignore]
+fn screenshot_clouds() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let app = &mut h.state_mut().state;
+    app.foreground = Color::from_rgba8([0, 0, 0, 255]);
+    app.background = Color::from_rgba8([255, 255, 255, 255]);
+    run_command(&mut h, crate::commands::Command::Clouds);
+    shot(&mut h, "clouds");
+}

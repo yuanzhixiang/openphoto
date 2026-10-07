@@ -1280,6 +1280,8 @@ pub struct AppState {
     pub full_screen_prompt: Option<crate::dialogs::alert::Alert>,
     /// "Don't show again" was ticked in that warning.
     pub skip_full_screen_prompt: bool,
+    /// A fixed seed for Clouds (tests); random when `None`.
+    pub seed_override: Option<u32>,
     /// Edit › Fade's dialog while open.
     pub fade_dialog: Option<FadeState>,
     /// Layer > Flatten Image's "Discard hidden layers?" while asked.
@@ -1425,6 +1427,7 @@ impl Default for AppState {
             hide_panels: false,
             full_screen_prompt: None,
             skip_full_screen_prompt: false,
+            seed_override: None,
             fade_dialog: None,
             flatten_prompt: None,
             skip_flatten_prompt: false,
@@ -1500,6 +1503,18 @@ impl AppState {
 
     pub fn set_flag(&mut self, key: &'static str, on: bool) {
         *self.setting(key, "0") = if on { "1" } else { "0" }.to_owned();
+    }
+
+    /// A new random seed for filters that make a new pattern each time
+    /// (Clouds); fixed while `seed_override` is set, for tests.
+    pub fn next_seed(&self) -> u32 {
+        if let Some(seed) = self.seed_override {
+            return seed;
+        }
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.subsec_nanos() ^ d.as_secs() as u32);
+        nanos.wrapping_mul(0x9e37_79b9)
     }
 
     /// Makes `tool` current and the tool shown in its toolbar slot.

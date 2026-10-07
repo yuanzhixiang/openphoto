@@ -65,6 +65,8 @@ const ALL_COMMANDS: &[Command] = &[
     Command::LastFilter,
     Command::Average,
     Command::Solarize,
+    Command::Clouds,
+    Command::DifferenceClouds,
     Command::GaussianBlur,
     Command::BoxBlur,
     Command::UnsharpMask,
@@ -871,7 +873,21 @@ impl NativeMenu {
                         ("Pointillize...", None),
                     ],
                 ),
-                &todo_sub("Render"),
+                &Submenu::with_items(
+                    "Render",
+                    true,
+                    &[
+                        &todo("Flame...", None) as &dyn IsMenuItem,
+                        &todo("Picture Frame...", None),
+                        &todo("Tree...", None),
+                        &sep(),
+                        &item("Clouds", Command::Clouds),
+                        &item("Difference Clouds", Command::DifferenceClouds),
+                        &todo("Fibers...", None),
+                        &todo("Lens Flare...", None),
+                    ],
+                )
+                .expect("static menu definition is valid"),
                 &filter_sub(
                     "Sharpen",
                     &[

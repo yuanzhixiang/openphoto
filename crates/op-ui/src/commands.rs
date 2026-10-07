@@ -73,6 +73,9 @@ pub enum Command {
     LastFilter,
     Average,
     Solarize,
+    /// Filter > Render > Clouds, Difference Clouds.
+    Clouds,
+    DifferenceClouds,
     Blur,
     BlurMore,
     Sharpen,
@@ -514,6 +517,8 @@ impl Command {
             | Self::Exposure
             | Self::Average
             | Self::Solarize
+            | Self::Clouds
+            | Self::DifferenceClouds
             | Self::Blur
             | Self::BlurMore
             | Self::Sharpen
@@ -869,6 +874,8 @@ impl Command {
             | Self::AutoColor
             | Self::Average
             | Self::Solarize
+            | Self::Clouds
+            | Self::DifferenceClouds
             | Self::Blur
             | Self::BlurMore
             | Self::Sharpen
@@ -1204,6 +1211,8 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         }
         Command::Average
         | Command::Solarize
+        | Command::Clouds
+        | Command::DifferenceClouds
         | Command::Blur
         | Command::BlurMore
         | Command::Sharpen
@@ -1224,8 +1233,21 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 Command::Fragment => Some(Filter::Fragment),
                 Command::Despeckle => Some(Filter::Despeckle),
                 Command::SharpenEdges => Some(Filter::SharpenEdges),
+                Command::Clouds => Some(Filter::Clouds {
+                    foreground: [0; 3],
+                    background: [0; 3],
+                    seed: 0,
+                }),
+                Command::DifferenceClouds => Some(Filter::DifferenceClouds {
+                    foreground: [0; 3],
+                    background: [0; 3],
+                    seed: 0,
+                }),
                 _ => app.last_filter,
             };
+            // The clouds take the current colors and a new pattern each
+            // time, Last Filter included
+            let filter = filter.map(|f| with_cloud_colors(f, app));
             let [r, g, b, _] = app.background.to_rgba8();
             if let Some(filter) = filter
                 && let Some(state) = app.active_doc.and_then(|id| app.docs.get_mut(&id))
@@ -1766,5 +1788,30 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 _ => unreachable!("handled above"),
             }
         }
+    }
+}
+
+/// Clouds and Difference Clouds with the current foreground and background
+/// colors and a fresh pattern; other filters as they are.
+fn with_cloud_colors(filter: op_core::filter::Filter, app: &AppState) -> op_core::filter::Filter {
+    use op_core::filter::Filter;
+    let rgb = |c: op_core::Color| {
+        let [r, g, b, _] = c.to_rgba8();
+        [r, g, b]
+    };
+    let (foreground, background) = (rgb(app.foreground), rgb(app.background));
+    let seed = app.next_seed();
+    match filter {
+        Filter::Clouds { .. } => Filter::Clouds {
+            foreground,
+            background,
+            seed,
+        },
+        Filter::DifferenceClouds { .. } => Filter::DifferenceClouds {
+            foreground,
+            background,
+            seed,
+        },
+        other => other,
     }
 }

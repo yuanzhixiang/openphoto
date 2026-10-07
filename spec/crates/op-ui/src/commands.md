@@ -65,6 +65,7 @@ Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's men
 | Mosaic | Filter › Pixelate › Mosaic... | None |
 | UnsharpMask | Filter › Sharpen › Unsharp Mask... | None |
 | Solarize | Filter › Stylize › Solarize | None |
+| Clouds, DifferenceClouds | Filter › Render › Clouds, Difference Clouds | None |
 | HighPass | Filter › Other › High Pass... | None |
 | Maximum | Filter › Other › Maximum... | None |
 | Minimum | Filter › Other › Minimum... | None |
@@ -232,6 +233,7 @@ Select All, Deselect, Reselect and Inverse each record one history entry, named 
 
 ## Filter commands
 
+- Clouds, Difference Clouds: apply immediately with the current foreground and background colors and a new pattern each time (`AppState::next_seed`; `seed_override` fixes it in tests); Last Filter repeats them the same way, with the colors at that moment.
 - Average, Solarize: apply immediately to the current layer (`filter.md` in `op-core`), recording history under the same name, and are stored as `last_filter`.
 - Filters with settings (Box Blur, Gaussian Blur, Add Noise, Median, Mosaic, Unsharp Mask, High Pass, Maximum, Minimum, Offset): checked the same way as adjustment commands; if the checks pass, save a snapshot and open the dialog (`dialogs/adjust.md`).
 - LastFilter: immediately applies again with `last_filter`'s settings, recording that filter's name, without showing a dialog.
