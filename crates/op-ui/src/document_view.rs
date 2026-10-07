@@ -320,6 +320,12 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             crate::snap::begin(state, &view_options, moving);
         }
     }
+    // A point drag's smart guides go when the button is up (the Move
+    // tool clears its own when the move ends)
+    if tool != Tool::Move && !ui.input(|i| i.pointer.primary_down() || i.pointer.primary_released())
+    {
+        state.smart_guides = None;
+    }
     // With the Move tool (or Cmd held), guides can be grabbed
     let guides_live = view_options.guides_visible() && !view_options.lock_guides;
     let cmd = ui.input(|i| i.modifiers.command);

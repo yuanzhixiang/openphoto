@@ -125,7 +125,7 @@ pub fn begin(state: &mut DocState, view: &ViewOptions, moving: bool) {
     state.smart_guides = if moving {
         crate::smart_guides::SmartGuides::begin(state, view, &skip)
     } else {
-        None
+        crate::smart_guides::SmartGuides::for_points(state, view)
     };
     state.snap = Targets::new(state, view, &skip).map(|mut t| {
         if moving {
@@ -135,12 +135,23 @@ pub fn begin(state: &mut DocState, view: &ViewOptions, moving: bool) {
     });
 }
 
-/// A document point pulled to the drag's targets (Control held: as is,
+/// A document point pulled to the drag's targets and lined up by the
+/// smart guides, the smaller pull winning per axis (Control held: as is,
 /// as in Photoshop).
-pub fn point(ui: &egui::Ui, state: &DocState, p: Pos2, ppp: f32) -> Pos2 {
-    match &state.snap {
-        Some(t) if !ui.input(|i| i.modifiers.ctrl) => t.point(p, tolerance(state, ppp)),
-        _ => p,
+pub fn point(ui: &egui::Ui, state: &mut DocState, p: Pos2, ppp: f32) -> Pos2 {
+    if ui.input(|i| i.modifiers.ctrl) {
+        if let Some(smart) = &mut state.smart_guides {
+            smart.lines.clear();
+        }
+        return p;
+    }
+    let tol = tolerance(state, ppp);
+    let snapped = state.snap.as_ref().map_or(p, |t| t.point(p, tol));
+    match &mut state.smart_guides {
+        Some(smart) => smart
+            .align_with(p.to_vec2(), snapped.to_vec2(), tol)
+            .to_pos2(),
+        None => snapped,
     }
 }
 

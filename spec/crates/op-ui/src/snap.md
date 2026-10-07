@@ -33,14 +33,13 @@ Gathered once when a drag starts (`begin`, called by `document_view.rs`) and kep
   - A handle pulls each edge it moved to the nearest line within the distance.
 - Guides: dragging a guide out of a ruler or moving one gathers targets, and the guide's position is pulled to the nearest line. A moved guide doesn't snap to itself.
 - Holding Control while dragging turns snapping off for that moment, as in Photoshop.
-- For a Move drag, `begin` also starts the smart guides (`smart_guides.md`), whose pull competes with this one per axis.
+- `begin` also starts the smart guides (`smart_guides.md`): for a Move drag (or a transform) the moved box's, otherwise a point's (`for_points`). `point` takes `&mut DocState` and combines both pulls, the smaller winning per axis.
 
 ## Known limitations
 
 - The Object Selection rectangle and the lassos do not snap; Free Transform's turned or reshaped boxes, Warp and a turned crop box do not either.
 - Shift-dragging a guide does not snap it to the rulers' ticks.
 - Photoshop's exact snap distance has not been measured; 8 points is an approximation.
-- No smart guides.
 
 ## Test coverage
 

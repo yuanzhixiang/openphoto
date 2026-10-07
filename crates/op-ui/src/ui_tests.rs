@@ -7854,6 +7854,84 @@ fn open_recent_reopens_files() {
 }
 
 #[test]
+fn smart_guides_for_marquees_and_distance_labels() {
+    use crate::commands::Command;
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // Snap off, so only the smart guides pull
+    run_command(&mut h, Command::ToggleSnap);
+    run_command(&mut h, Command::NewLayerNoDialog);
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.active_layer.unwrap();
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 50..150 {
+            for x in 50..150 {
+                image.set_pixel(x, y, [255, 255, 255, 255]);
+            }
+        }
+        doc.mark_dirty();
+    }
+    // A marquee ended 3 px off the square's center line (x 100) ends on it
+    h.state_mut().state.select_tool(Tool::RectangularMarquee);
+    h.run_steps(2);
+    let (a, b) = (doc_point(&h, 300.0, 300.0), doc_point(&h, 103.0, 400.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let sel = active(&h).doc.selection().unwrap().bounds().unwrap();
+    assert_eq!(sel.0, 100, "{sel:?}");
+    // Moving the square: the gap to a second square shows as a label
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        doc.set_selection(None);
+    }
+    run_command(&mut h, Command::NewLayerNoDialog);
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.active_layer.unwrap();
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 60..140 {
+            for x in 300..380 {
+                image.set_pixel(x, y, [200, 0, 0, 255]);
+            }
+        }
+        doc.mark_dirty();
+        let first = doc.layers[1].id;
+        doc.active_layer = Some(first);
+    }
+    h.state_mut().state.select_tool(Tool::Move);
+    h.run_steps(2);
+    let (from, to) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 120.0, 100.0));
+    h.hover_at(from);
+    h.event(egui::Event::PointerButton {
+        pos: from,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    for i in 1..=4 {
+        h.event(egui::Event::PointerMoved(
+            from + (to - from) * (i as f32 / 4.0),
+        ));
+        h.step();
+    }
+    let labels = active(&h).smart_guides.as_ref().unwrap().labels.clone();
+    assert!(
+        labels.iter().any(|(_, d)| (*d - 130.0).abs() < 0.5),
+        "{labels:?}"
+    );
+    shot(&mut h, "smart_guides_labels");
+    h.event(egui::Event::PointerButton {
+        pos: to,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(2);
+}
+
+#[test]
 fn smart_guides_line_up_a_moved_layer() {
     use crate::commands::Command;
     use op_tools::Tool;

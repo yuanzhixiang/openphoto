@@ -22,6 +22,9 @@ pub struct SmartGuides {
     others: Vec<Bounds>,
     /// The lines showing now, as document segments.
     pub lines: Vec<[Pos2; 2]>,
+    /// The distance labels showing now: the gap from the moved box to its
+    /// nearest neighbor on each side (a segment and its length).
+    pub labels: Vec<([Pos2; 2], f32)>,
 }
 
 impl SmartGuides {
@@ -46,6 +49,32 @@ impl SmartGuides {
             moving,
             others,
             lines: Vec::new(),
+            labels: Vec::new(),
+        })
+    }
+
+    /// For a drag that places points (the marquees, the shape tools): the
+    /// point lines up with the canvas's and every visible layer's edges
+    /// and centers. `align` then takes the point as its offset.
+    pub fn for_points(state: &DocState, view: &ViewOptions) -> Option<Self> {
+        if !(view.extras && view.smart_guides) {
+            return None;
+        }
+        let doc = &state.doc;
+        let mut others = vec![(0.0, 0.0, doc.width as f32, doc.height as f32)];
+        for layer in &doc.layers {
+            if !layer.visible || layer.is_background {
+                continue;
+            }
+            if let Some((x0, y0, x1, y1)) = layer.image().and_then(|i| i.content_bounds()) {
+                others.push((x0 as f32, y0 as f32, x1 as f32, y1 as f32));
+            }
+        }
+        Some(Self {
+            moving: (0.0, 0.0, 0.0, 0.0),
+            others,
+            lines: Vec::new(),
+            labels: Vec::new(),
         })
     }
 
@@ -116,6 +145,55 @@ impl SmartGuides {
             }
         }
         self.lines = lines;
+        self.labels = self.gaps(moved);
+        out
+    }
+
+    /// The gaps between the moved box and the nearest other box on each
+    /// side that overlaps it across (not the canvas; nothing for a point).
+    fn gaps(&self, m: Bounds) -> Vec<([Pos2; 2], f32)> {
+        if m.2 - m.0 < 1e-3 && m.3 - m.1 < 1e-3 {
+            return Vec::new();
+        }
+        let neighbors = &self.others[1.min(self.others.len())..];
+        let mut out = Vec::new();
+        let across_y = |b: &Bounds| b.1 < m.3 && b.3 > m.1;
+        let across_x = |b: &Bounds| b.0 < m.2 && b.2 > m.0;
+        let mid_y = |b: &Bounds| (m.1.max(b.1) + m.3.min(b.3)) / 2.0;
+        let mid_x = |b: &Bounds| (m.0.max(b.0) + m.2.min(b.2)) / 2.0;
+        // Left, right, above, below: the nearest that doesn't overlap
+        let left = neighbors
+            .iter()
+            .filter(|b| across_y(b) && b.2 <= m.0)
+            .max_by(|a, b| a.2.total_cmp(&b.2));
+        if let Some(b) = left {
+            let y = mid_y(b);
+            out.push(([Pos2::new(b.2, y), Pos2::new(m.0, y)], m.0 - b.2));
+        }
+        let right = neighbors
+            .iter()
+            .filter(|b| across_y(b) && b.0 >= m.2)
+            .min_by(|a, b| a.0.total_cmp(&b.0));
+        if let Some(b) = right {
+            let y = mid_y(b);
+            out.push(([Pos2::new(m.2, y), Pos2::new(b.0, y)], b.0 - m.2));
+        }
+        let above = neighbors
+            .iter()
+            .filter(|b| across_x(b) && b.3 <= m.1)
+            .max_by(|a, b| a.3.total_cmp(&b.3));
+        if let Some(b) = above {
+            let x = mid_x(b);
+            out.push(([Pos2::new(x, b.3), Pos2::new(x, m.1)], m.1 - b.3));
+        }
+        let below = neighbors
+            .iter()
+            .filter(|b| across_x(b) && b.1 >= m.3)
+            .min_by(|a, b| a.1.total_cmp(&b.1));
+        if let Some(b) = below {
+            let x = mid_x(b);
+            out.push(([Pos2::new(x, m.3), Pos2::new(x, b.1)], b.1 - m.3));
+        }
         out
     }
 }
@@ -132,6 +210,24 @@ pub fn draw(ui: &Ui, state: &DocState, clip: Rect, ppp: f32) {
             Stroke::new(crate::theme::pt(1.0), COLOR),
         );
     }
+    // Distances: the gap's line and its length in a magenta tag
+    for ([a, b], length) in &smart.labels {
+        let (a, b) = (to_screen(state, *a, ppp), to_screen(state, *b, ppp));
+        painter.line_segment([a, b], Stroke::new(crate::theme::pt(1.0), COLOR));
+        let text = format!("{} px", length.round());
+        let galley = painter.layout_no_wrap(
+            text,
+            egui::FontId::proportional(crate::theme::pt(10.0)),
+            Color32::WHITE,
+        );
+        let mid = a + (b - a) / 2.0;
+        let tag = Rect::from_center_size(
+            mid,
+            galley.size() + Vec2::new(crate::theme::pt(8.0), crate::theme::pt(4.0)),
+        );
+        painter.rect_filled(tag, crate::theme::pt(2.0), COLOR);
+        painter.galley(tag.center() - galley.size() / 2.0, galley, Color32::WHITE);
+    }
 }
 
 #[cfg(test)]
@@ -143,6 +239,7 @@ mod tests {
             moving: (10.0, 10.0, 30.0, 20.0),
             others: vec![(0.0, 0.0, 100.0, 80.0), (60.0, 50.0, 90.0, 70.0)],
             lines: Vec::new(),
+            labels: Vec::new(),
         }
     }
 
@@ -167,5 +264,23 @@ mod tests {
         let d = g.align(Vec2::new(5.0, 5.5), 1.0);
         assert_eq!(d, Vec2::new(5.0, 5.5));
         assert!(g.lines.is_empty());
+    }
+
+    #[test]
+    fn gaps_and_points() {
+        let mut g = guides();
+        // Moved to (20, 50)–(40, 60): 20 px left of the other layer
+        g.align(Vec2::new(10.0, 40.0), 0.0);
+        assert_eq!(g.labels.len(), 1);
+        let ([a, b], length) = g.labels[0];
+        assert_eq!((a.x, b.x, length), (40.0, 60.0, 20.0));
+        // A point (a zero box) lines up but has no gaps
+        let mut p = SmartGuides {
+            moving: (0.0, 0.0, 0.0, 0.0),
+            ..guides()
+        };
+        let d = p.align(Vec2::new(58.0, 20.0), 4.0);
+        assert_eq!(d.x, 60.0);
+        assert!(p.labels.is_empty() && !p.lines.is_empty());
     }
 }
