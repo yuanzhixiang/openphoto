@@ -68,6 +68,13 @@ impl OpenPhotoApp {
         if let Some(store) = crop_tool::CropPresets::default_store() {
             app.state.crop_presets = crop_tool::CropPresets::load(store);
         }
+        if let Some(store) = dialogs::document_presets::store_path() {
+            let text = std::fs::read_to_string(&store).unwrap_or_default();
+            let (recent, saved) = dialogs::document_presets::parse(&text);
+            app.state.new_document_recent = recent;
+            app.state.new_document_saved = saved;
+            app.state.new_document_store = Some(store);
+        }
         if let Some(store) = recent::RecentFiles::default_store() {
             app.state.recent = recent::RecentFiles::load(store);
             // The files opened from the command line, before the list was read
@@ -643,8 +650,13 @@ impl OpenPhotoApp {
             return;
         };
         let outcome = dialog.show(ctx);
-        self.state.new_document_saved.extend(dialog.take_saved());
+        let saved = dialog.take_saved();
+        let changed = !saved.is_empty();
+        self.state.new_document_saved.extend(saved);
         self.state.new_document_welcome_closed = dialog.welcome_closed();
+        if changed {
+            self.save_document_presets();
+        }
         match outcome {
             dialogs::NewDocumentOutcome::Open => self.state.new_document_dialog = Some(dialog),
             dialogs::NewDocumentOutcome::Cancel => {}
@@ -661,6 +673,7 @@ impl OpenPhotoApp {
                 recent.retain(|p| *p != preset);
                 recent.insert(0, preset);
                 recent.truncate(20);
+                self.save_document_presets();
                 actions::create_document(
                     &mut self.state,
                     name,
@@ -670,6 +683,21 @@ impl OpenPhotoApp {
                 );
             }
         }
+    }
+
+    /// Writes Recent and Saved to their file (when the app has one).
+    fn save_document_presets(&self) {
+        let Some(store) = &self.state.new_document_store else {
+            return;
+        };
+        let text = dialogs::document_presets::serialize(
+            &self.state.new_document_recent,
+            &self.state.new_document_saved,
+        );
+        if let Some(dir) = store.parent() {
+            std::fs::create_dir_all(dir).ok();
+        }
+        std::fs::write(store, text).ok();
     }
 
     fn new_layer_dialog(&mut self, ctx: &egui::Context) {

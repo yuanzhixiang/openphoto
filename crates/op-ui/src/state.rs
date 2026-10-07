@@ -1395,9 +1395,11 @@ pub struct AppState {
     /// File > New..., while open.
     pub new_document_dialog: Option<crate::dialogs::NewDocumentDialog>,
     /// The New Document dialog's Recent (newest first) and Saved presets,
-    /// and whether its welcome box was closed; kept for this run.
+    /// kept across launches in `new_document_store` (none in tests), and
+    /// whether its welcome box was closed (this run).
     pub new_document_recent: Vec<crate::dialogs::DocumentPreset>,
     pub new_document_saved: Vec<crate::dialogs::DocumentPreset>,
+    pub new_document_store: Option<std::path::PathBuf>,
     pub new_document_welcome_closed: bool,
     /// View > Guides > New Guide..., while open.
     pub new_guide_dialog: Option<crate::dialogs::NewGuideDialog>,
@@ -1531,6 +1533,7 @@ impl Default for AppState {
             new_document_dialog: None,
             new_document_recent: Vec::new(),
             new_document_saved: Vec::new(),
+            new_document_store: None,
             new_document_welcome_closed: false,
             modify_dialog: None,
             adjust_dialog: None,

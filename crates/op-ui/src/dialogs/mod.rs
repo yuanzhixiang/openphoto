@@ -16,7 +16,7 @@ mod common;
 mod curves;
 mod custom_filter;
 mod distort;
-mod document_presets;
+pub(crate) mod document_presets;
 mod duplicate_layer;
 mod equalize;
 mod exposure;

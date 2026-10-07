@@ -33,13 +33,13 @@ Compared side by side with Photoshop screenshots, all element positions match; t
 - Opens on the Recent page. Initial details: if the clipboard holds an image, its size (pixels, 72 ppi); otherwise the first Recent item (with its card selected); if neither exists, 1920 × 1080 pixels, 72 ppi. The name is the next "Untitled-N", background White.
 - Switching tabs selects and applies that page's first preset, as in Photoshop (an empty page leaves things unchanged). Single-clicking a card: selects it and fills its width, height, unit and resolution into the right side (the name is unchanged). Double-clicking a card: creates directly with that preset.
 - Changing the unit converts width and height into the new unit while keeping the represented pixel count (pixels are rounded to integers, other units to at most 3 decimal places). Changing the resolution unit converts the value accordingly.
-- Save icon: saves the current settings, named by the name field, into the Saved page (kept for the current run, collected into `AppState::new_document_saved` by `lib.rs`).
+- Save icon: saves the current settings, named by the name field, into the Saved page (collected into `AppState::new_document_saved` by `lib.rs`, and kept across launches with Recent).
 - Create or Enter: creates; width and height are converted to pixels and rounded, and must be between 1–30000, resolution 1–10000 ppi, otherwise nothing is created. When the name is empty, "Untitled" is used. Close or Esc: cancels.
 - After creating, these settings (named "Custom") are put at the front of the Recent list; identical settings are not duplicated, up to 20 entries.
 
 ## Known limitations
 
-- Recent and Saved are kept only within the current run; Photoshop saves them across launches.
+- Recent and Saved are kept across launches in OpenPhoto's own file (`document_presets.md`), not Photoshop's; the welcome box comes back each launch.
 - No Adobe Stock templates or search; card icons are approximate shapes drawn from the preset's shape, not Photoshop's icon assets.
 - Color mode, bit depth, color profile and pixel aspect ratio each have only one selectable option; no artboards; Background Contents has no Custom.
 - In Photoshop the Print page has 14 presets, Mobile 28 and Film & Video 25; here the ones visible in the screenshots are listed (12, 24, 24).

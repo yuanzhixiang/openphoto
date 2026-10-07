@@ -21,6 +21,19 @@ Name, width, height, unit, resolution (ppi), and the kind of card icon (`Kind`).
 - **Mobile** (pixels, 72 ppi): iPhone, iPad, Android, Surface, Apple Watch, Mobile Design, iOS 7 and Mac icon sizes, 24 in total.
 - **Film & Video** (pixels, 72 ppi): HDTV, HDV, DVCPRO HD, DCI 2K/4K/8K, UHDTV, FUHDTV, NTSC, PAL, Cineon, Film (2K)/(4K), 24 in total.
 
+## Keeping Recent and Saved (`store_path`, `serialize`, `parse`)
+
+- The file is `~/Library/Application Support/OpenPhoto/new-document-presets.txt` (`store_path`).
+- `serialize` writes one line per preset, Recent first (newest first), then Saved. Each line has these fields, separated by tabs:
+  1. `recent` or `saved`
+  2. the name (tabs and line breaks become spaces)
+  3. the width
+  4. the height
+  5. the unit, as an index into `Unit::ALL`
+  6. the ppi
+  7. the card's kind: `custom`, `photo`, `page`, `grid`, `brush`, `browser`, `phone`, `tablet`, `watch`, `app-icon`, `surface`, `strip`, `video`, or `video:<badge>`
+- `parse` reads the file back and skips lines that don't read. A video badge is looked up among Film & Video's; an unknown badge reads as a video without one.
+
 ## Card icons (`paint_icon`)
 
 1 pt `#b9b9b9` lines; a frame is drawn with the preset's aspect ratio: the longest side runs from 36 pt to 82 pt according to the square root of its size within the page (`scales`: the position of the square root of the pixel area within the page, 0–1), and the other side is at most 62 pt (measured from the cards on Photoshop's Photo page). Depending on the kind, the frame contains: photo (mountains and sun), page (folded corner; Custom draws a crosshair outside the top-left corner), dot grid, brush, browser (top bar), phone/tablet (rounded corners and Home button), Surface (stylus on the right), watch (watch band), app icon (rounded dot grid), thin strip, video (play triangle and 2K/4K/8K corner badge).
@@ -31,4 +44,5 @@ Name, width, height, unit, resolution (ppi), and the kind of card icon (`Kind`).
 
 ## Test coverage
 
+- `recent_and_saved_round_trip`: a video preset with a badge and a print preset in Recent and a custom one in Saved read back the same (a tab in a name becomes a space); a short line is skipped.
 - `presets_convert_to_pixels`: Photo has 9 and the first is 2100 × 1500 pixels; A4 is 2480 × 3508; the Web size line; three decimals for inches.

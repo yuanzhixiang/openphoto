@@ -108,7 +108,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 ## Known Limitations
 
 - Undo restores layer visibility and the currently selected layer to how they were in the snapshot; Photoshop does not record these two by default, and undo does not change them.
-- `new_document_recent`, `new_document_saved`, `new_document_welcome_closed`: the New Document dialog's Recent list (newest first, no duplicates, at most 20), presets saved with the save icon, and whether the Recent page's welcome box has been closed; kept only for the current run (see `dialogs/new_document.md`).
+- `new_document_recent`, `new_document_saved`, `new_document_welcome_closed`: the New Document dialog's Recent list (newest first, no duplicates, at most 20), presets saved with the save icon, and whether the Recent page's welcome box has been closed (this run). `new_document_store` is the file Recent and Saved are kept in across launches (`dialogs/document_presets.md`): set by `OpenPhotoApp::new`, which reads it, and none in headless tests; `lib.rs` writes it whenever Create changes Recent or the save icon adds to Saved (`save_document_presets`).
 - `healing_brush`, `spot_healing`: the Healing Brush's and Spot Healing Brush's `PaintOptions` (13 px, 100% hardness), returned by `paint_options(tool)`.
 - `DocState::patch_drag`: while the Patch tool or Content-Aware Move drags the selection, where the drag started and where it is (document pixels); the selection outline is drawn moved by the difference.
 - `DocState::magnetic` (`MagneticPath`): the Magnetic Lasso under way: its `EdgeMap` (built from the merged image when it starts), the indices of the anchors in `DocState::lasso`'s points, and how many points are fixed (the rest is the live wire to the pointer).

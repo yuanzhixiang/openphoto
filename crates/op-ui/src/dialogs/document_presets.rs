@@ -472,9 +472,139 @@ pub fn scales(presets: &[Preset]) -> Vec<f32> {
         .collect()
 }
 
+/// Where the New Document dialog's Recent and Saved presets are kept
+/// across launches: `~/Library/Application Support/OpenPhoto/
+/// new-document-presets.txt`.
+pub fn store_path() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    Some(
+        std::path::PathBuf::from(home)
+            .join("Library/Application Support/OpenPhoto/new-document-presets.txt"),
+    )
+}
+
+fn kind_name(kind: Kind) -> String {
+    match kind {
+        Kind::Custom => "custom".into(),
+        Kind::Photo => "photo".into(),
+        Kind::Page => "page".into(),
+        Kind::Grid => "grid".into(),
+        Kind::Brush => "brush".into(),
+        Kind::Browser => "browser".into(),
+        Kind::Phone => "phone".into(),
+        Kind::Tablet => "tablet".into(),
+        Kind::Watch => "watch".into(),
+        Kind::AppIcon => "app-icon".into(),
+        Kind::Surface => "surface".into(),
+        Kind::Strip => "strip".into(),
+        Kind::Video(None) => "video".into(),
+        Kind::Video(Some(badge)) => format!("video:{badge}"),
+    }
+}
+
+fn kind_from(name: &str) -> Option<Kind> {
+    Some(match name {
+        "custom" => Kind::Custom,
+        "photo" => Kind::Photo,
+        "page" => Kind::Page,
+        "grid" => Kind::Grid,
+        "brush" => Kind::Brush,
+        "browser" => Kind::Browser,
+        "phone" => Kind::Phone,
+        "tablet" => Kind::Tablet,
+        "watch" => Kind::Watch,
+        "app-icon" => Kind::AppIcon,
+        "surface" => Kind::Surface,
+        "strip" => Kind::Strip,
+        "video" => Kind::Video(None),
+        _ => {
+            // A badge is one of Film & Video's
+            let badge = name.strip_prefix("video:")?;
+            return category(5)
+                .into_iter()
+                .find_map(|p| match p.kind {
+                    Kind::Video(Some(b)) if b == badge => Some(p.kind),
+                    _ => None,
+                })
+                .or(Some(Kind::Video(None)));
+        }
+    })
+}
+
+/// Recent and Saved as lines: `recent` or `saved`, then the name, width,
+/// height, unit, ppi and card kind, separated by tabs.
+pub fn serialize(recent: &[Preset], saved: &[Preset]) -> String {
+    let clean = |t: &str| t.replace(['\t', '\n'], " ");
+    let line = |list: &str, p: &Preset| {
+        let unit = Unit::ALL.iter().position(|u| *u == p.unit).unwrap_or(0);
+        format!(
+            "{list}\t{}\t{}\t{}\t{unit}\t{}\t{}\n",
+            clean(&p.name),
+            p.width,
+            p.height,
+            p.ppi,
+            kind_name(p.kind)
+        )
+    };
+    recent
+        .iter()
+        .map(|p| line("recent", p))
+        .chain(saved.iter().map(|p| line("saved", p)))
+        .collect()
+}
+
+/// The lists [`serialize`] wrote; lines that don't read are skipped.
+pub fn parse(text: &str) -> (Vec<Preset>, Vec<Preset>) {
+    let (mut recent, mut saved) = (Vec::new(), Vec::new());
+    for line in text.lines() {
+        let f: Vec<&str> = line.split('\t').collect();
+        let [list, name, width, height, unit, ppi, kind] = f[..] else {
+            continue;
+        };
+        let (Ok(width), Ok(height), Ok(unit), Ok(ppi), Some(kind)) = (
+            width.parse::<f64>(),
+            height.parse::<f64>(),
+            unit.parse::<usize>(),
+            ppi.parse::<f64>(),
+            kind_from(kind),
+        ) else {
+            continue;
+        };
+        let Some(&unit) = Unit::ALL.get(unit) else {
+            continue;
+        };
+        let preset = Preset::new(name, (width, height), unit, ppi, kind);
+        match list {
+            "recent" => recent.push(preset),
+            "saved" => saved.push(preset),
+            _ => {}
+        }
+    }
+    (recent, saved)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recent_and_saved_round_trip() {
+        let recent = vec![category(5)[2].clone(), category(1)[0].clone()];
+        let mut mine = Preset::new(
+            "My\tSize",
+            (640.0, 480.0),
+            Unit::Pixels,
+            144.0,
+            Kind::Custom,
+        );
+        let saved = vec![mine.clone()];
+        let (r, s) = parse(&serialize(&recent, &saved));
+        assert_eq!(r, recent);
+        mine.name = "My Size".into();
+        assert_eq!(s, vec![mine]);
+        // Damaged lines are skipped
+        assert_eq!(parse("recent\tx\t1\n").0.len(), 0);
+    }
 
     #[test]
     fn presets_convert_to_pixels() {

@@ -5792,6 +5792,9 @@ fn new_document_origin(h: &mut Harness<'_, OpenPhotoApp>) -> (f32, f32) {
 #[test]
 fn new_document_dialog_presets_recent_and_saved() {
     let mut h = harness(Vec::new());
+    // Recent and Saved are written to their file as they change
+    let store = std::env::temp_dir().join(format!("openphoto-presets-{}.txt", std::process::id()));
+    h.state_mut().state.new_document_store = Some(store.clone());
     h.key_press_modifiers(Modifiers::COMMAND, egui::Key::N);
     h.run_steps(3);
     let (x, y) = new_document_origin(&mut h);
@@ -5819,6 +5822,11 @@ fn new_document_dialog_presets_recent_and_saved() {
     click(&mut h, at(936.0, 674.0));
     assert!(h.state().state.new_document_dialog.is_none());
     assert_eq!(h.state().state.docs.len(), docs);
+    let text = std::fs::read_to_string(&store).unwrap();
+    let (recent, saved) = crate::dialogs::document_presets::parse(&text);
+    assert_eq!(recent, h.state().state.new_document_recent);
+    assert_eq!(saved, h.state().state.new_document_saved);
+    std::fs::remove_file(store).ok();
 }
 
 #[test]
