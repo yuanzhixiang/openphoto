@@ -311,7 +311,10 @@ impl OpenPhotoApp {
         let Some(mut dialog) = self.state.new_document_dialog.take() else {
             return;
         };
-        match dialog.show(ctx) {
+        let outcome = dialog.show(ctx);
+        self.state.new_document_saved.extend(dialog.take_saved());
+        self.state.new_document_welcome_closed = dialog.welcome_closed();
+        match outcome {
             dialogs::NewDocumentOutcome::Open => self.state.new_document_dialog = Some(dialog),
             dialogs::NewDocumentOutcome::Cancel => {}
             dialogs::NewDocumentOutcome::Create {
@@ -320,13 +323,21 @@ impl OpenPhotoApp {
                 height,
                 resolution,
                 contents,
-            } => actions::create_document(
-                &mut self.state,
-                name,
-                (width, height),
-                resolution,
-                contents,
-            ),
+                preset,
+            } => {
+                // Recent: newest first, without repeats, at most 20
+                let recent = &mut self.state.new_document_recent;
+                recent.retain(|p| *p != preset);
+                recent.insert(0, preset);
+                recent.truncate(20);
+                actions::create_document(
+                    &mut self.state,
+                    name,
+                    (width, height),
+                    resolution,
+                    contents,
+                );
+            }
         }
     }
 

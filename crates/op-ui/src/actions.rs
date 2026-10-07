@@ -117,7 +117,17 @@ pub fn clipboard(command: Command, app: &mut AppState, ppp: f32) {
 pub fn new_dialog(app: &mut AppState) {
     let name = format!("Untitled-{}", app.untitled_counter + 1);
     let size = app.clipboard.get().map(|c| (c.width, c.height));
-    app.new_document_dialog = Some(crate::dialogs::NewDocumentDialog::new(name, size));
+    let [r, g, b, _] = app.background.to_rgba8();
+    app.new_document_dialog = Some(
+        crate::dialogs::NewDocumentDialog::new(
+            name,
+            size,
+            app.new_document_recent.clone(),
+            app.new_document_saved.clone(),
+            app.new_document_welcome_closed,
+        )
+        .with_background(egui::Color32::from_rgb(r, g, b)),
+    );
 }
 
 /// Creates the document the New dialog describes. A transparent background

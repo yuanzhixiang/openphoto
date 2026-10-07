@@ -96,31 +96,7 @@ pub fn pill_button(
 }
 
 const FIELD_BORDER: Color32 = Color32::from_gray(0x77);
-const DROPDOWN_BORDER: Color32 = Color32::from_gray(0x6a);
 const FOCUS: Color32 = Color32::from_rgb(0x14, 0x73, 0xe6);
-
-/// A text input with Photoshop's dialog styling (dark fill, light border,
-/// blue focus ring). With `select_all`, it takes focus and selects its text
-/// (Photoshop does this for a dialog's first field when it opens).
-pub fn number_field(
-    ui: &mut Ui,
-    rect: Rect,
-    text: &mut String,
-    id: impl egui::AsIdSalt,
-    font: f32,
-    select_all: bool,
-) -> egui::Response {
-    let pad = rect.height() * 0.23;
-    text_field(
-        ui,
-        rect,
-        text,
-        id,
-        FontId::proportional(font),
-        pad,
-        select_all,
-    )
-}
 
 /// [`number_field`] with a given font and left padding (the right one is
 /// 2 pt).
@@ -172,36 +148,6 @@ pub fn text_field(
         state.store(ui.ctx(), id);
     }
     output.response.response
-}
-
-/// A dropdown with Photoshop's dialog styling, filling `rect`.
-pub fn dropdown(
-    ui: &mut Ui,
-    rect: Rect,
-    id: impl egui::AsIdSalt,
-    selected: &str,
-    font: f32,
-    enabled: bool,
-    menu: impl FnOnce(&mut Ui),
-) {
-    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect));
-    child.add_enabled_ui(enabled, |ui| {
-        let v = &mut ui.visuals_mut().widgets;
-        for w in [&mut v.inactive, &mut v.hovered, &mut v.active, &mut v.open] {
-            w.weak_bg_fill = color::PANEL;
-            w.bg_fill = color::PANEL;
-            w.bg_stroke = Stroke::new(1.0, DROPDOWN_BORDER);
-            w.corner_radius = CornerRadius::same(3);
-        }
-        v.hovered.weak_bg_fill = color::HOVER;
-        ui.spacing_mut().interact_size.y = rect.height();
-        ui.spacing_mut().button_padding = vec2(rect.height() * 0.35, rect.height() * 0.17);
-        egui::ComboBox::from_id_salt(id)
-            .width(rect.width())
-            .height(400.0)
-            .selected_text(egui::RichText::new(selected).font(FontId::proportional(font)))
-            .show_ui(ui, menu);
-    });
 }
 
 // Photoshop 2026's dialog controls, measured on its New Layer dialog: text

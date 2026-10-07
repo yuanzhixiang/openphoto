@@ -4844,3 +4844,61 @@ fn selection_brush_remove_and_adjustment_brush_bars_edit_their_settings() {
     click(&mut h, at_pt(522.0, 45.25));
     assert_eq!(setting(&h, "adjbrush.overlay").as_deref(), Some("1"));
 }
+
+#[test]
+#[ignore]
+fn screenshot_new_document_dialog() {
+    let mut h = harness(Vec::new());
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::N);
+    h.run_steps(3);
+    shot(&mut h, "new_document_recent");
+    // The Photo tab (its text from x 172 in the dialog)
+    let (x, y) = new_document_origin(&mut h);
+    click(&mut h, at_pt(x + 188.0, y + 51.0));
+    shot(&mut h, "new_document_photo");
+}
+
+/// The New Document dialog's top-left corner (its title bar's color).
+fn new_document_origin(h: &mut Harness<'_, OpenPhotoApp>) -> (f32, f32) {
+    let image = h.render().expect("render frame");
+    let (mut x0, mut y0) = (u32::MAX, u32::MAX);
+    for (x, y, p) in image.enumerate_pixels() {
+        if p.0[..3] == [0xd3, 0xd4, 0xd5] {
+            x0 = x0.min(x);
+            y0 = y0.min(y);
+        }
+    }
+    (x0 as f32 / 2.0, y0 as f32 / 2.0)
+}
+
+#[test]
+fn new_document_dialog_presets_recent_and_saved() {
+    let mut h = harness(Vec::new());
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::N);
+    h.run_steps(3);
+    let (x, y) = new_document_origin(&mut h);
+    let at = |dx: f32, dy: f32| at_pt(x + dx, y + dy);
+    // The Photo tab picks its first preset, Default Photoshop Size
+    click(&mut h, at(188.0, 51.0));
+    // Landscape, 6 x 4 (the third card, from x 387.8)
+    click(&mut h, at(26.0 + 2.0 * 180.9 + 84.0, 124.0 + 84.0));
+    // Save it as a preset with the save icon, then create
+    click(&mut h, at(1048.5, 131.0));
+    assert_eq!(h.state().state.new_document_saved.len(), 1);
+    click(&mut h, at(1024.0, 674.0));
+    let d = &active(&h).doc;
+    assert_eq!((d.width, d.height, d.resolution), (1800, 1200, 300.0));
+    // Reopened, Recent starts with it and the Saved tab lists the preset
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::N);
+    h.run_steps(3);
+    let recent = &h.state().state.new_document_recent;
+    assert_eq!(recent.len(), 1);
+    assert_eq!(recent[0].size_label(), "6 x 4 in @ 300 ppi");
+    click(&mut h, at(128.0, 51.0));
+    shot(&mut h, "new_document_saved");
+    // Close leaves without a document
+    let docs = h.state().state.docs.len();
+    click(&mut h, at(936.0, 674.0));
+    assert!(h.state().state.new_document_dialog.is_none());
+    assert_eq!(h.state().state.docs.len(), docs);
+}

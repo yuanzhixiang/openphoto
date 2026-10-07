@@ -13,6 +13,7 @@ mod common;
 mod curves;
 mod custom_filter;
 mod distort;
+mod document_presets;
 mod duplicate_layer;
 mod equalize;
 mod exposure;
@@ -45,7 +46,10 @@ pub use fill::{FillDialog, Outcome as FillOutcome};
 pub use image_size::{ImageSizeDialog, Outcome as ImageSizeOutcome, Preview as ImageSizePreview};
 pub use lock_layers::{LockLayersDialog, Outcome as LockOutcome};
 pub use modify_selection::{ModifyDialog, ModifyKind, Outcome as ModifyOutcome};
-pub use new_document::{Contents as NewContents, NewDocumentDialog, Outcome as NewDocumentOutcome};
+pub use new_document::{
+    Contents as NewContents, NewDocumentDialog, Outcome as NewDocumentOutcome,
+    Preset as DocumentPreset,
+};
 pub use new_guide::{NewGuideDialog, Outcome as NewGuideOutcome};
 pub use new_layer::{Kind as NewLayerKind, NewLayer, NewLayerDialog, Outcome as NewLayerOutcome};
 pub use rotate_canvas::{Outcome as RotateOutcome, RotateCanvasDialog};
