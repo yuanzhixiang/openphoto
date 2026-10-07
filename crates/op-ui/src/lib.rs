@@ -729,10 +729,13 @@ impl eframe::App for OpenPhotoApp {
         // The status bar's arrow: its native menu (without one, as in
         // tests, the request stays and the commands are run directly)
         #[cfg(target_os = "macos")]
-        if let Some(menu) = &self.menu
-            && std::mem::take(&mut self.state.status_menu)
-        {
-            menu.popup_status(&self.state);
+        if let Some(menu) = &self.menu {
+            if std::mem::take(&mut self.state.status_menu) {
+                menu.popup_status(&self.state);
+            }
+            if std::mem::take(&mut self.state.ruler_menu) {
+                menu.popup_ruler_units(&self.state);
+            }
         }
 
         if let Some(msg) = self.state.alert.clone() {

@@ -86,6 +86,11 @@ pub struct DocState {
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
     /// What the drag in progress snaps to (View › Snap).
     pub snap: Option<crate::snap::Targets>,
+    /// The rulers' zero point, in document pixels (moved by dragging out of
+    /// the rulers' corner).
+    pub ruler_origin: egui::Pos2,
+    /// The pointer while the origin is dragged out of the corner.
+    pub origin_drag: Option<egui::Pos2>,
     /// A guide being dragged.
     pub guide_drag: Option<GuideDrag>,
     /// Where the pointer is over the document (document pixels), for the
@@ -208,6 +213,8 @@ impl DocState {
             quick: None,
             object_drag: None,
             snap: None,
+            ruler_origin: egui::Pos2::ZERO,
+            origin_drag: None,
             free_transform: None,
             crop: None,
             guide_drag: None,
@@ -1169,6 +1176,9 @@ pub struct AppState {
     pub untitled_counter: u32,
     /// Error message to show to the user.
     pub alert: Option<String>,
+    /// The rulers' unit, and a right-click on a ruler asking for its menu.
+    pub ruler_units: crate::rulers::RulerUnit,
+    pub ruler_menu: bool,
     /// What the status bar shows beside the zoom box.
     pub status_info: crate::status_info::StatusInfo,
     /// The status bar's arrow was clicked: its menu opens after the frame.
@@ -1312,6 +1322,8 @@ impl Default for AppState {
             image_size_dialog: None,
             new_guide_dialog: None,
             new_layer_dialog: None,
+            ruler_units: Default::default(),
+            ruler_menu: false,
             status_info: Default::default(),
             status_menu: false,
             last_timing: 0.0,

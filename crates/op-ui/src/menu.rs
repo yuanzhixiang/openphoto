@@ -11,6 +11,7 @@ use muda::{
 };
 
 use crate::commands::Command;
+use crate::rulers::RulerUnit;
 use crate::state::AppState;
 use crate::status_info::StatusInfo;
 use op_core::align::{Align, Distribute};
@@ -175,6 +176,13 @@ const ALL_COMMANDS: &[Command] = &[
     Command::ShowAllExtras,
     Command::ShowNoExtras,
     Command::ToggleSnap,
+    Command::RulerUnits(RulerUnit::Pixels),
+    Command::RulerUnits(RulerUnit::Inches),
+    Command::RulerUnits(RulerUnit::Centimeters),
+    Command::RulerUnits(RulerUnit::Millimeters),
+    Command::RulerUnits(RulerUnit::Points),
+    Command::RulerUnits(RulerUnit::Picas),
+    Command::RulerUnits(RulerUnit::Percent),
     Command::StatusInfo(StatusInfo::DocumentSizes),
     Command::StatusInfo(StatusInfo::DocumentProfile),
     Command::StatusInfo(StatusInfo::DocumentDimensions),
@@ -1129,22 +1137,39 @@ impl NativeMenu {
     }
 
     /// The status bar's menu, as Photoshop's native one: what the bar
-    /// shows, the current item checked, opening down from the pointer. A
-    /// pick arrives as a command like the menu bar's.
+    /// shows, the current item checked.
     pub fn popup_status(&self, app: &AppState) {
+        let items = StatusInfo::ALL.map(|info| {
+            (
+                Command::StatusInfo(info),
+                info.label(),
+                app.status_info == info,
+            )
+        });
+        self.popup(&items);
+    }
+
+    /// A ruler's right-click menu: the units, the current one checked.
+    pub fn popup_ruler_units(&self, app: &AppState) {
+        let items = RulerUnit::ALL.map(|unit| {
+            (
+                Command::RulerUnits(unit),
+                unit.label(),
+                app.ruler_units == unit,
+            )
+        });
+        self.popup(&items);
+    }
+
+    /// A native context menu of check items opening down from the pointer;
+    /// a pick arrives as a command like the menu bar's.
+    fn popup(&self, items: &[(Command, &str, bool)]) {
         let Some(view) = self.view else {
             return;
         };
         let menu = Menu::new();
-        for info in StatusInfo::ALL {
-            let command = Command::StatusInfo(info);
-            let item = CheckMenuItem::with_id(
-                id(command),
-                info.label(),
-                true,
-                app.status_info == info,
-                None,
-            );
+        for &(command, label, checked) in items {
+            let item = CheckMenuItem::with_id(id(command), label, true, checked, None);
             let _ = menu.append(&item);
         }
         // SAFETY: the window's live content view, on the main thread

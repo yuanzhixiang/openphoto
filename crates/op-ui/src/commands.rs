@@ -234,6 +234,8 @@ pub enum Command {
     ShowNoExtras,
     /// View > Screen Mode.
     ScreenMode(crate::state::ScreenMode),
+    /// A ruler's right-click menu: the rulers' unit.
+    RulerUnits(crate::rulers::RulerUnit),
     /// The status bar's menu: what it shows.
     StatusInfo(crate::status_info::StatusInfo),
     /// View > Snap and View > Snap To.
@@ -460,7 +462,8 @@ impl Command {
             | Self::SnapToAll
             | Self::SnapToNone
             | Self::ScreenMode(_)
-            | Self::StatusInfo(_) => return None,
+            | Self::StatusInfo(_)
+            | Self::RulerUnits(_) => return None,
             Self::ToggleRulers => cmd(Key::R),
             Self::ToggleExtras => cmd(Key::H),
             Self::ToggleGuides => cmd(Key::Semicolon),
@@ -621,6 +624,7 @@ impl Command {
             Self::ToggleSnap => v.snap,
             Self::ScreenMode(mode) => app.screen_mode == mode,
             Self::StatusInfo(info) => app.status_info == info,
+            Self::RulerUnits(unit) => app.ruler_units == unit,
             Self::SnapToGuides => v.snap_guides,
             Self::SnapToGrid => v.snap_grid,
             Self::SnapToLayers => v.snap_layers,
@@ -691,6 +695,7 @@ impl Command {
             | Self::SnapToNone
             | Self::ScreenMode(_)
             | Self::StatusInfo(_)
+            | Self::RulerUnits(_)
             | Self::LockGuides => true,
             Self::FlipView => doc.is_some(),
             Self::ClearGuides => doc.is_some_and(|d| !d.doc.guides.is_empty()),
@@ -1434,6 +1439,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::ToggleSnap => app.view.snap = !app.view.snap,
         Command::ScreenMode(mode) => app.set_screen_mode(mode),
         Command::StatusInfo(info) => app.status_info = info,
+        Command::RulerUnits(unit) => app.ruler_units = unit,
         Command::SnapToGuides => app.view.snap_guides = !app.view.snap_guides,
         Command::SnapToGrid => app.view.snap_grid = !app.view.snap_grid,
         Command::SnapToLayers => app.view.snap_layers = !app.view.snap_layers,

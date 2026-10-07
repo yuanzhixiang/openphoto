@@ -26,7 +26,7 @@ Implemented items emit a `Command`; items not yet implemented are shown grayed o
 
 ## Pop-up menus
 
-`NativeMenu::popup_status` shows the status bar's menu (`status_info.md`) as a native context menu in the window's view (`set_view`, the NSView from the window handle, given by `lib.rs` at startup): Photoshop's 15 items as check items with the current one checked, at the pointer. Its items carry `Command::StatusInfo` ids, so a pick arrives through the same event channel as the menu bar's.
+Both use `popup`: a native context menu of check items at the pointer. `NativeMenu::popup_ruler_units` shows a ruler's right-click menu (the seven units of `rulers.md`, the current one checked; `Command::RulerUnits`). `NativeMenu::popup_status` shows the status bar's menu (`status_info.md`) as a native context menu in the window's view (`set_view`, the NSView from the window handle, given by `lib.rs` at startup): Photoshop's 15 items as check items with the current one checked, at the pointer. Its items carry `Command::StatusInfo` ids, so a pick arrives through the same event channel as the menu bar's.
 
 ## Dynamic content
 

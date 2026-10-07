@@ -154,6 +154,7 @@ Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's men
 | ShowAllExtras | View › Show › All | — |
 | ShowNoExtras | View › Show › None | — |
 | ToggleSnap | View › Snap | ⇧⌘; |
+| RulerUnits(unit) | a ruler's right-click menu: the rulers' unit (checked) | — |
 | StatusInfo(item) | the status bar's menu: what the bar shows (checked) | — |
 | ScreenMode(mode) | View › Screen Mode › Standard Screen Mode, Full Screen Mode With Menu Bar, Full Screen Mode | — (F cycles, see `actions.md`) |
 | SnapToGuides, SnapToGrid, SnapToLayers, SnapToSlices, SnapToBounds | View › Snap To › Guides, Grid, Layers, Slices, Document Bounds | — |
@@ -174,7 +175,7 @@ Determines both whether a command can execute and whether its menu item is graye
 
 - When an input box has keyboard focus (`AppState::typing`), Cut, Copy, CopyMerged, Paste and PasteInPlace are always available (including input boxes in modal dialogs), and act on the input box's text when executed (see "Clipboard" below).
 - Apart from that, all commands are unavailable while a modal dialog is open.
-- New, Open, ToggleHistory, ToggleInfo, ToggleNavigator, ToggleHistogram, Quit, HideApp and the view toggles (Rulers, Extras, Guides, Grid, Lock Guides, Pixel Grid, Selection Edges, Layer Edges, Show › All / None, Snap and the Snap To items, Screen Mode, the status bar's items) are always available (except when a modal dialog is open); ClearGuides is available when the current document has guides; FitLayers, Zoom200, PrintSize, ActualSize, NewGuide and FlipView are available when there is a current document.
+- New, Open, ToggleHistory, ToggleInfo, ToggleNavigator, ToggleHistogram, Quit, HideApp and the view toggles (Rulers, Extras, Guides, Grid, Lock Guides, Pixel Grid, Selection Edges, Layer Edges, Show › All / None, Snap and the Snap To items, Screen Mode, the status bar's items, the ruler units) are always available (except when a modal dialog is open); ClearGuides is available when the current document has guides; FitLayers, Zoom200, PrintSize, ActualSize, NewGuide and FlipView are available when there is a current document.
 - Revert: available when the current document has a file and unsaved changes. Save, Save As, Save a Copy: available when there is a current document.
 - Undo, ToggleLastState: available when the current document can undo; Redo: available when it can redo.
 - DeleteLayer: available when the current document has more than 1 layer.

@@ -44,15 +44,10 @@ impl Targets {
         if view.snap_grid && view.grid_visible() {
             // The grid's lines and subdivisions (see rulers::draw_grid)
             let step = doc.resolution / 4.0;
-            let mut v = 0.0;
-            while step > 0.0 && v <= w.max(h) {
-                if v <= w {
-                    t.xs.push(v);
-                }
-                if v <= h {
-                    t.ys.push(v);
-                }
-                v += step;
+            if step > 0.0 {
+                let o = state.ruler_origin;
+                t.xs.extend(crate::rulers::grid_lines(o.x, step, w).map(|(_, v)| v));
+                t.ys.extend(crate::rulers::grid_lines(o.y, step, h).map(|(_, v)| v));
             }
         }
         if view.snap_layers {

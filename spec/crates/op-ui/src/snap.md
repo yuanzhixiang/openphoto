@@ -13,7 +13,7 @@ Pulls the points and boxes of a drag to guides, grid lines, layer edges and the 
 Gathered once when a drag starts (`begin`, called by `document_view.rs`) and kept in `DocState::snap`, since finding layer bounds every frame is not cheap:
 
 - Guides (Snap To › Guides): only while guides are shown (Extras and Show › Guides on). Vertical guides give x lines, horizontal ones y lines.
-- Grid (Snap To › Grid): only while the grid is shown; every major line and subdivision (a quarter inch apart, the same lines `rulers::draw_grid` draws).
+- Grid (Snap To › Grid): only while the grid is shown; every major line and subdivision (a quarter inch apart from the rulers' origin, the same lines `rulers::draw_grid` draws).
 - Layers (Snap To › Layers): the four edges of the non-transparent pixels of every visible layer except the background and the layers being moved.
 - Document Bounds: x = 0 and the width, y = 0 and the height.
 - Slices: a switch only; there are no slices yet.

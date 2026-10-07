@@ -185,6 +185,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let mut straightened = false;
     let mut paint_error = None;
     let status_info = app.status_info;
+    let ruler_units = app.ruler_units;
     let status_text = app
         .docs
         .get(&id)
@@ -242,10 +243,19 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
 
     let response = ui.allocate_rect(canvas_rect, Sense::click_and_drag());
-    // Dragging out of a ruler makes a guide
+    // Dragging out of a ruler makes a guide, out of their corner moves
+    // their origin; right-clicking one asks for the unit menu
     if let Some((top, left)) = rulers {
+        crate::rulers::origin_input(ui, state, &view_options, window_rect, ppp);
         for (rect, vertical) in [(top, false), (left, true)] {
-            let r = ui.interact(rect, ui.id().with(("ruler", vertical)), Sense::drag());
+            let r = ui.interact(
+                rect,
+                ui.id().with(("ruler", vertical)),
+                Sense::click_and_drag(),
+            );
+            if r.secondary_clicked() {
+                app.ruler_menu = true;
+            }
             if r.drag_started()
                 && let Some(p) = r.interact_pointer_pos()
             {
@@ -725,7 +735,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
     if rulers.is_some() {
         let pointer = ui.input(|i| i.pointer.hover_pos());
-        crate::rulers::draw_rulers(ui, state, window_rect, pointer, ppp);
+        crate::rulers::draw_rulers(ui, state, ruler_units, window_rect, pointer, ppp);
     }
     crate::free_transform::draw(ui, state, canvas_rect, ppp);
     if let Some(bounds) = controls_bounds

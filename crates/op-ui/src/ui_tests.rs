@@ -5868,3 +5868,51 @@ fn actual_size_uses_the_displays_density() {
     #[cfg(not(target_os = "macos"))]
     assert_eq!(zoom, 2.0 * UI_SCALE);
 }
+
+#[test]
+#[ignore]
+fn screenshot_rulers() {
+    let mut h = harness(Vec::new());
+    probe_document(&mut h);
+    run_command(&mut h, crate::commands::Command::ToggleRulers);
+    h.run_steps(4);
+    shot(&mut h, "rulers_probe");
+}
+
+#[test]
+fn ruler_units_and_origin() {
+    use crate::commands::Command;
+    use crate::rulers::RulerUnit;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, Command::ToggleRulers);
+    let vp = active(&h).view.viewport;
+    let ruler = crate::rulers::RULER;
+    // Right-clicking a ruler asks for the units menu (native, after the
+    // frame); a pick sets the unit, checked in the menu
+    right_click(&mut h, Pos2::new(vp.center().x, vp.top() - ruler / 2.0));
+    assert!(h.state().state.ruler_menu);
+    run_command(&mut h, Command::RulerUnits(RulerUnit::Inches));
+    assert_eq!(h.state().state.ruler_units, RulerUnit::Inches);
+    assert!(
+        Command::RulerUnits(RulerUnit::Inches)
+            .checked(&h.state().state)
+            .unwrap()
+    );
+    // Dragging out of the corner moves the origin to where it's let go
+    let corner = vp.min - Vec2::splat(ruler / 2.0);
+    let target = doc_point(&h, 200.0, 300.0);
+    drag(&mut h, corner, target, Modifiers::NONE);
+    let o = active(&h).ruler_origin;
+    assert!((o - Pos2::new(200.0, 300.0)).length() < 1.5, "{o:?}");
+    // The grid starts there (96 ppi: lines every 24 px)
+    let xs: Vec<f32> = crate::rulers::grid_lines(o.x, 24.0, 734.0)
+        .map(|(_, x)| x)
+        .collect();
+    assert!(xs.iter().any(|&x| (x - o.x).abs() < 1e-3));
+    // Double-clicking the corner puts it back (a while after the earlier
+    // clicks, so egui doesn't count a triple click)
+    h.run_steps(60);
+    double_click(&mut h, corner);
+    assert_eq!(active(&h).ruler_origin, Pos2::ZERO);
+}

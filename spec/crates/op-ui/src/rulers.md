@@ -6,12 +6,20 @@ The rulers (View › Rulers, ⌘R), guides (dragging out, moving, deleting, draw
 
 ## Rulers
 
-- When rulers are on, the canvas area of the document window gives up 16 pt (`RULER`) at the top and left for the rulers, with a square of the same color in the top-left corner; the canvas area shrinks accordingly (zoom, Fit on Screen and so on are based on the remaining area).
-- The unit is pixels, with the origin at the top-left corner of the canvas, moving with zoom and scrolling.
-- Ticks: the spacing of numbered major ticks is the smallest of 1, 2, 5 × 10ⁿ pixels that is at least 60 pt on screen; each major interval is divided into 10 minor divisions, the 5th medium length (40% of the ruler thickness), the rest 20%, and major ticks span the full thickness.
-- Numbers: 9 pt, color `#a8a8a8`; on the top ruler they are written to the right of the tick, and on the left ruler they are stacked vertically digit by digit, as in Photoshop.
-- Background `#3c3c3c`, with a separator line on the side next to the canvas.
-- When the pointer is inside the window, a thin line on each ruler marks the pointer position.
+Measured on Photoshop 2026 (probe document at nine zoom levels and in every unit):
+
+- When rulers are on, the canvas area of the document window gives up 19 pt (`RULER`) at the top and left for the rulers, with a square of the same color in the top-left corner; the canvas area shrinks accordingly (zoom, Fit on Screen and so on are based on the remaining area). Background `#474747`, no separator line on the canvas side.
+- Unit (`RulerUnit`, `AppState::ruler_units`, Pixels by default): Pixels, Inches, Centimeters, Millimeters, Points, Picas, Percent (of the image's width on the top ruler, of its height on the left one). Right-clicking either ruler opens Photoshop's native menu of the seven units with the current one checked (`AppState::ruler_menu`, shown after the frame by `NativeMenu::popup_ruler_units`; a pick runs `Command::RulerUnits`).
+- Ticks (`ticks`): each unit has a ladder of spacings (1, 2, 5 × 10ⁿ; inches also ½ down to ¹⁄₁₆; picas 1, 3, 6, 12, 24, 60, … and points twelve times those). The numbered major step is the smallest on the ladder at least 30 pt apart on screen; the minor step the smallest dividing it that is at least 4.75 pt apart; the medium step the largest between them that divides the major and is divided by the minor (none when there is none). For example, pixels at 100% (Retina): 100 / 50 / 10; at 200%: 50 / 10 / 5; at 800%: 10 / none / 2; inches at 100% on a 72 ppi image: 1 / ½ / ¼; points: 72 / 36 / 12.
+- Ticks are one physical pixel wide, `#666666`, standing on the canvas side: major ticks the full thickness, medium 4 pt, minor 2 pt.
+- Numbers (`ruler_label`): the distance from the origin in the unit, without a sign (Photoshop writes −100 as 100), whole or with up to three decimals; Source Sans 3 10.5 pt, `#9e9e9e`. On the top ruler they start 1.5 pt after the tick, centered 11.25 pt from the ruler's top, with 1.1 pt tracking (Adobe Clean's digits are wider); on the left ruler they are stacked digit by digit, centered 9.5 pt from the ruler's left, the first 5.75 pt below the tick and each next 9.75 pt lower, as in Photoshop.
+- When the pointer is inside the window, each ruler marks its position with a 1 pt `#dcdcdc` line from 1.5 to 13.5 pt across the ruler.
+
+## Ruler origin
+
+- The origin (`DocState::ruler_origin`, document pixels, the image's top-left corner by default) is where the rulers count from; it moves with zoom and scrolling.
+- Dragging out of the corner square shows a crosshair (1 point `#dcdcdc` lines across the canvas area) following the pointer, and letting go moves the origin there (snapping to the View › Snap targets, gathered as the drag starts). Double-clicking the corner puts it back at the image's top-left corner. Neither is recorded in the history; the origin is not saved with the document.
+- The grid starts at the origin (`grid_lines`), as in Photoshop.
 
 ## Guides
 
@@ -22,7 +30,7 @@ The rulers (View › Rulers, ⌘R), guides (dragging out, moving, deleting, draw
 
 ## Grid
 
-- One major line per inch (document resolution in pixels), subdivided into 4 (Photoshop's default setting), drawn only within the canvas, each line mapped end to end from document space so the grid follows the view's rotation and flip; the grid is not drawn when subdivision lines would be less than 4 pt apart on screen.
+- One major line per inch (document resolution in pixels), subdivided into 4 (Photoshop's default setting), counted from the rulers' origin, drawn only within the canvas, each line mapped end to end from document space so the grid follows the view's rotation and flip; the grid is not drawn when subdivision lines would be less than 4 pt apart on screen.
 - The color is semi-transparent gray, with major lines somewhat brighter than subdivision lines.
 
 ## Display toggles
@@ -37,4 +45,6 @@ The rulers (View › Rulers, ⌘R), guides (dragging out, moving, deleting, draw
 
 ## Test coverage
 
-- `ruler_steps_are_round_numbers`: at different zoom levels the major tick spacing is 100, 200, 20 and 2 pixels.
+- `ticks_match_photoshops`: the major, medium and minor steps at Photoshop's nine measured zoom levels in pixels, and at 100% in inches, centimeters, millimeters, points, picas and percent, equal Photoshop's.
+- `labels_drop_the_sign`, `the_grid_starts_at_the_origin`.
+- `ruler_units_and_origin` (UI test): see `ui_tests.md`. `screenshot_rulers` (`#[ignore]`) captures the rulers on the probe document for comparison with Photoshop.
