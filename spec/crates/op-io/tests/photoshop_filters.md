@@ -45,6 +45,14 @@ So the simpler coverage model stays.
   - Every case (36, including the image borders) is now within one level; before, the diagonals were off by up to 18.
 - **Emboss** reads each of its two points from the pixels within one pixel of it, weighted 1 − d − 0.012·d³ and not normalized. Every case is within one level, and the axes are exact; with bilinear sampling 30° was off by 22 levels.
 
+`add_noise_strength` compares the standard deviation of Add Noise on flat 50% gray (256 × 256) with Photoshop's at 5–100%, uniform and Gaussian. Photoshop's noise is twice what OpenPhoto had: Gaussian has a standard deviation of amount% × 255 and is bounded at about 3.5σ (a sum of four uniforms), and uniform noise spans ±(amount% × 255 + 0.75). All are now within about 1%.
+
+`wind_patterns` writes ours for Wind, Blast and Stagger on a white line at x 40 and on gray steps (60–255 against 40), so the streaks can be counted beside Photoshop's runs of the same patterns:
+
+- **Wind:** a streak's first pixel is ½, ¾, ⅞ or 15⁄16 of the step, in 58/32/8/1% of streaked rows. That is Poisson-many (mean 1.1) passes of "average with the pixel before, keep the lighter", which halves a streak at each pixel (107, 53, 26, 13 … above the ground). Two passes give 161, 107, 66, 39 …. Most rows also get passes starting inside the streak, which lengthen it. Photoshop streaks two thirds of the rows at every contrast; lengths from white are 8–21 in 80% of rows (mean 14).
+- **Blast:** streaks of the full color, exactly 10, 20, 30 or 40 pixels, in the same proportions as Wind's passes.
+- **Stagger:** every row moves. A line moves 0.636 of the way to the downwind edge (the same at widths 128, 256 and 512 and from both sides), give or take about 0.36·√distance. A block moves whole; a gradient of 2-pixel steps moves 0–1 pixels.
+
 ## Known limitations
 
 Producing Photoshop's PNGs needs Photoshop and the measuring scripts, which are outside the repository.

@@ -1499,14 +1499,18 @@ fn filtered(
             for c in 0..3 {
                 let channel = if monochromatic { 0 } else { c };
                 let u = noise(x, y, channel);
+                // Measured from Photoshop: Gaussian noise (a sum of four
+                // uniforms, bounded like Photoshop's at about 3.5σ) has a
+                // standard deviation of amount% × 255; uniform noise spans
+                // ±(amount% × 255 + 0.75)
+                let spread = amount / 100.0 * 255.0;
                 let n = if gaussian {
-                    // Sum of uniforms: roughly normal with unit variance
                     let s: f32 = (0..4).map(|k| noise(x, y, channel * 4 + k + 8)).sum();
-                    (s - 2.0) * 3f32.sqrt()
+                    (s - 2.0) * 3f32.sqrt() * spread
                 } else {
-                    u * 2.0 - 1.0
+                    (u * 2.0 - 1.0) * (spread + 0.75)
                 };
-                let v = px[c] as f32 + n * amount / 100.0 * 127.5;
+                let v = px[c] as f32 + n;
                 out[c] = v.round().clamp(0.0, 255.0) as u8;
             }
             out
@@ -1619,62 +1623,91 @@ fn filtered(
                 .collect()
         }
         Filter::Wind { method, from_left } => {
+            // Measured from Photoshop 2026 (`photoshop_filters.md`). Every
+            // edge where the row gets darker downwind takes a random number
+            // of passes (Poisson, mean 1.1: none a third of the time), most
+            // from the edge, a few one to three pixels on. A Wind pass
+            // averages each pixel with the one before it (keeping the
+            // lighter) until nothing changes, so a streak halves with each
+            // pixel and passes stack (½, ¾, ⅞ of the step); a Blast pass
+            // carries the lighter pixel ten pixels on. Stagger moves each
+            // row round by 0.636 of its longest run of equal pixels, give or
+            // take 0.36·√run.
             let mut out: Vec<[u8; 4]> = src.px.iter().map(|&p| Buffer::straight(p)).collect();
             for y in 0..h {
                 // The row in the wind's direction
                 let index = |k: usize| y * w + if from_left { k } else { w - 1 - k };
-                let row: Vec<[u8; 4]> = (0..w).map(|k| out[index(k)]).collect();
-                let lum = |p: [u8; 4]| p[0] as i32 * 3 + p[1] as i32 * 6 + p[2] as i32;
-                let mut streak: Option<([f32; 3], f32, usize)> = None;
-                for k in 1..w {
-                    let (prev, here) = (row[k - 1], row[k]);
-                    let r = noise(k, y, 7);
-                    // A streak starts, half the time, where it gets darker
-                    if streak.is_none() && lum(prev) - lum(here) > 40 && r < 0.5 {
-                        let len = 8 + (noise(k, y, 8) * 24.0) as usize;
-                        let color = [0, 1, 2].map(|c| prev[c] as f32);
-                        streak = Some(match method {
-                            WindMethod::Wind => (
-                                [0, 1, 2].map(|c| (prev[c] as f32 + here[c] as f32) / 2.0),
-                                0.08 + noise(k, y, 9) * 0.2,
-                                len,
-                            ),
-                            WindMethod::Blast => (color, 0.0, len),
-                            // Stagger carries the pixel on and drops it
-                            WindMethod::Stagger => (color, 0.0, len * 3),
-                        });
-                        if method == WindMethod::Stagger {
-                            out[index(k - 1)] = here;
-                        }
+                let mut row: Vec<[u8; 4]> = (0..w).map(|k| out[index(k)]).collect();
+                if method == WindMethod::Stagger {
+                    let mut longest = 0;
+                    let mut run = 0;
+                    for k in 0..w {
+                        run = if k > 0 && row[k] == row[k - 1] {
+                            run + 1
+                        } else {
+                            1
+                        };
+                        longest = longest.max(run);
                     }
-                    let Some((color, decay, left)) = streak.as_mut() else {
-                        continue;
+                    let g = ((0..4).map(|c| noise(c, y, 31)).sum::<f32>() - 2.0) * 3f32.sqrt();
+                    let shift = (0.636 * longest as f32 + 0.36 * (longest as f32).sqrt() * g)
+                        .round()
+                        .clamp(0.0, w as f32) as usize
+                        % w;
+                    row.rotate_right(shift);
+                } else {
+                    let lum = |p: [u8; 4]| p[0] as i32 * 3 + p[1] as i32 * 6 + p[2] as i32;
+                    // How many passes start at a pixel: Poisson, mean 1.1 at
+                    // the image's own edges and 0.4 elsewhere
+                    let edge: Vec<bool> = (0..w)
+                        .map(|k| k > 0 && lum(row[k - 1]) > lum(row[k]))
+                        .collect();
+                    let passes_at = |k: usize| {
+                        let u = noise(k, y, 7);
+                        let cdf: &[f32] = if edge[k] {
+                            &[0.333, 0.699, 0.900, 0.974, 0.995]
+                        } else {
+                            &[0.670, 0.938, 0.992, 0.999]
+                        };
+                        cdf.iter().take_while(|&&c| u >= c).count()
                     };
-                    let i = index(k);
-                    match method {
-                        WindMethod::Stagger => {
-                            if *left == 0 {
-                                for c in 0..3 {
-                                    out[i][c] = color[c] as u8;
+                    if method == WindMethod::Blast {
+                        for k in (1..w).filter(|&k| edge[k]) {
+                            // Each pass carries on where the last one stopped
+                            for pass in 0..passes_at(k) {
+                                let from = (k + pass * 10).min(w);
+                                for x in from..(from + 10).min(w) {
+                                    for c in 0..3 {
+                                        row[x][c] = row[x][c].max(row[x - 1][c]);
+                                    }
                                 }
-                                streak = None;
-                                continue;
                             }
                         }
-                        _ => {
-                            for c in 0..3 {
-                                let v = color[c].round() as u8;
-                                out[i][c] = out[i][c].max(v);
-                                // Wind's streak fades into what it crosses
-                                color[c] += (here[c] as f32 - color[c]) * *decay;
-                            }
-                            if *left == 0 {
-                                streak = None;
-                                continue;
+                    } else {
+                        // Passes start anywhere; one that changes nothing
+                        // stops at once, so only edges and streaks take them
+                        for k in 1..w {
+                            for _ in 0..passes_at(k) {
+                                for x in k..w {
+                                    let mut changed = false;
+                                    for c in 0..3 {
+                                        let avg =
+                                            ((row[x - 1][c] as u16 + row[x][c] as u16) / 2) as u8;
+                                        if avg > row[x][c] {
+                                            row[x][c] = avg;
+                                            changed = true;
+                                        }
+                                    }
+                                    if !changed {
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
-                    *left -= 1;
+                }
+                for (k, p) in row.into_iter().enumerate() {
+                    out[index(k)] = p;
                 }
             }
             out
@@ -2142,7 +2175,9 @@ mod tests {
         let src = Buffer {
             w,
             h,
-            px: (0..w * h).map(|i| [(i % 251) as f32, 50.0, 90.0, 255.0]).collect(),
+            px: (0..w * h)
+                .map(|i| [(i % 251) as f32, 50.0, 90.0, 255.0])
+                .collect(),
         };
         let t = std::time::Instant::now();
         let out = src.motion_blur(30, 50);
