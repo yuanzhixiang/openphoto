@@ -14,7 +14,7 @@
 
 ## 对外接口
 
-- `BrushTip`：直径（像素）、硬度（0 柔边 – 1 硬边）、`aliased`（铅笔：没有抗锯齿）。笔印透明度：从中心到 `半径 × 硬度` 为 1，之后平滑衰减到半径外 0.5 像素处为 0；硬度为 1 时也保留 1 像素的抗锯齿边缘。铅笔的像素中心在半径内为 1，否则为 0（直径至少按 1 像素计）。
+- `BrushTip`：直径（像素）、硬度（0 柔边 – 1 硬边）、`aliased`（铅笔：没有抗锯齿）、`square`（橡皮擦的 Block：边长为直径的方块，内部完全覆盖、外部为 0）。笔印透明度：从中心到 `半径 × 硬度` 为 1，之后平滑衰减到半径外 0.5 像素处为 0；硬度为 1 时也保留 1 像素的抗锯齿边缘。铅笔的像素中心在半径内为 1，否则为 0（直径至少按 1 像素计）。
 - `StrokeKind`：
   - `Paint(rgb)`：画颜色（画笔、铅笔）。`Erase { background }`：橡皮擦。
   - `Dodge(range)`、`Burn(range)`：减淡、加深。`ToneRange` 为 Shadows / Midtones（默认）/ Highlights，`label()` 为菜单文字。
@@ -29,6 +29,15 @@
   - 没有图层：「Could not use the {工具} because there is no layer to paint on.」
   - `lock_pixels`：「Could not use the {工具} because the layer is locked.」
   - 图层隐藏：「Could not use the {工具} because the target layer is hidden.」
+
+## 绘画模式（`PaintMode`）
+
+画笔、铅笔的 Mode，用 `Stroke::with_mode` 设置（默认 Normal）：
+
+- `Blend(mode)`：以图层原有像素为底色，用 `blend::composite` 的混合公式把颜色以「覆盖率 × 不透明度 × 选区」的强度合成上去（Dissolve 按像素随机，与图层混合模式相同）。例：Multiply 的红色画在 `#808080` 上得到 `#800000`。
+- `Behind`：颜色画在图层「下面」：原有像素盖在颜色之上，所以只有透明处被涂上。
+- `Clear`：按强度降低透明度（像橡皮擦）。
+- 背景图层、锁定透明像素或蒙版上，混合结果保留原透明度；Behind 与 Clear 在这些地方不改变像素。
 
 ## 像素规则
 
@@ -65,6 +74,7 @@
 
 ## 测试覆盖
 
+- `paint_modes_blend_with_the_layer`：Multiply、Behind、Clear；`a_square_tip_covers_a_block`：方形笔尖的角也被覆盖。
 - `hard_brush_paints_full_color_in_its_core`、`pencil_is_aliased`：硬边画笔中心为完整颜色；铅笔只有完全透明和完全不透明。
 - `dodge_burn_and_sponge`：中间调减淡变亮、加深变暗；Highlights 几乎不影响暗像素；去色后三通道相等。
 - `quick_mask_round_trip`：快速蒙版模式下在隐藏图层上也能画；涂黑处退出后不在选区内；什么都不画时退出后没有选区。
