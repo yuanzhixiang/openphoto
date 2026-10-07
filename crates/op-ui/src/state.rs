@@ -18,6 +18,9 @@ pub struct View {
     pub initialized: bool,
     /// Viewport of the last frame, in points; used by keyboard zoom.
     pub viewport: egui::Rect,
+    /// The Rotate View tool's angle: the canvas turned clockwise by this
+    /// many degrees about the document's center (−180 to 180).
+    pub rotation: f32,
 }
 
 impl Default for View {
@@ -27,6 +30,7 @@ impl Default for View {
             offset: egui::Vec2::ZERO,
             initialized: false,
             viewport: egui::Rect::NOTHING,
+            rotation: 0.0,
         }
     }
 }

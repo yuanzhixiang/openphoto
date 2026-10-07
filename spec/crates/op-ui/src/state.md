@@ -90,6 +90,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 
 - `zoom`: the number of physical pixels per document pixel; 1.0 = 100%.
 - `offset`: the offset of the document center relative to the viewport center (logical points). The center rather than the top-left corner is used as the reference so the document stays centered when the window size changes, matching Photoshop.
+- `rotation`: the view rotation in degrees, clockwise, within ±180° (Rotate View; see `document_view.md`). Not saved with the document.
 - `initialized` / `viewport`: on first display, the initial zoom is decided only after the viewport size settles (see `document_view.md`); `viewport` is used by shortcut zooming.
 
 ## Known Limitations

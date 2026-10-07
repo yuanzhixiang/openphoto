@@ -336,6 +336,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
         }
     } else if !space {
         match tool {
+            Tool::RotateView => rotate_view_input(ui, &response, state, ppp),
             Tool::Zoom if response.clicked() => {
                 if let Some(p) = response.interact_pointer_pos() {
                     let z = next_zoom_step(state.view.zoom, alt == zoom_out);
@@ -645,7 +646,17 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
         origin: [origin.x, origin.y],
         zoom: state.view.zoom,
         shield: crate::crop_tool::shield(state, &crop_options),
-        rotation: crate::crop_tool::rotation(state),
+        // The crop's own turn, or the view's (the shader maps screen points
+        // to the image by the opposite angle)
+        rotation: crate::crop_tool::rotation(state).or_else(|| {
+            let a = view_angle(state);
+            (a != 0.0).then(|| {
+                (
+                    [state.doc.width as f32 / 2.0, state.doc.height as f32 / 2.0],
+                    -a,
+                )
+            })
+        }),
         pixel_grid: true,
     };
     ui.painter()
@@ -693,19 +704,47 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
 /// Screen point → document pixel coordinates (not clamped).
 pub(crate) fn to_doc(state: &DocState, p: Pos2, ppp: f32) -> Pos2 {
     let d = (p - origin(state, ppp)) * ppp / state.view.zoom;
-    Pos2::new(d.x, d.y)
+    turn(state, Pos2::new(d.x, d.y), -view_angle(state))
+}
+
+/// The view's rotation in radians (clockwise), none while cropping (the
+/// Crop tool turns the image its own way).
+pub(crate) fn view_angle(state: &DocState) -> f32 {
+    if state.crop.is_some() {
+        0.0
+    } else {
+        state.view.rotation.to_radians()
+    }
+}
+
+/// `p` (document pixels) turned clockwise by `angle` about the document's
+/// center.
+fn turn(state: &DocState, p: Pos2, angle: f32) -> Pos2 {
+    if angle == 0.0 {
+        return p;
+    }
+    let c = Pos2::new(state.doc.width as f32 / 2.0, state.doc.height as f32 / 2.0);
+    let (s, k) = angle.sin_cos();
+    let q = p - c;
+    c + Vec2::new(q.x * k - q.y * s, q.x * s + q.y * k)
 }
 
 /// The part of the document shown in the window, in document pixels
 /// (x0, y0, x1, y1; may extend past the canvas).
 pub fn visible_rect(state: &DocState, ppp: f32) -> [f32; 4] {
-    let min = to_doc(state, state.view.viewport.min, ppp);
-    let max = to_doc(state, state.view.viewport.max, ppp);
-    [min.x, min.y, max.x, max.y]
+    // With the view rotated, the bounds of all four corners
+    let v = state.view.viewport;
+    let corners = [v.left_top(), v.right_top(), v.left_bottom(), v.right_bottom()]
+        .map(|p| to_doc(state, p, ppp));
+    let (xs, ys) = (corners.map(|p| p.x), corners.map(|p| p.y));
+    let min = |a: [f32; 4]| a.into_iter().fold(f32::INFINITY, f32::min);
+    let max = |a: [f32; 4]| a.into_iter().fold(f32::NEG_INFINITY, f32::max);
+    [min(xs), min(ys), max(xs), max(ys)]
 }
 
 /// Document pixel → screen point.
 pub(crate) fn to_screen(state: &DocState, d: Pos2, ppp: f32) -> Pos2 {
+    let d = turn(state, d, view_angle(state));
     origin(state, ppp) + d.to_vec2() * state.view.zoom / ppp
 }
 
@@ -1647,57 +1686,57 @@ fn draw_selection(
         }
     }
 
+    // Outlines are worked out in document pixels and mapped point by point,
+    // so they turn with the view
+    let corners = |r: Rect| {
+        [
+            r.left_top(),
+            r.right_top(),
+            r.right_bottom(),
+            r.left_bottom(),
+            r.left_top(),
+        ]
+        .map(|p| to_screen(state, p, ppp))
+    };
+    let oval = |r: Rect| -> Vec<Pos2> {
+        (0..=96)
+            .map(|i| {
+                let t = i as f32 / 96.0 * std::f32::consts::TAU;
+                to_screen(
+                    state,
+                    r.center() + Vec2::new(t.cos() * r.width() / 2.0, t.sin() * r.height() / 2.0),
+                    ppp,
+                )
+            })
+            .collect()
+    };
     if let Some((a, b)) = state.object_drag {
-        let (a, b) = (to_screen(state, a, ppp), to_screen(state, b, ppp));
-        let r = Rect::from_two_pos(a, b);
-        for (p, q) in [
-            (r.left_top(), r.right_top()),
-            (r.right_top(), r.right_bottom()),
-            (r.right_bottom(), r.left_bottom()),
-            (r.left_bottom(), r.left_top()),
-        ] {
-            ants(p, q);
+        for w in corners(Rect::from_two_pos(a, b)).windows(2) {
+            ants(w[0], w[1]);
         }
     }
     if let Some(drag) = state.marquee_drag {
         let mods = ui.input(|i| i.modifiers);
         let r = marquee_rect(&drag, mods.shift, mods.alt);
-        let a = to_screen(state, Pos2::new(r.x0, r.y0), ppp);
-        let b = to_screen(state, Pos2::new(r.x1, r.y1), ppp);
-        let rect = Rect::from_two_pos(a, b);
-        if tool == Tool::EllipticalMarquee {
-            // Ellipse preview: a polyline approximating the ellipse
-            let n = 96;
-            let pts: Vec<Pos2> = (0..=n)
-                .map(|i| {
-                    let t = i as f32 / n as f32 * std::f32::consts::TAU;
-                    rect.center()
-                        + Vec2::new(t.cos() * rect.width() / 2.0, t.sin() * rect.height() / 2.0)
-                })
-                .collect();
-            for w in pts.windows(2) {
-                ants(w[0], w[1]);
-            }
+        let rect = Rect::from_two_pos(Pos2::new(r.x0, r.y0), Pos2::new(r.x1, r.y1));
+        // The ellipse preview is a polyline approximating it
+        let pts: Vec<Pos2> = if tool == Tool::EllipticalMarquee {
+            oval(rect)
         } else {
-            for (a, b) in [
-                (rect.left_top(), rect.right_top()),
-                (rect.right_top(), rect.right_bottom()),
-                (rect.right_bottom(), rect.left_bottom()),
-                (rect.left_bottom(), rect.left_top()),
-            ] {
-                ants(a, b);
-            }
+            corners(rect).to_vec()
+        };
+        for w in pts.windows(2) {
+            ants(w[0], w[1]);
         }
     }
     // A shape being dragged: its outline as a thin blue path
     if let Some((s, e)) = state.shape_drag {
         let mods = ui.input(|i| i.modifiers);
         let (a, b) = shape_points(tool, s, e, mods);
-        let (a, b) = (to_screen(state, a, ppp), to_screen(state, b, ppp));
         let r = Rect::from_two_pos(a, b);
         let blue = egui::Stroke::new(1.0, Color32::from_rgb(0x2c, 0x8b, 0xe8));
         let painter = ui.painter_at(canvas);
-        let outline: Vec<Pos2> = match tool {
+        let doc_outline: Vec<Pos2> = match tool {
             Tool::Line => vec![a, b],
             Tool::Ellipse => (0..=96)
                 .map(|i| {
@@ -1730,6 +1769,10 @@ fn draw_selection(
                 r.left_top(),
             ],
         };
+        let outline: Vec<Pos2> = doc_outline
+            .iter()
+            .map(|&p| to_screen(state, p, ppp))
+            .collect();
         painter.add(egui::Shape::line(outline, blue));
     }
     // The gradient's direction while dragging: a line with a dot at each end
@@ -2188,4 +2231,59 @@ fn object_input(
     let combined = op_core::Selection::combine(state.doc.selection(), region, op);
     state.doc.set_selection(Some(combined));
     state.record("Object Selection");
+}
+
+/// The Rotate View tool: dragging turns the canvas about the document's
+/// center by the angle the pointer sweeps around it (Shift snaps to 15°),
+/// showing a compass; Escape turns it back upright.
+fn rotate_view_input(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
+    let center = to_screen(
+        state,
+        Pos2::new(state.doc.width as f32 / 2.0, state.doc.height as f32 / 2.0),
+        ppp,
+    );
+    let start_id = ui.id().with("rotate-view-start");
+    if ui.input(|i| i.key_pressed(Key::Escape)) {
+        state.view.rotation = 0.0;
+    }
+    let angle_of = |p: Pos2| (p.y - center.y).atan2(p.x - center.x).to_degrees();
+    if response.drag_started_by(PointerButton::Primary)
+        && let Some(p) = ui.input(|i| i.pointer.press_origin())
+    {
+        ui.data_mut(|d| d.insert_temp(start_id, (state.view.rotation, angle_of(p))));
+    }
+    let Some((start, from)) = ui.data(|d| d.get_temp::<(f32, f32)>(start_id)) else {
+        return;
+    };
+    if !ui.input(|i| i.pointer.primary_down()) {
+        ui.data_mut(|d| d.remove::<(f32, f32)>(start_id));
+        return;
+    }
+    if let Some(p) = ui.input(|i| i.pointer.interact_pos()) {
+        let mut a = crate::options_tools::normalize_angle(start + angle_of(p) - from);
+        if ui.input(|i| i.modifiers.shift) {
+            a = crate::options_tools::normalize_angle((a / 15.0).round() * 15.0);
+        }
+        state.view.rotation = a;
+    }
+    // The compass: a ring and a needle pointing to the image's top
+    let painter = ui.painter();
+    let r = 60.0;
+    painter.circle(
+        center,
+        r,
+        Color32::from_black_alpha(90),
+        egui::Stroke::new(1.5, Color32::from_gray(0xd0)),
+    );
+    let a = (state.view.rotation - 90.0).to_radians();
+    let dir = Vec2::new(a.cos(), a.sin());
+    painter.line_segment(
+        [center - dir * r * 0.8, center],
+        egui::Stroke::new(3.0, Color32::from_gray(0xd0)),
+    );
+    painter.line_segment(
+        [center, center + dir * r * 0.8],
+        egui::Stroke::new(3.0, Color32::from_rgb(0xe0, 0x30, 0x30)),
+    );
+    ui.ctx().request_repaint();
 }

@@ -60,4 +60,4 @@ Called after the Duplicate Layer dialog is confirmed; handled in three cases dep
 
 ## Known limitations
 
-- Shortcuts for features not yet implemented, such as F (screen mode) and R (Rotate View), are not handled.
+- Shortcuts for features not yet implemented, such as F (screen mode), are not handled.

@@ -133,9 +133,8 @@ fn active<'a>(h: &'a Harness<'_, OpenPhotoApp>) -> &'a crate::state::DocState {
 
 /// Screen position (egui points) of a document pixel in the active document.
 fn doc_point(h: &Harness<'_, OpenPhotoApp>, x: f32, y: f32) -> Pos2 {
-    let state = active(h);
     let ppp = 2.0 * UI_SCALE;
-    crate::document_view::origin(state, ppp) + egui::vec2(x, y) * state.view.zoom / ppp
+    crate::document_view::to_screen(active(h), Pos2::new(x, y), ppp)
 }
 
 #[test]
@@ -4568,9 +4567,9 @@ fn type_shape_and_view_options_bars_edit_their_settings() {
     // Rotate View: the angle wraps into ±180°; Reset View clears it
     select(&mut h, Tool::RotateView);
     type_in_bar(&mut h, 210.0, "200");
-    assert_eq!(setting(&h, "rotate.angle").as_deref(), Some("-160°"));
+    assert_eq!(active(&h).view.rotation, -160.0);
     click(&mut h, at_pt(309.0, 45.5));
-    assert_eq!(setting(&h, "rotate.angle").as_deref(), Some("0°"));
+    assert_eq!(active(&h).view.rotation, 0.0);
     // Perspective Crop: Front Image takes the document's size
     select(&mut h, Tool::PerspectiveCrop);
     click(&mut h, at_pt(584.0, 45.5));
@@ -5367,7 +5366,10 @@ fn quick_and_object_selection() {
     }
     let bounds = |h: &Harness<'_, OpenPhotoApp>| active(h).doc.selection().and_then(|s| s.bounds());
     let near = |b: (u32, u32, u32, u32)| {
-        b.0.abs_diff(240) <= 3 && b.1.abs_diff(240) <= 3 && b.2.abs_diff(360) <= 3 && b.3.abs_diff(360) <= 3
+        b.0.abs_diff(240) <= 3
+            && b.1.abs_diff(240) <= 3
+            && b.2.abs_diff(360) <= 3
+            && b.3.abs_diff(360) <= 3
     };
     // Quick Selection: a short drag inside the disc selects all of it
     h.state_mut().state.select_tool(Tool::QuickSelection);
@@ -5378,7 +5380,14 @@ fn quick_and_object_selection() {
     assert!(near(got), "{got:?}");
     assert_eq!(last_history(&h), "Quick Selection");
     // New turned into Add
-    assert_eq!(h.state().state.tool_settings.get("quick.mode").map(String::as_str), Some("1"));
+    assert_eq!(
+        h.state()
+            .state
+            .tool_settings
+            .get("quick.mode")
+            .map(String::as_str),
+        Some("1")
+    );
 
     // Object Selection around the disc finds it
     run_command(&mut h, crate::commands::Command::Deselect);
@@ -5389,4 +5398,67 @@ fn quick_and_object_selection() {
     let got = bounds(&h).expect("a selection");
     assert!(near(got), "{got:?}");
     assert_eq!(last_history(&h), "Object Selection");
+}
+
+#[test]
+fn rotate_view_turns_the_canvas() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let (w, hgt) = {
+        let d = &active(&h).doc;
+        (d.width as f32, d.height as f32)
+    };
+    let center = doc_point(&h, w / 2.0, hgt / 2.0);
+    h.state_mut().state.select_tool(Tool::RotateView);
+    h.run_steps(1);
+    // A quarter turn clockwise around the document's center
+    drag(
+        &mut h,
+        center + egui::vec2(100.0, 0.0),
+        center + egui::vec2(0.0, 100.0),
+        Modifiers::NONE,
+    );
+    let r = active(&h).view.rotation;
+    assert!((r - 90.0).abs() < 1.0, "{r}");
+    // The center stays put; the image's top-left corner is now top-right
+    let c = doc_point(&h, w / 2.0, hgt / 2.0);
+    assert!((c - center).length() < 0.5);
+    let corner = doc_point(&h, 0.0, 0.0);
+    assert!(corner.x > center.x && corner.y < center.y, "{corner:?}");
+    // Screen points map back to the same document points
+    let ppp = 2.0 * UI_SCALE;
+    let back = crate::document_view::to_doc(active(&h), corner, ppp);
+    assert!(back.x.abs() < 0.5 && back.y.abs() < 0.5, "{back:?}");
+    // Shift snaps to 15°
+    drag(
+        &mut h,
+        center + egui::vec2(100.0, 0.0),
+        center + egui::vec2(100.0, 20.0),
+        Modifiers::SHIFT,
+    );
+    let r = active(&h).view.rotation;
+    assert_eq!(r % 15.0, 0.0, "{r}");
+    // A marquee in the turned view still selects in document space
+    h.state_mut().state.select_tool(Tool::RectangularMarquee);
+    h.run_steps(1);
+    h.state_mut().state.active().unwrap().view.rotation = 90.0;
+    h.run_steps(1);
+    let (a, b) = (doc_point(&h, 100.0, 120.0), doc_point(&h, 300.0, 220.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let (x0, y0, x1, y1) = active(&h).doc.selection().unwrap().bounds().unwrap();
+    assert!(
+        x0.abs_diff(100) <= 1
+            && y0.abs_diff(120) <= 1
+            && x1.abs_diff(300) <= 1
+            && y1.abs_diff(220) <= 1,
+        "{:?}",
+        (x0, y0, x1, y1)
+    );
+    // Escape with Rotate View turns it back upright
+    h.state_mut().state.select_tool(Tool::RotateView);
+    h.run_steps(1);
+    h.key_press(egui::Key::Escape);
+    h.run_steps(1);
+    assert_eq!(active(&h).view.rotation, 0.0);
 }

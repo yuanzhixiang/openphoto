@@ -1563,6 +1563,10 @@ fn text(app: &mut AppState, key: &'static str, default: &str) -> String {
         "paint.flow" => app.paint_options(tool).map(|o| percent(o.flow)),
         "bucket.opacity" => Some(percent(app.bucket.fill.opacity)),
         "bucket.tolerance" => Some(app.bucket.tolerance.to_string()),
+        // The active document's view rotation
+        "rotate.angle" => app
+            .active()
+            .map(|d| format!("{}°", d.view.rotation.round())),
         "type.style" => Some(FONT_STYLES[app.type_options.semibold as usize].to_owned()),
         "type.size" => Some(format!(
             "{} pt",
@@ -1626,10 +1630,10 @@ fn set_text(app: &mut AppState, key: &'static str, default: &str, typed: String)
             }
         }
         "rotate.angle" => {
-            if let Some(v) = number {
-                // Photoshop keeps the angle within ±180°
-                let a = (v + 180.0).rem_euclid(360.0) - 180.0;
-                *app.setting(key, default) = format!("{}°", a.round());
+            if let Some(v) = number
+                && let Some(doc) = app.active()
+            {
+                doc.view.rotation = normalize_angle(v);
             }
         }
         _ => {
@@ -1906,8 +1910,22 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 }
             }
             Dial(cx, key) => {
-                let angle = crate::options_bar::typed_number(&text(app, key, "0°")).unwrap_or(0.0);
                 let c = b.at(cx, 17.5);
+                // Dragging on the dial points its tick at the pointer
+                let r = crate::theme::pt(11.0);
+                let response = b.ui.interact(
+                    egui::Rect::from_center_size(c, egui::Vec2::splat(2.0 * r)),
+                    b.ui.id().with(("dial", key)),
+                    egui::Sense::click_and_drag(),
+                );
+                if (response.dragged() || response.clicked())
+                    && let Some(p) = response.interact_pointer_pos()
+                    && p != c
+                {
+                    let a = (p.y - c.y).atan2(p.x - c.x).to_degrees() + 90.0;
+                    set_text(app, key, "0°", format!("{}", normalize_angle(a).round()));
+                }
+                let angle = crate::options_bar::typed_number(&text(app, key, "0°")).unwrap_or(0.0);
                 let ink = crate::theme::color::OPTIONS_ICON;
                 let p = b.ui.painter();
                 p.circle_stroke(
@@ -2059,7 +2077,11 @@ fn to32(c: op_core::Color) -> egui::Color32 {
 fn action(app: &mut AppState, label: &str, ppp: f32) {
     use crate::document_view as view;
     match label {
-        "Reset View" => *app.setting("rotate.angle", "0°") = "0°".to_owned(),
+        "Reset View" => {
+            if let Some(doc) = app.active() {
+                doc.view.rotation = 0.0;
+            }
+        }
         "Clear" => {
             for key in ["pcrop.w", "pcrop.h", "pcrop.res"] {
                 app.setting(key, "").clear();
@@ -2363,4 +2385,10 @@ pub fn object_options(app: &mut AppState) -> (bool, bool) {
         flag(app, "object.all_layers", false),
         flag(app, "object.hard_edge", true),
     )
+}
+
+/// An angle in degrees within Photoshop's ±180°.
+pub fn normalize_angle(v: f32) -> f32 {
+    let a = (v + 180.0).rem_euclid(360.0) - 180.0;
+    if a == -180.0 { 180.0 } else { a }
 }
