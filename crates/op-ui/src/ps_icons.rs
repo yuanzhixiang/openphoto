@@ -105,6 +105,14 @@ pub enum Icon {
     /// Mixer Brush: load the brush after each stroke, clean it.
     MixerLoad,
     MixerClean,
+    /// The gradient types: 14 pt squares filled with each kind of ramp.
+    GradientLinear,
+    GradientRadial,
+    GradientAngle,
+    GradientReflected,
+    GradientDiamond,
+    /// The Notes panel (a note with lines).
+    NotesPanel,
     Eye,
     /// A partly locked layer's lock (and the background's): hollow.
     LayerLock,
@@ -1077,6 +1085,67 @@ pub fn paint_scaled(
                 pen.poly(&[(-9.0, -15.0), (-5.2, -7.0), (-12.8, -7.0)]);
             } else {
                 pen.line(&[(-14.0, -14.0), (14.0, 14.0)], 2.2);
+            }
+        }
+        Icon::GradientLinear
+        | Icon::GradientRadial
+        | Icon::GradientAngle
+        | Icon::GradientReflected
+        | Icon::GradientDiamond => {
+            // Gray from dark (0) to light (1), measured on Photoshop's
+            let ramp = |x: f32, y: f32| -> f32 {
+                let t = match icon {
+                    Icon::GradientLinear => (x + 12.0) / 24.0,
+                    Icon::GradientRadial => 1.0 - (x * x + y * y).sqrt() / 15.0,
+                    Icon::GradientAngle => {
+                        (y.atan2(x) + std::f32::consts::PI) / std::f32::consts::TAU
+                    }
+                    Icon::GradientReflected => 1.0 - y.abs() / 12.0,
+                    _ => 1.0 - (x.abs() + y.abs()) / 20.0,
+                };
+                t.clamp(0.0, 1.0)
+            };
+            let mut mesh = egui::Mesh::default();
+            let n = 12;
+            for j in 0..=n {
+                for i in 0..=n {
+                    let (x, y) = (
+                        -12.0 + 24.0 * i as f32 / n as f32,
+                        -12.0 + 24.0 * j as f32 / n as f32,
+                    );
+                    let g = (40.0 + 196.0 * ramp(x, y)) as u8;
+                    mesh.colored_vertex(pen.p(x, y), Color32::from_gray(g));
+                }
+            }
+            for j in 0..n {
+                for i in 0..n {
+                    let k = (j * (n + 1) + i) as u32;
+                    let w = n as u32 + 1;
+                    mesh.add_triangle(k, k + 1, k + w + 1);
+                    mesh.add_triangle(k, k + w + 1, k + w);
+                }
+            }
+            pen.painter.add(Shape::mesh(mesh));
+            pen.line(
+                &[
+                    (-13.0, -13.0),
+                    (13.0, -13.0),
+                    (13.0, 13.0),
+                    (-13.0, 13.0),
+                    (-13.0, -13.0),
+                ],
+                2.0,
+            );
+        }
+        Icon::NotesPanel => {
+            pen.rect(-14.0, -14.0, 14.0, 14.0);
+            let hole = Pen {
+                color: background,
+                ..pen
+            };
+            hole.rect(-12.0, -6.0, 12.0, 12.0);
+            for y in [-2.0, 3.0, 8.0] {
+                pen.rect(-8.0, y, 8.0, y + 2.0);
             }
         }
         Icon::Swap => {

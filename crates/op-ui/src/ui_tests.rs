@@ -4057,6 +4057,74 @@ const PS_BAR_MARKS: &[BarMarks] = &[
         &[198.0, 457.0, 535.0, 615.0],
         &[242.0, 319.0, 358.0, 394.5, 409.0, 485.0, 525.5],
     ),
+    (
+        "SpotHealingBrush",
+        &[156.0, 300.0, 613.0, 727.5, 797.0],
+        &[196.0, 295.0, 336.5, 425.0, 513.5, 608.0, 751.5, 792.0],
+    ),
+    (
+        "HealingBrush",
+        &[190.0, 334.0, 497.0, 548.0, 878.5, 948.0, 987.0],
+        &[
+            230.0, 329.0, 381.0, 440.0, 492.0, 502.0, 531.0, 543.0, 738.0, 839.5, 902.5, 943.0,
+            1051.5, 1079.0, 1093.5,
+        ],
+    ),
+    (
+        "Patch",
+        &[222.0, 371.0, 597.5, 738.5, 855.0],
+        &[
+            110.0, 135.0, 266.5, 362.0, 380.0, 431.0, 502.5, 607.5, 684.0, 688.5, 717.5, 729.5,
+            803.0, 830.5, 845.0,
+        ],
+    ),
+    (
+        "ContentAwareMove",
+        &[222.0, 332.0, 528.5],
+        &[
+            110.0, 135.0, 266.0, 323.0, 401.5, 424.0, 438.5, 481.5, 504.0, 518.5,
+        ],
+    ),
+    (
+        "RedEye",
+        &[359.5],
+        &[164.0, 200.5, 215.0, 302.5, 339.0, 353.5],
+    ),
+    (
+        "Gradient",
+        &[230.0, 338.0, 489.0, 629.0],
+        &[
+            115.0, 221.0, 241.0, 313.0, 327.0, 349.0, 359.0, 374.0, 685.0, 760.0,
+        ],
+    ),
+    (
+        "PaintBucket",
+        &[568.5],
+        &[
+            110.0, 189.5, 193.5, 222.5, 234.5, 273.5, 371.5, 419.0, 455.5, 470.0, 530.0, 564.0,
+        ],
+    ),
+    ("Eyedropper", &[532.5], &[177.0, 291.5, 344.0, 523.5]),
+    (
+        "ColorSampler",
+        &[300.0, 379.5],
+        &[177.0, 291.5, 310.0, 370.0],
+    ),
+    (
+        "Ruler",
+        &[230.0, 356.5, 549.0, 694.5],
+        &[702.0, 801.5, 811.5, 857.0],
+    ),
+    (
+        "Note",
+        &[333.0, 411.5, 491.0],
+        &[150.5, 324.0, 421.5, 482.0],
+    ),
+    (
+        "Count",
+        &[223.0, 542.0],
+        &[232.0, 381.0, 480.5, 532.5, 652.0, 690.5, 757.0, 795.5],
+    ),
 ];
 
 /// The x (bar points) of separators and of frame edges in an options bar
@@ -4211,4 +4279,42 @@ fn brush_options_bars_edit_their_settings() {
     assert!(h.state().state.retouch.clone_aligned);
     click(&mut h, at_pt(699.0, 45.25));
     assert!(!h.state().state.retouch.clone_aligned);
+}
+
+#[test]
+fn fill_and_sample_options_bars_edit_their_settings() {
+    use op_core::gradient::GradientKind;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // Gradient: the second type button (center 388) is Radial
+    h.state_mut().state.select_tool(op_tools::Tool::Gradient);
+    h.run_steps(2);
+    click(&mut h, at_pt(388.0, 45.25));
+    assert_eq!(h.state().state.gradient.kind, GradientKind::Radial);
+    // Reverse (box at 500)
+    click(&mut h, at_pt(505.0, 45.25));
+    assert!(h.state().state.gradient.reverse);
+    // Paint Bucket: Tolerance at 530–565
+    h.state_mut().state.select_tool(op_tools::Tool::PaintBucket);
+    h.run_steps(2);
+    click(&mut h, at_pt(548.0, 45.25));
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("10".into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(h.state().state.bucket.tolerance, 10);
+    // Spot Healing: Create Texture (the second segment, 425.5–513.5)
+    h.state_mut()
+        .state
+        .select_tool(op_tools::Tool::SpotHealingBrush);
+    h.run_steps(2);
+    click(&mut h, at_pt(470.0, 45.25));
+    assert_eq!(
+        h.state()
+            .state
+            .tool_settings
+            .get("spotheal.type")
+            .map(String::as_str),
+        Some("1")
+    );
 }

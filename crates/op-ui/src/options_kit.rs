@@ -425,6 +425,130 @@ impl<'a> Bar<'a> {
         );
     }
 
+    /// Segmented buttons: one box split at `edges` (its left edge first and
+    /// its right edge last) with a label per segment, the `chosen` one
+    /// pressed. Returns the segment clicked.
+    pub fn segmented(
+        &mut self,
+        edges: &[f32],
+        labels: &[&str],
+        chosen: usize,
+        enabled: bool,
+    ) -> Option<usize> {
+        let mut clicked = None;
+        let whole = self.rect(edges[0], (5.0, 30.0), edges[edges.len() - 1]);
+        self.ui.painter().rect(
+            whole,
+            CornerRadius::same(pt(3.0) as u8),
+            color::FIELD,
+            Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+            StrokeKind::Inside,
+        );
+        for (k, w) in edges.windows(2).enumerate() {
+            let rect = self.rect(w[0], (5.0, 30.0), w[1]);
+            if k > 0 {
+                self.ui.painter().rect_filled(
+                    Rect::from_min_max(self.at(w[0], 5.0), self.at(w[0] + 1.0, 30.0)),
+                    0,
+                    Color32::from_gray(0x66),
+                );
+            }
+            if k == chosen {
+                self.ui.painter().rect_filled(
+                    rect.shrink(pt(1.0)),
+                    CornerRadius::same(pt(2.0) as u8),
+                    color::TOOL_ACTIVE,
+                );
+            }
+            let sense = if enabled {
+                Sense::click()
+            } else {
+                Sense::hover()
+            };
+            if self
+                .ui
+                .interact(rect, self.ui.id().with(("segment", labels[k])), sense)
+                .clicked()
+            {
+                clicked = Some(k);
+            }
+            self.ui.painter().text(
+                rect.center(),
+                Align2::CENTER_CENTER,
+                labels[k],
+                theme::body(),
+                if enabled { LABEL } else { LABEL_OFF },
+            );
+        }
+        clicked
+    }
+
+    /// The gradient swatch: `a` to `b` from `x0` to `x1` (y 5–30), its
+    /// chevron box to `x2`.
+    pub fn gradient_swatch(&mut self, x0: f32, x1: f32, x2: f32, a: Color32, b: Color32) {
+        let rect = self.rect(x0, (5.0, 30.0), x1);
+        let mut mesh = egui::Mesh::default();
+        mesh.colored_vertex(rect.left_top(), a);
+        mesh.colored_vertex(rect.right_top(), b);
+        mesh.colored_vertex(rect.right_bottom(), b);
+        mesh.colored_vertex(rect.left_bottom(), a);
+        mesh.add_triangle(0, 1, 2);
+        mesh.add_triangle(0, 2, 3);
+        self.ui.painter().add(egui::Shape::mesh(mesh));
+        self.ui.painter().rect_stroke(
+            rect,
+            0,
+            Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+            StrokeKind::Inside,
+        );
+        let chevron = self.rect(x1 - 1.0, (5.0, 30.0), x2);
+        self.ui.painter().rect(
+            chevron,
+            CornerRadius::same(pt(2.0) as u8),
+            color::FIELD,
+            Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+            StrokeKind::Inside,
+        );
+        crate::ps_icons::paint(
+            self.ui.painter(),
+            chevron.center() + egui::vec2(0.0, pt(0.5)),
+            Icon::Caret,
+            color::OPTIONS_ICON,
+            color::FIELD,
+        );
+    }
+
+    /// A plain color box from `x0` to `x1` (y 5–30), unframed.
+    pub fn color_box(&mut self, x0: f32, x1: f32, fill: Color32) -> egui::Response {
+        let rect = self.rect(x0, (5.0, 30.0), x1);
+        self.ui.painter().rect_filled(rect, 0, fill);
+        self.ui.interact(
+            rect,
+            self.ui.id().with(("color-box", x0 as i32)),
+            Sense::click(),
+        )
+    }
+
+    /// An empty, unusable pattern box (x0–x1) with its chevron box (to x2).
+    pub fn empty_pattern(&mut self, x0: f32, x1: f32, x2: f32) {
+        for (a, b) in [(x0, x1), (x1 - 1.0, x2)] {
+            self.ui.painter().rect(
+                self.rect(a, (5.0, 30.0), b),
+                CornerRadius::same(pt(2.0) as u8),
+                Color32::from_gray(0x4d),
+                Stroke::new(pt(1.0), Color32::from_gray(0x5e)),
+                StrokeKind::Inside,
+            );
+        }
+        crate::ps_icons::paint(
+            self.ui.painter(),
+            self.at((x1 + x2) / 2.0 - 0.5, 18.0),
+            Icon::Caret,
+            Color32::from_gray(0x6a),
+            Color32::from_gray(0x4d),
+        );
+    }
+
     /// A pressed-look box around `x0`–`x1` with a small triangle at its
     /// bottom right (a button with a menu, e.g. Select people), its text
     /// centered.

@@ -35,6 +35,24 @@ pub enum Item {
     /// A swatch from x0 to x1 with a chevron at x2 (white: the Mixer
     /// Brush's load color; gray: the Pattern Stamp's pattern).
     Swatch(f32, f32, f32, bool),
+    /// Segmented buttons split at the edges, choosing a setting.
+    Segments(&'static [f32], &'static [&'static str], &'static str),
+    /// An icon among several choosing a setting: centered at x, the
+    /// setting's value when it's pressed.
+    Radio(f32, Icon, &'static str, &'static str, usize),
+    /// A push button from x0 to x1, usable or not.
+    Button(f32, f32, &'static str, bool),
+    /// An unusable pop-up showing its text.
+    PopupOff(f32, f32, &'static str),
+    /// An empty, unusable pattern box with its chevron box.
+    NoPattern(f32, f32, f32),
+    /// A color box from x0 to x1.
+    ColorBox(f32, f32, [u8; 3]),
+    /// The current gradient (foreground to background) from x0 to x1, its
+    /// chevron box to x2.
+    GradientSwatch(f32, f32, f32),
+    /// The four selection combine modes from x, chosen by a setting.
+    Modes(f32, &'static str),
 }
 
 use Item::*;
@@ -73,6 +91,22 @@ const BLEND: &[&str] = &[
 const RANGES: &[&str] = &["Shadows", "Midtones", "Highlights"];
 const SAMPLE: &[&str] = &["Current Layer", "Current & Below", "All Layers"];
 const LIMITS: &[&str] = &["Discontiguous", "Contiguous", "Find Edges"];
+const SAMPLE_SIZES: &[&str] = &[
+    "Point Sample",
+    "3 by 3 Average",
+    "5 by 5 Average",
+    "11 by 11 Average",
+    "31 by 31 Average",
+    "51 by 51 Average",
+    "101 by 101 Average",
+];
+const EYEDROPPER_SAMPLE: &[&str] = &[
+    "Current Layer",
+    "Current & Below",
+    "All Layers",
+    "All Layers No Adjustments",
+    "Current & Below No Adjustments",
+];
 
 /// The tools' bars, measured on Photoshop 2026.
 pub fn layout(tool: Tool) -> Option<&'static [Item]> {
@@ -669,6 +703,272 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
                 "sponge.size_pressure",
             ),
         ],
+        SpotHealingBrush => &[
+            Picker(124.0),
+            Sep(156.0),
+            Label(162.0, "Mode:"),
+            Popup(
+                196.5,
+                296.0,
+                "spotheal.mode",
+                &[
+                    "Normal",
+                    "Replace",
+                    "Multiply",
+                    "Screen",
+                    "Darken",
+                    "Lighten",
+                    "Color",
+                    "Luminosity",
+                ],
+            ),
+            Sep(300.0),
+            Label(306.5, "Type:"),
+            Segments(
+                &[336.5, 425.5, 513.5, 609.0],
+                &["Content-Aware", "Create Texture", "Proximity Match"],
+                "spotheal.type",
+            ),
+            Sep(613.0),
+            Check(618.0, "Sample All Layers", "spotheal.all_layers", false),
+            Sep(727.5),
+            Icon(740.5, Icon::Angle, "Set the brush angle"),
+            Field(751.5, 793.0, "spotheal.angle", "0°"),
+            Sep(797.0),
+            Toggle(
+                817.25,
+                Icon::PenPressure,
+                "Always use pressure for size",
+                "spotheal.size_pressure",
+            ),
+        ],
+        HealingBrush => &[
+            Picker(124.0),
+            Icon(
+                171.0,
+                Icon::CloneSourcePanel,
+                "Toggle the Clone Source panel",
+            ),
+            Sep(190.0),
+            Label(196.0, "Mode:"),
+            Popup(
+                230.5,
+                330.0,
+                "heal.mode",
+                &[
+                    "Normal",
+                    "Replace",
+                    "Multiply",
+                    "Screen",
+                    "Darken",
+                    "Lighten",
+                    "Color",
+                    "Luminosity",
+                ],
+            ),
+            Sep(334.0),
+            Label(340.5, "Source:"),
+            Segments(
+                &[381.0, 440.0, 493.0],
+                &["Sampled", "Pattern"],
+                "heal.source",
+            ),
+            Sep(497.0),
+            NoPattern(502.0, 532.0, 544.0),
+            Sep(548.0),
+            Check(553.0, "Aligned", "heal.aligned", false),
+            Check(613.5, "Use Legacy", "heal.legacy", false),
+            Label(694.5, "Sample:"),
+            Popup(738.0, 840.5, "heal.sample", SAMPLE),
+            Icon(
+                859.5,
+                Icon::IgnoreAdjustments,
+                "Ignore adjustment layers when healing",
+            ),
+            Sep(878.5),
+            Icon(891.5, Icon::Angle, "Set the brush angle"),
+            Field(902.5, 944.0, "heal.angle", "0°"),
+            Sep(948.0),
+            Toggle(
+                968.25,
+                Icon::PenPressure,
+                "Always use pressure for size",
+                "heal.size_pressure",
+            ),
+            Sep(987.0),
+            Label(998.0, "Diffusion:"),
+            Percent(1051.5, 1080.0, 1094.5, "heal.diffusion", "5"),
+        ],
+        Patch => &[
+            Modes(110.0, "patch.mode"),
+            Sep(222.0),
+            Label(232.0, "Patch:"),
+            Popup(266.5, 363.5, "patch.patch", &["Normal", "Content-Aware"]),
+            Sep(371.0),
+            Segments(
+                &[380.0, 431.0, 503.5],
+                &["Source", "Destination"],
+                "patch.source",
+            ),
+            Check(511.5, "Transparent", "patch.transparent", false),
+            Sep(597.5),
+            Button(607.5, 685.0, "Use Pattern", false),
+            NoPattern(688.5, 718.5, 730.5),
+            Sep(738.5),
+            Label(749.5, "Diffusion:"),
+            Percent(803.0, 831.5, 846.0, "patch.diffusion", "5"),
+            Sep(855.0),
+        ],
+        ContentAwareMove => &[
+            Modes(110.0, "cam.mode"),
+            Sep(222.0),
+            Label(232.0, "Mode:"),
+            Popup(266.5, 324.5, "cam.move", &["Move", "Extend"]),
+            Sep(332.0),
+            Label(345.0, "Structure:"),
+            Percent(401.5, 425.0, 439.5, "cam.structure", "4"),
+            Label(445.0, "Color:"),
+            Percent(481.5, 505.0, 519.5, "cam.color", "0"),
+            Sep(528.5),
+            Check(537.5, "Sample All Layers", "cam.all_layers", false),
+            Check(651.0, "Transform On Drop", "cam.transform", true),
+        ],
+        RedEye => &[
+            Label(112.0, "Pupil Size:"),
+            Percent(164.0, 201.5, 216.0, "redeye.pupil", "50%"),
+            Label(223.0, "Darken Amount:"),
+            Percent(302.5, 340.0, 354.5, "redeye.darken", "50%"),
+            Sep(359.5),
+        ],
+        Gradient => &[
+            Popup(
+                115.0,
+                222.0,
+                "gradient.style",
+                &["Gradient", "Classic gradient"],
+            ),
+            Sep(230.0),
+            GradientSwatch(241.0, 314.0, 328.0),
+            Sep(338.0),
+            Radio(
+                362.0,
+                Icon::GradientLinear,
+                "Linear Gradient",
+                "gradient.kind",
+                0,
+            ),
+            Radio(
+                388.0,
+                Icon::GradientRadial,
+                "Radial Gradient",
+                "gradient.kind",
+                1,
+            ),
+            Radio(
+                414.0,
+                Icon::GradientAngle,
+                "Angle Gradient",
+                "gradient.kind",
+                2,
+            ),
+            Radio(
+                440.0,
+                Icon::GradientReflected,
+                "Reflected Gradient",
+                "gradient.kind",
+                3,
+            ),
+            Radio(
+                466.0,
+                Icon::GradientDiamond,
+                "Diamond Gradient",
+                "gradient.kind",
+                4,
+            ),
+            Sep(489.0),
+            Check(500.0, "Reverse", "gradient.reverse", false),
+            Check(569.0, "Dither", "gradient.dither", true),
+            Sep(629.0),
+            Label(641.0, "Method:"),
+            Popup(
+                685.0,
+                761.0,
+                "gradient.method",
+                &["Perceptual", "Linear", "Classic", "Smooth"],
+            ),
+        ],
+        PaintBucket => &[
+            Popup(110.0, 191.0, "bucket.source", &["Foreground", "Pattern"]),
+            NoPattern(193.5, 223.5, 235.5),
+            Label(239.5, "Mode:"),
+            Popup(274.0, 373.0, "bucket.mode", BLEND),
+            Label(377.0, "Opacity:"),
+            Percent(419.0, 456.5, 471.0, "bucket.opacity", "100%"),
+            Label(476.5, "Tolerance:"),
+            Field(530.0, 565.0, "bucket.tolerance", "32"),
+            Sep(568.5),
+            Check(572.5, "Anti-alias", "bucket.anti_alias", true),
+            Check(641.5, "Contiguous", "bucket.contiguous", true),
+            Check(720.0, "All Layers", "bucket.all_layers", false),
+        ],
+        Eyedropper => &[
+            Label(110.5, "Sample Size:"),
+            Popup(177.0, 292.5, "eyedropper.size", SAMPLE_SIZES),
+            Label(300.5, "Sample:"),
+            Popup(344.0, 525.0, "eyedropper.sample", EYEDROPPER_SAMPLE),
+            Sep(532.5),
+            Check(541.5, "Show Sampling Ring", "eyedropper.ring", true),
+        ],
+        ColorSampler => &[
+            Label(110.5, "Sample Size:"),
+            Popup(177.0, 292.5, "sampler.size", SAMPLE_SIZES),
+            Sep(300.0),
+            Button(310.0, 371.5, "Clear All", false),
+            Sep(379.5),
+        ],
+        Ruler => &[
+            Label(111.5, "X: 0.00"),
+            Label(172.0, "Y: 0.00"),
+            Sep(230.0),
+            Label(234.5, "W: 0.00"),
+            Label(297.5, "H: 0.00"),
+            Sep(356.5),
+            Label(361.0, "A: 0.0°"),
+            Label(422.0, "L1: 0.00"),
+            Label(485.5, "L2:"),
+            Sep(549.0),
+            Check(554.0, "Use Measurement Scale", "ruler.scale", true),
+            Sep(694.5),
+            Button(702.0, 802.5, "Straighten Layer", false),
+            Button(811.5, 858.0, "Clear", false),
+        ],
+        Note => &[
+            Label(111.5, "Author:"),
+            Field(150.5, 325.0, "note.author", ""),
+            Sep(333.0),
+            Label(343.5, "Color:"),
+            ColorBox(376.5, 403.0, [255, 255, 255]),
+            Sep(411.5),
+            Button(421.5, 483.0, "Clear All", false),
+            Sep(491.0),
+            Icon(515.0, Icon::NotesPanel, "Toggle the Notes panel"),
+        ],
+        Count => &[
+            Label(110.5, "Count:"),
+            Label(151.5, "0"),
+            Sep(223.0),
+            PopupOff(232.0, 382.0, "Count Group"),
+            Icon(403.0, Icon::Eye, "Toggle count group visibility"),
+            Icon(431.0, Icon::Folder, "Create a new count group"),
+            Icon(459.0, Icon::DeleteLayer, "Delete the current count group"),
+            Button(480.5, 533.5, "Clear", false),
+            Sep(542.0),
+            ColorBox(552.0, 578.0, [0x9c, 0xf2, 0xf4]),
+            Label(589.0, "Marker Size:"),
+            Field(652.0, 691.5, "count.marker", "2"),
+            Label(701.5, "Label Size:"),
+            Field(757.0, 796.5, "count.label", "8"),
+        ],
         _ => return None,
     })
 }
@@ -684,6 +984,8 @@ fn text(app: &mut AppState, key: &'static str, default: &str) -> String {
     match key {
         "paint.opacity" => app.paint_options(tool).map(|o| percent(o.opacity)),
         "paint.flow" => app.paint_options(tool).map(|o| percent(o.flow)),
+        "bucket.opacity" => Some(percent(app.bucket.fill.opacity)),
+        "bucket.tolerance" => Some(app.bucket.tolerance.to_string()),
         _ => None,
     }
     .unwrap_or_else(|| app.setting(key, default).clone())
@@ -702,6 +1004,16 @@ fn set_text(app: &mut AppState, key: &'static str, default: &str, typed: String)
                 } else {
                     o.flow = v;
                 }
+            }
+        }
+        "bucket.opacity" => {
+            if let Some(v) = number {
+                app.bucket.fill.opacity = (v / 100.0).clamp(0.01, 1.0);
+            }
+        }
+        "bucket.tolerance" => {
+            if let Some(v) = number {
+                app.bucket.tolerance = v.clamp(0.0, 255.0) as u8;
             }
         }
         _ => {
@@ -723,6 +1035,30 @@ fn choice(app: &mut AppState, key: &'static str) -> usize {
         "dodge.range" => range(app.retouch.dodge_range),
         "burn.range" => range(app.retouch.burn_range),
         "sponge.mode" => app.retouch.sponge_saturate as usize,
+        "gradient.kind" => op_core::gradient::GradientKind::ALL
+            .iter()
+            .position(|k| *k == app.gradient.kind)
+            .unwrap_or(0),
+        "bucket.mode" => BLEND
+            .iter()
+            .position(|l| *l == app.bucket.fill.mode.label())
+            .unwrap_or(0),
+        "eyedropper.size" => crate::state::EyedropperOptions::SIZES
+            .iter()
+            .position(|(s, _)| *s == app.eyedropper.size)
+            .unwrap_or(0),
+        "eyedropper.sample" => {
+            let all = app.eyedropper.all_layers;
+            let shown: usize = app.setting(key, "2").parse().unwrap_or(2);
+            // The setting's own choice, as long as it agrees with the state
+            if (shown >= 2 && shown != 4) == all {
+                shown
+            } else if all {
+                2
+            } else {
+                0
+            }
+        }
         _ => app.setting(key, default_choice(key)).parse().unwrap_or(0),
     }
 }
@@ -733,6 +1069,7 @@ fn default_choice(key: &str) -> &'static str {
     match key {
         "colorreplace.mode" => "2",
         "colorreplace.limits" | "bgeraser.limits" => "1",
+        "gradient.method" => "3",
         _ => "0",
     }
 }
@@ -743,6 +1080,21 @@ fn set_choice(app: &mut AppState, key: &'static str, i: usize) {
         "dodge.range" => app.retouch.dodge_range = ToneRange::ALL[i],
         "burn.range" => app.retouch.burn_range = ToneRange::ALL[i],
         "sponge.mode" => app.retouch.sponge_saturate = i == 1,
+        "gradient.kind" => app.gradient.kind = op_core::gradient::GradientKind::ALL[i],
+        "bucket.mode" => {
+            if let Some(m) = op_core::BlendMode::GROUPS
+                .iter()
+                .flat_map(|g| g.iter())
+                .find(|m| m.label() == BLEND[i])
+            {
+                app.bucket.fill.mode = *m;
+            }
+        }
+        "eyedropper.size" => app.eyedropper.size = crate::state::EyedropperOptions::SIZES[i].0,
+        "eyedropper.sample" => {
+            app.eyedropper.all_layers = i >= 2 && i != 4;
+            *app.setting(key, "2") = i.to_string();
+        }
         _ => *app.setting(key, default_choice(key)) = i.to_string(),
     }
 }
@@ -750,6 +1102,10 @@ fn set_choice(app: &mut AppState, key: &'static str, i: usize) {
 fn flag(app: &mut AppState, key: &'static str, default: bool) -> bool {
     match key {
         "clone.aligned" => app.retouch.clone_aligned,
+        "gradient.reverse" => app.gradient.reverse,
+        "bucket.anti_alias" => app.bucket.anti_alias,
+        "bucket.contiguous" => app.bucket.contiguous,
+        "bucket.all_layers" => app.bucket.all_layers,
         _ => app.flag(key, default),
     }
 }
@@ -757,6 +1113,10 @@ fn flag(app: &mut AppState, key: &'static str, default: bool) -> bool {
 fn set_flag(app: &mut AppState, key: &'static str, on: bool) {
     match key {
         "clone.aligned" => app.retouch.clone_aligned = on,
+        "gradient.reverse" => app.gradient.reverse = on,
+        "bucket.anti_alias" => app.bucket.anti_alias = on,
+        "bucket.contiguous" => app.bucket.contiguous = on,
+        "bucket.all_layers" => app.bucket.all_layers = on,
         _ => app.set_flag(key, on),
     }
 }
@@ -823,6 +1183,56 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
             CheckOff(x, label) => {
                 let mut off = false;
                 b.check(x, label, &mut off, false);
+            }
+            Segments(edges, labels, key) => {
+                let chosen = choice(app, key);
+                if let Some(k) = b.segmented(edges, labels, chosen, true) {
+                    set_choice(app, key, k);
+                }
+            }
+            Radio(x, icon, tip, key, value) => {
+                let on = choice(app, key) == value;
+                if b.icon(x, icon, tip, on, true).clicked() {
+                    set_choice(app, key, value);
+                }
+            }
+            Button(x0, x1, label, enabled) => {
+                b.button(x0, x1, label, enabled);
+            }
+            PopupOff(x0, x1, label) => {
+                b.popup(x0, x1, label, label, false, |_| {});
+            }
+            NoPattern(x0, x1, x2) => b.empty_pattern(x0, x1, x2),
+            ColorBox(x0, x1, [r, g, bl]) => {
+                b.color_box(x0, x1, egui::Color32::from_rgb(r, g, bl));
+            }
+            GradientSwatch(x0, x1, x2) => {
+                let to32 = |c: op_core::Color| {
+                    let [r, g, b, _] = c.to_rgba8();
+                    egui::Color32::from_rgb(r, g, b)
+                };
+                let (a, z) = if app.gradient.reverse {
+                    (app.background, app.foreground)
+                } else {
+                    (app.foreground, app.background)
+                };
+                b.gradient_swatch(x0, x1, x2, to32(a), to32(z));
+            }
+            Modes(x, key) => {
+                use crate::state::SelectionMode;
+                const MODES: [SelectionMode; 4] = [
+                    SelectionMode::New,
+                    SelectionMode::Add,
+                    SelectionMode::Subtract,
+                    SelectionMode::Intersect,
+                ];
+                let i = choice(app, key).min(3);
+                let mut mode = MODES[i];
+                b.modes(x, &mut mode);
+                let j = MODES.iter().position(|m| *m == mode).unwrap_or(0);
+                if j != i {
+                    set_choice(app, key, j);
+                }
             }
             Swatch(x0, x1, x2, white) => {
                 let fill = if white {
