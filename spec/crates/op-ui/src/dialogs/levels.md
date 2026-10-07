@@ -1,41 +1,41 @@
-# dialogs/levels.rs：Levels 对话框
+# dialogs/levels.rs: Levels dialog
 
-## 组件职责
+## Component responsibility
 
-Image › Adjustments › Levels...（⌘L）的对话框，按 Photoshop 2026 的经典对话框逐像素重做（412 × 371 pt，文字与控件与 Photoshop 截图相差 1–2 像素）。算法见 `op-core` 的 `adjust.md`（`Levels`、`levels_gamma`）。
+The dialog for Image › Adjustments › Levels... (⌘L), rebuilt pixel by pixel after Photoshop 2026's classic dialog (412 × 371 pt; text and controls are within 1–2 pixels of Photoshop screenshots). The algorithm is in `adjust.md` in `op-core` (`Levels`, `levels_gamma`).
 
-## 数据与默认值
+## Data and defaults
 
-- 四组色阶：RGB（复合）、Red、Green、Blue，各有输入黑场（0–253）、gamma（0.01–9.99）、输入白场（2–255）、输出黑场、输出白场（0–255），默认 0 / 1.00 / 255 / 0 / 255。每次打开都恢复默认。
-- `new(channels)`：红、绿、蓝三个通道的直方图（`adjust::rgb_histograms`），复合直方图为三者之和。
-- `adjustment()`：四组都有效且每组黑场比白场至少小 2 时返回 `Adjustment::Levels`。
-- Preset：未改动时「Default」，否则「Custom」；菜单的 Default 恢复默认。Photoshop 的其它预设（Darker、Increase Contrast 等）还没有。
+- Four sets of levels: RGB (composite), Red, Green, Blue, each with input black point (0–253), gamma (0.01–9.99), input white point (2–255), output black point, and output white point (0–255), defaulting to 0 / 1.00 / 255 / 0 / 255. Defaults are restored every time the dialog opens.
+- `new(channels)`: histograms of the red, green, and blue channels (`adjust::rgb_histograms`); the composite histogram is the sum of the three.
+- `adjustment()`: returns `Adjustment::Levels` when all four sets are valid and in each set the black point is at least 2 less than the white point.
+- Preset: "Default" when unchanged, otherwise "Custom"; Default in the menu restores the defaults. Photoshop's other presets (Darker, Increase Contrast, etc.) are not available yet.
 
-## 布局（Photoshop 点）
+## Layout (Photoshop points)
 
-- 「Preset:」(11, 50)，弹出菜单 (59, 39.5)–(266, 60.5)，齿轮 (283.5, 50)（只画出）。
-- Channel 分组框 (11, 90.5)–(295.5, 359.5)，标题处断开；「Channel:」(30.5, 90.5)，弹出菜单 (85, 80)–(206.5, 101)。
-- 「Input Levels:」(20.5, 118.5)；直方图 (25, 131)–(281, 230)，`#454545` 底，每级 1 pt 宽的 `#d0d0d0` 竖条，按最大计数归一化；显示当前通道的直方图。
-- 输入针：尖端 y 233，0 与 255 分别在 x 25.75 与 279.25；黑（空心）、灰、白三枚。灰针位于黑白针之间 `0.5^gamma` 处。
-- 输入框 y 249–268：x 60–105、150–195、240–285。
-- 分隔线 y 277，x 20–286，`#3e3e3e`。
-- 「Output Levels:」(20.5, 290.5)；黑到白渐变条 (24, 302)–(282, 315)；输出针尖端 y 315；输出框 y 332–351，x 60–105、240–285。
-- 右侧按钮 x 313.5–402.5：OK (38.5)、Cancel (73.5)、Auto (115.5)、Options... (157.5)，各 26 高。
-- 三个吸管 (327 / 357 / 387, 213)（黑、灰、白，只画出）；「Preview」复选框 (312.5, 243)。
+- "Preset:" (11, 50), pop-up menu (59, 39.5)–(266, 60.5), gear (283.5, 50) (drawn only).
+- Channel group box (11, 90.5)–(295.5, 359.5), broken at the title; "Channel:" (30.5, 90.5), pop-up menu (85, 80)–(206.5, 101).
+- "Input Levels:" (20.5, 118.5); histogram (25, 131)–(281, 230), `#454545` background, a 1 pt wide `#d0d0d0` vertical bar per level, normalized to the maximum count; shows the current channel's histogram.
+- Input sliders: tips at y 233, with 0 and 255 at x 25.75 and 279.25 respectively; three sliders: black (hollow), gray, white. The gray slider sits between the black and white sliders at `0.5^gamma`.
+- Input fields y 249–268: x 60–105, 150–195, 240–285.
+- Separator at y 277, x 20–286, `#3e3e3e`.
+- "Output Levels:" (20.5, 290.5); black-to-white gradient bar (24, 302)–(282, 315); output slider tips at y 315; output fields y 332–351, x 60–105, 240–285.
+- Right-side buttons x 313.5–402.5: OK (38.5), Cancel (73.5), Auto (115.5), Options... (157.5), each 26 high.
+- Three eyedroppers (327 / 357 / 387, 213) (black, gray, white; drawn only); "Preview" checkbox (312.5, 243).
 
-## 交互
+## Interaction
 
-- 打开时输入黑场框获得焦点并全选。
-- Channel 菜单或 ⌥2–⌥5 切换 RGB、Red、Green、Blue；每个通道保留自己的值。
-- 拖动针：在针所在的行按下时选中最近的针；黑场不超过白场 − 2，白场不低于黑场 + 2；灰针按位置反算 gamma（两位小数）。
-- Auto：复合通道恢复默认，三个通道各自把最暗与最亮 0.1% 设为黑白场（Photoshop 的「Enhance Per Channel Contrast」；Photoshop 2026 的默认 Auto 算法与 Options... 对话框未实现）。
-- Enter / OK 应用，记录「Levels」；Esc / Cancel 取消。
+- On open, the input black point field gets focus with everything selected.
+- The Channel menu or ⌥2–⌥5 switches between RGB, Red, Green, Blue; each channel keeps its own values.
+- Dragging sliders: pressing in a slider's row selects the nearest slider; the black point does not exceed the white point − 2, and the white point does not go below the black point + 2; the gray slider's position is converted back to gamma (two decimals).
+- Auto: the composite channel is restored to defaults, and each of the three channels sets its darkest and brightest 0.1% as the black and white points (Photoshop's "Enhance Per Channel Contrast"; Photoshop 2026's default Auto algorithm and the Options... dialog are not implemented).
+- Enter / OK applies, recording "Levels"; Esc / Cancel cancels.
 
-## 已知限制
+## Known limitations
 
-- Options...（Auto Color Correction Options）、吸管、齿轮菜单（存储/载入预设）没有行为。
+- Options... (Auto Color Correction Options), the eyedroppers, and the gear menu (save/load presets) have no behavior.
 
-## 测试覆盖
+## Test coverage
 
-- `channels_keep_their_levels`、`auto_stretches_each_channel`。
-- `ui_tests::levels_dialog_sets_the_black_point`、`ui_tests::levels_and_curves_edit_one_channel`（⌥3 后只改红色）。截图 `levels_dialog.png`、`levels_red.png`。
+- `channels_keep_their_levels`, `auto_stretches_each_channel`.
+- `ui_tests::levels_dialog_sets_the_black_point`, `ui_tests::levels_and_curves_edit_one_channel` (after ⌥3 only red changes). Screenshots `levels_dialog.png`, `levels_red.png`.

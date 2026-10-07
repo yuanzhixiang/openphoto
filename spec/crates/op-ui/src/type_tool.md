@@ -1,26 +1,26 @@
-# type_tool.rs：横排文字工具（画布交互）
+# type_tool.rs: Horizontal Type tool (canvas interaction)
 
-## 组件职责
+## Component responsibilities
 
-横排文字工具（T）在画布上的输入、实时预览、确认与取消。栅格化见 `op-core` 的 `text.md`。
+Input, live preview, commit, and cancel for the Horizontal Type tool (T) on the canvas. For rasterization, see `op-core`'s `text.md`.
 
-## 状态
+## State
 
-进行中的文字保存在 `DocState::text_edit`（`TextEdit`）：第一行基线的起点 `origin`（文档像素）、已输入的文字、开始前的文档快照 `before`，以及文档上当前显示的文字 `shown`。文字选项在 `AppState::type_options`（`TypeOptions`：Regular / Semibold、字号，默认 12 pt）。
+Text in progress is stored in `DocState::text_edit` (`TextEdit`): the start of the first line's baseline `origin` (document pixels), the text typed so far, the document snapshot from before it started `before`, and the text currently shown on the document `shown`. Text options are in `AppState::type_options` (`TypeOptions`: Regular / Semibold, font size, default 12 pt).
 
-## 交互
+## Interaction
 
-- 单击画布：没有进行中的文字时，在单击处放下插入点（基线起点）开始输入；有进行中的文字时确认它（与 Photoshop 单击别处一致）。
-- 输入期间（`AppState::typing_text()` 为真，`modal_open()` 也为真）菜单命令与单键工具快捷键都不生效，键入的字符进入文字：
-  - 字符：追加到末尾；⌫：删除最后一个字符；Enter：换行。
-  - Esc：取消，文档恢复到开始前。
-  - ⌘Enter、选项栏的 ✓、单击画布别处、切换到其它工具：确认。文字为空（或只有空白）时什么也不留下；否则保留文字图层并记录「Type Tool」。
-  - 选项栏的 ⦸：取消。
-  - 有输入框（如选项栏的字号框）获得焦点时，键入的内容不进入画布上的文字。
-- 预览：文字变化时恢复开始前的快照，再用当前选项生成文字图层（前景色，字号换算为像素：`pt × 分辨率 / 72`），所以文档上看到的就是最终结果。预览不记录历史。
-- 光标：最后一个字符后画一条闪烁（每 0.5 秒）的插入线，黑色 3 pt 外加白色 1 pt，在任何底色上都看得见。画布上的鼠标光标为文字光标。
+- Clicking the canvas: when there is no text in progress, places the insertion point (baseline start) at the click and starts input; when there is text in progress, commits it (matching Photoshop when clicking elsewhere).
+- While typing (`AppState::typing_text()` is true, and `modal_open()` is also true), menu commands and single-key tool shortcuts do not take effect, and typed characters go into the text:
+  - Characters: appended to the end; ⌫: deletes the last character; Enter: new line.
+  - Esc: cancels, and the document is restored to before it started.
+  - ⌘Enter, the ✓ in the options bar, clicking elsewhere on the canvas, or switching to another tool: commits. When the text is empty (or only whitespace), nothing is left behind; otherwise the text layer is kept and "Type Tool" is recorded.
+  - The ⦸ in the options bar: cancels.
+  - When an input field (such as the font size field in the options bar) has focus, typed content does not go into the text on the canvas.
+- Preview: when the text changes, the snapshot from before it started is restored, and the text layer is then generated with the current options (foreground color, font size converted to pixels: `pt × resolution / 72`), so what is seen on the document is the final result. The preview records no history.
+- Cursor: after the last character a blinking (every 0.5 seconds) insertion line is drawn, 3 pt black plus 1 pt white outside, visible on any background. The mouse cursor over the canvas is the text cursor.
 
-## 已知限制
+## Known limitations
 
-- 不能把插入点移到文字中间、选中文字或用方向键移动；不能编辑已确认的文字图层。
-- 只有 Source Sans 3 的 Regular 与 Semibold（应用自带的字体）；没有系统字体列表。
+- The insertion point cannot be moved into the middle of the text, text cannot be selected or moved with the arrow keys; committed text layers cannot be edited.
+- Only Source Sans 3 Regular and Semibold (the fonts bundled with the application) are available; there is no system font list.

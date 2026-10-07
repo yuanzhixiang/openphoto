@@ -1,74 +1,74 @@
-# clipboard.rs：剪切、复制与粘贴的像素规则
+# clipboard.rs: Pixel rules for cut, copy, and paste
 
-## 职责
+## Responsibility
 
-实现 Edit › Cut、Copy、Copy Merged、Paste 与 Paste Special › Paste in Place 的像素部分：复制哪些像素、剪切后留下什么、粘贴到哪里。剪贴板本身（保存内容、与系统剪贴板交换）在 `op-ui` 的 `clipboard.rs`。
+Implements the pixel part of Edit › Cut, Copy, Copy Merged, Paste, and Paste Special › Paste in Place: which pixels are copied, what is left behind after a cut, and where content is pasted. The clipboard itself (holding the content, exchanging with the system clipboard) is in `clipboard.rs` in `op-ui`.
 
-## 对外接口
+## Public interface
 
 ### `Clip`
 
-剪贴板上的像素：`width`、`height`、`pixels`（直通 alpha 的 RGBA8，逐行排列）、`origin`（在来源文档中的左上角位置；来自其它应用的图片为 `None`）。`Clip::from_rgba8(w, h, pixels)` 构造没有位置的图片，像素长度不对时 panic。
+Pixels on the clipboard: `width`, `height`, `pixels` (straight-alpha RGBA8, row by row), `origin` (the top-left position in the source document; `None` for images from other applications). `Clip::from_rgba8(w, h, pixels)` constructs an image without a position, and panics when the pixel length is wrong.
 
 ### `ClipError`
 
-- `NoLayer`、`Hidden`、`Locked`：提示文字与 Fill 相同（见 `fill.md`），例如「Could not complete the Cut command because the target layer is hidden.」。
-- `Empty`：复制范围内只有透明像素，提示「Could not complete the {命令} command because the selected area is empty.」，与 Photoshop 一致。
-- `message(command)` 生成提示，`command` 为「Cut」「Copy」「Copy Merged」。
+- `NoLayer`, `Hidden`, `Locked`: alert text is the same as for Fill (see `fill.md`), e.g. "Could not complete the Cut command because the target layer is hidden.".
+- `Empty`: only transparent pixels within the copy extent; alert "Could not complete the {command} command because the selected area is empty.", matching Photoshop.
+- `message(command)` produces the alert, where `command` is "Cut", "Copy", or "Copy Merged".
 
-### 函数
+### Functions
 
-- `copy(doc)`：复制活动图层。
-- `copy_merged(doc)`：复制所有可见图层合成后的结果（`composite_rgba8`）。
-- `cut(doc, background)`：先复制，再按 Edit › Clear 的规则清除（`fill::clear`）：普通图层上变透明，背景图层或锁定透明像素的图层上填背景色。
-- `placement(clip, width, height, visible, in_place)`：计算粘贴位置（左上角）。
-- `paste(doc, clip, at)`：把内容放到新图层上，返回新图层 ID。
+- `copy(doc)`: copies the active layer.
+- `copy_merged(doc)`: copies the composite of all visible layers (`composite_rgba8`).
+- `cut(doc, background)`: copies first, then clears according to the rules of Edit › Clear (`fill::clear`): becomes transparent on a normal layer, and is filled with the background color on a background layer or a layer with locked transparent pixels.
+- `placement(clip, width, height, visible, in_place)`: computes the paste position (top-left corner).
+- `paste(doc, clip, at)`: places the content on a new layer and returns the new layer ID.
 
-## 行为规则
+## Behavior rules
 
-### 复制范围
+### Copy extent
 
-- 有选区时取选区的外接矩形；没有选区时取整个画布。
-- 每个像素的 alpha 乘以该点的选择程度（四舍五入），所以羽化、消除锯齿的选区边缘会被带上半透明。外接矩形内、选区外的像素 alpha 为 0。
-- 范围内所有像素 alpha 都是 0 时返回 `Empty`，不改动剪贴板。选区为空（没有外接矩形）同样返回 `Empty`。
-- `origin` 为外接矩形左上角。
+- With a selection, the selection's bounding rectangle; without a selection, the whole canvas.
+- Each pixel's alpha is multiplied by the selection degree at that point (rounded), so feathered and anti-aliased selection edges come along semi-transparent. Pixels inside the bounding rectangle but outside the selection have alpha 0.
+- When all pixels in the extent have alpha 0, `Empty` is returned and the clipboard is not changed. An empty selection (no bounding rectangle) also returns `Empty`.
+- `origin` is the top-left corner of the bounding rectangle.
 
-### 可用条件
+### Availability
 
-- Copy、Copy Merged 不检查图层是否隐藏或锁定，只读不写。
-- Cut 要求活动图层可见（否则 `Hidden`）、像素未锁定（否则 `Locked`），检查在复制之前，失败时文档不变。
+- Copy and Copy Merged do not check whether the layer is hidden or locked; they only read, never write.
+- Cut requires the active layer to be visible (otherwise `Hidden`) and its pixels not locked (otherwise `Locked`); the checks happen before copying, and on failure the document is unchanged.
 
-### 粘贴位置
+### Paste position
 
-- Paste in Place：始终使用 `origin`（没有 `origin` 时按下面的居中规则）。
-- Paste：`origin` 存在、整块内容落在画布内、并且与可见区域有交集时，使用 `origin`——在同一文档里复制后粘贴，副本正好叠在原处，与 Photoshop 一致。否则把内容居中放在「可见区域与画布的交集」里；交集为空（画布被完全滚出窗口）时居中放在画布上。居中坐标四舍五入到整数像素。
-- `visible` 由调用方给出（文档像素坐标的 `[x0, y0, x1, y1]`）。
+- Paste in Place: always uses `origin` (without `origin`, the centering rule below applies).
+- Paste: uses `origin` when `origin` exists, the whole content falls inside the canvas, and it intersects the visible area; so copying and pasting within the same document stacks the copy exactly over the original, matching Photoshop. Otherwise the content is centered in "the intersection of the visible area and the canvas"; when the intersection is empty (the canvas is scrolled completely out of the window), it is centered on the canvas. Centered coordinates are rounded to whole pixels.
+- `visible` is supplied by the caller (`[x0, y0, x1, y1]` in document pixel coordinates).
 
-### 粘贴
+### Paste
 
-- 新建与画布同样大的透明图层，按 `Document::next_layer_name` 命名（「Layer N」），插到活动图层正上方并设为活动图层（`insert_above_active`）。
-- 只写入 alpha 大于 0 的像素；落在画布外的部分保留在新图层上（`set_pixel_at`），与 Photoshop 一致，Image › Reveal All 可以让它们显示出来。
-- 粘贴后取消选区（原选区记为可以 Reselect 的选区），与 Photoshop 一致。
-- 历史记录由调用方负责（`op-ui` 记录「Paste」「Cut」）。
+- Creates a transparent layer the same size as the canvas, named by `Document::next_layer_name` ("Layer N"), inserted directly above the active layer and made the active layer (`insert_above_active`).
+- Only pixels with alpha greater than 0 are written; parts that fall outside the canvas are kept on the new layer (`set_pixel_at`), matching Photoshop, and Image › Reveal All can bring them into view.
+- After pasting, the selection is deselected (the original selection is recorded as the selection that Reselect can restore), matching Photoshop.
+- The caller is responsible for history (`op-ui` records "Paste" and "Cut").
 
-## 边界情况
+## Edge cases
 
-- 没有活动图层时 Copy、Cut 返回 `NoLayer`；Copy Merged 不需要活动图层。
-- 粘贴内容可以比画布大，超出部分被裁掉。
+- Without an active layer, Copy and Cut return `NoLayer`; Copy Merged does not need an active layer.
+- Pasted content can be larger than the canvas; the excess is clipped.
 
-## 已知限制
+## Known limitations
 
-- 没有 Paste Into / Paste Outside（需要图层蒙版）。
-- 不支持粘贴文字（Photoshop 会创建文字图层）和矢量路径。
+- No Paste Into / Paste Outside (requires layer masks).
+- Pasting text (Photoshop creates a type layer) and vector paths is not supported.
 
-## 图层组
+## Layer groups
 
-当前图层是组时，拷贝、剪切返回 `ClipError::Group`。
+When the current layer is a group, copy and cut return `ClipError::Group`.
 
-## 测试覆盖
+## Test coverage
 
-- `copy_takes_the_selection_bounds`：复制选区外接矩形内的像素和位置；没有选区时复制整个图层。
-- `copying_transparent_pixels_fails`：透明图层上复制返回 `Empty` 及其提示文字；Copy Merged 能取到下层的像素。
-- `cut_clears_and_paste_stacks_on_the_original`：背景图层上剪切后留下背景色；粘贴回原位置，生成「Layer 1」、成为活动图层并取消选区。
-- `paste_centers_when_the_origin_is_out_of_view`：原位置超出画布时居中；Paste in Place 保持原位置；外部图片居中到可见区域。
-- `paste_keeps_pixels_outside_the_canvas`：画布内的部分正常显示，超出右边的像素保留在图层上，图层内容范围伸到画布外。
+- `copy_takes_the_selection_bounds`: copies the pixels and position within the selection's bounding rectangle; without a selection, copies the whole layer.
+- `copying_transparent_pixels_fails`: copying on a transparent layer returns `Empty` and its alert text; Copy Merged picks up the pixels of the layer below.
+- `cut_clears_and_paste_stacks_on_the_original`: cutting on a background layer leaves the background color behind; pasting back to the original position creates "Layer 1", which becomes the active layer, and deselects.
+- `paste_centers_when_the_origin_is_out_of_view`: centers when the original position extends beyond the canvas; Paste in Place keeps the original position; an external image is centered in the visible area.
+- `paste_keeps_pixels_outside_the_canvas`: the part inside the canvas displays normally, pixels beyond the right edge are kept on the layer, and the layer's content extent reaches outside the canvas.

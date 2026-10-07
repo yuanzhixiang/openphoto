@@ -1,49 +1,49 @@
-# toolbar.rs：左侧工具栏
+# toolbar.rs: Left Toolbar
 
-## 组件职责
+## Component Responsibilities
 
-窗口左侧的竖向工具栏，对应 Photoshop 的 Tools 面板（单列布局）。
+The vertical toolbar on the left side of the window, corresponding to Photoshop's Tools panel (single-column layout).
 
-## 布局（自上而下）
+## Layout (Top to Bottom)
 
-工具栏宽 42 pt，右侧 3 pt 是紧挨画布的分隔条，工具按钮在其余宽度里居中。
+The toolbar is 42 pt wide; the right 3 pt is the divider against the canvas, and tool buttons are centered in the remaining width.
 
 
-1. 顶部 13 pt 的折叠条：上下各一条 1 pt 的 `#383838` 线，中间 `#424242`；左侧是粗的像素对齐「»」（`#c8c8c8`，照 Photoshop 描出），只有外观。折叠条的 `header(ui, Collapse)` 由工具栏、图标列（细线「«」）和面板列（细线「»」）共用。下面是拖动手柄：10 条 1 × 4 pt 的 `#454545` 短竖线，间距 2 pt，从 x 10 开始，顶部距工具栏顶 16 pt（只有外观）。
-2. 工具按钮，每个按钮是一组工具（分组与顺序见 `crates/op-tools/src/lib.md`），显示这组里最近用过的工具（初始为组内第一个）。各格等距排列、之间没有分组间隔：格距 25.9 pt，第一格中心在工具栏顶部下方 43 pt，与 Photoshop 2026 实测一致。
-3. 工具下方的部件按 Photoshop 2026 的位置绝对定位（照 2x 截图描出，下列坐标是相对工具栏左上角的 pt）：
-   - Edit Toolbar（「•••」）：三个直径 4、间距 6 的圆点，中心 (19.25, 613.75)，右下有灰色小三角（`#bcbcbc`）；只有外观。
-   - 恢复默认颜色图标：两个 9 pt 小方块，左上黑色、右下白色带黑框，外面一圈 `#c3c3c3` 浅灰边，位于 (3, 632)–(15, 644)。
-   - 交换颜色图标：一段四分之一圆弧，两端各一个箭头（向左、向下），位于 (21.5, 631.5)–(34, 643)。
-   - 前景色色块 (4, 648)–(24, 668)，背景色色块 (14, 658)–(34, 678)，前景在上。
-   - Quick Mask 按钮：圆角矩形框 (9, 689)–(27, 702) 内一圈 12 个小方点；在快速蒙版中时显示为按下状态。
-   - Change Screen Mode 按钮：两个重叠的窗口图形（右上那个在前），右下有灰色小三角；只有外观。
-   图标颜色 `#dddddd`；按钮的悬停热区与工具按钮同样大小。
-4. 右侧 3 pt 的分隔条（`#383838`、`#474747`、`#383838`），紧挨画布。
+1. A 13 pt collapse bar at the top: a 1 pt `#383838` line above and below, `#424242` in between; on the left is a bold pixel-aligned "»" (`#c8c8c8`, traced from Photoshop), appearance only. The collapse bar's `header(ui, Collapse)` is shared by the toolbar, the icon column (thin "«") and the panel column (thin "»"). Below it is the drag handle: 10 short 1 × 4 pt `#454545` vertical lines, 2 pt apart, starting at x 10, their tops 16 pt from the top of the toolbar (appearance only).
+2. Tool buttons; each button is a tool group (grouping and order in `crates/op-tools/src/lib.md`) and shows the most recently used tool in that group (initially the first tool in the group). Cells are evenly spaced with no gaps between groups: a pitch of 25.9 pt, with the first cell's center 43 pt below the top of the toolbar, matching Photoshop 2026 measurements.
+3. The widgets below the tools are absolutely positioned at Photoshop 2026's positions (traced from 2x screenshots; coordinates below are in pt relative to the toolbar's top-left):
+   - Edit Toolbar ("•••"): three dots of diameter 4, spaced 6 apart, centered at (19.25, 613.75), with a small gray triangle (`#bcbcbc`) at the bottom right; appearance only.
+   - Default colors icon: two 9 pt small squares, black at the top left and white with a black border at the bottom right, surrounded by a light gray `#c3c3c3` edge, at (3, 632)–(15, 644).
+   - Swap colors icon: a quarter-circle arc with an arrow at each end (pointing left and down), at (21.5, 631.5)–(34, 643).
+   - Foreground color swatch (4, 648)–(24, 668), background color swatch (14, 658)–(34, 678), foreground on top.
+   - Quick Mask button: a ring of 12 small square dots inside a rounded rectangle (9, 689)–(27, 702); shown pressed while in Quick Mask.
+   - Change Screen Mode button: two overlapping window shapes (the top-right one in front), with a small gray triangle at the bottom right; appearance only.
+   Icon color `#dddddd`; the buttons' hover hit areas are the same size as the tool buttons'.
+4. The 3 pt divider on the right (`#383838`, `#474747`, `#383838`), against the canvas.
 
-Quick Mask 按钮（「Edit in Quick Mask Mode (Q)」）点击进入/退出当前文档的快速蒙版（`toggle_quick_mask`，记录「Quick Mask」）。
+The Quick Mask button ("Edit in Quick Mask Mode (Q)") enters/exits Quick Mask for the current document when clicked (`toggle_quick_mask`, recording "Quick Mask").
 
-## 工具按钮
+## Tool Buttons
 
-- 宽 30.5 pt、高为格距减 1 像素，在工具栏中水平居中。当前工具有 `#383838` 深色底并带 1 像素 `#606060` 外描边（圆角 4），悬停变浅。
-- 组里有多个工具时，按钮右下角画一个小三角。
-- 悬停提示为「工具名 (快捷键)」，例如「Move Tool (V)」。
-- 左键点击：选中按钮显示的工具。
-- 右键点击，或按住按钮 0.4 秒（`HOLD_SECONDS`，Photoshop 的按住弹出）：在按钮右侧弹出这组工具的列表（按住打开时松开鼠标列表保持打开，这次松开也不算点击、不切换工具），每行是图标、名称和快捷键，当前显示的工具前有小方块标记，悬停行高亮为强调色；点击某行选中该工具，并让这一格从此显示它，列表关闭。
-- 列表的尺寸与位置按 Photoshop 2026 实测（`flyout_metrics`，单位 pt）：1 pt `#3e3e3e` 外框、底色同面板，带向下的阴影；每行高 19；当前工具的 4 pt 方块在 x 7；图标中心 x 28.5（`tool_icons` 按 0.93 倍绘制，移动工具图标约 14 pt 宽）；名称从 x 41 起，面板字体 11.5 pt（Photoshop 的 Adobe Clean 里「Move Tool」宽 47.5，Source Sans 3 为 48.7）；快捷键右端距外框右边 7，与最长名称至少隔 11。宽度按内容计算，Move 组为 130 × 40。外框左上角在按钮右边再往右 1.5、与按钮顶边齐平，即移动工具的列表从窗口 (36, 92) 开始。
-- 图标使用 Phosphor Bold 字形（`theme::tool_icon`，17.5 pt），比 Regular 更接近 Photoshop 偏粗的工具图标；对应关系见 `icons.md`。
+- 30.5 pt wide and the pitch minus 1 pixel high, horizontally centered in the toolbar. The current tool has a `#383838` dark background with a 1 pixel `#606060` outer stroke (corner radius 4); lighter on hover.
+- When a group has multiple tools, a small triangle is drawn at the button's bottom right.
+- The hover tooltip is "Tool name (shortcut)", e.g. "Move Tool (V)".
+- Left click: selects the tool shown on the button.
+- Right click, or holding the button for 0.4 seconds (`HOLD_SECONDS`, Photoshop's press-and-hold flyout): a list of the group's tools pops up to the right of the button (when opened by holding, the list stays open after releasing the mouse, and that release does not count as a click or switch tools); each row is an icon, a name and a shortcut; the currently shown tool has a small square marker in front of it; the hovered row is highlighted in the accent color. Clicking a row selects that tool, makes this cell show it from then on, and closes the list.
+- The list's size and position follow Photoshop 2026 measurements (`flyout_metrics`, in pt): a 1 pt `#3e3e3e` border, the background the same as the panel, with a downward shadow; each row is 19 high; the current tool's 4 pt square is at x 7; icon center at x 28.5 (`tool_icons` draws at 0.93×; the Move tool icon is about 14 pt wide); names start at x 41, panel font 11.5 pt ("Move Tool" is 47.5 wide in Photoshop's Adobe Clean, 48.7 in Source Sans 3); the shortcut's right end is 7 from the border's right edge, at least 11 from the longest name. The width is computed from the content; the Move group is 130 × 40. The border's top-left corner is 1.5 further right of the button's right edge, flush with the button's top edge; that is, the Move tool's list starts at window (36, 92).
+- Icons use Phosphor Bold glyphs (`theme::tool_icon`, 17.5 pt), closer than Regular to Photoshop's heavier tool icons; the mapping is in `icons.md`.
 
-## 前景色/背景色
+## Foreground/Background Colors
 
-- 前景色在左上，背景色在右下，相互错开叠放；都是 20 pt 见方、1 pt `#363636` 深色框，背景色在深色框里面还有 1 pt 白框（`swatch`，与 Photoshop 一致）。
-- 左上的小图标：恢复默认颜色（前景黑、背景白），等同于按 D。
-- 右上的小图标：交换前景色与背景色，等同于按 X。
-- 点击前景色或背景色色块：打开对应的 Color Picker（见 `dialogs/color_picker.md`），同时让 Color 面板转为编辑该颜色。
+- The foreground color is at the top left and the background color at the bottom right, stacked offset from each other; both are 20 pt square with a 1 pt `#363636` dark frame, and the background color also has a 1 pt white frame inside the dark frame (`swatch`, matching Photoshop).
+- The small icon at the top left: restores default colors (foreground black, background white), the same as pressing D.
+- The small icon at the top right: swaps the foreground and background colors, the same as pressing X.
+- Clicking the foreground or background swatch: opens the corresponding Color Picker (see `dialogs/color_picker.md`), and also switches the Color panel to editing that color.
 
-## 已知限制
+## Known Limitations
 
-- 工具栏不能折叠成双列，也不能拖动。
+- The toolbar cannot collapse into two columns and cannot be dragged.
 
-## 工具图标
+## Tool Icons
 
-按钮里的图标由 `tool_icons.rs` 按 Photoshop 的样式绘制（见 `tool_icons.md`），图标中心按 Photoshop 的行距计算；`paint` 返回 false 的工具（目前没有）退回 Phosphor 字体图标。
+The icons in the buttons are drawn in Photoshop's style by `tool_icons.rs` (see `tool_icons.md`), with icon centers computed from Photoshop's row pitch; tools for which `paint` returns false (currently none) fall back to Phosphor font icons.

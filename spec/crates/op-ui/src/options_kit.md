@@ -1,33 +1,33 @@
-# options_kit.rs：选项栏控件（按 Photoshop 实测定位）
+# options_kit.rs: Options bar controls (positioned from Photoshop measurements)
 
-## 组件职责
+## Component responsibilities
 
-选项栏里 Photoshop 2026 的各种控件，按「栏坐标」绝对定位：`x` 为距选项栏左边的 pt，`y` 为距选项栏顶上方 0.5 pt 的 pt（与测量时截图的裁剪方式一致）。每个工具的选项栏因此就是一串实测坐标（见 `options_bar.md`「按实测布局的工具」）。
+The various Photoshop 2026 controls in the options bar, absolutely positioned in "bar coordinates": `x` is pt from the left edge of the options bar, `y` is pt from 0.5 pt above the top of the options bar (matching how the screenshots were cropped when measuring). Each tool's options bar is therefore a sequence of measured coordinates (see "Tools with measured layouts" in `options_bar.md`).
 
-## 控件与实测尺寸
+## Controls and measured sizes
 
-- `sep(x)`：1 pt 分隔线，`#3e3e3e`，y 6.5–29。
-- `label(x, text, enabled)`：面板字体文字，`#dddddd`，不可用时 `#878787`，纵向中心 17.25；Source Sans 3 比 Adobe Clean 起笔靠右，所以向左偏 0.75 pt。
-- `check(x, label, value, enabled)`：Photoshop 样式复选框（`widgets::checkbox`），方框从 `x` 起，标签在方框右 8 pt。不可用时关闭 egui 对禁用控件的淡化（`disabled_alpha = 1`），由复选框自己画 Photoshop 的禁用色。
-- `field` / `value(x0, x1, …)`：输入框，y 9–25.5，`#454545` 底、1 pt `#666666` 边（不可用 `#4d4d4d` / `#5e5e5e`），文字左缩进 4.5 pt；`value` 在输入结束（失去焦点或 Enter）时返回所输入的文字，Enter 不再传给画布。
-- `popup` / `choice(x0, x1, …)`：下拉框，y 8–27（`widgets::dropdown_with`）。
-- `button(x0, x1, text, enabled)`：按钮，y 5.5–29.5，`#454545` 底、`#666666` 边，文字居中；不可用时 `#4d4d4d` 底、`#5e5e5e` 边、`#878787` 字。`menu_button` 高一点（4.5–30.5）并在右下角画小三角；`chevron_button`（y 5–30）里是 12.5 pt 宽、1 pt 线的下拉箭头。
-- `icon(cx, icon, tip, on, enabled)`：图标按钮，按下状态 (`on`) 为 y 4–31 的 `#383838` 框（0.5 pt `#636363` 边，3 pt 圆角）。
-- `modes(x, mode)`：选区运算四按钮，每个 26 pt 宽，选中的为按下框；图标按实测绘制：New 是 10 pt 实心方块，Add 两个重叠的实心方块，Subtract 前一个方块减去后一个（后者只画轮廓），Intersect 两个轮廓、重叠处实心。
-- `brush_picker(cx, label, size, hardness)`：笔刷选择器：笔尖预览按 Photoshop 的方式画（直径为笔刷大小个设备像素，最大 28 px，软笔刷向外渐隐；中心 y 11），下方 10.5 pt 的大小数字（y 26.25），右侧 21 pt 处的下拉箭头。
-- `slider_box(x0, x1, id, current)`：百分比输入框后面共用边框的箭头框，点击弹出 0–100% 滑块，返回拖动后的新值。
-- `swatch(x0, x1, fill, chevron_box)`：色块（y 5–30）。混合器画笔的载入颜色是无边框的白块，箭头紧跟其后；图案图章的图案块带 1 pt 边、画默认图案的叶点，箭头在单独的框里。
+- `sep(x)`: a 1 pt separator, `#3e3e3e`, y 6.5–29.
+- `label(x, text, enabled)`: panel-font text, `#dddddd`, `#878787` when disabled, vertical center 17.25; Source Sans 3 starts its strokes further right than Adobe Clean, so it is shifted 0.75 pt to the left.
+- `check(x, label, value, enabled)`: a Photoshop-style checkbox (`widgets::checkbox`); the box starts at `x` and the label is 8 pt to the right of the box. When disabled, egui's fading of disabled controls is turned off (`disabled_alpha = 1`) and the checkbox draws Photoshop's disabled colors itself.
+- `field` / `value(x0, x1, …)`: an input field, y 9–25.5, `#454545` background, 1 pt `#666666` border (disabled `#4d4d4d` / `#5e5e5e`), text indented 4.5 pt from the left; `value` returns the entered text when input ends (focus lost or Enter), and Enter is no longer passed on to the canvas.
+- `popup` / `choice(x0, x1, …)`: a dropdown, y 8–27 (`widgets::dropdown_with`).
+- `button(x0, x1, text, enabled)`: a button, y 5.5–29.5, `#454545` background, `#666666` border, text centered; when disabled, `#4d4d4d` background, `#5e5e5e` border, `#878787` text. `menu_button` is a bit taller (4.5–30.5) and draws a small triangle in the bottom-right corner; `chevron_button` (y 5–30) contains a 12.5 pt wide, 1 pt stroke dropdown arrow.
+- `icon(cx, icon, tip, on, enabled)`: an icon button; the pressed state (`on`) is a `#383838` box at y 4–31 (0.5 pt `#636363` border, 3 pt corner radius).
+- `modes(x, mode)`: the four selection-operation buttons, each 26 pt wide, with the selected one shown as a pressed box; the icons are drawn as measured: New is a 10 pt solid square, Add is two overlapping solid squares, Subtract is the first square minus the second (the latter drawn only as an outline), Intersect is two outlines with the overlap solid.
+- `brush_picker(cx, label, size, hardness)`: the brush picker: the brush tip preview is drawn the way Photoshop draws it (diameter of brush-size device pixels, at most 28 px, soft brushes fading outward; center y 11), a 10.5 pt size number below it (y 26.25), and a dropdown arrow 21 pt to the right.
+- `slider_box(x0, x1, id, current)`: the arrow box sharing a border with a preceding percentage input field; clicking pops up a 0–100% slider and returns the new value after dragging.
+- `swatch(x0, x1, fill, chevron_box)`: a color swatch (y 5–30). The Mixer Brush's load color is a borderless white block with the arrow right after it; the Pattern Stamp's pattern block has a 1 pt border and draws the leaf dots of the default pattern, with the arrow in a separate box.
 
-- `segmented(edges, labels, chosen, enabled)`：分段按钮（y 5–30，`#454545` 底、`#666666` 边，所选段为 `#383838`），返回点击的段。
-- `color_box`（无边框颜色块）、`empty_pattern`（不可用的空图案框与箭头框）、`gradient_swatch`（渐变色块与箭头框）。
-- `field_off(x0, x1)`：不可用的空输入框，y 8–26（Photoshop 禁用的输入框比可用的高一点）。
-- `combo(x0, x1, x2, id, shown, options, enabled)`：输入框（y 8–26）与它右侧共用边框的箭头框（到 `x2`），点箭头框弹出 `options`；返回输入的文字或所选的项。用于字体、字体样式、字号、描边宽度。不可用时两部分都画成禁用色，不响应。
-- `framed_swatch(x0, x1, fill)`：形状的 Fill / Stroke 色块：外框 y 7.5–27.5（`#666666` 1 pt 边），颜色内缩 3 pt；`None` 为「无颜色」（白底红斜线）。
-- `line_popup(x0, x1, id, options, value)`：显示线型（实线、虚线、点线）的下拉框。
-- `framed_color(x0, x1, y, fill)`：带 1 pt `#363636` 深色边的颜色块（文字颜色 y 8.5–26.5，画板背景 y 9–26）。
-- `centered_label(cx, text)`：以 `cx` 为中心的文字；`width()` 返回选项栏宽度（pt），用于居中提示。
+- `segmented(edges, labels, chosen, enabled)`: a segmented button (y 5–30, `#454545` background, `#666666` border, the selected segment `#383838`); returns the clicked segment.
+- `color_box` (borderless color block), `empty_pattern` (disabled empty pattern box and arrow box), `gradient_swatch` (gradient swatch and arrow box).
+- `field_off(x0, x1)`: a disabled empty input field, y 8–26 (Photoshop's disabled input fields are a bit taller than enabled ones).
+- `combo(x0, x1, x2, id, shown, options, enabled)`: an input field (y 8–26) and an arrow box to its right sharing its border (up to `x2`); clicking the arrow box pops up `options`; returns the entered text or the selected item. Used for font, font style, font size and stroke width. When disabled, both parts are drawn in disabled colors and do not respond.
+- `framed_swatch(x0, x1, fill)`: a shape's Fill / Stroke swatch: outer frame y 7.5–27.5 (`#666666` 1 pt border), color inset 3 pt; `None` is "no color" (white background with a red diagonal line).
+- `line_popup(x0, x1, id, options, value)`: a dropdown that shows line types (solid, dashed, dotted).
+- `framed_color(x0, x1, y, fill)`: a color block with a 1 pt dark `#363636` border (text color y 8.5–26.5, artboard background y 9–26).
+- `centered_label(cx, text)`: text centered on `cx`; `width()` returns the options bar width (pt), used for centering hints.
 
-## 测试覆盖
+## Test coverage
 
-- `ui_tests.rs` 的 `options_bars_match_photoshops_layout`：已按实测布局的工具，其选项栏的分隔线与各种框的边缘位置（从截图中按颜色识别）与 Photoshop 测得的数值（`PS_BAR_MARKS`）逐一对应，相差不超过 1 pt。
-- `screenshot_options_bars`（`#[ignore]`）：把每个工具的选项栏截成 `target/ui-shots/bars/<Tool>.png`，用于与 Photoshop 的截图并排比对。
+- `options_bars_match_photoshops_layout` in `ui_tests.rs`: for tools with measured layouts, the positions of the options bar's separators and the edges of its various boxes (identified by color in a screenshot) correspond one by one to the values measured in Photoshop (`PS_BAR_MARKS`), within 1 pt.
+- `screenshot_options_bars` (`#[ignore]`): captures each tool's options bar as `target/ui-shots/bars/<Tool>.png` for side-by-side comparison with Photoshop's screenshots.

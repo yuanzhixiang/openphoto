@@ -1,103 +1,103 @@
-# paint.rs：绘画笔画
+# paint.rs: Paint strokes
 
-## 职责
+## Responsibilities
 
-画笔、铅笔、橡皮擦的笔画计算：沿路径放置笔印，把颜色画到当前图层上，或擦除像素。
+Stroke computation for the Brush, Pencil and Eraser: places dabs along a path and paints color onto the current layer, or erases pixels.
 
-## 不透明度与流量
+## Opacity and flow
 
-与 Photoshop 一致：一笔之内「流量」不断累加，但不会超过「不透明度」。
+Matches Photoshop: within one stroke, "flow" keeps accumulating but never exceeds "opacity".
 
-- 每一笔保存图层开始前的像素（`base`，因为 tile 共享，复制代价低），以及这一笔在每个像素上的覆盖度（0–1，按 tile 分块存储）。
-- 每个笔印把覆盖度增加 `(1 − 覆盖度) × 笔印透明度 × 流量`。
-- 像素结果 = 从 `base` 出发，按 `覆盖度 × 不透明度 × 选区` 改变。所以在同一笔内来回涂抹，结果最多达到不透明度。
+- Each stroke keeps the layer's pixels from before it started (`base`; cheap to copy because tiles are shared), plus this stroke's coverage at each pixel (0–1, stored in tile chunks).
+- Each dab increases coverage by `(1 − coverage) × dab alpha × flow`.
+- Pixel result = starting from `base`, changed by `coverage × opacity × selection`. So scrubbing back and forth within one stroke reaches at most the opacity.
 
-## 对外接口
+## Public interface
 
-- `BrushTip`：直径（像素）、硬度（0 柔边 – 1 硬边）、`aliased`（铅笔：没有抗锯齿）、`square`（橡皮擦的 Block：边长为直径的方块，内部完全覆盖、外部为 0）。笔印透明度：从中心到 `半径 × 硬度` 为 1，之后平滑衰减到半径外 0.5 像素处为 0；硬度为 1 时也保留 1 像素的抗锯齿边缘。铅笔的像素中心在半径内为 1，否则为 0（直径至少按 1 像素计）。
-- `StrokeKind`：
-  - `Paint(rgb)`：画颜色（画笔、铅笔）。`Erase { background }`：橡皮擦。
-  - `Dodge(range)`、`Burn(range)`：减淡、加深。`ToneRange` 为 Shadows / Midtones（默认）/ Highlights，`label()` 为菜单文字。
-  - `Sponge { saturate }`：海绵（加色或去色）。
-  - `Blur`、`Sharpen`：模糊、锐化。
-  - `Source { image, dx, dy }`：画另一张图像中的像素，目标 (x, y) 取 `image` 的 (x − dx, y − dy)——仿制图章（同一图层的另一处）和历史记录画笔（图层的早先状态，偏移为 0）都用它。
-  `StrokeKind` 可以克隆，但不再是 `Copy`（`Source` 带着图像）。
-- `Stroke::begin(doc, tip, kind, opacity, flow)`：在当前图层上开始一笔，同时记下当前选区。
-- `Stroke::add_point(doc, x, y)`：把笔画延伸到 (`x`, `y`)。第一点放一个笔印；之后沿直线每隔直径的 25%（Photoshop 默认间距，至少 1 像素）放一个，跨调用保持间距连续。
-- `last_point()`：笔画结束的位置，界面用于 Shift+单击画直线。
-- `StrokeError`：不能开始的原因，`message(tool)` 给出 Photoshop 的提示文字：
-  - 没有图层：「Could not use the {工具} because there is no layer to paint on.」
-  - `lock_pixels`：「Could not use the {工具} because the layer is locked.」
-  - 图层隐藏：「Could not use the {工具} because the target layer is hidden.」
+- `BrushTip`: diameter (pixels), hardness (0 soft – 1 hard), `aliased` (Pencil: no anti-aliasing), `square` (the Eraser's Block: a square with side length equal to the diameter, fully covered inside and 0 outside). Dab alpha: 1 from the center out to `radius × hardness`, then falls off smoothly to 0 at 0.5 pixels outside the radius; even at hardness 1 a 1-pixel anti-aliased edge is kept. For the Pencil, a pixel whose center is within the radius is 1, otherwise 0 (the diameter counts as at least 1 pixel).
+- `StrokeKind`:
+  - `Paint(rgb)`: paints color (Brush, Pencil). `Erase { background }`: Eraser.
+  - `Dodge(range)`, `Burn(range)`: Dodge, Burn. `ToneRange` is Shadows / Midtones (default) / Highlights; `label()` is the menu text.
+  - `Sponge { saturate }`: Sponge (saturate or desaturate).
+  - `Blur`, `Sharpen`: Blur, Sharpen.
+  - `Source { image, dx, dy }`: paints pixels from another image; target (x, y) takes (x − dx, y − dy) of `image`. Used by both the Clone Stamp (another spot on the same layer) and the History Brush (an earlier state of the layer, offset 0).
+  `StrokeKind` can be cloned but is no longer `Copy` (`Source` carries an image).
+- `Stroke::begin(doc, tip, kind, opacity, flow)`: starts a stroke on the current layer and records the current selection.
+- `Stroke::add_point(doc, x, y)`: extends the stroke to (`x`, `y`). The first point places one dab; after that, dabs are placed along a straight line every 25% of the diameter (Photoshop's default spacing, at least 1 pixel), with spacing kept continuous across calls.
+- `last_point()`: where the stroke ended; the UI uses it for Shift+click straight lines.
+- `StrokeError`: the reason a stroke cannot start; `message(tool)` gives Photoshop's message text:
+  - No layer: "Could not use the {tool} because there is no layer to paint on."
+  - `lock_pixels`: "Could not use the {tool} because the layer is locked."
+  - Hidden layer: "Could not use the {tool} because the target layer is hidden."
 
-## 绘画模式（`PaintMode`）
+## Paint modes (`PaintMode`)
 
-画笔、铅笔的 Mode，用 `Stroke::with_mode` 设置（默认 Normal）：
+The Mode of the Brush and Pencil, set with `Stroke::with_mode` (default Normal):
 
-- `Blend(mode)`：以图层原有像素为底色，用 `blend::composite` 的混合公式把颜色以「覆盖率 × 不透明度 × 选区」的强度合成上去（Dissolve 按像素随机，与图层混合模式相同）。例：Multiply 的红色画在 `#808080` 上得到 `#800000`。
-- `Behind`：颜色画在图层「下面」：原有像素盖在颜色之上，所以只有透明处被涂上。
-- `Clear`：按强度降低透明度（像橡皮擦）。
-- 背景图层、锁定透明像素或蒙版上，混合结果保留原透明度；Behind 与 Clear 在这些地方不改变像素。
+- `Blend(mode)`: uses the layer's existing pixels as the base color and composites the color on top with the blend formula of `blend::composite` at a strength of "coverage × opacity × selection" (Dissolve is random per pixel, as with the layer blend mode). Example: red in Multiply painted on `#808080` gives `#800000`.
+- `Behind`: paints the color "under" the layer: existing pixels sit on top of the color, so only transparent areas get painted.
+- `Clear`: lowers alpha by the strength (like the Eraser).
+- On the background layer, with locked transparent pixels, or on a mask, the blend result keeps the original alpha; Behind and Clear do not change pixels there.
 
-## 涂抹、图案、背景橡皮擦与颜色替换
+## Smudge, pattern, Background Eraser and Color Replacement
 
-- `Pattern(image)`（图案图章）：目标像素取图案在 (x mod 宽, y mod 高) 的颜色，即从文档原点平铺（Aligned）；按覆盖率、不透明度、流量混入。
-- `Smudge(strength)`（涂抹）：不走覆盖率，直接改当前像素：每个笔印把上一笔印位置的像素按「强度 × 笔尖覆盖 × 选区」拉到当前位置（先读完再写）；第一笔印只取色不改变。
-- `BackgroundErase(ColorMatch)`（背景橡皮擦）与 `ReplaceColor { color, mode, matching }`（颜色替换，`mode` 为 Hue / Saturation / Color / Luminosity 的混合公式）只改变「匹配」的像素：
-  - 取样颜色（`Sampling`）：`Continuous` 每个笔印取笔印中心（笔画开始前的像素），`Once` 取第一个笔印中心，`Swatch(c)` 用给定颜色（背景色）。
-  - 匹配：像素不透明度大于 0，且每个通道与取样颜色之差的最大值 ≤ 容差（0–1）；`protect` 给出颜色时，与它在容差内的像素不变（Protect Foreground Color）。
-  - `contiguous` 时只取笔印范围内、从中心像素出发四连通的匹配像素（中心不匹配则这一笔印不改变任何像素）；否则笔印内所有匹配像素。
-  - 背景橡皮擦把匹配像素的透明度按强度降低；颜色替换按强度把颜色移向混合结果、透明度不变。
+- `Pattern(image)` (Pattern Stamp): the target pixel takes the pattern's color at (x mod width, y mod height), i.e. tiled from the document origin (Aligned); mixed in by coverage, opacity and flow.
+- `Smudge(strength)` (Smudge): does not use coverage but changes the current pixels directly: each dab pulls the pixels at the previous dab's position to the current position by "strength × tip coverage × selection" (reading everything before writing); the first dab only picks up color and changes nothing.
+- `BackgroundErase(ColorMatch)` (Background Eraser) and `ReplaceColor { color, mode, matching }` (Color Replacement; `mode` is the Hue / Saturation / Color / Luminosity blend formula) only change "matching" pixels:
+  - Sample color (`Sampling`): `Continuous` takes the center of each dab (pixels before the stroke started), `Once` takes the center of the first dab, `Swatch(c)` uses the given color (the background color).
+  - Matching: the pixel's alpha is greater than 0, and the maximum per-channel difference from the sample color is ≤ the tolerance (0–1); when `protect` gives a color, pixels within tolerance of it stay unchanged (Protect Foreground Color).
+  - With `contiguous`, only matching pixels within the dab that are 4-connected from the center pixel (if the center does not match, that dab changes no pixels); otherwise all matching pixels within the dab.
+  - The Background Eraser lowers the alpha of matching pixels by the strength; Color Replacement moves the color toward the blend result by the strength, with alpha unchanged.
 
 ## Healing strokes
 
 - `Heal { source, dx, dy }` (Healing Brush) and `SpotHeal(source)` (Spot Healing Brush) don't go through the coverage map. Each dab heals the pixels under the tip with `heal::heal_window` over the dab's box plus one pixel (the edge values come from the layer as it is at that moment, so dabs follow on from earlier ones), and mixes them into the layer by the tip's coverage × opacity × selection; alpha is kept (or follows `mix` when transparency isn't locked).
 - The Healing Brush takes its texture at the fixed offset; the Spot Healing Brush picks an offset per dab with `heal::proximity_match` on its source image. A dab whose source would leave the image changes nothing.
 
-## 像素规则
+## Pixel rules
 
-- 画颜色（普通图层）：颜色以 `数量` 为 alpha 做 source-over，叠到原像素上。
-- 背景图层或「锁定透明像素」：只把颜色混向目标色，alpha 保持不变。
-- 橡皮擦（普通图层）：alpha 乘以 `1 − 数量`。
-- 橡皮擦（背景图层或锁定透明像素）：像画颜色一样，把颜色混向背景色，alpha 不变 —— 与 Photoshop 在背景图层上擦出背景色一致。
-- 选区：按选中程度（0–255 → 0–1）缩放数量，羽化的选区按比例生效。
-- 每个笔印之后调用 `mark_dirty`。
+- Painting color (regular layer): the color is composited source-over onto the original pixel with `amount` as alpha.
+- Background layer or "lock transparent pixels": only mixes the color toward the target color; alpha stays the same.
+- Eraser (regular layer): alpha is multiplied by `1 − amount`.
+- Eraser (background layer or locked transparent pixels): like painting color, mixes the color toward the background color with alpha unchanged, matching Photoshop erasing to the background color on the background layer.
+- Selection: scales the amount by selection degree (0–255 → 0–1); a feathered selection takes effect proportionally.
+- `mark_dirty` is called after each dab.
 
-### 在蒙版上绘画
+### Painting on masks
 
-笔画的目标按快速蒙版 > 图层蒙版 > 像素的优先级决定。快速蒙版模式下，图层隐藏或锁定也可以绘画（只改快速蒙版）。编辑目标是蒙版（快速蒙版或 `Document::editing_mask`）时，笔画的基准图像是蒙版：画笔/铅笔的颜色换成灰度（`adjust::mask_gray`，即亮度），橡皮擦画背景色的灰度，修饰工具直接作用于灰度图像；蒙版不透明，alpha 保持不变。
+The stroke target is decided by priority Quick Mask > layer mask > pixels. In Quick Mask mode, painting works even when the layer is hidden or locked (only the Quick Mask changes). When the editing target is a mask (Quick Mask or `Document::editing_mask`), the stroke's base image is the mask: Brush/Pencil colors are converted to gray (`adjust::mask_gray`, i.e. luminance), the Eraser paints the gray of the background color, and the retouching tools act directly on the grayscale image; the mask is opaque, and alpha stays the same.
 
-### 修饰工具
+### Retouching tools
 
-修饰工具先算出笔画前像素在「满强度」下的目标值，再按 `数量`（覆盖率 × 不透明度 × 选择程度；界面把 Exposure / Strength 作为不透明度传入，海绵的 Flow 作为流量）在预乘 alpha 下从原像素混向目标；背景图层或锁定透明像素时只混颜色、保持 alpha。目标值（v 为 0–1 的通道值）：
+The retouching tools first compute the "full strength" target value of the pre-stroke pixel, then mix from the original pixel toward the target in premultiplied alpha by `amount` (coverage × opacity × selection degree; the UI passes Exposure / Strength as opacity and the Sponge's Flow as flow); on the background layer or with locked transparent pixels only color is mixed, keeping alpha. Target values (v is a channel value in 0–1):
 
-- 减淡：`v + w(v) × (1 − v)`；加深：`v − w(v) × v`。权重 w：Shadows `(1 − v)²`、Midtones `4v(1 − v)`、Highlights `v²`。逐通道计算；这是对 Photoshop 算法的近似。
-- 海绵：在 HSL 中把饱和度变为 0（去色）或加倍（加色，最大 1）。
-- 模糊：笔画前像素的 3×3 预乘平均；锐化：`v + (v − 3×3 平均)`。因为基于笔画前的像素，同一笔内来回涂抹不会继续累积模糊/锐化。
-- 来源：`image` 中对应位置的像素（含 alpha）；超出 `image` 范围时保持原像素。
+- Dodge: `v + w(v) × (1 − v)`; Burn: `v − w(v) × v`. Weight w: Shadows `(1 − v)²`, Midtones `4v(1 − v)`, Highlights `v²`. Computed per channel; this approximates Photoshop's algorithm.
+- Sponge: in HSL, sets saturation to 0 (desaturate) or doubles it (saturate, at most 1).
+- Blur: the 3×3 premultiplied average of the pre-stroke pixels; Sharpen: `v + (v − 3×3 average)`. Because they are based on the pre-stroke pixels, scrubbing back and forth within one stroke does not keep accumulating blur/sharpening.
+- Source: the pixel at the corresponding position in `image` (including alpha); outside the bounds of `image` the original pixel is kept.
 
-## 已知限制
+## Known limitations
 
-- 只有圆形笔尖，没有笔刷预设、角度、圆度、间距设置，也没有压感、平滑（Smoothing）和喷枪。
-- 没有涂抹工具（Smudge）；修饰工具的 Protect Tones、Vibrance、Sample All Layers、Protect Detail 选项没有实现。
-- 画笔模式只有 Normal；橡皮擦只有 Brush 模式（没有 Pencil、Block 模式）。
-- 每个笔印都会触发整个文档重新合成和上传，大文档上绘画较慢。
+- Only round brush tips; no brush presets, angle, roundness or spacing settings, and no pressure, Smoothing or airbrush.
+- No Smudge tool; the retouching tools' Protect Tones, Vibrance, Sample All Layers and Protect Detail options are not implemented.
+- The only brush mode is Normal; the Eraser only has Brush mode (no Pencil or Block mode).
+- Every dab triggers a full recomposite and upload of the document, so painting on large documents is slow.
 
-## 图层组
+## Layer groups
 
-当前图层是组且目标是像素时，开始笔画返回 `StrokeError::Group`（「Could not use the {工具} because the target layer is a group.」）；组的蒙版仍可以绘画。
+When the current layer is a group and the target is pixels, starting a stroke returns `StrokeError::Group` ("Could not use the {tool} because the target layer is a group."); the group's mask can still be painted.
 
-## 测试覆盖
+## Test coverage
 
-- `pattern_smudge_background_eraser_and_color_replacement`：图案平铺、涂抹把红色拉到空处、背景橡皮擦只擦取样的灰色、颜色替换只给灰色换色。
-- `paint_modes_blend_with_the_layer`：Multiply、Behind、Clear；`a_square_tip_covers_a_block`：方形笔尖的角也被覆盖。
-- `hard_brush_paints_full_color_in_its_core`、`pencil_is_aliased`：硬边画笔中心为完整颜色；铅笔只有完全透明和完全不透明。
-- `dodge_burn_and_sponge`：中间调减淡变亮、加深变暗；Highlights 几乎不影响暗像素；去色后三通道相等。
-- `quick_mask_round_trip`：快速蒙版模式下在隐藏图层上也能画；涂黑处退出后不在选区内；什么都不画时退出后没有选区。
-- `blur_sharpen_and_clone`：模糊让黑白边缘出现中间值；仿制把 (5, 5) 的红点画到 (20, 20)，旁边不变。
-- `opacity_caps_a_single_stroke`：同一笔内反复涂抹，结果停在 50% 不透明度。
-- `flow_builds_up`：低流量时重复经过同一点会加深。
-- `selection_masks_paint`：选区外不被画到。
-- `eraser_removes_alpha_and_paints_background_on_background_layer`：普通图层上擦成透明，背景图层上擦出背景色。
-- `locked_and_hidden_layers_refuse`：锁定像素和隐藏的图层拒绝绘画。
-- `spacing_places_dabs_along_a_line`：沿直线的笔印没有间断。
+- `pattern_smudge_background_eraser_and_color_replacement`: pattern tiling, smudge pulling red into an empty area, the Background Eraser erasing only the sampled gray, Color Replacement recoloring only the gray.
+- `paint_modes_blend_with_the_layer`: Multiply, Behind, Clear; `a_square_tip_covers_a_block`: the corners of a square tip are also covered.
+- `hard_brush_paints_full_color_in_its_core`, `pencil_is_aliased`: a hard brush paints full color at its center; the Pencil produces only fully transparent and fully opaque pixels.
+- `dodge_burn_and_sponge`: midtone Dodge lightens and Burn darkens; Highlights barely affects dark pixels; after desaturation the three channels are equal.
+- `quick_mask_round_trip`: in Quick Mask mode painting works even on a hidden layer; areas painted black are not in the selection after exiting; with nothing painted there is no selection after exiting.
+- `blur_sharpen_and_clone`: Blur produces intermediate values at a black-white edge; Clone paints the red dot at (5, 5) to (20, 20) and leaves its surroundings unchanged.
+- `opacity_caps_a_single_stroke`: scrubbing repeatedly within one stroke stops at 50% opacity.
+- `flow_builds_up`: at low flow, passing over the same point repeatedly builds up.
+- `selection_masks_paint`: areas outside the selection are not painted.
+- `eraser_removes_alpha_and_paints_background_on_background_layer`: erases to transparency on a regular layer, and to the background color on the background layer.
+- `locked_and_hidden_layers_refuse`: layers with locked pixels and hidden layers refuse painting.
+- `spacing_places_dabs_along_a_line`: dabs along a straight line have no gaps.

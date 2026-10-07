@@ -1,26 +1,26 @@
-# dialogs/selective_color.rs：Selective Color 对话框
+# dialogs/selective_color.rs: Selective Color dialog
 
-## 组件职责
+## Component responsibilities
 
-Image › Adjustments › Selective Color... 的对话框，按 Photoshop 2026 的 UXP 对话框重做（473 × 400 pt）。算法见 `op-core` 的 `adjust.md`（`SelectiveColor`）。
+The dialog for Image › Adjustments › Selective Color..., rebuilt after Photoshop 2026's UXP dialog (473 × 400 pt). For the algorithm see `adjust.md` in `op-core` (`SelectiveColor`).
 
-## 数据与默认值
+## Data and defaults
 
-- 九个颜色范围（Reds、Yellows、Greens、Cyans、Blues、Magentas、Whites、Neutrals、Blacks）各有 Cyan、Magenta、Yellow、Black（−100–100%），默认 0；Method 默认 Relative。
-- 输入框可带「%」，解析时去掉；`adjustment()` 在全部有效时返回 `Adjustment::SelectiveColor`。Preset 规则同其它 UXP 对话框。
+- Each of the nine color ranges (Reds, Yellows, Greens, Cyans, Blues, Magentas, Whites, Neutrals, Blacks) has Cyan, Magenta, Yellow and Black (−100–100%), default 0; Method defaults to Relative.
+- Input fields may include "%", which is stripped when parsing; `adjustment()` returns `Adjustment::SelectiveColor` when everything is valid. Preset rules are the same as in the other UXP dialogs.
 
-## 布局（Photoshop 点）
+## Layout (Photoshop points)
 
-- 「Preset」(20, 61)，下拉 (56, 48.5)–(302, 73.5)，预设菜单图标 (319, 61)。
-- 九个圆点：圆心 x 从 32 起每 36 pt，y 96；填充为 Photoshop 的颜色（白、`#807f7f` 灰、黑表示 Whites、Neutrals、Blacks），悬停提示范围名。
-- 四行滑块：Cyan、Magenta、Yellow、Black，输入框 x 277–331.5、y 120 / 175 / 230 / 285，数字后画「%」；轨道在框下 36 pt，x 20–331.5，颜色为红→灰→青、绿→灰→洋红、蓝→灰→黄、白→灰→黑（取自 Photoshop）。
-- 「Method」(20, 348.5)，单选「Relative」(26, 368.5)、「Absolute」(98, 368.5)（`uxp::radio`）。
-- 「Preview (Opt+P)」(344, 127)；右侧 OK、Cancel。
+- "Preset" (20, 61), dropdown (56, 48.5)–(302, 73.5), preset menu icon (319, 61).
+- Nine dots: centers at x starting from 32 every 36 pt, y 96; filled with Photoshop's colors (white, `#807f7f` gray and black represent Whites, Neutrals and Blacks), with the range name as a hover tooltip.
+- Four slider rows: Cyan, Magenta, Yellow, Black, input fields x 277–331.5, y 120 / 175 / 230 / 285, with "%" drawn after the number; tracks are 36 pt below the field, x 20–331.5, colored red→gray→cyan, green→gray→magenta, blue→gray→yellow, white→gray→black (taken from Photoshop).
+- "Method" (20, 348.5), radio buttons "Relative" (26, 368.5) and "Absolute" (98, 368.5) (`uxp::radio`).
+- "Preview (Opt+P)" (344, 127); OK and Cancel on the right.
 
-## 交互
+## Interaction
 
-- 点击圆点切换范围，Cyan 框获得焦点并全选；打开时 Reds 的 Cyan 框获得焦点。
+- Clicking a dot switches the range, and the Cyan field gets focus with its contents selected; on open, the Cyan field of Reds has focus.
 
-## 测试覆盖
+## Test coverage
 
-- `ranges_keep_their_values`；`ui_tests::channel_mixer_and_selective_color_apply`（Yellows、Absolute）；截图 `selective_color_dialog.png`。
+- `ranges_keep_their_values`; `ui_tests::channel_mixer_and_selective_color_apply` (Yellows, Absolute); screenshot `selective_color_dialog.png`.

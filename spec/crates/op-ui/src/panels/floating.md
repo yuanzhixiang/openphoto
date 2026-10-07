@@ -1,21 +1,21 @@
-# panels/floating.rs：浮动面板
+# panels/floating.rs: floating panels
 
-## 组件职责
+## Component responsibilities
 
-从 Window 菜单打开、不停靠在右侧面板列里的面板：Info、Navigator、Histogram。每个面板有自己的外框，可以拖动。
+Panels opened from the Window menu that are not docked in the right-hand panel column: Info, Navigator, Histogram. Each panel has its own frame and can be dragged.
 
-## 状态
+## State
 
-`AppState::floating`（`FloatingPanels`）：三个面板是否打开。`toggle` 切换。位置由 egui 的 Area 记住（拖动后保持）。
+`AppState::floating` (`FloatingPanels`): whether each of the three panels is open. `toggle` toggles it. Positions are remembered by egui's Area (kept after dragging).
 
-## 布局与视觉
+## Layout and visuals
 
-- 外框：面板底色、1 pt 分隔线色描边、阴影。
-- 头部 26 pt：标签栏底色，左侧 90 pt 宽的标签（面板底色，半粗体面板名），右侧关闭按钮（×，悬停变亮），点击关闭面板。
-- 内容区四周留 10 pt。尺寸（不含头部）：Navigator 250 × 230、Histogram 250 × 150、Info 250 × 200。
-- 默认位置：图标列左侧，按 Navigator、Histogram、Info 的顺序从上往下排成一列，间隔 8 pt；每个面板的默认位置固定（与其它面板是否打开无关），后打开的面板不会盖住先打开的。
+- Frame: panel background color, 1 pt stroke in the divider color, shadow.
+- Header 26 pt: tab bar background color, a 90 pt wide tab on the left (panel background color, panel name in semibold), and a close button on the right (×, brighter on hover) that closes the panel when clicked.
+- The content area has 10 pt of margin on all sides. Sizes (excluding the header): Navigator 250 × 230, Histogram 250 × 150, Info 250 × 200.
+- Default position: to the left of the icon column, arranged in a column from top to bottom in the order Navigator, Histogram, Info, with 8 pt gaps; each panel's default position is fixed (regardless of whether other panels are open), so a panel opened later does not cover one opened earlier.
 
-## 已知限制
+## Known limitations
 
-- 面板不能停靠到面板列、不能折叠成图标、不能与其它面板组成标签组；没有面板菜单。
-- 关闭应用后不记住打开状态。
+- Panels cannot be docked into the panel column, collapsed to icons, or grouped with other panels into tab groups; there is no panel menu.
+- The open state is not remembered after the application closes.

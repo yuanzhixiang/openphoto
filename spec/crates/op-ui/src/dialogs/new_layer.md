@@ -1,43 +1,43 @@
-# dialogs/new_layer.rs：New Layer 对话框
+# dialogs/new_layer.rs: New Layer dialog
 
-## 组件职责
+## Component responsibility
 
-Layer › New › Layer...（⇧⌘N）弹出的对话框，设置新图层的名称、颜色标签、混合模式、不透明度和是否用中性色填充，对应 Photoshop 2026 的 New Layer 对话框。⌥⇧⌘N 跳过对话框直接新建（见 `commands.md`），Layers 面板底部「新建图层」按钮按住 ⌥ 单击时也会弹出它。
+The dialog opened by Layer › New › Layer... (⇧⌘N); it sets the new layer's name, color label, blend mode, opacity, and whether to fill with a neutral color, corresponding to Photoshop 2026's New Layer dialog. ⌥⇧⌘N skips the dialog and creates the layer directly (see `commands.md`); ⌥-clicking the "New Layer" button at the bottom of the Layers panel also opens it.
 
-## 布局（Photoshop 2026 实测，相对对话框左上角的 pt）
+## Layout (measured from Photoshop 2026, in pt relative to the dialog's top-left corner)
 
-对话框 552 × 186，居中显示，标题栏与边框见 `common.md` 的 `frame`；标题「New Layer」为窗口标题（13 pt 粗体系统字体）。这是 UXP 对话框，文字是 Adobe Clean，所以用 `theme::uxp`（Source Sans 3 Regular 12 pt），颜色 `#f1f1f1`；短文字的宽度与 Photoshop 相差 1–3 px，长句宽约 2.5%（两种字体本身的差别）。
+The dialog is 552 × 186, centered; the title bar and border are described by `frame` in `common.md`; the title "New Layer" is the window title (13 pt bold system font). This is a UXP dialog whose text is Adobe Clean, so `theme::uxp` (Source Sans 3 Regular 12 pt) is used, color `#f1f1f1`; the width of short text differs from Photoshop by 1–3 px, and long sentences are about 2.5% wider (the inherent difference between the two fonts).
 
-- 「Name」右对齐到 x 49、中心 y 61；名称输入框 (59, 49)–(243, 71)，文字左侧留 10，打开时获得焦点并全选，默认值为下一个「Layer N」（`Document::next_layer_name`）。
-- 「Color」右对齐到 x 282（「Opacity」到 281.5，「Mode」到 49.5）；颜色下拉 (290, 48)–(450, 72)：1 pt `#7a7a7a` 边、圆角 3，左边是 14 pt 的颜色方块（None 时为带叉的空心方块），x 321 起是颜色名，距右边 13.5 是 10 × 6 pt 的 V 形箭头。菜单列出 `LayerColor` 的全部八项。
-- 「Use previous layer to create clipping mask」复选框 (58, 83)，12 pt 见方，文字在框右 9.5。本应用还不支持剪贴蒙版，所以它总是置灰且不勾选（Photoshop 中可用）。
-- 「Mode」右对齐到 x 49、中心 y 125.5；模式下拉 (58, 113)–(218, 137)，值在左侧 9；菜单按 Photoshop 的分组列出全部混合模式，组间有分隔线。
-- 「Opacity」右对齐到 x 280.5；数值框 (290, 113)–(340, 137)（文字左侧留 11.5，可直接输入，带不带 % 都可以）；右侧紧接带 V 形箭头的小框 (339, 113)–(358, 137)，点击弹出 0–100 的滑块。
-- 「Fill with ‹mode›-neutral color」复选框 (58, 148) 与色块 (192, 142)–(216, 166)：只有当前模式有中性色（`op_core::neutral_color`）时可用，文字变为如「Fill with Multiply-neutral color」，色块显示中性色并跟在文字后面 12 pt；否则文字为「Fill with neutral color」并置灰，色块为灰色。
-- 按钮：OK (462, 48)–(532, 72)，默认按钮，1 pt 亮边 `#f1f1f1`；Cancel (462, 84)–(532, 108)，1 pt `#727272` 边。都是胶囊形（`common::ps_button`），标签为 `theme::uxp_bold`（Source Sans 3 Semibold 12 pt），悬停或按下时底色变化。
+- "Name" right-aligned to x 49, center y 61; name field (59, 49)–(243, 71), with 10 left of the text; it gets focus with everything selected on open; the default value is the next "Layer N" (`Document::next_layer_name`).
+- "Color" right-aligned to x 282 ("Opacity" to 281.5, "Mode" to 49.5); color dropdown (290, 48)–(450, 72): 1 pt `#7a7a7a` border, corner radius 3; on the left a 14 pt color square (a hollow square with a cross for None), the color name from x 321, and a 10 × 6 pt V-shaped arrow 13.5 from the right edge. The menu lists all eight `LayerColor` entries.
+- "Use previous layer to create clipping mask" checkbox (58, 83), 12 pt square, text 9.5 to the right of the box. This app does not support clipping masks yet, so it is always grayed out and unchecked (it is enabled in Photoshop).
+- "Mode" right-aligned to x 49, center y 125.5; mode dropdown (58, 113)–(218, 137), value 9 from the left; the menu lists all blend modes in Photoshop's groups, with separators between groups.
+- "Opacity" right-aligned to x 280.5; value box (290, 113)–(340, 137) (11.5 left of the text; can be typed into directly, with or without %); immediately to its right a small box with a V-shaped arrow (339, 113)–(358, 137), which on click pops up a 0–100 slider.
+- "Fill with ‹mode›-neutral color" checkbox (58, 148) and swatch (192, 142)–(216, 166): enabled only when the current mode has a neutral color (`op_core::neutral_color`); the text then becomes e.g. "Fill with Multiply-neutral color", and the swatch shows the neutral color and follows 12 pt after the text; otherwise the text is "Fill with neutral color" and grayed out, and the swatch is gray.
+- Buttons: OK (462, 48)–(532, 72), the default button, with a 1 pt bright `#f1f1f1` border; Cancel (462, 84)–(532, 108), with a 1 pt `#727272` border. Both are pill-shaped (`common::ps_button`), with labels in `theme::uxp_bold` (Source Sans 3 Semibold 12 pt); the background changes on hover or press.
 
-## Layer from Background 版本
+## Layer from Background variant
 
-Layer › New › Layer from Background... 与双击 Layers 面板中的背景图层时弹出同一个对话框的变体（`NewLayerDialog::from_background`）：标题仍是「New Layer」，高 157（没有中性色那一行），名称默认为「Layer 0」，「Use previous layer...」置灰。确认后背景图层变为普通图层，并使用对话框中的名称、颜色标签、混合模式和不透明度（`panels::layer_from_background_with`），记录「Layer From Background」。
+Layer › New › Layer from Background... and double-clicking the background layer in the Layers panel open a variant of the same dialog (`NewLayerDialog::from_background`): the title is still "New Layer", height 157 (no neutral color row), the name defaults to "Layer 0", and "Use previous layer..." is grayed out. On confirm, the background layer becomes a normal layer using the dialog's name, color label, blend mode, and opacity (`panels::layer_from_background_with`), recording "Layer From Background".
 
-## New Group 与 New Group from Layers 版本
+## New Group and New Group from Layers variants
 
-Layer › New › Group... 与 Group from Layers... 弹出同一布局的变体（`NewLayerDialog::group`，`Kind::Group` / `Kind::GroupFromLayers`）：标题分别为「New Group」「New Group from Layers」，高 128，没有剪贴蒙版和中性色两行，Mode 行上移 29 pt（中心 y 96.5），默认名称为下一个「Group N」，默认模式为 Pass Through，模式菜单最上面多一项「Pass Through」（与 Photoshop 2026 截图一致）。确认后新建空组或把选中的图层编组，并使用对话框中的名称、颜色标签、模式和不透明度（`panels::new_group_from`），分别记录「New Group」「Group Layers」。
+Layer › New › Group... and Group from Layers... open variants with the same layout (`NewLayerDialog::group`, `Kind::Group` / `Kind::GroupFromLayers`): titled "New Group" and "New Group from Layers" respectively, height 128, without the clipping mask and neutral color rows; the Mode row moves up 29 pt (center y 96.5); the default name is the next "Group N"; the default mode is Pass Through; and the mode menu has an extra "Pass Through" item at the top (matching Photoshop 2026 screenshots). On confirm, an empty group is created or the selected layers are grouped, using the dialog's name, color label, mode, and opacity (`panels::new_group_from`), recording "New Group" and "Group Layers" respectively.
 
-## 交互
+## Interaction
 
-- Enter 或 OK：按当前值新建图层（`panels::new_layer_from`）：插在当前图层上方并选中，设名称（为空时用「Layer」）、颜色标签、混合模式和不透明度（0–100% 截断）；勾选中性色填充且模式有中性色时整幅画布填该颜色。记录一条「New Layer」历史。
-- Esc 或 Cancel：关闭，不做任何事。
-- 不透明度不是数字时 OK 不可用。
-- 对话框打开期间菜单与快捷键不生效（`AppState::modal_open`）。
+- Enter or OK: creates a layer with the current values (`panels::new_layer_from`): inserted above the current layer and selected, with the name (when empty, "Layer"), color label, blend mode, and opacity (clamped to 0–100%); when neutral color fill is checked and the mode has a neutral color, the whole canvas is filled with that color. Records one "New Layer" history entry.
+- Esc or Cancel: closes without doing anything.
+- OK is disabled when the opacity is not a number.
+- Menus and shortcuts do not work while the dialog is open (`AppState::modal_open`).
 
-## 已知限制
+## Known limitations
 
-- 「Use previous layer to create clipping mask」不可用（剪贴蒙版尚未实现）。
-- Photoshop 中不透明度箭头弹出的是 Photoshop 样式的滑块；这里是 egui 的滑块。
+- "Use previous layer to create clipping mask" is unavailable (clipping masks are not implemented yet).
+- In Photoshop, the opacity arrow pops up a Photoshop-style slider; here it is an egui slider.
 
-## 测试覆盖
+## Test coverage
 
-- `defaults_and_values`（单元测试）：默认值；不透明度的解析、截断和非法输入；中性色填充只在有中性色的模式下生效。
-- `new_layer_dialog_names_colors_and_blends`（UI 测试）：⇧⌘N 打开对话框，输入「Shade」，从颜色菜单选 Violet、从模式菜单选 Multiply，勾选中性色填充后点 OK，得到名为 Shade、紫色标签、Multiply、整幅白色的图层并记录「New Layer」；Esc 取消不新建；⌥⇧⌘N 不弹对话框直接得到「Layer 1」。
-- `screenshot_new_layer_dialog`（截图，`#[ignore]`）：用于与 Photoshop 的截图逐像素比对。
+- `defaults_and_values` (unit test): default values; opacity parsing, clamping, and invalid input; neutral color fill only takes effect in modes that have a neutral color.
+- `new_layer_dialog_names_colors_and_blends` (UI test): ⇧⌘N opens the dialog; typing "Shade", choosing Violet from the color menu and Multiply from the mode menu, checking neutral color fill, and clicking OK produces a layer named Shade with a violet label, Multiply, filled entirely white, and records "New Layer"; Esc cancels without creating a layer; ⌥⇧⌘N produces "Layer 1" directly without the dialog.
+- `screenshot_new_layer_dialog` (screenshot, `#[ignore]`): used for pixel-by-pixel comparison with Photoshop screenshots.

@@ -1,38 +1,38 @@
-# dialogs/fill.rs：Fill 对话框
+# dialogs/fill.rs: Fill dialog
 
-## 组件职责
+## Component responsibilities
 
-Edit › Fill...（⇧F5）。选择填充内容和混合方式，确定后由 `lib.rs` 调用 `op_core::fill::fill` 填充当前图层的选区（没有选区时整个图层），并记录一条「Fill」历史。
+Edit › Fill... (⇧F5). Chooses the fill contents and blending; on OK, `lib.rs` calls `op_core::fill::fill` to fill the current layer's selection (the whole layer when there is no selection) and records a "Fill" history entry.
 
-## 布局
+## Layout
 
-按 Photoshop 2026 的 Fill 对话框（经典 AppKit 对话框，2x 截图）逐点量取，与 Levels、Curves 同一类，控件来自 `appkit.rs`。对话框 348 × 293 pt，坐标为距对话框左上角的 pt：
+Measured point by point from Photoshop 2026's Fill dialog (a classic AppKit dialog, 2x screenshots), the same kind as Levels and Curves, with controls from `appkit.rs`. The dialog is 348 × 293 pt; coordinates are pt from the dialog's top-left:
 
-- 标题栏：`common::frame`，系统粗体 13 pt「Fill」。文字为 12 pt 系统字体（`theme::dialog`，带 macOS 字距），`#f0f0f0`。
-- 「Contents:」右对齐于 112.5，中心 y 48.5；下拉 (118–263，y 38–59)。
-- **Options** 分组框 (11.5–262.5，y 116–166)：1 pt `#424242` 线，标题「Options」从 30.5 起压在上边线上，线在标题两侧各留 5 pt。里面是不可用的「Color Adaptation」复选框 (20, 141.5)：只对 Content-Aware 有用，而 Content-Aware 还没有实现，所以总是置灰。
-- **Blending** 分组框 (11.5–262.5，y 184–282)：「Mode:」(中心 y 208.5) 与下拉 (118–253，y 198–219，全部 27 种混合模式，按 Photoshop 菜单分组)；「Opacity:」(236.5) 与输入框 (117–169，y 227–246，打开时获得焦点并全选，↑↓ 步进 1、⇧ 步进 10) 加「%」(177.5)；「Preserve Transparency」复选框 (20, 257.5)。
-- 复选框 12 pt，文字在方框右 11 pt；不可用时为 `#4d4d4d` 方框、`#5d5d5d` 边、`#8e8e8e` 文字。
-- OK（默认按钮，亮边）(278.5–338.5，y 38.5–64.5)、Cancel (y 73.5–99.5)：26 pt 高的胶囊按钮。
+- Title bar: `common::frame`, system bold 13 pt "Fill". Text is 12 pt system font (`theme::dialog`, with macOS tracking), `#f0f0f0`.
+- "Contents:" right-aligned at 112.5, centered at y 48.5; dropdown (118–263, y 38–59).
+- **Options** group box (11.5–262.5, y 116–166): 1 pt `#424242` line, the title "Options" starting at 30.5 on top of the upper line, with the line leaving 5 pt on each side of the title. Inside is the disabled "Color Adaptation" checkbox (20, 141.5): it only matters for Content-Aware, and Content-Aware is not implemented yet, so it is always grayed out.
+- **Blending** group box (11.5–262.5, y 184–282): "Mode:" (centered at y 208.5) and dropdown (118–253, y 198–219, all 27 blend modes, grouped as in Photoshop's menu); "Opacity:" (236.5) and input field (117–169, y 227–246, focused with everything selected on open, ↑↓ step 1, ⇧ step 10) plus "%" (177.5); "Preserve Transparency" checkbox (20, 257.5).
+- Checkboxes are 12 pt, with text 11 pt to the right of the box; when disabled, a `#4d4d4d` box, `#5d5d5d` border and `#8e8e8e` text.
+- OK (default button, bright border) (278.5–338.5, y 38.5–64.5), Cancel (y 73.5–99.5): 26 pt high capsule buttons.
 
-与 Photoshop 截图相比各元素相差不超过 1 pt。
+Compared with Photoshop screenshots, each element differs by no more than 1 pt.
 
-## Contents 选项
+## Contents options
 
-Foreground Color（默认）、Background Color、Color...；Content-Aware、Pattern、History（置灰）；Black、50% Gray（128）、White。
+Foreground Color (default), Background Color, Color...; Content-Aware, Pattern, History (grayed out); Black, 50% Gray (128), White.
 
-选择「Color...」打开标题为「Color Picker (Fill Color)」的 Color Picker；在那里确定后，Contents 变为 Color... 并使用所选颜色，取消则保持原来的选择。
+Choosing "Color..." opens the Color Picker titled "Color Picker (Fill Color)"; after OK there, Contents becomes Color... and uses the chosen color; Cancel keeps the previous choice.
 
-## 键盘
+## Keyboard
 
-- Enter：确定（不透明度有效时）。Esc：取消。
-- Color Picker 打开期间，Enter/Esc 只作用于 Color Picker。
+- Enter: OK (when the opacity is valid). Esc: Cancel.
+- While the Color Picker is open, Enter/Esc act only on the Color Picker.
 
-## 校验
+## Validation
 
-不透明度必须是 0–100 的数字，否则 OK 置灰。
+The opacity must be a number from 0–100, otherwise OK is grayed out.
 
-## 已知限制
+## Known limitations
 
-- Content-Aware、Pattern、History 还没有实现，所以 Color Adaptation 总是置灰；没有 Pattern 的图案选择和脚本选项。
-- 不记住上次的设置。
+- Content-Aware, Pattern and History are not implemented yet, so Color Adaptation is always grayed out; there is no pattern picker for Pattern and no script options.
+- The last settings are not remembered.

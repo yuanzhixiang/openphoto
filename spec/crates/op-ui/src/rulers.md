@@ -1,40 +1,40 @@
-# rulers.rs：标尺、参考线与网格
+# rulers.rs: Rulers, guides and grid
 
-## 组件职责
+## Component responsibilities
 
-文档窗口里的标尺（View › Rulers，⌘R）、参考线（拖出、移动、删除、绘制）与网格（View › Show › Grid，⌘'）。参考线数据保存在文档里（`op_core::Guide`，见 `document.md`），可撤销。
+The rulers (View › Rulers, ⌘R), guides (dragging out, moving, deleting, drawing) and grid (View › Show › Grid, ⌘') in the document window. Guide data is stored in the document (`op_core::Guide`, see `document.md`) and can be undone.
 
-## 标尺
+## Rulers
 
-- 打开标尺时，文档窗口的画布区域上方和左侧各让出 16 pt（`RULER`）作为标尺，左上角是同色的方块；画布区域相应缩小（缩放、适合屏幕等都以剩下的区域为准）。
-- 单位为像素，原点在画布左上角，随缩放与滚动移动。
-- 刻度：带数字的主刻度间距取 1、2、5 × 10ⁿ 像素中屏幕上不小于 60 pt 的最小值；每个主刻度分 10 小格，第 5 格中等长度（标尺厚度的 40%），其余 20%，主刻度贯穿整个厚度。
-- 数字：9 pt，颜色 `#a8a8a8`；上标尺写在刻度右侧，左标尺按 Photoshop 的方式逐位竖排。
-- 背景 `#3c3c3c`，与画布相邻的一边有一条分隔线。
-- 指针在窗口内时，两条标尺上各有一条细线标出指针位置。
+- When rulers are on, the canvas area of the document window gives up 16 pt (`RULER`) at the top and left for the rulers, with a square of the same color in the top-left corner; the canvas area shrinks accordingly (zoom, Fit on Screen and so on are based on the remaining area).
+- The unit is pixels, with the origin at the top-left corner of the canvas, moving with zoom and scrolling.
+- Ticks: the spacing of numbered major ticks is the smallest of 1, 2, 5 × 10ⁿ pixels that is at least 60 pt on screen; each major interval is divided into 10 minor divisions, the 5th medium length (40% of the ruler thickness), the rest 20%, and major ticks span the full thickness.
+- Numbers: 9 pt, color `#a8a8a8`; on the top ruler they are written to the right of the tick, and on the left ruler they are stacked vertically digit by digit, as in Photoshop.
+- Background `#3c3c3c`, with a separator line on the side next to the canvas.
+- When the pointer is inside the window, a thin line on each ruler marks the pointer position.
 
-## 参考线
+## Guides
 
-- 从上标尺向下拖出水平参考线，从左标尺向右拖出垂直参考线；标尺上的光标为对应方向的调整光标。拖动时参考线跟随指针；在画布区域内松开时加入文档并记录「New Guide」，在区域外松开则放弃。
-- 移动：当前工具为移动工具，或按住 ⌘（Photoshop 中 ⌘ 临时切换为移动工具）时，指针距参考线 4 pt 以内显示调整光标，拖动可移动；在画布区域内松开记录「Move Guide」，拖到区域外（如拖回标尺）松开则删除并记录「Delete Guide」。参考线被锁定（View › Guides › Lock Guides）或隐藏时不能拖动。
-- 绘制：1 pt 青色（`#4affff`，Photoshop 默认的 Cyan）直线，横贯整个画布区域（包括画布外的灰色区域）。拖动中的参考线总是绘制。
-- 参考线随画布变化移动：Canvas Size 按锚点偏移、裁剪按裁剪原点偏移、Image Size 按比例缩放、Image Rotation 与画布翻转按几何关系变换（见 `op-core` 的 `image_ops.md`、`document.md`）。
+- Drag down from the top ruler to create a horizontal guide, and right from the left ruler to create a vertical guide; the cursor over a ruler is the resize cursor for the corresponding direction. While dragging, the guide follows the pointer; releasing inside the canvas area adds it to the document and records "New Guide", and releasing outside the area discards it.
+- Moving: when the current tool is the Move tool, or while holding ⌘ (in Photoshop ⌘ temporarily switches to the Move tool), the resize cursor appears when the pointer is within 4 pt of a guide, and dragging moves it; releasing inside the canvas area records "Move Guide", and releasing after dragging outside the area (e.g. back onto a ruler) deletes it and records "Delete Guide". Guides cannot be dragged when locked (View › Guides › Lock Guides) or hidden.
+- Drawing: a 1 pt cyan (`#4affff`, Photoshop's default Cyan) straight line across the entire canvas area (including the gray area outside the canvas). A guide being dragged is always drawn.
+- Guides move with canvas changes: Canvas Size offsets them by the anchor, cropping by the crop origin, Image Size scales them proportionally, and Image Rotation and canvas flips transform them geometrically (see `image_ops.md` and `document.md` in `op-core`).
 
-## 网格
+## Grid
 
-- 每英寸（文档分辨率个像素）一条主线，再分为 4 格（Photoshop 的默认设置），只画在画布范围内；细分线在屏幕上间距小于 4 pt 时不画网格。
-- 颜色为半透明灰，主线比细分线亮一些。
+- One major line per inch (document resolution in pixels), subdivided into 4 (Photoshop's default setting), drawn only within the canvas; the grid is not drawn when subdivision lines would be less than 4 pt apart on screen.
+- The color is semi-transparent gray, with major lines somewhat brighter than subdivision lines.
 
-## 显示开关
+## Display toggles
 
-`AppState::view`（`ViewOptions`）：`rulers`（默认关）、`extras`（默认开）、`guides`（默认开）、`grid`（默认关）、`lock_guides`（默认关）。参考线在 Extras 与 Guides 都打开时显示（`guides_visible`），网格在 Extras 与 Grid 都打开时显示（`grid_visible`）；Extras 关闭时也不显示选区蚂蚁线（选区仍然有效）。
+`AppState::view` (`ViewOptions`): `rulers` (off by default), `extras` (on by default), `guides` (on by default), `grid` (off by default), `lock_guides` (off by default). Guides are shown when both Extras and Guides are on (`guides_visible`), and the grid is shown when both Extras and Grid are on (`grid_visible`); when Extras is off, the selection's marching ants are not shown either (the selection remains in effect).
 
-## 已知限制
+## Known limitations
 
-- 没有吸附（Snap、Snap To），没有智能参考线、画布参考线、参考线版面、参考线颜色与网格设置（Preferences）。
-- 标尺单位只有像素，不能双击标尺改单位，不能拖动左上角改原点。
-- 参考线不保存到 PSD 文件。
+- No snapping (Snap, Snap To), no smart guides, artboard guides, guide layouts, or guide color and grid settings (Preferences).
+- The only ruler unit is pixels; double-clicking a ruler does not change the unit, and the origin cannot be changed by dragging the top-left corner.
+- Guides are not saved to PSD files.
 
-## 测试覆盖
+## Test coverage
 
-- `ruler_steps_are_round_numbers`：不同缩放下主刻度间距为 100、200、20、2 像素。
+- `ruler_steps_are_round_numbers`: at different zoom levels the major tick spacing is 100, 200, 20 and 2 pixels.

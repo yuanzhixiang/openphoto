@@ -1,32 +1,32 @@
-# clipboard.rs：应用剪贴板
+# clipboard.rs: Application Clipboard
 
-## 职责
+## Responsibilities
 
-保存 Cut/Copy/Copy Merged 得到的像素，并与系统剪贴板交换图片：在 OpenPhoto 里复制的像素可以粘贴到其它应用，其它应用复制的图片（例如截图）也可以粘贴进来。像素规则见 `op-core` 的 `clipboard.md`。
+Holds the pixels produced by Cut/Copy/Copy Merged and exchanges images with the system clipboard: pixels copied in OpenPhoto can be pasted into other applications, and images copied in other applications (for example screenshots) can be pasted in. The pixel rules are in `op-core`'s `clipboard.md`.
 
-## 对外接口
+## Public Interface
 
-- `Clipboard::new(use_system)`：`use_system` 为真时连接系统剪贴板（arboard），连接失败则视同不连接。`AppState` 默认不连接，`OpenPhotoApp::new` 启动时换成连接的版本；无窗口测试保持不连接，不会改动用户的剪贴板。
-- `set(clip)`：保存为内部剪贴板，同时把图片写到系统剪贴板，记下是否写入成功。
-- `get()`：Paste 要粘贴的内容。
-- `text()`：系统剪贴板中的文字，用于把菜单的 Paste 转交给输入框。
+- `Clipboard::new(use_system)`: when `use_system` is true, connects to the system clipboard (arboard); if connecting fails, it behaves as not connected. `AppState` is not connected by default, and `OpenPhotoApp::new` replaces it with a connected version at startup; windowless tests stay unconnected and do not alter the user's clipboard.
+- `set(clip)`: saves to the internal clipboard, also writes the image to the system clipboard, and records whether the write succeeded.
+- `get()`: the content Paste will paste.
+- `text()`: the text in the system clipboard, used when the menu's Paste is handed to a text field.
 
-## 行为规则
+## Behavior Rules
 
-`get()` 的取舍：
+How `get()` decides:
 
-- 没有连接系统剪贴板：返回内部剪贴板。
-- 系统剪贴板里有图片：如果它就是上次在这里复制写进去的（尺寸相同，且所有通道的平均差不超过 3），返回内部剪贴板——它带着来源位置，粘贴时可以叠回原处；否则当作其它应用的图片，返回没有位置的 `Clip`（粘贴时居中）。
-- 系统剪贴板里没有图片：如果上次复制已经写入系统剪贴板，说明之后别处又复制了别的东西，返回 `None`（不粘贴）；如果当时写入失败，返回内部剪贴板。
+- Not connected to the system clipboard: returns the internal clipboard.
+- The system clipboard has an image: if it is the one written by the last copy here (same size, and the average difference across all channels is no more than 3), returns the internal clipboard—it carries the source position, so pasting can put it back in place; otherwise it is treated as another application's image, and a `Clip` without a position is returned (centered on paste).
+- The system clipboard has no image: if the last copy was written to the system clipboard, something else was copied elsewhere afterwards, so `None` is returned (nothing is pasted); if the write failed at the time, returns the internal clipboard.
 
-比较时允许少量差异，是因为图片经过系统的图片格式往返后，半透明像素（预乘 alpha）和颜色值可能有细微变化。
+A small difference is allowed in the comparison because after a round trip through the system's image format, semi-transparent pixels (premultiplied alpha) and color values may change slightly.
 
-## 已知限制
+## Known Limitations
 
-- 写入系统剪贴板的只有像素图片，不带位置；在两个 OpenPhoto 进程之间复制粘贴时会居中而不是保持原位置。
-- 系统剪贴板里的文字不会粘贴成文字图层。
+- Only the pixel image is written to the system clipboard, without a position; copying and pasting between two OpenPhoto processes centers the paste instead of keeping the original position.
+- Text in the system clipboard is not pasted as a type layer.
 
-## 测试覆盖
+## Test Coverage
 
-- `internal_clipboard_keeps_the_position`：不连接系统剪贴板时，取回的内容与存入的完全相同（包括位置）；未复制过时为 `None`。
-- `round_tripped_images_are_recognized`：细微差异仍认作同一张图片；尺寸不同或差异过大则不是。
+- `internal_clipboard_keeps_the_position`: when not connected to the system clipboard, the retrieved content is exactly what was stored (including the position); `None` when nothing has been copied.
+- `round_tripped_images_are_recognized`: slight differences are still recognized as the same image; a different size or too large a difference is not.

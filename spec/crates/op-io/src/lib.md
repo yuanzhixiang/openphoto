@@ -1,74 +1,74 @@
-# op-io：文件读写
+# op-io: file reading and writing
 
-## 职责
+## Responsibilities
 
-在磁盘文件与 `op_core::Document` 之间转换：打开 Photoshop 文档（PSD，见 `psd.md`）和位图文件为文档，把文档保存为 PSD，以及把文档合成结果导出为位图文件。位图编解码全部委托给 `image` crate（0.25，只启用 png、jpeg、webp、tiff、bmp、gif 六种格式特性）。
+Converts between disk files and `op_core::Document`: opens Photoshop documents (PSD, see `psd.md`) and bitmap files as documents, saves documents as PSD, and exports a document's composite as a bitmap file. All bitmap encoding and decoding is delegated to the `image` crate (0.25, with only the six format features png, jpeg, webp, tiff, bmp, and gif enabled).
 
-## 对外接口
+## Public interface
 
 ### `IoError`
 
-| 变体 | 含义 | 显示文案 |
+| Variant | Meaning | Display text |
 |---|---|---|
-| `Read(ImageError)` | 打开时解码失败（包括读文件出错） | `could not read image: …` |
-| `Write(ImageError)` | 导出时编码失败 | `could not write image: …` |
-| `File(io::Error)` | 导出时写文件失败 | `could not save file: …` |
-| `Unsupported(String)` | 扩展名不支持，携带转为小写的扩展名 | `unsupported file format: …` |
-| `Psd(String)` | PSD 文件格式不对或使用了不支持的特性 | `could not read Photoshop document: …` |
+| `Read(ImageError)` | Decoding failed when opening (including errors reading the file) | `could not read image: …` |
+| `Write(ImageError)` | Encoding failed when exporting | `could not write image: …` |
+| `File(io::Error)` | Writing the file failed when exporting | `could not save file: …` |
+| `Unsupported(String)` | Unsupported extension; carries the extension converted to lowercase | `unsupported file format: …` |
+| `Psd(String)` | The PSD file is malformed or uses an unsupported feature | `could not read Photoshop document: …` |
 
-`File(io::Error)` 也用于打开 PSD 时读文件出错。
+`File(io::Error)` is also used for errors reading the file when opening a PSD.
 
 ### `OPEN_EXTENSIONS`
 
-打开对话框提供的扩展名：`psd`、`png`、`jpg`、`jpeg`、`webp`、`tif`、`tiff`、`bmp`、`gif`。
+The extensions offered by the open dialog: `psd`, `png`, `jpg`, `jpeg`, `webp`, `tif`, `tiff`, `bmp`, `gif`.
 
 ### `SAVE_FORMATS`
 
-Save As 对话框提供的格式（名称与扩展名），顺序即对话框中的顺序，第一个是默认格式：Photoshop（`psd`）、PNG（`png`）、JPEG（`jpg`、`jpeg`）。
+The formats offered by the Save As dialog (name and extensions), in the same order as in the dialog, the first being the default format: Photoshop (`psd`), PNG (`png`), JPEG (`jpg`, `jpeg`).
 
 ### `open(path)`
 
-1. 取路径扩展名并转为 ASCII 小写；没有扩展名时视为空字符串。
-2. 扩展名不在 `OPEN_EXTENSIONS` 中时返回 `Unsupported`，不读取文件。
-3. `psd` 交给 `psd::read`（保留图层）；其余用 `image::open` 解码，并统一转换为 8 位 RGBA（`into_rgba8`）。
-4. 文档标题为文件名（含扩展名）；拿不到文件名时为 `"Untitled"`。
-5. 位图通过 `Document::from_rgba8` 构建文档，72 ppi，RGB，8 位。图层规则与 Photoshop 一致：图像完全不透明时是锁定的「Background」背景图层；只要有任何一个像素不是完全不透明，就是名为「Layer 0」的普通图层（见 `crates/op-core/src/document.md`）。
+1. Takes the path's extension and converts it to ASCII lowercase; when there is no extension, it is treated as an empty string.
+2. When the extension is not in `OPEN_EXTENSIONS`, returns `Unsupported` without reading the file.
+3. `psd` is handed to `psd::read` (keeping layers); everything else is decoded with `image::open` and uniformly converted to 8-bit RGBA (`into_rgba8`).
+4. The document title is the file name (including the extension); when the file name cannot be obtained, it is `"Untitled"`.
+5. Bitmaps build the document through `Document::from_rgba8`, at 72 ppi, RGB, 8-bit. The layer rules match Photoshop: when the image is fully opaque, it is a locked "Background" background layer; as soon as any pixel is not fully opaque, it is a regular layer named "Layer 0" (see `crates/op-core/src/document.md`).
 
 ### `save(doc, path)`
 
-File › Save / Save As 写文件：扩展名为 `psd`（不区分大小写）时写入 `psd::write` 的结果（保留图层）；其它扩展名交给 `export_composite`（合成后的扁平图像）。PSD 同样先在内存中生成，再一次写入。
+File › Save / Save As writes the file: when the extension is `psd` (case-insensitive), the result of `psd::write` is written (keeping layers); other extensions are handed to `export_composite` (the flattened composite image). The PSD is likewise generated in memory first and then written in one go.
 
 ### `export_composite(doc, path)`
 
-1. 按扩展名确定格式（`ImageFormat::from_path`）。无法识别时返回 `Unsupported`，不创建文件。
-2. 取 `Document::composite_rgba8` 的合成结果。
-3. JPEG 没有透明通道：先把合成结果按 alpha 铺到白色底上（与合成相同的 gamma 编码空间），转成 RGB 再编码。白色与 Photoshop Export As 导出 JPG 时的默认底色一致。其它格式（PNG、WebP、TIFF、BMP、GIF）直接以 RGBA 编码，保留透明。
-4. 先在内存里完成编码，成功后才写入文件。编码失败时不会创建或改动目标文件。
+1. Determines the format from the extension (`ImageFormat::from_path`). When it cannot be recognized, returns `Unsupported` without creating a file.
+2. Takes the composite result of `Document::composite_rgba8`.
+3. JPEG has no transparency channel: the composite is first laid onto a white background by alpha (in the same gamma-encoded space as compositing), converted to RGB, and then encoded. White matches the default matte color when Photoshop Export As exports JPG. Other formats (PNG, WebP, TIFF, BMP, GIF) are encoded directly as RGBA, keeping transparency.
+4. Encoding is completed in memory first, and the file is written only after it succeeds. When encoding fails, the target file is not created or modified.
 
-## 行为规则与边界情况
+## Behavior rules and edge cases
 
-- 扩展名判断不区分大小写（`.PNG` 可以打开）。
-- 实际解码格式由 `image::open` 按扩展名选择，而不是嗅探文件内容；扩展名与真实格式不符的文件会解码失败并返回 `Read` 错误。
-- 打开位图时丢弃源文件的位深、颜色空间/ICC 配置文件和分辨率元数据：16 位图像被降为 8 位，分辨率一律为 72 ppi。PSD 会读取分辨率。
-- 带 alpha 通道但所有像素都完全不透明的图片（例如不透明的 RGBA PNG）按不透明处理，打开为背景图层。
-- GIF 等多帧格式只取第一帧。
-- `export_composite` 内部的 `RgbaImage::from_raw` 依赖合成缓冲区长度等于 `width * height * 4`，此不变量由 `Document` 保证，不满足时 panic。
+- Extension matching is case-insensitive (`.PNG` can be opened).
+- The actual decoding format is chosen by `image::open` from the extension rather than by sniffing the file contents; a file whose extension does not match its real format fails to decode and returns a `Read` error.
+- Opening a bitmap discards the source file's bit depth, color space/ICC profile, and resolution metadata: 16-bit images are reduced to 8-bit, and the resolution is always 72 ppi. PSD reads the resolution.
+- An image with an alpha channel whose pixels are all fully opaque (for example an opaque RGBA PNG) is treated as opaque and opens as a background layer.
+- For multi-frame formats such as GIF, only the first frame is taken.
+- `RgbaImage::from_raw` inside `export_composite` relies on the composite buffer length being equal to `width * height * 4`; this invariant is guaranteed by `Document`, and it panics when not met.
 
-## 与其它模块的关系
+## Relationship to other modules
 
-- 依赖 `op-core`（`Document`）、`image`、`thiserror`。
-- `op-ui` 的打开流程用 `OPEN_EXTENSIONS` 设置文件对话框过滤器并调用 `open`，成功后以 `"Open"` 作为第一条历史状态；保存流程用 `SAVE_FORMATS` 设置过滤器并调用 `save`；导出流程（对话框提供 PNG 与 JPEG 两种过滤器）调用 `export_composite`，失败时以警告框显示错误文案。
+- Depends on `op-core` (`Document`), `image`, and `thiserror`.
+- `op-ui`'s open flow uses `OPEN_EXTENSIONS` to set the file dialog filter and calls `open`, and on success uses `"Open"` as the first history state; the save flow uses `SAVE_FORMATS` to set the filter and calls `save`; the export flow (the dialog offers two filters, PNG and JPEG) calls `export_composite`, and on failure shows the error text in an alert.
 
-## 已知限制
+## Known limitations
 
-- PSD 的限制见 `psd.md`；TIFF 不保存图层。
-- 没有质量、压缩、底色等导出选项；JPEG 使用 `image` crate 的默认质量，底色固定为白色。
-- 不读取、不写入任何元数据（EXIF、ICC、分辨率）。
+- For PSD limitations see `psd.md`; TIFF does not save layers.
+- There are no export options such as quality, compression, or matte color; JPEG uses the `image` crate's default quality, and the matte color is fixed to white.
+- No metadata (EXIF, ICC, resolution) is read or written.
 
-## 测试覆盖
+## Test coverage
 
-- `jpeg_export_flattens_onto_white`：半透明文档导出 JPEG 后能读回，不透明像素保持原色，透明像素变为白色（JPEG 有损，按容差比较）。
-- `png_export_keeps_transparency`：导出 PNG 保留透明。
-- `unknown_extension_writes_nothing`：未知扩展名返回 `Unsupported`，且不创建文件。
-- `transparent_png_opens_as_regular_layer`：含半透明像素的 PNG 打开后是「Layer 0」普通图层。
-- `flatten_blends_alpha`：50% 透明的黑色铺到白底上得到 `(127, 127, 127)`。
+- `jpeg_export_flattens_onto_white`: a semi-transparent document exported as JPEG can be read back; opaque pixels keep their original color and transparent pixels become white (JPEG is lossy, so comparison uses a tolerance).
+- `png_export_keeps_transparency`: exporting PNG keeps transparency.
+- `unknown_extension_writes_nothing`: an unknown extension returns `Unsupported` and creates no file.
+- `transparent_png_opens_as_regular_layer`: a PNG with semi-transparent pixels opens as a regular "Layer 0" layer.
+- `flatten_blends_alpha`: 50% transparent black laid onto white gives `(127, 127, 127)`.

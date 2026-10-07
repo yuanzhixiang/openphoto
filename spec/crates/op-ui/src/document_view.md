@@ -1,164 +1,164 @@
-# document_view.rs：文档窗口（画布与状态栏）
+# document_view.rs: Document window (canvas and status bar)
 
-## 组件职责
+## Component responsibility
 
-显示一个文档：画布区域（缩放、平移、工具输入）和底部状态栏。画布像素由 `op-render` 通过 egui-wgpu 的 paint callback 绘制，这里只计算视图变换和处理输入。
+Displays one document: the canvas area (zoom, pan, tool input) and the status bar at the bottom. Canvas pixels are drawn by `op-render` through an egui-wgpu paint callback; this file only computes the view transform and handles input.
 
-## 使用场景
+## Usage
 
-显示当前文档，位于文档标签栏（`doc_tabs.rs`）下方。
+Displays the current document, below the document tab bar (`doc_tabs.rs`).
 
-## 数据输入
+## Data input
 
-`AppState`（读取当前工具与各工具选项，吸管工具会写入前景色或背景色）和文档 id。视图状态保存在 `DocState::view`。
+`AppState` (reads the current tool and each tool's options; the Eyedropper tool writes the foreground or background color) and the document id. View state is stored in `DocState::view`.
 
-## 布局与视觉
+## Layout and visuals
 
-尺寸按 Photoshop 1:1 量取（pt）：
+Sizes are measured 1:1 against Photoshop (pt):
 
-- 画布区域填充粘贴板色 `#282828`。
-- 右侧是宽 17 的垂直滚动条列：左边依次是 1 pt 的 `#2e2e2e` 和 `#464646` 线，右边 1 pt 的 `#454545` 线，中间轨道 `#4a4a4a`；滑块是 12 宽的圆角长条，颜色 `#696969`。
-- 底部是高 16 的状态栏（见下文）。
-- 画布在粘贴板上按视图变换绘制，透明区域显示棋盘格，放大到 600% 以上显示像素网格（由 `op-render` 实现）。
-- 文档左上角的屏幕位置会对齐到物理像素，保证 100% 时像素清晰。
+- The canvas area is filled with the pasteboard color `#282828`.
+- On the right is the vertical scrollbar column, 17 wide: on the left, a 1 pt `#2e2e2e` line followed by a 1 pt `#464646` line; on the right, a 1 pt `#454545` line; the track in between is `#4a4a4a`. The thumb is a 12-wide rounded bar, color `#696969`.
+- At the bottom is the 16-high status bar (see below).
+- The canvas is drawn on the pasteboard according to the view transform; transparent areas show a checkerboard, and a pixel grid appears above 600% (implemented by `op-render`).
+- The screen position of the document's top-left corner is snapped to physical pixels so pixels are crisp at 100%.
 
-## 缩放
+## Zoom
 
-- 缩放值是「每个文档像素对应的物理像素数」，1.0 显示为 100%，与 Photoshop 相同（Retina 屏上 100% 也是一个图像像素对应一个物理像素）。
-- 范围 1%–12800%。
-- 预设级别与 Photoshop 一致：1、2、3、4、5、6.25、8.33、12.5、16.67、25、33.33、50、66.67、100、150、200、300、400、500、600、700、800、1200、1600、2400、3200、6400、12800（%）。⌘+ / ⌘- 和缩放工具按这些级别跳。
-- 百分比显示：整数时不带小数（`100%`），否则保留两位（`94.90%`）。
-- 以某一点缩放时，该点下的文档内容保持不动；快捷键缩放以视口中心为基准。
-- Fit on Screen：缩放到恰好完整显示文档并居中。Fill Screen（`fill_screen`，抓手与缩放工具选项栏的按钮）：缩放到文档铺满整个视口（取宽、高两个比例中较大的）并居中。100%：缩放为 1.0 并居中。
-- `center_on(state, p)`：滚动视图，使文档点 `p` 位于窗口中心（Navigator 使用）。
-- 200%（`zoom_to`）：以视口中心缩放到 2.0。Print Size（`print_size`）：缩放到 `72 / 分辨率 × 每点像素数`，即 1 英寸显示为 72 pt。Fit Layer(s) on Screen（`fit_layers`）：当前图层的非透明像素充满视口并居中，空图层时不变。
+- The zoom value is "physical pixels per document pixel"; 1.0 displays as 100%, the same as Photoshop (on a Retina display, 100% also means one image pixel per physical pixel).
+- Range 1%–12800%.
+- Preset levels match Photoshop: 1, 2, 3, 4, 5, 6.25, 8.33, 12.5, 16.67, 25, 33.33, 50, 66.67, 100, 150, 200, 300, 400, 500, 600, 700, 800, 1200, 1600, 2400, 3200, 6400, 12800 (%). ⌘+ / ⌘- and the Zoom tool step through these levels.
+- Percentage display: no decimals for whole numbers (`100%`), otherwise two decimals (`94.90%`).
+- When zooming around a point, the document content under that point stays put; keyboard-shortcut zooms are centered on the viewport center.
+- Fit on Screen: zooms so the whole document just fits, and centers it. Fill Screen (`fill_screen`, the button on the Hand and Zoom tool options bars): zooms so the document fills the entire viewport (the larger of the width and height ratios) and centers it. 100%: zooms to 1.0 and centers.
+- `center_on(state, p)`: scrolls the view so document point `p` is at the center of the window (used by Navigator).
+- 200% (`zoom_to`): zooms to 2.0 around the viewport center. Print Size (`print_size`): zooms to `72 / resolution × pixels per point`, so one inch displays as 72 pt. Fit Layer(s) on Screen (`fit_layers`): the non-transparent pixels of the current layer fill the viewport and are centered; no change for an empty layer.
 
-## 初始视图
+## Initial view
 
-- 头几帧布局可能还没稳定（第一帧拿到的视口尺寸不可靠），所以要等视口尺寸连续两帧相同后，才决定初始缩放；等待期间会主动请求重绘。
-- 文档在 100% 下能完整放进视口时用 100%，否则用 Fit on Screen。两种情况都居中。
+- The layout may not be stable in the first few frames (the viewport size reported on the first frame is unreliable), so the initial zoom is decided only after the viewport size is the same for two consecutive frames; while waiting, a repaint is actively requested.
+- If the document fits entirely in the viewport at 100%, 100% is used; otherwise Fit on Screen. In both cases the document is centered.
 
-## 交互
+## Interaction
 
-- 触控板捏合、⌘+滚轮：以指针为中心连续缩放。
-- 普通滚动（触控板双指滑动、滚轮）：平移。
-- 按住空格拖动、使用抓手工具拖动、或用鼠标中键拖动：平移。
-- 缩放工具：单击放大一级，按住 ⌥ 单击缩小一级，以单击点为中心。选项栏按下 Zoom Out（设置 `zoom.out`）时两者对调：单击缩小、⌥ 单击放大，光标也随之对调。
-- 魔术橡皮擦、红眼工具：单击时按选项栏（魔术橡皮擦的 Tolerance、Anti-alias、Contiguous、Sample All Layers、Opacity，`options_tools::magic_eraser_options`；红眼的 Pupil Size、Darken Amount，`red_eye_options`）执行 `fill::magic_erase` / `fill::red_eye`，有改变时记录「Magic Eraser」「Red Eye」；图层锁定、隐藏等时弹出「Could not use the magic eraser / red eye tool because …」。
-- 吸管工具：按下或拖动时按吸管选项取色（`DocState::sample_average`：以该点为中心的 Sample Size 方块，裁到画布内，按 alpha 加权平均；Sample 选项：Current Layer 取当前图层，Current & Below 取当前图层及其下方图层的合成，All Layers 取全部合成；两个「No Adjustments」选项与对应的普通选项相同（还没有调整图层）），设为前景色；按住 ⌥ 时设为背景色。取到的颜色总是不透明；点在文档外或取样处全透明时不变。不记录历史。
-- 取样环（选项栏 Show Sampling Ring，默认勾选）：按住吸管时在指针周围画一个环（内半径 38 pt、外半径 58 pt，内外各一圈 2 pt 灰线），上半是正在取的颜色、下半是按下时原来的颜色（⌥ 时为背景色），画在前景层，盖在画布上。
+- Trackpad pinch, ⌘+scroll wheel: continuous zoom centered on the pointer.
+- Plain scroll (trackpad two-finger swipe, scroll wheel): pan.
+- Dragging with Space held, dragging with the Hand tool, or dragging with the middle mouse button: pan.
+- Zoom tool: click zooms in one level, ⌥-click zooms out one level, centered on the click point. When Zoom Out is pressed in the options bar (sets `zoom.out`), the two are swapped: click zooms out, ⌥-click zooms in, and the cursor swaps accordingly.
+- Magic Eraser, Red Eye tool: a click runs `fill::magic_erase` / `fill::red_eye` according to the options bar (Magic Eraser's Tolerance, Anti-alias, Contiguous, Sample All Layers, Opacity, `options_tools::magic_eraser_options`; Red Eye's Pupil Size, Darken Amount, `red_eye_options`), and records "Magic Eraser" / "Red Eye" when something changed; when the layer is locked, hidden, etc., an alert "Could not use the magic eraser / red eye tool because …" appears.
+- Eyedropper tool: on press or drag, samples a color according to the eyedropper options (`DocState::sample_average`: a Sample Size square centered on the point, clipped to the canvas, alpha-weighted average; Sample option: Current Layer samples the current layer, Current & Below samples the composite of the current layer and the layers below it, All Layers samples the full composite; the two "No Adjustments" options are the same as the corresponding plain options (there are no adjustment layers yet)), and sets it as the foreground color; with ⌥ held it sets the background color. The sampled color is always opaque; nothing changes when the point is outside the document or the sampled area is fully transparent. No history is recorded.
+- Sampling ring (options bar Show Sampling Ring, checked by default): while the Eyedropper is held down, a ring is drawn around the pointer (inner radius 38 pt, outer radius 58 pt, with a 2 pt gray line on both the inside and outside edge); the top half is the color being sampled, the bottom half is the original color at the time of the press (the background color with ⌥), drawn on the foreground layer, over the canvas.
 
-## 文字工具
+## Type tool
 
-当前工具为横排文字工具时，画布输入交给 `type_tool::input`（见 `type_tool.md`）。切换到其它工具时确认进行中的文字。在其它叠加层之后绘制文字插入线。
+When the current tool is the Horizontal Type tool, canvas input is handed to `type_tool::input` (see `type_tool.md`). Switching to another tool commits the text in progress. The text insertion line is drawn after the other overlays.
 
-## 形状工具
+## Shape tools
 
-- 矩形、椭圆、三角形、多边形、直线：从按下处拖动；按住 Shift 时矩形类为正方形（取两个方向中较大的长度），直线吸附到 45° 的倍数；按住 ⌥ 时以按下处为中心向两边展开。
-- 拖动期间画出形状的 1 pt 蓝色轮廓（与选区预览同在 `draw_selection` 中绘制）。
-- 松开时用前景色生成新的形状图层（`op_core::shape::add_shape_layer`，多边形边数、直线粗细取 `AppState::shape`），记录「Rectangle Tool」「Ellipse Tool」「Triangle Tool」「Polygon Tool」「Line Tool」；形状为空时什么也不做。
-- 进行中的拖动保存在 `DocState::shape_drag`。
+- Rectangle, Ellipse, Triangle, Polygon, Line: drag from the press point; with Shift held, rectangle-type shapes become square (using the larger of the two directional lengths) and the line snaps to multiples of 45°; with ⌥ held, the shape expands outward in both directions with the press point as the center.
+- While dragging, a 1 pt blue outline of the shape is drawn (in `draw_selection`, together with the selection preview).
+- On release, a new shape layer is created with the foreground color (`op_core::shape::add_shape_layer`; polygon side count and line weight come from `AppState::shape`), recording "Rectangle Tool", "Ellipse Tool", "Triangle Tool", "Polygon Tool", "Line Tool"; nothing happens when the shape is empty.
+- The drag in progress is stored in `DocState::shape_drag`.
 
-## 渐变工具
+## Gradient tool
 
-- 从按下的位置拖动到松开的位置，确定渐变方向；按住 Shift 时方向吸附到 45° 的倍数（长度不变）。拖动期间画一条带白色端点的黑白细线表示方向。
-- 松开时按渐变选项把前景色到背景色的渐变画在当前图层上（`op_core::gradient::gradient`），记录「Gradient」；起止点相同时什么也不做；图层隐藏或像素锁定时弹出 Photoshop 的提示。
-- 进行中的拖动保存在 `DocState::gradient_drag`。
+- Dragging from the press point to the release point sets the gradient direction; with Shift held the direction snaps to multiples of 45° (length unchanged). While dragging, a thin black-and-white line with white endpoints shows the direction.
+- On release, a foreground-to-background gradient is drawn on the current layer according to the gradient options (`op_core::gradient::gradient`), recording "Gradient"; nothing happens when the start and end points are the same; when the layer is hidden or pixel-locked, Photoshop's alert appears.
+- The drag in progress is stored in `DocState::gradient_drag`.
 
-## 标尺与参考线
+## Rulers and guides
 
-- 打开标尺时画布区域缩小，标尺画在窗口的上方与左侧；在标尺上按下拖动时开始拖出参考线（见 `rulers.md`）。
-- 有参考线正在拖动时，画布上的输入只交给参考线拖动，不交给工具。
-- 当前工具为移动工具或按住 ⌘ 时，在参考线上按下开始移动参考线（先于移动工具移动图层）；悬停在参考线上时显示调整光标。
-- 绘制顺序：图像、网格、选区蚂蚁线（Extras 打开时）、参考线、标尺、变换框、裁剪框。
+- When rulers are on, the canvas area shrinks and the rulers are drawn along the top and left of the window; pressing and dragging on a ruler starts dragging out a guide (see `rulers.md`).
+- While a guide is being dragged, canvas input goes only to the guide drag, not to the tool.
+- When the current tool is the Move tool or ⌘ is held, pressing on a guide starts moving the guide (taking precedence over the Move tool moving the layer); hovering over a guide shows a resize cursor.
+- Drawing order: image, grid, selection marching ants (when Extras is on), guides, rulers, transform box, crop box.
 
-## 裁剪工具
+## Crop tool
 
-当前工具是裁剪工具时，画布上的输入交给 `crop_tool::input`，光标由 `crop_tool::cursor` 决定，并在变换框之后绘制裁剪框与遮罩（见 `crop_tool.md`）。当前工具不是裁剪工具时，丢弃文档的裁剪框。
+When the current tool is the Crop tool, canvas input is handed to `crop_tool::input`, the cursor is determined by `crop_tool::cursor`, and the crop box and shield are drawn after the transform box (see `crop_tool.md`). When the current tool is not the Crop tool, the document's crop box is discarded.
 
-## 自由变换
+## Free Transform
 
-文档处于自由变换时，画布上的按下、拖动、Enter、Esc 都交给 `free_transform::input`（见 `free_transform.md`），不交给当前工具；光标由 `free_transform::cursor` 决定；在选区蚂蚁线之后绘制变换框；不显示画笔轮廓。确认后把映射记为 `AppState::last_transform`。
+While the document is in Free Transform, presses, drags, Enter, and Esc on the canvas all go to `free_transform::input` (see `free_transform.md`), not to the current tool; the cursor is determined by `free_transform::cursor`; the transform box is drawn after the selection marching ants; the brush outline is not shown. On commit, the mapping is recorded as `AppState::last_transform`.
 
-## 魔棒
+## Magic Wand
 
-- 单击：按魔棒选项（`op_core::fill::magic_wand`，与油漆桶同一区域规则）得到区域，与当前选区按组合方式合并（有选区时 Shift 添加、⌥ 减去、两者同时按为交叉，与选框相同），记录「Magic Wand」。点在文档外时什么也不做。
+- Click: gets a region according to the Magic Wand options (`op_core::fill::magic_wand`, the same region rule as the Paint Bucket) and combines it with the current selection using the combine mode (with an existing selection, Shift adds, ⌥ subtracts, both together intersect, same as the marquee), recording "Magic Wand". Nothing happens when the point is outside the document.
 
-## 套索工具
+## Lasso tools
 
-- 套索：从按下的位置开始拖动，沿途每移动至少 1 个屏幕像素记一个点，并以蚂蚁线显示轨迹；松开时把轨迹首尾相连闭合，按选框选项（Feather、Anti-alias，组合方式在按下时由修饰键决定）生成多边形选区（`Selection::polygon`），记录「Lasso」。轨迹围成的面积为零时不生成选区。不拖动的单击在有选区时取消选区（与选框相同）。
-- 套索按住 ⌥ 临时变成多边形套索（与 Photoshop 一致）：拖动中按住 ⌥ 松开鼠标时不闭合（`LassoPath::held`），从最后一点到指针显示一条跟随的边；单击加一个角，按下拖动又接着自由画；松开 ⌥（鼠标未按下）时闭合，仍记录「Lasso」。
-- 多边形套索（有输入框获得焦点时不响应 Enter、Esc、⌫）：单击放下第一个角并开始；之后每次单击加一个角，从最后一个角到指针显示一条跟随的边。双击、按 Enter，或在已有三个以上角时单击第一个角附近（5 pt 以内）闭合并生成选区，记录「Polygonal Lasso」；⌫/Delete 删除最后一个角（删光则取消）；Esc 取消。
-- 进行中的轨迹保存在 `DocState::lasso`。
-- 窗口尺寸变化时文档保持居中（视图偏移以视口中心为基准存储）。
+- Lasso: drag from the press point; a point is recorded every time the pointer moves at least 1 screen pixel, and the path is shown as marching ants. On release, the path is closed by joining its ends, and a polygon selection (`Selection::polygon`) is created according to the marquee options (Feather, Anti-alias; the combine mode is determined by modifier keys at press time), recording "Lasso". No selection is created when the area enclosed by the path is zero. A click without dragging deselects when there is a selection (same as the marquee).
+- Holding ⌥ with the Lasso temporarily turns it into the Polygonal Lasso (matching Photoshop): releasing the mouse while ⌥ is held during a drag does not close the path (`LassoPath::held`), and a rubber-band edge follows from the last point to the pointer; a click adds a corner, and pressing and dragging continues freehand drawing; releasing ⌥ (with the mouse not pressed) closes the path, still recording "Lasso".
+- Polygonal Lasso (Enter, Esc, and ⌫ are ignored while a text field has focus): a click places the first corner and starts; each subsequent click adds a corner, and a rubber-band edge follows from the last corner to the pointer. Double-clicking, pressing Enter, or clicking near the first corner (within 5 pt) when there are three or more corners closes the path and creates the selection, recording "Polygonal Lasso"; ⌫/Delete removes the last corner (removing all of them cancels); Esc cancels.
+- The path in progress is stored in `DocState::lasso`.
+- When the window size changes, the document stays centered (the view offset is stored relative to the viewport center).
 
-## 选框工具
+## Marquee tools
 
-适用于 Rectangular、Elliptical、Single Row、Single Column Marquee：
+Applies to the Rectangular, Elliptical, Single Row, and Single Column Marquee:
 
-- **拖动**：从按下的位置开始画矩形或椭圆，矩形边界对齐整像素。拖动中按住 Shift 约束为正方形/正圆，按住 ⌥ 从起点向四周画（起点为中心）。拖动中实时显示蚂蚁线预览。
-- **组合方式**：开始拖动时如果已经有选区，按住 Shift 为添加、⌥ 为减去、Shift+⌥ 为交叉，这时这两个键不再起约束作用；否则使用选项栏中选择的组合方式。
-- **松开**：生成形状（椭圆按选项栏的「Anti-alias」决定是否抗锯齿；「Feather」大于 0 时先羽化），并入选区，记录历史「Rectangular Marquee」或「Elliptical Marquee」。宽或高不足 1 像素时不做任何事。
-- **单击**（没有拖动）：有选区且没按 Shift/⌥ 时取消选区，记录「Deselect」，与 Photoshop 一致。
-- **单行/单列选框**：单击选中所在的整行或整列（1 像素），按同样规则组合，记录「Single Row Marquee」或「Single Column Marquee」。
+- **Drag**: draws a rectangle or ellipse from the press point; rectangle edges snap to whole pixels. Holding Shift while dragging constrains to a square/circle; holding ⌥ draws outward from the start point (the start point is the center). A marching-ants preview is shown live while dragging.
+- **Combine mode**: if a selection already exists when the drag starts, Shift adds, ⌥ subtracts, Shift+⌥ intersects, and in this case those keys no longer act as constraints; otherwise the combine mode selected in the options bar is used.
+- **Release**: creates the shape (the ellipse is anti-aliased or not according to "Anti-alias" in the options bar; when "Feather" is greater than 0 it is feathered first), merges it into the selection, and records the history "Rectangular Marquee" or "Elliptical Marquee". Nothing happens when the width or height is less than 1 pixel.
+- **Click** (no drag): when there is a selection and neither Shift nor ⌥ is held, deselects and records "Deselect", matching Photoshop.
+- **Single Row/Single Column Marquee**: a click selects the entire row or column at that point (1 pixel), combined by the same rules, recording "Single Row Marquee" or "Single Column Marquee".
 
-## 移动工具
+## Move tool
 
-- 拖动：移动当前图层的像素，有选区时只移动选中的像素（规则见 `crates/op-core/src/move_tool.md`）。位移是拖动距离四舍五入到整像素，每一步都从开始时的像素重新计算。松开时如果确实移动了，记录「Move」。
-- 不能移动时（锁定、隐藏、没有选区的背景图层），在开始拖动时弹出 Photoshop 的提示。
-- Auto-Select（选项栏，默认关）：按下鼠标时把指针下最上面一个显示出像素的可见图层设为当前图层（`Document::layer_at`），然后照常拖动它。按住 ⌘ 时反过来（关闭时临时打开，打开时临时关闭），与 Photoshop 一致。指针下没有任何图层的像素时，当前图层不变。按在变换控件的控制点上时不做自动选择。切换当前图层不记录历史。
-- Show Transform Controls（选项栏，默认关）：在当前图层的非透明像素（有选区时为选区）外画出与自由变换相同的蓝框和 8 个控制点，没有中心参考点；背景图层没有选区时、隐藏或锁定的图层不画（与自由变换能否开始的规则相同，见 `crates/op-core/src/transform.md` 的 `bounds`）。在控制点上开始拖动会进入自由变换并由它接管这次拖动；框内其它位置的拖动仍是普通移动。框的范围按（修订号、当前图层、选区修订号）缓存在 `DocState` 里，不会每帧重算。关闭 Extras（⌘H）时不画框。
-- 方向键微移见 `actions.md`。
+- Drag: moves the pixels of the current layer; with a selection, only the selected pixels move (rules in `crates/op-core/src/move_tool.md`). The offset is the drag distance rounded to whole pixels, and each step is recomputed from the pixels at the start. On release, "Move" is recorded if anything actually moved.
+- When moving is not possible (locked, hidden, background layer without a selection), Photoshop's alert appears when the drag starts.
+- Auto-Select (options bar, off by default): on mouse press, makes the topmost visible layer showing pixels under the pointer the current layer (`Document::layer_at`), then drags it as usual. Holding ⌘ inverts this (temporarily on when off, temporarily off when on), matching Photoshop. When no layer has pixels under the pointer, the current layer stays the same. No auto-select happens when pressing on a transform control handle. Switching the current layer records no history.
+- Show Transform Controls (options bar, off by default): draws the same blue box and 8 handles as Free Transform around the current layer's non-transparent pixels (around the selection when there is one), without the center reference point; not drawn for a background layer without a selection, or for hidden or locked layers (the same rule as whether Free Transform can start; see `bounds` in `crates/op-core/src/transform.md`). Starting a drag on a handle enters Free Transform, which takes over this drag; a drag elsewhere inside the box is still a normal move. The box extent is cached in `DocState` keyed by (revision, current layer, selection revision) and is not recomputed every frame. The box is not drawn when Extras is off (⌘H).
+- Arrow-key nudging: see `actions.md`.
 
-## 油漆桶
+## Paint Bucket
 
-单击文档：按油漆桶选项（见 `crates/op-core/src/fill.md`）用前景色填充单击处的相似颜色区域，记录「Paint Bucket」。不能填充时弹出 Photoshop 的提示。光标为十字。
+Clicking the document: fills the region of similar color at the click point with the foreground color according to the Paint Bucket options (see `crates/op-core/src/fill.md`), recording "Paint Bucket". When filling is not possible, Photoshop's alert appears. The cursor is a crosshair.
 
-## 绘画工具
+## Painting tools
 
-适用于画笔、铅笔、橡皮擦与修饰工具（减淡、加深、海绵、模糊、锐化、仿制图章、历史记录画笔；笔画算法见 `crates/op-core/src/paint.md`）：
+Applies to the Brush, Pencil, Eraser, and retouching tools (Dodge, Burn, Sponge, Blur, Sharpen, Clone Stamp, History Brush; stroke algorithms in `crates/op-core/src/paint.md`):
 
-- 在画布上按下开始一笔（使用当前工具的大小、硬度、不透明度、流量；铅笔的流量固定为 100%、没有柔边），拖动时继续，松开后记录一条历史：「Brush Tool」「Pencil」「Eraser」「Dodge Tool」「Burn Tool」「Sponge Tool」「Blur Tool」「Sharpen Tool」「Clone Stamp」「History Brush」「Smudge Tool」「Pattern Stamp」「Background Eraser」「Color Replacement Tool」。画笔和铅笔用前景色，按选项栏的 Mode（全部混合模式与 Behind、Clear，见 `paint.md`「绘画模式」）画上去；橡皮擦在背景图层上用背景色。橡皮擦的 Mode：Brush（按画笔的大小、硬度、不透明度、流量）、Pencil（硬边无抗锯齿、流量 100%）、Block（固定为屏幕上 16 像素见方的方块，不透明度与流量都是 100%，与 Photoshop 一致）。
-- 笔画类型在按下时决定（`stroke_kind`）：减淡/加深按各自的 Range，海绵按 Mode，模糊/锐化，仿制图章和历史记录画笔见下。
-- 涂抹：Strength（选项栏，默认 50%）就是笔画的强度，不再乘不透明度。图案图章：用默认图案（`state::default_pattern`：深绿底上的绿点，18 × 22 像素）从文档原点平铺，Impressionist 等选项还没有效果。背景橡皮擦：取样、Limits、Tolerance、Protect Foreground Color 来自选项栏（`options_tools::color_match`），作用在背景图层上时先把背景转成普通图层「Layer 0」（与 Photoshop 一致）。颜色替换：Mode（Hue / Saturation / Color（默认）/ Luminosity）、取样、Limits、Tolerance，用前景色。这四个工具各有自己的笔刷（`AppState` 的 `smudge`、`pattern_stamp`、`background_eraser`、`color_replacement`：13 px 硬边）。
-- 仿制图章：按住 ⌥ 单击设定取样点（这一次按压不绘制，即使先松开 ⌥）。之后按下时，偏移为「按下位置 − 取样点」；勾选 Aligned（默认）时第一笔之后的偏移保持不变，否则每一笔都从取样点重新开始。取样按选项栏的 Sample：Current Layer（当前图层）、Current & Below（当前图层及其下方的合成，`Document::sample_source`）、All Layers（全部合成），都取按下时的像素。没有取样点时弹出「Could not use the clone stamp because the area to clone has not been defined (option-click to define a source point).」。取样点按文档保存在 `DocState::clone_source` / `clone_offset`。
-- 历史记录画笔：从文档打开（或新建）时的状态（第一条历史）中取同一图层的像素来画；该状态中没有这个图层或尺寸不同时弹出「Could not use the history brush because the history state does not contain a corresponding layer.」。
-- 按下时按住 Shift：从上一笔结束的位置画直线到按下的位置，再继续这一笔。
-- 图层不能画时（隐藏、锁定像素），在按下的那一刻弹出 Photoshop 的提示，不开始笔画。
-- 光标：所有这些工具，笔刷在屏幕上的直径不小于 4 点时，隐藏系统光标，画出笔刷大小的圆圈（半透明黑色外圈加白色细圈）；更小时显示十字光标。
+- Pressing on the canvas starts a stroke (using the current tool's size, hardness, opacity, flow; the Pencil's flow is fixed at 100% with no soft edge), dragging continues it, and on release one history entry is recorded: "Brush Tool", "Pencil", "Eraser", "Dodge Tool", "Burn Tool", "Sponge Tool", "Blur Tool", "Sharpen Tool", "Clone Stamp", "History Brush", "Smudge Tool", "Pattern Stamp", "Background Eraser", "Color Replacement Tool". The Brush and Pencil paint with the foreground color using the options bar Mode (all blend modes plus Behind and Clear; see "Painting modes" in `paint.md`); on a background layer the Eraser uses the background color. Eraser Mode: Brush (uses the brush size, hardness, opacity, flow), Pencil (hard edge, no anti-aliasing, flow 100%), Block (fixed as a square 16 pixels on a side on screen, opacity and flow both 100%, matching Photoshop).
+- The stroke kind is decided at press time (`stroke_kind`): Dodge/Burn by their respective Range, Sponge by Mode, Blur/Sharpen, and Clone Stamp and History Brush as below.
+- Smudge: Strength (options bar, default 50%) is the stroke strength itself and is no longer multiplied by opacity. Pattern Stamp: tiles the default pattern (`state::default_pattern`: green dots on a dark green ground, 18 × 22 pixels) from the document origin; Impressionist and similar options have no effect yet. Background Eraser: sampling, Limits, Tolerance, and Protect Foreground Color come from the options bar (`options_tools::color_match`); when it acts on a background layer, the background is first converted to a normal layer "Layer 0" (matching Photoshop). Color Replacement: Mode (Hue / Saturation / Color (default) / Luminosity), sampling, Limits, Tolerance, using the foreground color. These four tools each have their own brush (`smudge`, `pattern_stamp`, `background_eraser`, `color_replacement` in `AppState`: 13 px hard edge).
+- Clone Stamp: ⌥-click sets the source point (this press does not paint, even if ⌥ is released first). On later presses, the offset is "press position − source point"; with Aligned checked (default), the offset stays fixed after the first stroke, otherwise every stroke restarts from the source point. Sampling follows the options bar Sample: Current Layer (the current layer), Current & Below (the composite of the current layer and the layers below it, `Document::sample_source`), All Layers (the full composite), all using the pixels at press time. When there is no source point, the alert "Could not use the clone stamp because the area to clone has not been defined (option-click to define a source point)." appears. The source point is stored per document in `DocState::clone_source` / `clone_offset`.
+- History Brush: paints with the pixels of the same layer taken from the state when the document was opened (or created) (the first history entry); when that state does not contain this layer or its size differs, the alert "Could not use the history brush because the history state does not contain a corresponding layer." appears.
+- Holding Shift on press: draws a straight line from where the previous stroke ended to the press point, then continues the stroke.
+- When the layer cannot be painted (hidden, pixels locked), Photoshop's alert appears at the moment of the press and no stroke starts.
+- Cursor: for all these tools, when the brush's on-screen diameter is at least 4 points, the system cursor is hidden and a circle the size of the brush is drawn (a translucent black outer ring plus a thin white ring); when smaller, a crosshair cursor is shown.
 
-## 蚂蚁线
+## Marching ants
 
-- 选区轮廓（见 `crates/op-core/src/selection.md` 的 `outline`）按文档像素转换到屏幕，只绘制视口内的线段。
-- 每段先画 1 物理像素宽的白线，再叠一条 4 物理像素一段的黑色虚线。虚线的相位由线段位置决定，所以曲线边缘由许多短段组成时图案仍然连续。
-- 虚线每 1/8 秒前进一格，有选区时界面每 120 毫秒重绘一次。
+- The selection outline (see `outline` in `crates/op-core/src/selection.md`) is converted from document pixels to screen, and only segments within the viewport are drawn.
+- Each segment is first drawn as a white line 1 physical pixel wide, then overlaid with a black dashed line with 4-physical-pixel dashes. The dash phase is determined by the segment position, so the pattern stays continuous along curved edges made of many short segments.
+- The dashes advance one step every 1/8 second; when there is a selection, the UI repaints every 120 milliseconds.
 
-## 光标
+## Cursors
 
-- 平移状态（空格、抓手、中键）：抓手，拖动时为抓紧的手。
-- 缩放工具：放大镜，按住 ⌥ 时为缩小。
-- 吸管、形状工具、渐变、魔棒、套索、多边形套索、油漆桶、四种选框工具，以及笔刷很小时的绘画工具：十字光标。
-- 移动工具：移动光标。文字工具：文本光标。其它：默认光标。
+- Panning state (Space, Hand, middle button): hand; a grabbing hand while dragging.
+- Zoom tool: magnifier; zoom-out with ⌥ held.
+- Eyedropper, shape tools, Gradient, Magic Wand, Lasso, Polygonal Lasso, Paint Bucket, the four marquee tools, and painting tools when the brush is very small: crosshair.
+- Move tool: move cursor. Type tool: text cursor. Others: default cursor.
 
-## 滚动条
+## Scrollbars
 
-- 每个方向的可滚动范围是「文档大小 + 一个视口」，也就是文档的边可以滚到视口中央。滑块长度和位置按这个范围计算。
-- 拖动滑块平移文档。
-- 平移（滚动、抓手、空格拖动、拖动滑块）和缩放之后，偏移量都会被限制在这个范围内。
+- The scrollable range in each direction is "document size + one viewport", so a document edge can scroll to the center of the viewport. Thumb length and position are computed from this range.
+- Dragging the thumb pans the document.
+- After panning (scrolling, Hand, Space-drag, dragging a thumb) and zooming, the offset is clamped to this range.
 
-## 状态栏
+## Status bar
 
-- 高 16，顶部 1 pt 的 `#444444` 线，背景为面板色。
-- 从左到右：缩放百分比（宽 60 的 `#414141` 框，文字居中）、从距左 89 开始的文档尺寸与分辨率（例如 `734 px x 811 px (96 ppi)`）、距左 237 的向右箭头。
-- 从距左 243 开始到垂直滚动条列之前，是水平滚动条：轨道 `#4a4a4a`，滑块高 10、颜色 `#696969`。垂直滚动条列下方的角落保持面板色。
-- 缩放框不能输入，箭头没有菜单。
+- Height 16, with a 1 pt `#444444` line at the top, background in the panel color.
+- From left to right: zoom percentage (a 60-wide `#414141` box, text centered), document size and resolution starting at 89 from the left (e.g. `734 px x 811 px (96 ppi)`), and a right-pointing arrow at 237 from the left.
+- From 243 from the left up to the vertical scrollbar column is the horizontal scrollbar: track `#4a4a4a`, thumb 10 high, color `#696969`. The corner below the vertical scrollbar column stays the panel color.
+- The zoom box does not accept input, and the arrow has no menu.
 
-## 可见区域
+## Visible area
 
-`visible_rect(state, ppp)` 返回视口在文档像素坐标中的范围 `[x0, y0, x1, y1]`，可能超出画布。Paste 用它决定粘贴位置（见 `op-core` 的 `clipboard.md`）。
+`visible_rect(state, ppp)` returns the viewport's extent in document pixel coordinates `[x0, y0, x1, y1]`, which may extend beyond the canvas. Paste uses it to decide where to paste (see `clipboard.md` in `op-core`).
 
-## 已知限制
+## Known limitations
 
-- 选框工具的「Fixed Ratio」「Fixed Size」样式没有效果。
-- 没有标尺和参考线。
-- 滚动条的滑块长度与 Photoshop 不完全一致（Photoshop 的可滚动范围算法不同），也不能点击轨道翻页。
+- The marquee tool's "Fixed Ratio" and "Fixed Size" styles have no effect.
+- No rulers or guides.
+- Scrollbar thumb length does not exactly match Photoshop (Photoshop computes the scrollable range differently), and clicking the track does not page.

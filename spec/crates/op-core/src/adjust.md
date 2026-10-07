@@ -1,83 +1,83 @@
-# adjust.rs：图像调整
+# adjust.rs: Image Adjustments
 
-## 职责
+## Responsibilities
 
-实现 Image › Adjustments 中逐像素的调整，作用于活动图层、限于选区。不记录历史（由 `op-ui` 按调整名称记录）。
+Implements the per-pixel adjustments in Image › Adjustments. They act on the active layer, limited to the selection. No history is recorded here (`op-ui` records it under the adjustment's name).
 
-## 对外接口
+## Public Interface
 
-- `Adjustment`：
-  - `Invert`：每个颜色通道取 `255 - v`。
-  - `Desaturate`：三个通道都设为该像素的 HSL 亮度 `(max + min) / 2`（向上取整），与 Photoshop 的 Desaturate 一致（不是加权亮度）。
-  - `EqualizeEntireImage`：用选区内的直方图生成同一张表，但作用于整个图层（忽略选区）。
-  - `Threshold(level)`：亮度（`luminosity`）大于等于 `level` 的像素变白，其余变黑。Photoshop 的取值范围 1–255，默认 128。
-  - `Posterize(levels)`：每个通道量化为 `levels` 个色阶：`round(round(v × (L−1) / 255) × 255 / (L−1))`。范围 2–255，默认 4。
-  - `Equalize`：直方图均衡。用活动图层选区内、alpha 不为 0 的像素的 R、G、B 三个通道值合在一起统计直方图（`channel_histogram`），每个值映射为它在累计直方图中的位置 × 255（四舍五入），同一张表作用于三个通道。
-  - `Levels([Levels; 4])`：RGB 复合通道与红、绿、蓝通道各一组（`Levels { input_black, input_white, gamma, output_black, output_white }`），先应用各通道自己的，再应用复合通道的（Photoshop 的顺序）。`t = clamp((v − 输入黑场) / (输入白场 − 输入黑场), 0, 1)`，经 `levels_gamma(t, gamma)` 后映射到输出黑白场，半数进位取整。输入白场不大于黑场时按黑场 + 1 计算。`Levels::composite()` 只设复合通道。
-  - `levels_gamma(t, gamma)`：Photoshop 的 gamma 曲线（从 Photoshop 2026 的 Levels 量得）：`t^(1/gamma)`，但 gamma 大于 1 时黑端斜率限制为 `2^gamma`：以二次曲线 `a·t + b·t²`（`a = 2^gamma`）从 0 起步，在与幂曲线斜率相同的点接上。gamma 8 以上幂曲线本身就不比它陡，没有这段。与 Photoshop 相差不超过 2 级（gamma 5–7 的最暗几级差 6 级以内）。
-  - `HueSaturation(HueSaturation)`：Master 三个值、六个颜色范围（`HueRange { bounds, hue, saturation, lightness }`，默认边界 `HUE_RANGES`：Reds 315/345/15/45，其余每 60° 一组）和 Colorize。逐像素（拟合 Photoshop 2026，见测试）：
-    - 每个范围按像素原色相的权重计入：边界之间线性渐入渐出，比边界晚半度（`HueRange::weight`）。
-    - 色相转动 Master 的加上各范围加权的，保持最大与最小通道不变；
-    - Master 的亮度：正值向白混合 `v + (255 − v)·k`，负值向黑 `v·(1 + k)`；
-    - 各范围加权的亮度另一种算法：正值把各通道向最大通道移动，负值向最小通道移动；
-    - 然后先各范围加权的饱和度，再 Master 的饱和度：正值时各通道离开 HSL 亮度 `L = (max+min)/2`，倍数 `1/a − 1`，`a` 为 `1 − 量`，当量与该色的 HSL 饱和度之和达到 1 时 `a` 为该饱和度（即推到全饱和）；负值时向 L 收缩 `(1 + 量)` 倍。
-    - Colorize：取像素的 HSL 亮度，按 Master 亮度调整，再用 Master 的色相（0–360）与饱和度（0–100）组成颜色。
-    - 结果与 Photoshop 相差：Master 不超过 4 级，Colorize 3 级，颜色范围 4 级（渐变边上）。
-    - `HueSaturation::master(h, s, l)` 构造只有 Master 的设置；`HueSaturation::apply(px)` 作用于一个像素（对话框的 Before - After 色带也用它）。
-  - `Exposure {  - `Exposure { exposure, offset, gamma }`：在 gamma 2.2 的线性光下计算（不是 sRGB 曲线，与 Photoshop 一致）：`v^2.2` 乘以 `2^exposure`、加 `offset`，负值截为 0，再取 `^(1/gamma)`，最后 `^(1/2.2)`。与 Photoshop 相差不超过 2 级。
-  - `BrightnessContrast { brightness, contrast, legacy }`（−150–150、−50–100）：默认算法直接用 Photoshop 2026 的曲线：`data/brightness_contrast.bin` 存有 Photoshop 对每个亮度值（301 条）和每个对比度值（151 条）各自输出的 256 级表，按「先亮度、后对比度」复合（与 Photoshop 组合结果相差不超过 1 级）。这些曲线没有找到闭式（亮度的起始斜率为 `2^(b/110)`，正负亮度互为反函数）。`legacy`（Use Legacy）：亮度平移 `v + b`；对比度为正时以 128 为中心拉伸 `100/(100 − c)` 倍（100 时为阈值 128），为负时压缩 `(100 + c)/100` 倍，偏移量四舍五入（半数远离中心）；对比度为负时先对比度后亮度，为正时先亮度后对比度（与 Photoshop 的结果吻合）。
-  - `ColorBalance { shadows, midtones, highlights, preserve_luminosity }`：每个通道一条曲线（Photoshop 的 Color Balance 是逐通道的查找表，包括 Preserve Luminosity），形如 Levels：阴影为负时输入黑场 = −值；高光为正时输入白场 = 255 − 值；gamma 为 `2^(G/100)`（经 `levels_gamma`）。不保持亮度时 `G = 中间调 + (阴影 + 高光)/2`；保持亮度时，三个轴的阴影先减去其最大值、高光减去其最小值、中间调减去 (最大 + 最小)/2，且只有中间调影响 gamma。与 Photoshop 2026 的 80 组随机设置相差不超过 3 级。
-  - `BlackWhite { weights, tint }`：红、黄、绿、青、蓝、洋红六个权重（百分比）。灰度 = 最小通道 + (中间通道 − 最小) × 次色权重 + (最大 − 中间) × 主色权重；主色是最大的通道（红/绿/蓝），次色是最大两个通道合成的颜色（黄/青/洋红）。与 Photoshop 逐级相同（默认预设 40、60、40、60、20、80）。`tint` 为 Tint 颜色时，以「颜色」混合把它设到这个灰度上（`set_lum`：按 0.3 R + 0.59 G + 0.11 B 的亮度平移，再用 ClipColor 收回 0–1），与 Photoshop 相差不超过 2 级。
-  - `Vibrance { vibrance, saturation }`：Vibrance 为近似：在 HSL 中饱和度乘 `1 + vibrance × (1 − s)`（对低饱和颜色作用更大；Photoshop 还会保护肤色，未还原）。Saturation 与 Photoshop 一致（相差不超过 2 级）：在 sRGB 线性光中各通道以灰 `0.2878 R + 0.7122 G`（蓝的权重为 0，与 Photoshop 的实测一致）为中心缩放 `1 + saturation/100` 倍。
-  - `PhotoFilter { color, density, preserve_luminosity }`：在 D50 的 XYZ 中（线性 sRGB 经 `SRGB_TO_XYZ_D50`）把 X、Y、Z 分别乘以 `1 − 密度 + 密度 × 滤镜色的对应分量 / 白的分量`，再转回 sRGB——Photoshop 正是这样（拟合出的变换矩阵的本征向量即这组原色），与 Photoshop 相差不超过 1 级。Preserve Luminosity 时再用 `set_lum` 把结果的亮度设回原像素的亮度（相差不超过 6 级）。
-  - `GradientMap { from, to, method }`：像素的亮度（0.299 R + 0.587 G + 0.114 B，与 Photoshop 一致）决定在渐变上的位置，颜色由 `gradient::blend_colors` 按方法插值（见 `gradient.md`）。
-  - `AutoTone`、`AutoColor`：每个通道各自去掉最暗、最亮 0.1% 后拉伸到 0–255（Photoshop 的 Auto Color 还会中和中间调，这里没有）；`AutoContrast`：三个通道合并统计、按同一范围拉伸，颜色关系不变。直方图取当前图层选区内、alpha 不为 0 的像素。
-  - `Curves { points, counts }`：RGB 复合、红、绿、蓝通道各最多 16 个（输入, 输出）点（`Adjustment::curves(points)` 只设复合通道，`curves_per_channel([..; 4])` 四个通道，空列表表示该通道不变）；先各通道自己的曲线，再复合曲线。`curve_table(points)` 生成查找表：按输入排序、去掉重复输入后做自然三次样条（两端二阶导为 0），第一个点之前、最后一个点之后保持平直，结果限制在 0–255、四舍五入；与 Photoshop 2026 的 12 组曲线逐级相同。没有点时为恒等，只有一个点时为常数。
-  - `ChannelMixer { rows, monochrome }`：每个输出通道（Monochrome 时为三个通道相同的灰）= (R × 红% + G × 绿% + B × 蓝%) / 100 + 常数% × 2.55，半数进位并限制在 0–255。与 Photoshop 2026 相差不超过 1 级。
-  - `SelectiveColor { colors, absolute }`：九个范围（Reds、Yellows、Greens、Cyans、Blues、Magentas、Whites、Neutrals、Blacks）各有 C、M、Y、K（−100–100%）。每个范围对像素有一个权重：Reds/Greens/Blues 为该通道单独最大时最大值与中间值之差；Cyans/Magentas/Yellows 为红/绿/蓝单独最小时中间值与最小值之差；Whites 为 `2·(min − 50%)`，Blacks 为 `2·(50% − max)`（不小于 0）；Neutrals 为 `1 − (|max − 50%| + |min − 50%|)`。每个通道的墨量 `ink = 1 − v`（C 对红、M 对绿、Y 对蓝）按每个范围变化 `权重 × clamp(d, −ink, 1 − ink)`，其中 `d = 量 + K × (1 + 量)`，Relative 时 d 再乘以 ink；各范围的变化相加（不是依次作用）。与 Photoshop 2026 的十余组设置（含多范围、Absolute）相差不超过 1 级。
-  - Levels、Exposure、Brightness/Contrast、Color Balance、Curves、Equalize 与 Auto 系列先算出三个通道的 256 项查找表（`Adjustment::tables()`）再逐像素查表。
-- `Adjustment::name()`：菜单与历史名称（「Invert」「Desaturate」「Threshold」「Posterize」「Equalize」「Levels」「Hue/Saturation」「Exposure」「Brightness/Contrast」「Color Balance」「Black & White」「Vibrance」「Photo Filter」「Gradient Map」「Auto Tone」「Auto Contrast」「Auto Color」「Curves」「Channel Mixer」「Selective Color」）。
-- `rgb_histograms(doc)`：活动图层选区内、alpha 不为 0 的像素的红、绿、蓝三个直方图（Levels、Curves 对话框）。
-- `channel_histogram(doc)`：活动图层选区内、alpha 不为 0 的像素的 R、G、B 值合并统计的直方图（Equalize 与 Levels 对话框使用）。
-- `hsl_color(h, s, l)`、`hue_of(rgb)`：HSL 与 RGB 之间的换算（Colorize 的颜色、前景色的色相）。
-- `mask_gray(rgb)`：颜色画在图层蒙版上的灰度（亮度，三个通道相同）。
-- `luminosity(px)`：亮度 `(299 R + 587 G + 114 B) / 1000`，四舍五入到 0–255（Rec. 601 权重）。
-- `luminosity_histogram(doc)`：活动图层选区内、alpha 不为 0 的像素的亮度直方图（Threshold 对话框显示它）。
-- `check(doc)`：调整前的检查，失败时返回 `FillError`（没有图层、图层隐藏、像素锁定），提示文字与 Fill 相同格式，例如「Could not complete the Invert command because the target layer is hidden.」。
-- `apply(doc, adjustment)`：先 `check`，再逐像素应用。
+- `Adjustment`:
+  - `Invert`: each color channel becomes `255 - v`.
+  - `Desaturate`: all three channels are set to the pixel's HSL lightness `(max + min) / 2` (rounded up), matching Photoshop's Desaturate (not a weighted luminosity).
+  - `EqualizeEntireImage`: builds the same table from the histogram inside the selection, but applies it to the whole layer (ignoring the selection).
+  - `Threshold(level)`: pixels whose luminosity (`luminosity`) is greater than or equal to `level` become white; all others become black. Photoshop's range is 1–255, default 128.
+  - `Posterize(levels)`: each channel is quantized to `levels` levels: `round(round(v × (L−1) / 255) × 255 / (L−1))`. Range 2–255, default 4.
+  - `Equalize`: histogram equalization. The R, G and B values of pixels with nonzero alpha inside the selection on the active layer are counted together into one histogram (`channel_histogram`); each value maps to its position in the cumulative histogram × 255 (rounded), and the same table is applied to all three channels.
+  - `Levels([Levels; 4])`: one set each for the RGB composite channel and the red, green and blue channels (`Levels { input_black, input_white, gamma, output_black, output_white }`). Each channel's own levels are applied first, then the composite's (Photoshop's order). `t = clamp((v − input black) / (input white − input black), 0, 1)`, passed through `levels_gamma(t, gamma)`, then mapped to the output black and white points, rounding halves up. When the input white point is not greater than the black point, it is treated as black point + 1. `Levels::composite()` sets only the composite channel.
+  - `levels_gamma(t, gamma)`: Photoshop's gamma curve (measured from Levels in Photoshop 2026): `t^(1/gamma)`, but when gamma is greater than 1 the slope at the black end is limited to `2^gamma`: it starts from 0 with the quadratic `a·t + b·t²` (`a = 2^gamma`) and joins the power curve at the point where their slopes are equal. From gamma 8 up, the power curve itself is no steeper than that, so this segment does not exist. Differs from Photoshop by at most 2 levels (within 6 levels at the darkest few levels for gamma 5–7).
+  - `HueSaturation(HueSaturation)`: three Master values, six color ranges (`HueRange { bounds, hue, saturation, lightness }`, default bounds `HUE_RANGES`: Reds 315/345/15/45, the rest one group every 60°), and Colorize. Per pixel (fitted to Photoshop 2026, see tests):
+    - Each range contributes with a weight based on the pixel's original hue: linear ramp in and out between the bounds, half a degree later than the bounds (`HueRange::weight`).
+    - The hue rotation is Master's plus each range's weighted amount, keeping the maximum and minimum channels unchanged;
+    - Master lightness: positive values blend toward white `v + (255 − v)·k`, negative values toward black `v·(1 + k)`;
+    - Each range's weighted lightness uses a different algorithm: positive values move each channel toward the maximum channel, negative values toward the minimum channel;
+    - Then each range's weighted saturation first, then Master's saturation: for positive values, each channel moves away from the HSL lightness `L = (max+min)/2` by a factor of `1/a − 1`, where `a` is `1 − amount`; when the amount plus the color's HSL saturation reaches 1, `a` is that saturation (i.e., pushed to full saturation). For negative values, channels shrink toward L by a factor of `(1 + amount)`.
+    - Colorize: takes the pixel's HSL lightness, adjusts it by Master lightness, then forms a color with Master's hue (0–360) and saturation (0–100).
+    - Results differ from Photoshop by: at most 4 levels for Master, 3 levels for Colorize, 4 levels for color ranges (at the edges of the ramps).
+    - `HueSaturation::master(h, s, l)` builds a setting with only Master; `HueSaturation::apply(px)` applies to one pixel (the dialog's Before - After color bars also use it).
+  - `Exposure {  - `Exposure { exposure, offset, gamma }`: computed in gamma-2.2 linear light (not the sRGB curve, matching Photoshop): `v^2.2` multiplied by `2^exposure`, plus `offset`, negative values clipped to 0, then `^(1/gamma)`, and finally `^(1/2.2)`. Differs from Photoshop by at most 2 levels.
+  - `BrightnessContrast { brightness, contrast, legacy }` (−150–150, −50–100): the default algorithm uses Photoshop 2026's curves directly: `data/brightness_contrast.bin` stores the 256-level table Photoshop outputs for each brightness value (301 entries) and each contrast value (151 entries), composed as "brightness first, then contrast" (differs from Photoshop's combined result by at most 1 level). No closed form was found for these curves (the initial slope of brightness is `2^(b/110)`, and positive and negative brightness are inverses of each other). `legacy` (Use Legacy): brightness shifts `v + b`; positive contrast stretches around 128 by a factor of `100/(100 − c)` (at 100 it is a threshold at 128), negative contrast compresses by a factor of `(100 + c)/100`, with the offset rounded (halves away from the center); with negative contrast, contrast comes before brightness; with positive contrast, brightness comes before contrast (matching Photoshop's results).
+  - `ColorBalance { shadows, midtones, highlights, preserve_luminosity }`: one curve per channel (Photoshop's Color Balance is a per-channel lookup table, including Preserve Luminosity), shaped like Levels: when shadows are negative, input black point = −value; when highlights are positive, input white point = 255 − value; gamma is `2^(G/100)` (via `levels_gamma`). Without preserving luminosity, `G = midtones + (shadows + highlights)/2`; with preserving luminosity, across the three axes the shadows first subtract their maximum, the highlights subtract their minimum, the midtones subtract (max + min)/2, and only the midtones affect gamma. Differs from Photoshop 2026 by at most 3 levels over 80 random settings.
+  - `BlackWhite { weights, tint }`: six weights (percentages) for red, yellow, green, cyan, blue and magenta. Gray = minimum channel + (middle channel − minimum) × secondary color weight + (maximum − middle) × primary color weight; the primary color is the largest channel (red/green/blue), the secondary color is the color formed by the two largest channels (yellow/cyan/magenta). Identical to Photoshop at every level (default preset 40, 60, 40, 60, 20, 80). When `tint` is a Tint color, it is set onto this gray with the "Color" blend (`set_lum`: shift by the luminosity 0.3 R + 0.59 G + 0.11 B, then pull back into 0–1 with ClipColor), differing from Photoshop by at most 2 levels.
+  - `Vibrance { vibrance, saturation }`: Vibrance is an approximation: in HSL, saturation is multiplied by `1 + vibrance × (1 − s)` (stronger effect on low-saturation colors; Photoshop also protects skin tones, which is not reproduced). Saturation matches Photoshop (within 2 levels): in sRGB linear light, each channel is scaled by `1 + saturation/100` around the gray `0.2878 R + 0.7122 G` (blue has weight 0, matching Photoshop measurements).
+  - `PhotoFilter { color, density, preserve_luminosity }`: in D50 XYZ (linear sRGB via `SRGB_TO_XYZ_D50`), X, Y and Z are each multiplied by `1 − density + density × the filter color's corresponding component / white's component`, then converted back to sRGB. This is exactly what Photoshop does (the eigenvectors of the fitted transform matrix are these primaries), differing from Photoshop by at most 1 level. With Preserve Luminosity, `set_lum` then sets the result's luminosity back to the original pixel's luminosity (within 6 levels).
+  - `GradientMap { from, to, method }`: the pixel's luminosity (0.299 R + 0.587 G + 0.114 B, matching Photoshop) determines its position on the gradient; the color is interpolated by `gradient::blend_colors` according to the method (see `gradient.md`).
+  - `AutoTone`, `AutoColor`: each channel separately drops the darkest and brightest 0.1%, then stretches to 0–255 (Photoshop's Auto Color also neutralizes midtones; this one does not). `AutoContrast`: the three channels are counted together and stretched by the same range, keeping color relationships unchanged. The histogram uses pixels with nonzero alpha inside the selection on the current layer.
+  - `Curves { points, counts }`: up to 16 (input, output) points each for the RGB composite, red, green and blue channels (`Adjustment::curves(points)` sets only the composite channel; `curves_per_channel([..; 4])` sets all four channels; an empty list means that channel is unchanged). Each channel's own curve is applied first, then the composite curve. `curve_table(points)` builds the lookup table: sort by input, remove duplicate inputs, then fit a natural cubic spline (second derivative 0 at both ends); before the first point and after the last point it stays flat; results are clamped to 0–255 and rounded. Identical at every level to 12 curves from Photoshop 2026. With no points it is the identity; with one point it is a constant.
+  - `ChannelMixer { rows, monochrome }`: each output channel (with Monochrome, the same gray for all three channels) = (R × red% + G × green% + B × blue%) / 100 + constant% × 2.55, rounding halves up and clamped to 0–255. Differs from Photoshop 2026 by at most 1 level.
+  - `SelectiveColor { colors, absolute }`: nine ranges (Reds, Yellows, Greens, Cyans, Blues, Magentas, Whites, Neutrals, Blacks), each with C, M, Y, K (−100–100%). Each range has a weight for a pixel: for Reds/Greens/Blues, the difference between the maximum and middle values when that channel alone is the maximum; for Cyans/Magentas/Yellows, the difference between the middle and minimum values when red/green/blue alone is the minimum; Whites is `2·(min − 50%)`, Blacks is `2·(50% − max)` (not less than 0); Neutrals is `1 − (|max − 50%| + |min − 50%|)`. Each channel's ink amount `ink = 1 − v` (C for red, M for green, Y for blue) changes per range by `weight × clamp(d, −ink, 1 − ink)`, where `d = amount + K × (1 + amount)`; with Relative, d is further multiplied by ink. The changes from all ranges are summed (not applied in sequence). Differs from Photoshop 2026 by at most 1 level over a dozen or so settings (including multiple ranges and Absolute).
+  - Levels, Exposure, Brightness/Contrast, Color Balance, Curves, Equalize and the Auto family first compute 256-entry lookup tables for the three channels (`Adjustment::tables()`), then look up each pixel.
+- `Adjustment::name()`: the menu and history name ("Invert", "Desaturate", "Threshold", "Posterize", "Equalize", "Levels", "Hue/Saturation", "Exposure", "Brightness/Contrast", "Color Balance", "Black & White", "Vibrance", "Photo Filter", "Gradient Map", "Auto Tone", "Auto Contrast", "Auto Color", "Curves", "Channel Mixer", "Selective Color").
+- `rgb_histograms(doc)`: the red, green and blue histograms of pixels with nonzero alpha inside the selection on the active layer (Levels and Curves dialogs).
+- `channel_histogram(doc)`: the histogram of the R, G and B values counted together for pixels with nonzero alpha inside the selection on the active layer (used by Equalize and the Levels dialog).
+- `hsl_color(h, s, l)`, `hue_of(rgb)`: conversion between HSL and RGB (the Colorize color, the foreground color's hue).
+- `mask_gray(rgb)`: the gray a color paints on a layer mask (luminosity, the same in all three channels).
+- `luminosity(px)`: luminosity `(299 R + 587 G + 114 B) / 1000`, rounded to 0–255 (Rec. 601 weights).
+- `luminosity_histogram(doc)`: the luminosity histogram of pixels with nonzero alpha inside the selection on the active layer (shown by the Threshold dialog).
+- `check(doc)`: the check before an adjustment; on failure it returns a `FillError` (no layer, layer hidden, pixels locked), with message text in the same format as Fill, e.g. "Could not complete the Invert command because the target layer is hidden.".
+- `apply(doc, adjustment)`: runs `check` first, then applies per pixel.
 
-## 行为规则
+## Behavior Rules
 
-- 只改颜色通道，alpha 不变；完全透明的像素跳过。
-- 有选区时只处理选中的像素；部分选中（羽化、消除锯齿边缘）的像素按选择程度在原色与新颜色之间线性混合。
-- 背景图层同样可以调整（背景图层只是不能移动、不能有透明，像素可以修改）。
+- Only color channels change; alpha stays the same. Fully transparent pixels are skipped.
+- With a selection, only selected pixels are processed; partially selected pixels (feathered, anti-aliased edges) are linearly blended between the original color and the new color by their degree of selection.
+- The Background layer can also be adjusted (the Background layer only cannot be moved or have transparency; its pixels can be modified).
 
-## 已知限制
+## Known Limitations
 
-- Vibrance 滑块本身是近似（Photoshop 的 Vibrance 带有肤色保护，未还原）。
+- The Vibrance slider itself is an approximation (Photoshop's Vibrance includes skin tone protection, which is not reproduced).
 
-## 数据来源
+## Data Sources
 
-Brightness/Contrast 的表与 `fixtures/adjust/` 下的对照数据都由脚本在 Photoshop 2026 中生成：一张图每行一条灰阶，每行用选区套用不同的参数，存为 PNG 后读出。`probe.rgb` 为 64 × 72 的探测图（16 级 RGB 立方体、灰阶、随机颜色），其余 `.rgb` 为 Photoshop 对它的输出。
+The Brightness/Contrast tables and the reference data under `fixtures/adjust/` were all generated by scripts in Photoshop 2026: an image with one gray ramp per row, each row given different parameters via a selection, saved as PNG and read back. `probe.rgb` is a 64 × 72 probe image (a 16-level RGB cube, gray ramps, random colors); the other `.rgb` files are Photoshop's output for it.
 
-## 测试覆盖
+## Test Coverage
 
-- `invert_desaturate_threshold_posterize`：各调整对 (200, 100, 0) 等像素的结果，包括 Threshold 恰好在亮度 119 两侧的边界。
-- `equalize_stretches_the_range`：只有 100 和 200 两个值时分别映射到 128 和 255。
-- `levels_hue_saturation_and_exposure`：Levels 的黑白场拉伸与 gamma 2（128 → 181）；红色色相 +120° 变绿、饱和度 −100 加亮度 +50 得到 191 灰；曝光 +1 档把 128 变为 176。
-- `color_adjustments`：Black & White 默认预设下纯红为 102、纯黄为 153；黑到红的渐变映射；Vibrance 提高低饱和颜色；蓝色滤镜 50% 把 200 灰变为 (100, 100, 200)。
-- `curves_pass_through_their_points`：两点曲线为恒等；S 曲线经过各点且单调；端点外平直；(64→128) 的曲线把 64 灰变为 128。
-- `auto_tone_stretches_each_channel`：两个像素时各通道拉伸到 0 与 255。
-- `only_the_selection_changes`：选区外的像素不变。
-- `hidden_layers_are_refused`：隐藏图层返回错误及 Photoshop 的提示文字。
-- `photoshop::*`：与 Photoshop 2026 的输出对照（`fixtures/adjust/`）：
-  - `hue_saturation_master_matches_photoshop`、`hue_saturation_colorize_and_ranges_match_photoshop`：七组 Master 设置、Colorize、五组颜色范围设置，限定最大误差与超过 1 级的通道数。
-  - `levels_match_photoshop`：28 组 Levels（各种 gamma、黑白场、输出范围）。
-  - `channel_levels_apply_before_the_composite`、`curves_per_channel`：单通道先于复合通道。
-  - `brightness_contrast_matches_photoshop`：七组组合与十一组 Use Legacy。
-  - `color_balance_matches_photoshop`：80 组随机三色调设置（含 Preserve Luminosity），每级误差不超过 3。
-- `channel_histograms`：三个通道的直方图与合并直方图。
-- `photoshop::channel_mixer_matches_photoshop`、`photoshop::selective_color_matches_photoshop`：三组通道混合（含单色）与七组可选颜色设置对照 Photoshop。
-- `photoshop::black_white_photo_filter_and_exposure_match_photoshop`：Black & White（含两组 Tint）、四组 Photo Filter、四组 Exposure、三组 Vibrance 的 Saturation 对照 Photoshop。
-- `photoshop::gradient_map_matches_photoshop`：红→蓝渐变在四种方法下对照 Photoshop。
-- `equalize_the_entire_image_from_the_selection`：选区外的像素在 EqualizeEntireImage 时按选区的表变化，Equalize 时不变。
+- `invert_desaturate_threshold_posterize`: each adjustment's result for pixels such as (200, 100, 0), including the Threshold boundary exactly on either side of luminosity 119.
+- `equalize_stretches_the_range`: with only the values 100 and 200, they map to 128 and 255 respectively.
+- `levels_hue_saturation_and_exposure`: Levels black/white point stretching and gamma 2 (128 → 181); red with hue +120° becomes green; saturation −100 plus lightness +50 gives 191 gray; exposure +1 stop turns 128 into 176.
+- `color_adjustments`: with the Black & White default preset, pure red is 102 and pure yellow is 153; a black-to-red gradient map; Vibrance raises low-saturation colors; a 50% blue filter turns 200 gray into (100, 100, 200).
+- `curves_pass_through_their_points`: a two-point curve is the identity; an S curve passes through each point and is monotonic; flat beyond the endpoints; a (64→128) curve turns 64 gray into 128.
+- `auto_tone_stretches_each_channel`: with two pixels, each channel stretches to 0 and 255.
+- `only_the_selection_changes`: pixels outside the selection do not change.
+- `hidden_layers_are_refused`: a hidden layer returns an error with Photoshop's message text.
+- `photoshop::*`: comparison against Photoshop 2026's output (`fixtures/adjust/`):
+  - `hue_saturation_master_matches_photoshop`, `hue_saturation_colorize_and_ranges_match_photoshop`: seven Master settings, Colorize, and five color range settings, bounding the maximum error and the number of channels off by more than 1 level.
+  - `levels_match_photoshop`: 28 Levels settings (various gamma, black/white points, output ranges).
+  - `channel_levels_apply_before_the_composite`, `curves_per_channel`: individual channels come before the composite channel.
+  - `brightness_contrast_matches_photoshop`: seven combinations and eleven Use Legacy settings.
+  - `color_balance_matches_photoshop`: 80 random three-tone settings (including Preserve Luminosity), with error at most 3 per level.
+- `channel_histograms`: the three channel histograms and the combined histogram.
+- `photoshop::channel_mixer_matches_photoshop`, `photoshop::selective_color_matches_photoshop`: three channel mixer settings (including monochrome) and seven selective color settings compared against Photoshop.
+- `photoshop::black_white_photo_filter_and_exposure_match_photoshop`: Black & White (including two Tint settings), four Photo Filter settings, four Exposure settings, and three Vibrance Saturation settings compared against Photoshop.
+- `photoshop::gradient_map_matches_photoshop`: a red→blue gradient under four methods compared against Photoshop.
+- `equalize_the_entire_image_from_the_selection`: with EqualizeEntireImage, pixels outside the selection change by the selection's table; with Equalize, they do not change.

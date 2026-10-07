@@ -1,46 +1,46 @@
-# blend.rs：混合模式算法
+# blend.rs: Blend Mode Algorithms
 
-## 职责
+## Responsibilities
 
-实现 Photoshop 全部 27 种图层混合模式的像素计算，供 `Document::composite_rgba8` 使用。公式采用 W3C Compositing and Blending 规范，它与 Photoshop 对这些模式的定义一致。所有数值都是直通 alpha（非预乘）、gamma 编码的 0–1 浮点数，混合在 gamma 空间进行（与 Photoshop 默认一致）。
+Implements the pixel math for all 27 of Photoshop's layer blend modes, used by `Document::composite_rgba8`. The formulas follow the W3C Compositing and Blending specification, which matches Photoshop's definitions of these modes. All values are straight-alpha (non-premultiplied), gamma-encoded 0–1 floats, and blending happens in gamma space (matching Photoshop's default).
 
-## 对外接口
+## Public Interface
 
-- `blend(mode, cb, cs)`：两个不透明颜色的混合结果 B(cb, cs)，`cb` 为下层（背景），`cs` 为上层（源）。
-- `composite(mode, dst, src, src_alpha, x, y)`：把一个源像素合成到下层像素上。`src_alpha` 已包含像素 alpha、图层不透明度和填充。按 W3C 的通用公式：下层透明的部分直接显示源颜色，两者都存在的部分使用混合结果，然后做 source-over；`x`、`y` 是像素在文档中的位置，只有 Dissolve 用到。
+- `blend(mode, cb, cs)`: the blend result B(cb, cs) of two opaque colors; `cb` is the lower layer (backdrop), `cs` is the upper layer (source).
+- `composite(mode, dst, src, src_alpha, x, y)`: composites one source pixel onto a lower-layer pixel. `src_alpha` already includes pixel alpha, layer opacity, and fill. Following the W3C general formula: where the lower layer is transparent, the source color is shown directly; where both exist, the blend result is used; then source-over is applied. `x`, `y` are the pixel's position in the document, used only by Dissolve.
 
-## 各模式
+## Modes
 
-| 模式 | 计算 |
+| Mode | Computation |
 |---|---|
-| Normal | 源颜色 |
-| Dissolve | 每个像素按「伪随机数 < alpha」决定完全显示或完全隐藏，没有半透明；随机数由像素位置决定，所以同一位置结果固定 |
-| Darken / Lighten | 逐通道取较小 / 较大值 |
+| Normal | Source color |
+| Dissolve | Each pixel is fully shown or fully hidden according to "pseudo-random number < alpha", with no semi-transparency; the random number is determined by the pixel position, so the result at a given position is fixed |
+| Darken / Lighten | Per-channel minimum / maximum |
 | Multiply / Screen | `b·s` / `b + s − b·s` |
-| Color Burn | `b = 1` 时为 1，`s = 0` 时为 0，否则 `1 − min(1, (1 − b) / s)` |
-| Color Dodge | `b = 0` 时为 0，`s = 1` 时为 1，否则 `min(1, b / (1 − s))` |
+| Color Burn | 1 when `b = 1`, 0 when `s = 0`, otherwise `1 − min(1, (1 − b) / s)` |
+| Color Dodge | 0 when `b = 0`, 1 when `s = 1`, otherwise `min(1, b / (1 − s))` |
 | Linear Burn / Linear Dodge (Add) | `max(0, b + s − 1)` / `min(1, b + s)` |
-| Darker Color / Lighter Color | 比较三个通道之和，整体取较暗 / 较亮的颜色（不逐通道） |
-| Overlay | 以下层为条件的 Hard Light，即 `HardLight(s, b)` |
-| Soft Light | W3C 公式（`s ≤ 0.5` 时 `b − (1 − 2s)·b·(1 − b)`，否则用 `D(b)`） |
-| Hard Light | `s ≤ 0.5` 时 `Multiply(b, 2s)`，否则 `Screen(b, 2s − 1)` |
-| Vivid Light | `s ≤ 0.5` 时 `ColorBurn(b, 2s)`，否则 `ColorDodge(b, 2s − 1)` |
-| Linear Light | `b + 2s − 1`，截断到 0–1 |
-| Pin Light | `s ≤ 0.5` 时 `min(b, 2s)`，否则 `max(b, 2s − 1)` |
-| Hard Mix | `b + s ≥ 1` 时为 1，否则为 0 |
+| Darker Color / Lighter Color | Compares the sum of the three channels and takes the darker / lighter color as a whole (not per channel) |
+| Overlay | Hard Light conditioned on the lower layer, i.e. `HardLight(s, b)` |
+| Soft Light | W3C formula (`b − (1 − 2s)·b·(1 − b)` when `s ≤ 0.5`, otherwise using `D(b)`) |
+| Hard Light | `Multiply(b, 2s)` when `s ≤ 0.5`, otherwise `Screen(b, 2s − 1)` |
+| Vivid Light | `ColorBurn(b, 2s)` when `s ≤ 0.5`, otherwise `ColorDodge(b, 2s − 1)` |
+| Linear Light | `b + 2s − 1`, clipped to 0–1 |
+| Pin Light | `min(b, 2s)` when `s ≤ 0.5`, otherwise `max(b, 2s − 1)` |
+| Hard Mix | 1 when `b + s ≥ 1`, otherwise 0 |
 | Difference / Exclusion | `|b − s|` / `b + s − 2bs` |
-| Subtract / Divide | `max(0, b − s)` / `min(1, b / s)`（`s = 0` 时下层为 0 则 0，否则 1） |
-| Hue / Saturation / Color / Luminosity | W3C 不可分离模式：亮度 `Lum = 0.3R + 0.59G + 0.11B`，用 SetLum、SetSat、ClipColor 组合源与下层的色相、饱和度、亮度 |
+| Subtract / Divide | `max(0, b − s)` / `min(1, b / s)` (when `s = 0`: 0 if the lower layer is 0, otherwise 1) |
+| Hue / Saturation / Color / Luminosity | W3C non-separable modes: luminosity `Lum = 0.3R + 0.59G + 0.11B`; SetLum, SetSat, and ClipColor combine the hue, saturation, and luminosity of the source and lower layer |
 
-## 已知限制
+## Known Limitations
 
-- Photoshop 对 Color Burn、Linear Burn、Color Dodge、Linear Dodge、Linear Light、Vivid Light、Hard Mix、Difference 这 8 种模式中「填充（Fill）」与「不透明度」的效果做了区别处理，这里两者都只是简单相乘作为源 alpha。
-- Soft Light 使用 W3C 公式，与 Photoshop 的结果在部分取值上有细微差别。
-- Dissolve 的随机图案与 Photoshop 不同。
+- Photoshop treats the effect of Fill differently from Opacity for 8 modes—Color Burn, Linear Burn, Color Dodge, Linear Dodge, Linear Light, Vivid Light, Hard Mix, Difference—whereas here both are simply multiplied together as the source alpha.
+- Soft Light uses the W3C formula, which differs slightly from Photoshop's results for some values.
+- Dissolve's random pattern differs from Photoshop's.
 
-## 测试覆盖
+## Test Coverage
 
-- `separable_modes`：Multiply、Screen、Difference、Darken、Lighten、Linear Dodge、Subtract 的具体数值（例如 128 与 128 相乘为 64、滤色为 192），白色相乘、黑色滤色不改变颜色，Overlay 保持黑白下层。
-- `non_separable_modes`：Color 保留下层亮度、采用源的色相；Luminosity 采用源亮度；以灰色为源的 Saturation 得到无彩色。
-- `composite_over_transparent_shows_source`：下层透明时显示源颜色。
-- `dissolve_is_all_or_nothing`：Dissolve 的像素只有显示和隐藏两种结果，显示比例接近 alpha。
+- `separable_modes`: specific values for Multiply, Screen, Difference, Darken, Lighten, Linear Dodge, Subtract (for example, 128 multiplied by 128 is 64, and screened is 192); multiplying by white and screening with black do not change the color; Overlay preserves black and white lower layers.
+- `non_separable_modes`: Color keeps the lower layer's luminosity and takes the source's hue; Luminosity takes the source's luminosity; Saturation with a gray source gives an achromatic color.
+- `composite_over_transparent_shows_source`: when the lower layer is transparent, the source color is shown.
+- `dissolve_is_all_or_nothing`: Dissolve pixels have only two outcomes, shown or hidden, and the proportion shown is close to alpha.

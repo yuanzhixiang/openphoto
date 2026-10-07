@@ -1,15 +1,15 @@
-# titlebar.rs：自绘标题栏（macOS）
+# titlebar.rs: Custom-drawn title bar (macOS)
 
-## 组件职责
+## Component responsibility
 
-macOS 上窗口隐藏了系统标题栏（内容延伸到整个窗口），这里自绘一条与选项栏同色的标题栏，看起来和 Photoshop 的窗口一样。红绿灯按钮仍由系统绘制。其它平台使用系统标题栏，不显示这个组件。
+On macOS the window hides the system title bar (content extends over the whole window), so this draws a title bar in the same color as the options bar, making it look like Photoshop's window. The traffic-light buttons are still drawn by the system. Other platforms use the system title bar and do not show this component.
 
-## 视觉
+## Visuals
 
-- 高 40 参考像素，底色 `#535353`。
-- 居中显示「OpenPhoto」（Photoshop 显示「Adobe Photoshop 2026」）。
+- 40 reference pixels high, background `#535353`.
+- "OpenPhoto" is shown centered (Photoshop shows "Adobe Photoshop 2026").
 
-## 交互
+## Interaction
 
-- 按住拖动：移动窗口（`ViewportCommand::StartDrag`）。
-- 双击：在最大化与还原之间切换。
+- Press and drag: moves the window (`ViewportCommand::StartDrag`).
+- Double-click: toggles between maximized and restored.

@@ -1,14 +1,14 @@
 # lib.rs
 
-## 职责
+## Responsibilities
 
-`op-core` 的 crate 根。声明 `color`、`document`、`history`、`layer`、`pixel`、`tile` 六个公开模块，并把常用类型重导出到 crate 根，让下游 crate 可以直接写 `op_core::Document`、`op_core::TiledImage` 等。
+The crate root of `op-core`. Declares six public modules, `color`, `document`, `history`, `layer`, `pixel`, and `tile`, and re-exports commonly used types at the crate root so downstream crates can write `op_core::Document`, `op_core::TiledImage`, and so on directly.
 
-crate 级文档注释说明了本 crate 的定位：文档模型（图层树、分块像素存储、像素格式），不依赖 GPU 或 UI，所有编辑最终都是对这里数据结构的修改。整体模型见同目录 `README.md`。
+The crate-level doc comment states the crate's role: the document model (layer tree, tiled pixel storage, pixel formats), independent of GPU or UI; every edit ultimately modifies the data structures here. For the overall model, see `README.md` in the same directory.
 
-## 对外接口
+## Public interface
 
-根上重导出的类型：
+Types re-exported at the root:
 
 - `color::Color`
 - `document::{Anchor, DocId, Document, Snapshot}`
@@ -17,13 +17,13 @@ crate 级文档注释说明了本 crate 的定位：文档模型（图层树、�
 - `pixel::{BitDepth, ColorMode}`
 - `tile::{TILE_SIZE, Tile, TiledImage}`
 
-未在根上重导出、需走模块路径的公开项：`history::HistoryState`、`history::DEFAULT_LIMIT`。
+Public items not re-exported at the root, which must be reached through the module path: `history::HistoryState`, `history::DEFAULT_LIMIT`.
 
-## 与其它模块的关系
+## Relationship to other modules
 
-- 被 `op-color`、`op-io`、`op-tools`、`op-ui` 依赖。`op-render` 不依赖 `op-core`，它只接收 `op-ui` 传来的 RGBA 像素。
-- 本 crate 不依赖任何外部 crate。
+- Depended on by `op-color`, `op-io`, `op-tools`, and `op-ui`. `op-render` does not depend on `op-core`; it only receives RGBA pixels passed from `op-ui`.
+- This crate does not depend on any external crate.
 
-## 测试覆盖
+## Test coverage
 
-本文件没有测试；各模块的测试见对应 spec。
+This file has no tests; for each module's tests, see the corresponding spec.

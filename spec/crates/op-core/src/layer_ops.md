@@ -1,107 +1,107 @@
-# layer_ops.rs：图层菜单操作
+# layer_ops.rs: Layer menu operations
 
-## 职责
+## Responsibilities
 
-实现 Layer 菜单与 Layers 面板中改变图层结构的操作：复制图层、Layer Via Copy/Cut、背景图层转普通图层、调整顺序、改名、合并、拼合、删除隐藏图层。所有函数只改文档，不记录历史（由 `op-ui` 记录）。
+Implements the operations in the Layer menu and the Layers panel that change layer structure: duplicating layers, Layer Via Copy/Cut, converting the background layer to a regular layer, reordering, renaming, merging, flattening, and deleting hidden layers. All functions only change the document and record no history (`op-ui` records it).
 
-## 对外接口与规则
+## Public interface and rules
 
-### 复制
+### Duplicate
 
-- 副本的名字（`copy_name`，Photoshop 2026 实测）：一般是「原名 copy」，已存在时依次为「原名 copy 2」「原名 copy 3」……；原名本身以「 copy」或「 copy N」结尾时不再追加 copy，而是从 2（或 N+1）起找空闲编号：「A copy」→「A copy 2」，「E copy 7」→「E copy 8」；「Gcopy」不算（→「Gcopy copy」）。
-- `duplicate_selected(doc)`：把选中的图层拖到 Layers 面板的「新建图层」按钮上。只选中一个时同 `duplicate`；选中多个时每个（组连同内容）各复制一份，按原来的上下顺序作为一组插在最上面那个选中图层的正上方（父组同它），然后选中所有副本，活动图层的副本为活动图层（Photoshop 2026 实测：选中 A 和 Background copy 拖上去，得到最上面的「A copy」和其下的「Background copy 2」）。
-- `duplicate(doc)`：Layer › Duplicate Layer。在活动图层正上方插入一个完全相同的图层（像素、可见性、不透明度、Fill、混合模式、锁定都相同）并设为活动图层，返回新 ID；没有活动图层时返回 `None`。名称为「原名 copy」，已存在时依次为「原名 copy 2」「原名 copy 3」……，与 Photoshop 一致。背景图层的副本是普通图层。
-- `can_merge_selected(doc)` / `merge_selected(doc)`：Layer › Merge Layers（多选时的 ⌘E）：选中图层中可见的那些合并成一个，放在最上面那个的位置并沿用它的名字（其中有背景图层时合并进背景图层）；结果的不透明度、填充、混合模式复位，蒙版并入像素；隐藏的选中图层保持不动。至少两个选中图层可见时可用。
-- `delete_selected(doc)`：删除所有选中图层；会删光所有图层时拒绝。之后最低被删图层下面的那个（没有时最低的剩余图层）成为活动图层。
-- `toggle_selected_visibility(doc)`：Layer › Hide Layers / Show Layers：隐藏所有选中图层；全部已隐藏时改为全部显示。返回现在是否可见。
-- `can_reverse(doc)` / `reverse_selected(doc)`：Layer › Arrange › Reverse：两个以上同一组里的选中图层（组连同内容）互换位置，顺序反过来；包含背景图层或不在同一组时不可用。
-- `can_merge_group(doc)` / `merge_group(doc)`：当前图层是非空组时的 ⌘E（Merge Group）：组里的图层合并成一个像素图层，占据组的位置并沿用组的 id、名字、可见性、不透明度、填充、蒙版、颜色标签和混合模式（穿透变为 Normal），合并前后画面不变。
-- 图层组：
-  - `can_group(doc)` / `group_selected(doc)`：Layer › Group Layers（⌘G）：选中的图层（连同其中的内容；已在另一个选中组里的不重复算）放进一个新的「Group N」，组放在最上面那个选中图层原来的位置和所在的组里；选中背景图层时不可用。新组被选中。
-  - `ungroup(doc)`：Layer › Ungroup Layers（⇧⌘G）：当前组消失，它的直接子图层进入它原来所在的组，并全部被选中。
-  - `new_group(doc)`：一个空的「Group N」，插入规则同 `Document::insert_above_active`，并被选中。
-  - `can_move_blocks(doc, ids, gap)` / `move_blocks(doc, ids, gap)`：拖动多个选中的行：这些图层（各连同其中的内容，嵌套在其中另一个里的不重复算）按原来的上下顺序一起移到 `gap`，父组规则同 `move_block`。已经相邻的一组移到自己的边上视为没有变化。`move_block` 就是只有一个图层的情况。
-  - `can_move_block(doc, id, gap)` / `move_block(doc, id, gap)`：把图层连同其中的内容移到 `gap`（`layers` 中移动前的位置，介于 `gap - 1` 与 `gap` 之间）。新的父组：`gap` 正上方是一个组、正下方是它里面的图层时，就是这个组（放在组内最上面）；否则与正上方的图层同组；在最上面时不在任何组里。背景图层不能动，不能放到背景下面，组不能放进自己里面。Layers 面板拖动排序用它。
-  - `delete_selected` 删除组时连同组里的内容一起删除（Photoshop「Group and Contents」）。`delete_selected_keep_contents`：「Group Only」，选中的组消失、其中的图层留在组原来的位置（进入组的父组），其它选中图层照常删除。`deleting_groups_with_contents(doc)`：选中图层中第一个非空组的名字，界面据此先询问。
-  - 复制出的图层保留链接编号，即与原图层链接的图层也与副本链接（Photoshop 2026 实测）；复制到其它文档时清除链接。
-  - 复制（Duplicate Layer、⌘J、复制到其它文档）作用于组时，连同组里的所有图层一起复制（`cloned_block`：换成新 id，块内的父子关系随之对应），放在原组正上方（其它文档中按 `Document::insertion_point`）。
-- `duplicate_name(doc)`：Duplicate Layer 对话框「As」的默认值（与 `duplicate` 的命名规则相同）。
-- `duplicate_named(doc, name)`：复制到同一文档，名称为 `name`。
-- `duplicate_into(source, target, name)`：把 `source` 的活动图层复制到另一个文档 `target`：像素位置不变（`with_canvas` 平移 0，超出 `target` 画布的像素保留在画布外），图层蒙版扩展（显示）或裁到新画布，背景图层的副本是普通图层；插在 `target` 活动图层上方并设为活动图层。
-- `duplicate_to_new(source, title, name)`：生成一个与 `source` 同尺寸、同分辨率、标题为 `title` 的新文档，里面只有活动图层的副本 `name`。
-- `via_copy(doc)`：Layer › New › Layer Via Copy（⌘J）。
-  - 没有选区：复制整个图层。背景图层的副本按 `next_layer_name` 命名为「Layer N」，普通图层的副本命名为「原名 copy」（规则同上）。
-  - 有选区：把选区内的像素（规则同 Edit › Copy，见 `clipboard.md`）放到原位置的新图层「Layer N」上；选区保留（与 Paste 不同）。选区内只有透明像素时返回 `ClipError::Empty`。
-  - 新图层沿用来源图层的不透明度、Fill 与混合模式（来源是背景图层时为默认值）。
-- `via_cut(doc, background)`：Layer › New › Layer Via Cut（⇧⌘J）。像 Edit › Cut 一样剪下选区（背景图层上留下 `background` 颜色；隐藏或锁定像素的图层返回错误），再把像素放到原位置的新图层「Layer N」上；选区保留，属性规则同上。没有选区时作用于整个图层，但界面只在有选区时提供这个命令。
+- The name of a copy (`copy_name`, measured in Photoshop 2026): normally "Name copy"; if that exists, "Name copy 2", "Name copy 3", and so on. When the original name itself ends in " copy" or " copy N", no further "copy" is appended; instead the first free number is found starting at 2 (or N+1): "A copy" → "A copy 2", "E copy 7" → "E copy 8"; "Gcopy" does not count (→ "Gcopy copy").
+- `duplicate_selected(doc)`: dragging the selected layers onto the "Create a new layer" button in the Layers panel. With only one selected, same as `duplicate`; with several selected, each one (a group together with its contents) is copied once, and the copies are inserted as a block, in their original top-to-bottom order, directly above the topmost selected layer (in the same parent group as it). Then all copies are selected, and the copy of the active layer becomes the active layer (measured in Photoshop 2026: selecting A and Background copy and dragging them up gives "A copy" on top and "Background copy 2" below it).
+- `duplicate(doc)`: Layer › Duplicate Layer. Inserts an identical layer (same pixels, visibility, opacity, Fill, blend mode, locks) directly above the active layer, makes it the active layer, and returns the new ID; returns `None` when there is no active layer. The name is "Name copy"; if that exists, "Name copy 2", "Name copy 3", and so on, matching Photoshop. A copy of the background layer is a regular layer.
+- `can_merge_selected(doc)` / `merge_selected(doc)`: Layer › Merge Layers (⌘E with multiple layers selected): the visible ones among the selected layers are merged into one, placed at the position of the topmost one and keeping its name (if the background layer is among them, they are merged into the background layer); the result's opacity, fill and blend mode are reset, and masks are merged into the pixels; hidden selected layers stay untouched. Available when at least two selected layers are visible.
+- `delete_selected(doc)`: deletes all selected layers; refuses when it would delete every layer. Afterwards the layer below the lowest deleted layer (or, if there is none, the lowest remaining layer) becomes the active layer.
+- `toggle_selected_visibility(doc)`: Layer › Hide Layers / Show Layers: hides all selected layers; when all are already hidden, shows them all instead. Returns whether they are now visible.
+- `can_reverse(doc)` / `reverse_selected(doc)`: Layer › Arrange › Reverse: two or more selected layers in the same group (a group together with its contents) swap positions so their order is reversed; unavailable when the background layer is included or the layers are not in the same group.
+- `can_merge_group(doc)` / `merge_group(doc)`: ⌘E when the current layer is a non-empty group (Merge Group): the layers in the group are merged into one pixel layer, which takes the group's position and keeps the group's id, name, visibility, opacity, fill, mask, color label and blend mode (Pass Through becomes Normal); the image looks the same before and after the merge.
+- Layer groups:
+  - `can_group(doc)` / `group_selected(doc)`: Layer › Group Layers (⌘G): the selected layers (together with their contents; layers already inside another selected group are not counted twice) are put into a new "Group N", which is placed at the original position of the topmost selected layer and in its group; unavailable when the background layer is selected. The new group is selected.
+  - `ungroup(doc)`: Layer › Ungroup Layers (⇧⌘G): the current group disappears, its direct children move into the group it was in, and all of them are selected.
+  - `new_group(doc)`: an empty "Group N", inserted by the same rules as `Document::insert_above_active`, and selected.
+  - `can_move_blocks(doc, ids, gap)` / `move_blocks(doc, ids, gap)`: dragging several selected rows: these layers (each together with its contents; a layer nested inside another one of them is not counted twice) move together to `gap` in their original top-to-bottom order, with the same parent-group rules as `move_block`. Moving an already adjacent set to its own edge counts as no change. `move_block` is the single-layer case.
+  - `can_move_block(doc, id, gap)` / `move_block(doc, id, gap)`: moves a layer together with its contents to `gap` (a position in `layers` before the move, between `gap - 1` and `gap`). The new parent group: when the layer directly above `gap` is a group and the layer directly below is inside it, that group (placed at the top of the group); otherwise the same group as the layer directly above; at the very top, no group. The background layer cannot move, nothing can be placed below the background, and a group cannot be put inside itself. Drag-reordering in the Layers panel uses this.
+  - `delete_selected` deletes a group together with its contents (Photoshop "Group and Contents"). `delete_selected_keep_contents`: "Group Only": the selected groups disappear and their layers stay at the group's original position (moving into the group's parent group); other selected layers are deleted as usual. `deleting_groups_with_contents(doc)`: the name of the first non-empty group among the selected layers; the UI uses it to ask first.
+  - Duplicated layers keep their link number, i.e. layers linked to the original are also linked to the copy (measured in Photoshop 2026); links are cleared when duplicating into another document.
+  - Duplicating (Duplicate Layer, ⌘J, duplicating into another document) a group copies all the layers in the group with it (`cloned_block`: new ids, with parent-child relations inside the block remapped accordingly), placed directly above the original group (in another document, at `Document::insertion_point`).
+- `duplicate_name(doc)`: the default value of "As" in the Duplicate Layer dialog (same naming rules as `duplicate`).
+- `duplicate_named(doc, name)`: duplicates within the same document with the name `name`.
+- `duplicate_into(source, target, name)`: duplicates the active layer of `source` into another document `target`: pixel positions stay the same (`with_canvas` with an offset of 0; pixels outside the `target` canvas are kept outside the canvas), the layer mask is extended (reveal) or cropped to the new canvas, and a copy of the background layer is a regular layer; it is inserted above the active layer of `target` and made the active layer.
+- `duplicate_to_new(source, title, name)`: creates a new document with the same size and resolution as `source` and the title `title`, containing only the copy `name` of the active layer.
+- `via_copy(doc)`: Layer › New › Layer Via Copy (⌘J).
+  - No selection: copies the whole layer. A copy of the background layer is named "Layer N" by `next_layer_name`; a copy of a regular layer is named "Name copy" (same rules as above).
+  - With a selection: puts the pixels inside the selection (same rules as Edit › Copy, see `clipboard.md`) onto a new layer "Layer N" at the original position; the selection is kept (unlike Paste). Returns `ClipError::Empty` when the selection contains only transparent pixels.
+  - The new layer takes the source layer's opacity, Fill and blend mode (defaults when the source is the background layer).
+- `via_cut(doc, background)`: Layer › New › Layer Via Cut (⇧⌘J). Cuts the selection like Edit › Cut (leaving the `background` color on the background layer; returns an error for hidden layers or layers with locked pixels), then puts the pixels onto a new layer "Layer N" at the original position; the selection is kept, and attribute rules are as above. With no selection it acts on the whole layer, but the UI only offers this command when there is a selection.
 
-### 背景图层
+### Background layer
 
-- `layer_from_background(doc)`：把背景图层改为普通图层「Layer 0」，并解除全部锁定，之后可以有透明像素、可以移动和调整顺序。没有背景图层时返回 `false`。
+- `layer_from_background(doc)`: turns the background layer into a regular layer "Layer 0" and removes all locks; afterwards it can have transparent pixels and can be moved and reordered. Returns `false` when there is no background layer.
 
-### 顺序
+### Order
 
-- 图层列表自底向上，背景图层只能在最底层。
-- 锁定（背景图层不参与，只选中背景时三个函数都什么也不做）：
-  - `selected_locks(doc)`：Lock Layers 对话框的初始状态。每一项只有在所有选中的图层都开启时才算开启；只选中背景（或没有选中）时为 `None`，此时 Layer › Lock Layers... 不可用。
-  - `set_selected_locks(doc, locks)`：把五个锁定标志设到每个选中的图层上，返回是否有变化。
-  - `toggle_lock_all(doc)`：⌘/。选中的图层并非全部「全部锁定」时，给它们打开 `lock_all`（单项保持原样）；全部都已「全部锁定」时，清除所有锁定（包括单项，与面板按钮不同）。返回现在是否锁定；只选中背景时为 `None`。以上都在 Photoshop 2026 中实测。
-- `arrange_target(doc, arrange)` / `arrange(doc, arrange)`：Layer › Arrange 四项只在当前图层所在的组里（同级图层之间）移动，组连同其中的内容一起移动（用 `move_block`），所以置顶是到组内最上面而不是整个文档最上面；背景图层不动，也不会有图层越过它。
-- `arrange(doc, arrange)`：执行上述移动，返回是否移动。
+- The layer list runs bottom to top; the background layer can only be at the very bottom.
+- Locks (the background layer does not take part; when only the background is selected, all three functions do nothing):
+  - `selected_locks(doc)`: the initial state of the Lock Layers dialog. Each item counts as on only if it is on for every selected layer; `None` when only the background is selected (or nothing is selected), in which case Layer › Lock Layers... is unavailable.
+  - `set_selected_locks(doc, locks)`: sets the five lock flags on every selected layer and returns whether anything changed.
+  - `toggle_lock_all(doc)`: ⌘/. When not all selected layers are "lock all", turns on `lock_all` for them (individual locks stay as they are); when all of them are already "lock all", clears all locks (including the individual ones, unlike the panel button). Returns whether they are now locked; `None` when only the background is selected. All of the above was measured in Photoshop 2026.
+- `arrange_target(doc, arrange)` / `arrange(doc, arrange)`: the four Layer › Arrange items only move within the group the current layer is in (among sibling layers), and a group moves together with its contents (via `move_block`), so Bring to Front goes to the top of the group, not to the top of the whole document; the background layer does not move, and no layer passes it.
+- `arrange(doc, arrange)`: performs the move above and returns whether anything moved.
 
-### 改名
+### Rename
 
-- `rename(doc, id, name)`：去掉首尾空白后改名。名字为空或与原名相同时返回 `false`。
+- `rename(doc, id, name)`: renames after trimming leading and trailing whitespace. Returns `false` when the name is empty or the same as the old one.
 
-### 合并
+### Merge
 
-合并（Merge Down、Merge Layers、Merge Group、Merge Visible）连同画布外的像素一起合并并保留在结果里（Photoshop 2026 实测）：在扩大到覆盖所有像素的临时画布上合成，再放回原位。结果落在背景图层上时只保留画布内的部分。
+Merging (Merge Down, Merge Layers, Merge Group, Merge Visible) includes pixels outside the canvas and keeps them in the result (measured in Photoshop 2026): compositing happens on a temporary canvas enlarged to cover all pixels, and the result is put back in place. When the result lands on the background layer, only the part inside the canvas is kept.
 
-- `can_merge_down(doc)`：活动图层不是最底层，且它和下面一层都可见。
-- `merge_down(doc)`：Layer › Merge Down（⌘E）。把活动图层按它的混合模式、不透明度和 Fill 合成到下面一层的像素上（下面一层的像素按 Normal、100% 参与合成），结果保留下面一层的名字和属性，活动图层被删除，下面一层成为活动图层。
-- `can_merge_visible(doc)`：可见图层多于一个。
-- `merge_visible(doc)`：Layer › Merge Visible（⇧⌘E）。把所有可见图层合成为一个图层：可见的背景图层存在时合并到背景图层，否则合并到活动图层（活动图层隐藏时为最上面的可见图层）。结果的混合模式重置为 Normal、不透明度和 Fill 为 100%（这些已经体现在合成结果里），成为活动图层；隐藏图层保持不变。
-- `flatten(doc)`：Layer › Flatten Image。把可见图层合成后铺在白色上，得到唯一的不透明「Background」背景图层；隐藏图层被丢弃。
-- `delete_hidden(doc)`：Layer › Delete › Hidden Layers。删除所有隐藏图层；没有隐藏图层或所有图层都隐藏时返回 `false` 且不改动。活动图层被删除时，最上面的图层成为活动图层。
+- `can_merge_down(doc)`: the active layer is not the bottom layer, and both it and the layer below are visible.
+- `merge_down(doc)`: Layer › Merge Down (⌘E). Composites the active layer onto the pixels of the layer below using its blend mode, opacity and Fill (the lower layer's pixels take part as Normal, 100%); the result keeps the lower layer's name and attributes, the active layer is deleted, and the lower layer becomes the active layer.
+- `can_merge_visible(doc)`: more than one visible layer.
+- `merge_visible(doc)`: Layer › Merge Visible (⇧⌘E). Composites all visible layers into one layer: into the background layer when a visible background layer exists, otherwise into the active layer (the topmost visible layer when the active layer is hidden). The result's blend mode is reset to Normal and its opacity and Fill to 100% (these are already reflected in the composite), and it becomes the active layer; hidden layers stay unchanged.
+- `flatten(doc)`: Layer › Flatten Image. Composites the visible layers over white, giving a single opaque "Background" background layer; hidden layers are discarded.
+- `delete_hidden(doc)`: Layer › Delete › Hidden Layers. Deletes all hidden layers; returns `false` and changes nothing when there are no hidden layers or all layers are hidden. When the active layer is deleted, the topmost layer becomes the active layer.
 
-合并都通过 `Document::composite_layers_rgba8` 计算，规则与文档合成一致（见 `document.md`）。
+All merges are computed via `Document::composite_layers_rgba8`, with the same rules as document compositing (see `document.md`).
 
-### 图层蒙版
+### Layer masks
 
-- `NewMask`：`RevealAll`、`HideAll`、`RevealSelection`、`HideSelection`（Layer › Layer Mask 的前四项）。
-- `can_add_mask(doc)`：当前图层存在、不是背景图层、还没有蒙版。
-- `add_mask(doc, kind)`：给当前图层加蒙版——全白、全黑、选区（选择程度即蒙版值）或反选区；选区类需要有选区（选区保留）。之后编辑目标切换到蒙版（`mask_target = true`），与 Photoshop 一致。
-- `delete_mask(doc)`：删除蒙版而不应用，编辑目标回到像素。
-- `apply_mask(doc)`：启用的蒙版乘进图层的 alpha（四舍五入），然后删除蒙版；停用的蒙版直接删除。编辑目标回到像素。
-- `toggle_mask(doc)`：停用/启用，返回新状态；没有蒙版时为 `None`。
-- 合并：Merge Down 与 Merge Visible 的结果已经包含了各图层蒙版的效果，结果图层不再带蒙版；复制图层时蒙版随之复制。
+- `NewMask`: `RevealAll`, `HideAll`, `RevealSelection`, `HideSelection` (the first four items of Layer › Layer Mask).
+- `can_add_mask(doc)`: the current layer exists, is not the background layer, and has no mask yet.
+- `add_mask(doc, kind)`: adds a mask to the current layer: all white, all black, the selection (the selection degree is the mask value) or the inverted selection; the selection kinds require a selection (the selection is kept). Afterwards the editing target switches to the mask (`mask_target = true`), matching Photoshop.
+- `delete_mask(doc)`: deletes the mask without applying it; the editing target returns to the pixels.
+- `apply_mask(doc)`: an enabled mask is multiplied into the layer's alpha (rounded), then the mask is deleted; a disabled mask is simply deleted. The editing target returns to the pixels.
+- `toggle_mask(doc)`: disables/enables and returns the new state; `None` when there is no mask.
+- Merging: the results of Merge Down and Merge Visible already include the effect of each layer's mask, and the resulting layer has no mask; duplicating a layer duplicates its mask too.
 
-## 已知限制
+## Known limitations
 
-- 合并下面一层带非 Normal 混合模式或不透明度时，Photoshop 的结果与这里的近似（先按 Normal 100% 合成，再沿用下面一层的属性）可能不同。
-- 没有图层组、多选，Merge Layers 只有 Merge Down 一种。
-- 图层与画布同样大，合并结果也与画布同样大。
+- When the lower layer in a merge has a non-Normal blend mode or opacity, Photoshop's result may differ from the approximation here (composite as Normal 100% first, then keep the lower layer's attributes).
+- No layer groups or multi-selection; the only Merge Layers variant is Merge Down.
+- Layers are the same size as the canvas, and so are merge results.
 
-## 测试覆盖
+## Test coverage
 
-- `arranging_stays_within_the_group_and_reverse`：组内置顶只到组内最上面；组后移时带着内容越过下面的图层；顶层图层前移；Reverse 把组和两个图层的顺序反过来且组的内容不变。
-- `merging_a_group`：合并组后只剩一个同 id、同名的像素图层，画面与合并前完全相同。
-- `deleting_only_the_group_keeps_its_layers`、`duplicating_a_group_copies_its_layers`：只删组时图层留下并移出组；复制组得到「Group 1 copy」及其中图层的副本，复制到其它文档同样带上组里的图层。
-- `grouping_ungrouping_and_moving_blocks`：⌘G 把不相邻的两层放进新组（位置、父子关系、选中）；组展开时新图层插在组内最上面；把组外的图层移到组内最上面；组不能移到自身里或背景下面；取消编组后结构复原并选中原子图层；删除组连同内容。
-- `selected_layers_merge_delete_and_hide`：两个图层合并成上面那个，名字和位置正确、不透明像素叠加，未选的图层不动；隐藏/显示选中图层；删除选中图层后活动图层正确，最后一个图层不能删。
-- `duplicate_layer_dialog_targets`：默认名「Background copy」；同文档改名复制；复制到更小的文档时位置不变、超出部分保留在画布外并成为活动图层；复制到新文档时尺寸、标题和唯一图层正确。
-- `duplicates_are_named_like_photoshop`：「copy」「copy 2」命名；⌘J 作用于背景图层得到「Layer 2」这样的普通图层。
-- `via_copy_and_cut_move_the_selection_in_place`：选区复制到「Layer N」并沿用不透明度、保留选区；剪切后原图层对应像素变透明。
-- `arrange_keeps_the_background_at_the_bottom`：Send to Back 停在背景之上，背景不能上移。
-- `dragging_and_renaming`（拖动用 `move_block`）：`move_layer` 的允许与拒绝情况；改名去空白、拒绝空名和同名。
-- `masks_hide_reveal_and_apply`：背景图层不能加蒙版；Hide All 隐藏图层，停用后显示；在蒙版上填白重新显示、图层像素不变；应用 50% 灰的蒙版后 alpha 为 128；从选区建 Hide Selection 蒙版；删除蒙版。
-- `merge_down_keeps_the_lower_layer`：50% 红色合并到白色背景得到 `[255, 128, 128, 255]`，结果仍是背景图层。
-- `merge_visible_leaves_hidden_layers`：隐藏图层保留，可见图层合并到背景图层。
-- `flatten_fills_transparency_with_white`：隐藏图层被丢弃，透明处变白。
-- `delete_hidden_keeps_visible_layers`：删除隐藏图层并修正活动图层。
-- `lock_layers_sets_every_selected_layer_but_the_background`：只选背景时无可锁定的图层；对话框的勾选是所有选中图层的交集；设置作用于选中的非背景图层；重复设置无变化。
-- `lock_all_is_a_flag_of_its_own`：⌘/ 打开「全部锁定」但不改单项，使像素与透明受保护；再按一次清除所有锁定。
-- `copies_of_copies_count_on`：副本的副本按 Photoshop 的编号规则命名。
-- `duplicating_several_layers_puts_the_copies_on_top`：多选复制的位置、名字、选中状态与 Photoshop 一致；单选时副本在原图层正上方。
-- `moving_several_blocks_together`：两个不相邻的图层一起移到最上面、移到背景正上方；原地移动、移到背景下面、移动背景都不允许。
-- `a_locked_group_locks_its_layers`：组锁定位置时组内图层不能移动但能绘画；组 Lock all 时组内图层不能绘画、移动或删除（`delete_selected` 拒绝删除锁定组内的图层）。
+- `arranging_stays_within_the_group_and_reverse`: Bring to Front inside a group only goes to the top of the group; moving a group backward carries its contents past the layer below; a top-level layer moves forward; Reverse reverses the order of a group and two layers while the group's contents stay unchanged.
+- `merging_a_group`: after merging a group only one pixel layer with the same id and name remains, and the image is identical to before the merge.
+- `deleting_only_the_group_keeps_its_layers`, `duplicating_a_group_copies_its_layers`: deleting only the group keeps its layers and moves them out of the group; duplicating a group gives "Group 1 copy" and copies of its layers, and duplicating into another document also brings the group's layers.
+- `grouping_ungrouping_and_moving_blocks`: ⌘G puts two non-adjacent layers into a new group (position, parent-child relations, selection); when the group is expanded a new layer is inserted at the top of the group; a layer outside the group moves to the top inside the group; a group cannot move into itself or below the background; after ungrouping the structure is restored and the former children are selected; deleting a group deletes its contents.
+- `selected_layers_merge_delete_and_hide`: two layers merge into the upper one with the correct name and position and the opaque pixels stacked, unselected layers stay put; hiding/showing selected layers; after deleting selected layers the active layer is correct, and the last layer cannot be deleted.
+- `duplicate_layer_dialog_targets`: default name "Background copy"; duplicating with a new name within the same document; duplicating into a smaller document keeps the position, keeps the overflow outside the canvas, and becomes the active layer; duplicating into a new document gives the correct size, title and single layer.
+- `duplicates_are_named_like_photoshop`: "copy", "copy 2" naming; ⌘J on the background layer gives a regular layer like "Layer 2".
+- `via_copy_and_cut_move_the_selection_in_place`: the selection is copied to "Layer N", taking the opacity and keeping the selection; after cutting, the corresponding pixels of the original layer become transparent.
+- `arrange_keeps_the_background_at_the_bottom`: Send to Back stops above the background, and the background cannot move up.
+- `dragging_and_renaming` (dragging uses `move_block`): allowed and refused cases of `move_layer`; renaming trims whitespace and rejects empty and unchanged names.
+- `masks_hide_reveal_and_apply`: the background layer cannot have a mask; Hide All hides the layer, which shows again when the mask is disabled; filling white on the mask reveals it again with the layer pixels unchanged; applying a 50% gray mask gives alpha 128; creating a Hide Selection mask from a selection; deleting a mask.
+- `merge_down_keeps_the_lower_layer`: 50% red merged onto a white background gives `[255, 128, 128, 255]`, and the result is still the background layer.
+- `merge_visible_leaves_hidden_layers`: hidden layers are kept, and visible layers are merged into the background layer.
+- `flatten_fills_transparency_with_white`: hidden layers are discarded, and transparent areas become white.
+- `delete_hidden_keeps_visible_layers`: deletes hidden layers and fixes up the active layer.
+- `lock_layers_sets_every_selected_layer_but_the_background`: with only the background selected there are no lockable layers; the dialog's checkboxes are the intersection of all selected layers; the setting applies to the selected non-background layers; setting it again makes no change.
+- `lock_all_is_a_flag_of_its_own`: ⌘/ turns on "lock all" without changing the individual locks, protecting pixels and transparency; pressing it again clears all locks.
+- `copies_of_copies_count_on`: copies of copies are named by Photoshop's numbering rules.
+- `duplicating_several_layers_puts_the_copies_on_top`: position, names and selection state of a multi-selection duplicate match Photoshop; with a single selection the copy is directly above the original layer.
+- `moving_several_blocks_together`: two non-adjacent layers move together to the top and to directly above the background; moving in place, moving below the background and moving the background are not allowed.
+- `a_locked_group_locks_its_layers`: when a group locks position, layers inside it cannot move but can be painted; when a group is Lock all, layers inside it cannot be painted, moved or deleted (`delete_selected` refuses to delete layers inside a locked group).

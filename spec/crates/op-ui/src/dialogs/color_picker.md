@@ -1,85 +1,85 @@
-# dialogs/color_picker.rs：Color Picker 对话框
+# dialogs/color_picker.rs: Color Picker dialog
 
-## 组件职责
+## Component responsibilities
 
-Photoshop 的 Color Picker（拾色器）。选择一个颜色并返回给打开它的地方：前景色、背景色，或 Canvas Size 的画布扩展颜色。
+Photoshop's Color Picker. Picks a color and returns it to whatever opened it: the foreground color, the background color, or Canvas Size's canvas extension color.
 
-## 打开方式与标题
+## How it opens and its title
 
-| 入口 | 标题 | 确定后写入 |
+| Entry point | Title | Written on OK to |
 |---|---|---|
-| 工具栏的前景色色块 | Color Picker (Foreground Color) | 前景色 |
-| 工具栏的背景色色块 | Color Picker (Background Color) | 背景色 |
-| Color 面板中再次点击当前正在编辑的色块 | 同上，按前景/背景区分 | 同上 |
-| Canvas Size 里选择「Other...」或点击扩展色色块 | Color Picker | Canvas Size 的扩展颜色（同时切换为 Other...） |
+| The foreground color swatch in the toolbar | Color Picker (Foreground Color) | Foreground color |
+| The background color swatch in the toolbar | Color Picker (Background Color) | Background color |
+| Clicking the swatch currently being edited again in the Color panel | Same as above, distinguished by foreground/background | Same as above |
+| Choosing "Other..." in Canvas Size or clicking the extension color swatch | Color Picker | Canvas Size's extension color (which also switches to Other...) |
 
-打开时「current」和「new」都是打开前的颜色。Color Picker 可以叠在 Canvas Size 之上，这时键盘只作用于 Color Picker。
+When it opens, both "current" and "new" are the color from before it opened. The Color Picker can stack on top of Canvas Size, in which case the keyboard acts only on the Color Picker.
 
-## 布局
+## Layout
 
-所有尺寸都是在 Photoshop 2026 里按 1:1 量取的点数（pt），相对于对话框左上角（含标题栏）：
+All sizes are points (pt) measured 1:1 in Photoshop 2026, relative to the dialog's top-left corner (including the title bar):
 
-- 对话框 534×374，标题栏高 28（与其它对话框相同的浅灰标题栏）。
-- **颜色区域**：(10, 60) 起，256×256。显示滑条所控制通道之外的另外两个通道。
-- **滑条**：x 278–298，y 60–316。两侧各有一个白色小三角指示当前值，两个都朝右（与 Photoshop 一致）。
-- **new / current 色块**：x 310–370，y 77–145，上半为新颜色，下半为打开时的颜色；上方「new」、下方「current」字样。
-- **网页安全色警告**：颜色不是网页安全色时，色块右侧显示立方体图标，下面是一个 12 见方的最接近网页安全色的小色块。
-- **按钮**：x 408，115×25 的胶囊按钮，依次为 OK（y 39）、Cancel（y 73）、Add to Swatches（y 116）、Color Libraries（y 158）。
-- **数值区**（行中心 y）：
-  - 左列：H 209、S 232、B 255、R 281.5、G 304.5、B 327.5。单选按钮中心 x 316，字母 x 330，输入框 x 355、宽 35；H 后有「°」，S、B 后有「%」。
-  - 右列：L 209、a 232、b 255。单选按钮中心 x 429，字母 x 442，输入框 x 466、宽 43。
-  - CMYK：C 281.5、M 304.5、Y 327.5、K 351。字母右对齐到 x 462，输入框 x 466、宽 34，后面是「%」。
-  - 十六进制：「#」中心 x 314，输入框 x 322、宽 83，行中心 y 354。
-  - 输入框高 20，底色 `#484848`、边框 `#666666`，获得焦点时有蓝色外框 `#1473e6`。打开时十六进制输入框获得焦点并全选，与 Photoshop 一致（可以直接输入颜色值后按 Enter）。
-- **Only Web Colors**：复选框 (10, 330)，13 见方，文字从 x 32 开始。
-- Photoshop 的 Color Picker 是经典 AppKit 对话框：文字为 12 pt 系统字体（`theme::dialog`），按钮文字 13 pt，标题为 13 pt 系统粗体（`theme::dialog_bold`）。
+- Dialog 534×374, title bar 28 tall (the same light gray title bar as other dialogs).
+- **Color field**: from (10, 60), 256×256. Shows the two channels other than the one the slider controls.
+- **Slider**: x 278–298, y 60–316. Each side has a small white triangle indicating the current value, both pointing right (matching Photoshop).
+- **new / current swatches**: x 310–370, y 77–145; the top half is the new color and the bottom half the color at open; the words "new" above and "current" below.
+- **Web-safe color warning**: when the color is not web-safe, a cube icon appears to the right of the swatches, with a 12-square swatch of the nearest web-safe color below it.
+- **Buttons**: at x 408, 115×25 capsule buttons, in order OK (y 39), Cancel (y 73), Add to Swatches (y 116), Color Libraries (y 158).
+- **Value area** (row center y):
+  - Left column: H 209, S 232, B 255, R 281.5, G 304.5, B 327.5. Radio button center x 316, letter x 330, input field x 355, width 35; H is followed by "°", S and B by "%".
+  - Right column: L 209, a 232, b 255. Radio button center x 429, letter x 442, input field x 466, width 43.
+  - CMYK: C 281.5, M 304.5, Y 327.5, K 351. Letters right-aligned to x 462, input field x 466, width 34, followed by "%".
+  - Hexadecimal: "#" centered at x 314, input field x 322, width 83, row center y 354.
+  - Input fields are 20 tall with a `#484848` background and `#666666` border, and a blue outer ring `#1473e6` when focused. When opened, the hexadecimal field gets focus with its contents selected, as in Photoshop (you can type a color value directly and press Enter).
+- **Only Web Colors**: checkbox (10, 330), 13 square, text starting at x 32.
+- Photoshop's Color Picker is a classic AppKit dialog: text is the 12 pt system font (`theme::dialog`), button text 13 pt, and the title the 13 pt bold system font (`theme::dialog_bold`).
 
-## 模式（单选按钮）
+## Modes (radio buttons)
 
-九个单选按钮决定滑条控制哪个通道，颜色区域显示另外两个通道（与 Photoshop 的排列一致）：
+Nine radio buttons decide which channel the slider controls; the color field shows the other two channels (in the same arrangement as Photoshop):
 
-| 滑条 | 颜色区域横轴 | 颜色区域纵轴 |
+| Slider | Color field horizontal axis | Color field vertical axis |
 |---|---|---|
 | H | S | B |
 | S | H | B |
 | B | H | S |
 | R | B | G |
 | G | B | R |
-| B（蓝） | R | G |
+| B (blue) | R | G |
 | L | a | b |
 | a | b | L |
 | b | a | L |
 
-- 所有轴都是上方/右方为最大值。默认模式为 H。
-- H 模式下滑条显示纯色相（饱和度和亮度都为最大），与当前颜色无关；其它模式下滑条显示当前颜色只改变该通道时的渐变。
-- 颜色区域上有一个空心圆环标记当前颜色；颜色较亮（L > 60）时圆环为黑色，否则为白色。圆环裁在颜色区域内，与 Photoshop 一样：在角上（如白色时的左上角）只露出四分之一。
-- 颜色区域与滑条按当前模式和颜色在 CPU 上逐像素生成 256 级的图像，只在模式、颜色或「Only Web Colors」变化时重新生成。
+- On every axis the top/right is the maximum. The default mode is H.
+- In H mode the slider shows pure hues (maximum saturation and brightness), independent of the current color; in the other modes the slider shows the gradient of the current color with only that channel changing.
+- A hollow ring marks the current color in the color field; the ring is black when the color is light (L > 60), otherwise white. The ring is clipped to the color field, as in Photoshop: in a corner (such as the top-left for white) only a quarter of it shows.
+- The color field and slider are generated on the CPU pixel by pixel as 256-level images from the current mode and color, and are regenerated only when the mode, the color or "Only Web Colors" changes.
 
-## 数值
+## Values
 
-- 显示范围：H 0–360，S/B 0–100，R/G/B 0–255，L 0–100，a/b −128–127，CMYK 0–100，全部显示为整数。十六进制为 6 位小写。
-- Lab 为 D50 白点（sRGB 经 Bradford 色适应），与 Photoshop 显示的数值一致（例如 #00afdc 为 L66 a−27 b−34）。
-- 颜色内部以 HSB 保存，所以把亮度调到 0（黑色）或饱和度调到 0（灰色）时，色相和饱和度不会丢失，调回来后仍是原来的色相。
+- Display ranges: H 0–360, S/B 0–100, R/G/B 0–255, L 0–100, a/b −128–127, CMYK 0–100, all displayed as integers. Hexadecimal is 6 lowercase digits.
+- Lab uses the D50 white point (sRGB via Bradford chromatic adaptation), matching the values Photoshop displays (e.g. #00afdc is L66 a−27 b−34).
+- The color is stored internally as HSB, so when brightness is dragged to 0 (black) or saturation to 0 (gray), hue and saturation are not lost, and dragging back gives the original hue.
 
-## 交互
+## Interaction
 
-- 在颜色区域按下或拖动：设置区域的两个通道；在滑条（左右各放宽 10、上下各放宽 4 的范围）按下或拖动：设置滑条通道。
-- 点击单选按钮或它后面的字母：切换模式。
-- 输入框：输入时实时生效，超出范围的值被截断到范围内；无法解析或不完整的输入（例如十六进制只输了两位）不改变颜色，继续保留已输入的文字。输入框失去焦点后恢复显示规范化的数值。
-- 点击「current」色块：恢复为打开时的颜色。
-- 点击立方体图标或其下方的小色块：换成最接近的网页安全色。
-- Only Web Colors：勾选后当前颜色立即换成最接近的网页安全色，之后的所有选择都会对齐到网页安全色，颜色区域和滑条也只显示网页安全色。
-- Add to Swatches：把当前颜色追加到 Swatches 面板末尾，对话框保持打开。
-- OK 或 Enter：确定，把颜色写回打开它的地方。
-- Cancel 或 Esc：关闭，不做任何修改。从 Canvas Size 的「Other...」打开时，取消后扩展颜色保持原来的选择。
+- Pressing or dragging in the color field sets the field's two channels; pressing or dragging on the slider (in an area widened by 10 on the left and right and 4 on the top and bottom) sets the slider's channel.
+- Clicking a radio button or the letter after it switches the mode.
+- Input fields: input takes effect live, and out-of-range values are clamped to the range; input that cannot be parsed or is incomplete (e.g. only two hex digits typed) does not change the color, and the typed text is kept. After an input field loses focus, it goes back to displaying the normalized value.
+- Clicking the "current" swatch restores the color from when the dialog opened.
+- Clicking the cube icon or the small swatch below it switches to the nearest web-safe color.
+- Only Web Colors: when checked, the current color immediately becomes the nearest web-safe color, every later choice snaps to web-safe colors, and the color field and slider also show only web-safe colors.
+- Add to Swatches: appends the current color to the end of the Swatches panel; the dialog stays open.
+- OK or Enter: confirms and writes the color back to whatever opened the dialog.
+- Cancel or Esc: closes without changing anything. When opened from Canvas Size's "Other...", canceling keeps the previous choice for the extension color.
 
-## 与 Photoshop 的差异与已知限制
+## Differences from Photoshop and known limitations
 
-- CMYK 数值使用与设备无关的公式（K = 1 − max(R,G,B)），而 Photoshop 通过当前 CMYK 工作空间（默认 U.S. Web Coated SWOP）的 ICC 配置文件换算，所以数值不同（#00afdc 在 Photoshop 中为 C72 M10 Y6 K0，这里为 C100 M20 Y0 K14）。没有 CMYK 色域外警告图标。
-- Add to Swatches 直接添加，没有 Photoshop 的「Color Swatch Name」命名对话框。
-- Color Libraries 按钮置灰。
-- 对话框打开期间，鼠标移到文档上不会变成吸管取色。
-- 颜色没有经过显示器色彩管理，同一个颜色值看起来比 Photoshop（会按显示器配置文件转换）更饱和。
-- 按钮文字没有加 macOS 的字距，比 Photoshop 略宽（如「Add to Swatches」）。
-- Color Libraries 按钮不可用（没有颜色库）。
-- 对话框不能拖动，位置固定在窗口中央。
+- CMYK values use a device-independent formula (K = 1 − max(R,G,B)), whereas Photoshop converts through the ICC profile of the current CMYK working space (U.S. Web Coated SWOP by default), so the values differ (#00afdc is C72 M10 Y6 K0 in Photoshop and C100 M20 Y0 K14 here). There is no CMYK out-of-gamut warning icon.
+- Add to Swatches adds directly, without Photoshop's "Color Swatch Name" naming dialog.
+- The Color Libraries button is grayed out.
+- While the dialog is open, moving the mouse over the document does not turn it into an eyedropper for sampling colors.
+- Colors are not display color-managed, so the same color value looks more saturated than in Photoshop (which converts according to the display profile).
+- Button text does not use macOS letter spacing and is slightly wider than in Photoshop (e.g. "Add to Swatches").
+- The Color Libraries button is unavailable (there are no color libraries).
+- The dialog cannot be dragged; its position is fixed in the center of the window.

@@ -1,43 +1,43 @@
-# panels/history.rs：History 弹出面板
+# panels/history.rs: History flyout panel
 
-## 组件职责
+## Component responsibilities
 
-显示并操作当前文档的历史记录，对应 Photoshop 的 History 面板。它从图标列的 History 按钮弹出（Photoshop 默认工作区里 History 就是收起在图标列中的），定位与收起规则见 `../lib.md`。
+Displays and operates on the current document's history, corresponding to Photoshop's History panel. It flies out from the History button in the icon column (in Photoshop's default workspace, History is collapsed into the icon column); see `../lib.md` for positioning and collapse rules.
 
-## 尺寸与视觉
+## Size and visuals
 
-所有尺寸都是在 Photoshop 2026 里按 1:1 量取的点数（pt）：
+All sizes are points (pt) measured 1:1 in Photoshop 2026:
 
-- 面板宽 235，默认高 155，最小高 100，外围 1 像素深色边框 `#333333`，带阴影。
-- **标签栏**：高 28，底色 `#424242`。「History」「Comments」两个标签，左右各留 9.5 的内边距，字号 12 半粗体。激活标签底色 `#535353`、文字 `#eaeaea`；未激活标签文字 `#a8a8a8`，右侧有分隔线。右侧依次为折叠按钮「>>」（距右边 33）、竖分隔线（距右边 21）、面板菜单（距右边 9，只有外观）。
-- **快照行**：高 42。最左是历史画笔源标记（画笔图标，距左 11）；缩略图 30 见方（距左 24），是文档刚打开或新建时的样子，透明处为棋盘格；文档名距左 58，过长时以省略号截断。行下方有一条 2 pt 的深色分隔线。
-- **状态行**：高 22，行底有 `#474747` 分隔线。从左到右是历史画笔源复选框（距左 6、11 见方）、操作图标（中心距左 39，14 pt）、操作名称（距左 57，字号 12）。
-  - 当前状态行底色 `#6b6b6b`。
-  - 当前状态之后的状态（已被撤销）图标和文字为 `#868686`。
-  - 悬停的行底色变浅。
-- **滚动条**：内容超出时出现，12 宽的轨道 `#4a4a4a`，里面是 7 宽的圆角滑块 `#6e6e6e`。有新状态时列表自动滚到底部。
-- **底部按钮栏**：高 23，从右往左依次是删除（距右 36）、快照（距右 65）、从当前状态新建文档（距右 98），图标 13 pt。
-- **调整高度的手柄**：最底部 5 pt 高的条，底色 `#454545`，中间有一排短竖线。
+- Panel width 235, default height 155, minimum height 100, with a 1-pixel dark outer border `#333333` and a drop shadow.
+- **Tab bar**: height 28, background `#424242`. Two tabs, "History" and "Comments", each with 9.5 padding on left and right, font size 12 semibold. Active tab background `#535353`, text `#eaeaea`; inactive tab text `#a8a8a8`, with a divider on its right. On the right, in order: the collapse button ">>" (33 from the right edge), a vertical divider (21 from the right edge), and the panel menu (9 from the right edge, appearance only).
+- **Snapshot row**: height 42. At far left is the history brush source marker (a brush icon, 11 from the left); the thumbnail is 30 square (24 from the left) and shows the document as it was when just opened or created, with a checkerboard where transparent; the document name is 58 from the left and truncated with an ellipsis when too long. Below the row is a 2 pt dark divider.
+- **State row**: height 22, with a `#474747` divider at the bottom of the row. From left to right: the history brush source checkbox (6 from the left, 11 square), the operation icon (center 39 from the left, 14 pt), and the operation name (57 from the left, font size 12).
+  - The current state row has background `#6b6b6b`.
+  - States after the current state (undone) have icon and text `#868686`.
+  - A hovered row has a lighter background.
+- **Scrollbar**: appears when the content overflows; a 12-wide track `#4a4a4a` holding a 7-wide rounded thumb `#6e6e6e`. When a new state is added, the list scrolls to the bottom automatically.
+- **Bottom button bar**: height 23; from right to left: Delete (36 from the right), Snapshot (65 from the right), New Document from Current State (98 from the right), icons 13 pt.
+- **Height resize handle**: a 5 pt tall bar at the very bottom, background `#454545`, with a row of short vertical lines in the middle.
 
-## 交互
+## Interaction
 
-- 点击「History」「Comments」标签切换内容。Comments 页目前只显示占位文字。
-- 点击「>>」：收起面板。
-- 点击快照行：回到第一个状态（打开或新建时的样子）。
-- 点击状态行：跳到该状态，之后的状态变为已撤销（变暗），在新的操作发生前都可以再点回来。
-- 删除按钮：删除当前状态及其后的所有状态，并回到前一个状态。当前是第一个状态时不可用。
-- 快照、从当前状态新建文档两个按钮：置灰，悬停有提示。
-- 拖动底部手柄：改变面板高度，光标为上下箭头。高度在本次运行期间保留。
-- 面板宽度固定。
+- Clicking the "History" or "Comments" tab switches content. The Comments page currently shows only placeholder text.
+- Clicking ">>": collapses the panel.
+- Clicking the snapshot row: returns to the first state (the document as it was when opened or created).
+- Clicking a state row: jumps to that state; later states become undone (dimmed) and can be clicked back to until a new operation occurs.
+- Delete button: deletes the current state and all states after it, and returns to the previous state. Unavailable when the current state is the first state.
+- Snapshot and New Document from Current State buttons: grayed out, with a tooltip on hover.
+- Dragging the bottom handle: changes the panel height; the cursor is an up-down arrow. The height is kept for the rest of the current run.
+- The panel width is fixed.
 
-## 与其它部分的关系
+## Relationship to other parts
 
-- 状态数据来自 `DocState::history`（`op_core::History`），最多保留 50 条，超出时丢弃最早的非第一条状态。
-- Edit 菜单的 Undo / Redo / Toggle Last State 与这里显示的是同一份历史，操作后面板立即反映。
+- State data comes from `DocState::history` (`op_core::History`), which keeps at most 50 entries; when exceeded, the earliest state other than the first is discarded.
+- Undo / Redo / Toggle Last State in the Edit menu operate on the same history shown here, and the panel reflects them immediately.
 
-## 已知限制
+## Known limitations
 
-- 所有状态都使用同一个文档图标；Photoshop 会按操作类型显示不同图标（例如文字图层用「T」）。
-- 历史画笔还没有实现，复选框只有外观，快照行的画笔标记也是固定的。
-- 不能创建快照，不能从状态新建文档。
-- 面板菜单没有内容；Comments 页没有内容。
+- All states use the same document icon; Photoshop shows different icons by operation type (e.g. "T" for type layers).
+- The history brush is not implemented yet; the checkbox is appearance only, and the brush marker on the snapshot row is fixed.
+- Snapshots cannot be created, and documents cannot be created from a state.
+- The panel menu has no content; the Comments page has no content.

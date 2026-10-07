@@ -1,34 +1,34 @@
-# dialogs/document_presets.rs：New Document 的预设
+# dialogs/document_presets.rs: New Document presets
 
-## 组件职责
+## Component responsibility
 
-New Document 对话框（`new_document.md`）用到的数据与绘图：长度单位、预设、各类别的预设列表，以及卡片上的图标。
+The data and drawing used by the New Document dialog (`new_document.md`): length units, presets, the preset list for each category, and the icons on the cards.
 
-## 单位（`Unit`）
+## Units (`Unit`)
 
-Pixels、Inches、Centimeters、Millimeters、Points、Picas。`pixels(ppi)` 给出一个单位等于多少像素（1 英寸 = 2.54 厘米 = 25.4 毫米 = 72 点 = 6 派卡）；`short` 是卡片上的简写（px、in、cm、mm、pt、pica）；`format` 显示数值：像素取整，其它最多 3 位小数，去掉末尾的 0。
+Pixels, Inches, Centimeters, Millimeters, Points, Picas. `pixels(ppi)` gives how many pixels one unit equals (1 inch = 2.54 centimeters = 25.4 millimeters = 72 points = 6 picas); `short` is the abbreviation on the card (px, in, cm, mm, pt, pica); `format` displays a value: pixels are rounded to integers, others have at most 3 decimals with trailing zeros removed.
 
-## 预设（`Preset`）
+## Presets (`Preset`)
 
-名称、宽、高、单位、分辨率（ppi）与卡片图标的种类（`Kind`）。`size_label` 是卡片上的尺寸行，如「7 x 5 in @ 300 ppi」；`pixels` 换算成像素。
+Name, width, height, unit, resolution (ppi), and the kind of card icon (`Kind`). `size_label` is the size line on the card, e.g. "7 x 5 in @ 300 ppi"; `pixels` converts to pixels.
 
-`category(index)` 按 Photoshop 2026 的顺序给出各页的空白文档预设：
+`category(index)` gives each page's blank document presets in Photoshop 2026's order:
 
-- **Photo**（9 个，英寸、300 ppi）：Default Photoshop Size 7 × 5，Landscape 3 × 2、6 × 4、7 × 5、10 × 8，Portrait 2 × 3、4 × 6、5 × 7、8 × 10。
-- **Print**（300 ppi）：Letter、Legal、Tabloid（英寸）；A4、A6、A5、A3、B5、B4、B3、C4、C5（毫米）。
-- **Art & Illustration**（300 ppi）：1000 / 2000 pixel grid、Poster 18 × 24 in、Postcard 4 × 6 in、1080p、720p。
-- **Web**（像素、72 ppi）：Web Most Common 1366 × 768、Web Large、Web Medium、Web Minimum、Web Small、MacBook Pro 13 / 15 (Retina)、iMac 27、Desktop HD Design。
-- **Mobile**（像素、72 ppi）：iPhone、iPad、Android、Surface、Apple Watch、Mobile Design、iOS 7 与 Mac 图标尺寸，共 24 个。
-- **Film & Video**（像素、72 ppi）：HDTV、HDV、DVCPRO HD、DCI 2K/4K/8K、UHDTV、FUHDTV、NTSC、PAL、Cineon、Film (2K)/(4K)，共 24 个。
+- **Photo** (9, inches, 300 ppi): Default Photoshop Size 7 × 5, Landscape 3 × 2, 6 × 4, 7 × 5, 10 × 8, Portrait 2 × 3, 4 × 6, 5 × 7, 8 × 10.
+- **Print** (300 ppi): Letter, Legal, Tabloid (inches); A4, A6, A5, A3, B5, B4, B3, C4, C5 (millimeters).
+- **Art & Illustration** (300 ppi): 1000 / 2000 pixel grid, Poster 18 × 24 in, Postcard 4 × 6 in, 1080p, 720p.
+- **Web** (pixels, 72 ppi): Web Most Common 1366 × 768, Web Large, Web Medium, Web Minimum, Web Small, MacBook Pro 13 / 15 (Retina), iMac 27, Desktop HD Design.
+- **Mobile** (pixels, 72 ppi): iPhone, iPad, Android, Surface, Apple Watch, Mobile Design, iOS 7 and Mac icon sizes, 24 in total.
+- **Film & Video** (pixels, 72 ppi): HDTV, HDV, DVCPRO HD, DCI 2K/4K/8K, UHDTV, FUHDTV, NTSC, PAL, Cineon, Film (2K)/(4K), 24 in total.
 
-## 卡片图标（`paint_icon`）
+## Card icons (`paint_icon`)
 
-1 pt `#b9b9b9` 线条，按预设的长宽比画框：最长边按它在本页中的大小（`scales`：像素面积的平方根在本页中的位置，0–1）开方后从 36 pt 到 82 pt，另一边最多 62 pt（照 Photoshop Photo 页的卡片量取）。按种类在框里画：照片（山与太阳）、页面（折角；Custom 在左上角外画十字准星）、点阵网格、画笔、浏览器（顶栏）、手机/平板（圆角与 Home 键）、Surface（右侧触控笔）、手表（表带）、应用图标（圆角点阵）、细长条、视频（播放三角与 2K/4K/8K 角标）。
+1 pt `#b9b9b9` lines; a frame is drawn with the preset's aspect ratio: the longest side runs from 36 pt to 82 pt according to the square root of its size within the page (`scales`: the position of the square root of the pixel area within the page, 0–1), and the other side is at most 62 pt (measured from the cards on Photoshop's Photo page). Depending on the kind, the frame contains: photo (mountains and sun), page (folded corner; Custom draws a crosshair outside the top-left corner), dot grid, brush, browser (top bar), phone/tablet (rounded corners and Home button), Surface (stylus on the right), watch (watch band), app icon (rounded dot grid), thin strip, video (play triangle and 2K/4K/8K corner badge).
 
-## 已知限制
+## Known limitations
 
-- 图标是按形状画的近似图形，不是 Photoshop 的图标资源；Print、Mobile、Film & Video 只列出了截图里能看到的预设（Photoshop 分别有 14、28、25 个）。
+- The icons are approximate drawings made from shapes, not Photoshop's icon assets; Print, Mobile, and Film & Video list only the presets visible in the screenshots (Photoshop has 14, 28, and 25 respectively).
 
-## 测试覆盖
+## Test coverage
 
-- `presets_convert_to_pixels`：Photo 有 9 个、第一个是 2100 × 1500 像素；A4 是 2480 × 3508；Web 的尺寸行；英寸的三位小数。
+- `presets_convert_to_pixels`: Photo has 9 and the first is 2100 × 1500 pixels; A4 is 2480 × 3508; the Web size line; three decimals for inches.

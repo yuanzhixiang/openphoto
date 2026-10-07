@@ -1,27 +1,27 @@
-# doc_tabs.rs：文档标签栏
+# doc_tabs.rs: Document Tab Bar
 
-## 组件职责
+## Component Responsibilities
 
-画布上方的文档标签栏，每个打开的文档一个标签。尺寸在 Photoshop 2026 里按 1:1 量取（pt）。
+The document tab bar above the canvas, with one tab per open document. Dimensions are measured 1:1 in Photoshop 2026 (pt).
 
-## 视觉
+## Visuals
 
-- 栏高 30（含底部 1 pt 的 `#363636` 分隔线），底色 `#424242`。
-- 标签从栏的最左边开始依次排列。每个标签：
-  - 快速蒙版模式下，括号里的颜色模式显示为「Quick Mask」（如「(Quick Mask/8)」），与 Photoshop 一致。
-- 有未保存修改时，标题末尾加「 *」，与 Photoshop 一致（`title()`）。
-- 关闭按钮「×」中心距标签左边 11，是两条 1 pt 的细线组成的 6 pt 叉，颜色 `#8c8c8c`，悬停时变亮。
-  - 标题从距左边 24 开始，半粗体 12 pt；标题后留 12 的右边距。
-  - 右侧有 1 pt 的 `#404040` 竖线。
-  - 激活标签底色 `#535353`、标题 `#eaeaea`；未激活标签与栏同色、标题 `#bcbcbc`，悬停时底色 `#4c4c4c`。
-- 标题格式与 Photoshop 一致：`{文件名} @ {缩放} ({模式}/{位深})`，例如 `1.webp @ 100% (RGB/8#)`。位深后的「#」表示文档没有嵌入色彩配置文件：打开的文件都没有（目前不读取配置文件），新建的文档视为 sRGB，不带「#」。
+- Bar height 30 (including a 1 pt `#363636` divider at the bottom), background `#424242`.
+- Tabs are laid out in sequence starting from the far left of the bar. Each tab:
+  - In Quick Mask mode, the color mode in parentheses shows as "Quick Mask" (e.g. "(Quick Mask/8)"), matching Photoshop.
+- When there are unsaved changes, " *" is appended to the end of the title, matching Photoshop (`title()`).
+- The close button "×" is centered 11 from the tab's left edge; it is a 6 pt cross made of two 1 pt thin lines, color `#8c8c8c`, brightening on hover.
+  - The title starts 24 from the left edge, semibold 12 pt; a right margin of 12 is left after the title.
+  - There is a 1 pt `#404040` vertical line on the right.
+  - The active tab has background `#535353` and title `#eaeaea`; inactive tabs have the same color as the bar and title `#bcbcbc`, with background `#4c4c4c` on hover.
+- The title format matches Photoshop: `{file name} @ {zoom} ({mode}/{bit depth})`, for example `1.webp @ 100% (RGB/8#)`. The "#" after the bit depth means the document has no embedded color profile: opened files never have one (profiles are not read yet), and new documents are treated as sRGB, without "#".
 
-## 交互
+## Interaction
 
-- 点击标签：切换为当前文档。
-- 点击「×」：关闭该文档（有未保存修改时先确认，见 `actions.md`「关闭」）。关闭的是当前文档时，它左边的标签（没有则第一个）成为当前文档。
+- Clicking a tab: makes it the current document.
+- Clicking "×": closes that document (confirming first when there are unsaved changes; see "Closing" in `actions.md`). When the closed one is the current document, the tab to its left (or the first one if there is none) becomes the current document.
 
-## 已知限制
+## Known Limitations
 
-- Photoshop 在文档有未保存的更改时在标题后加「*」，这里没有（目前也没有保存功能）。
-- 标签不能拖动排序，不能拖出成浮动窗口；标签过多时不会滚动或折叠。
+- Photoshop appends "*" to the title when the document has unsaved changes; this does not (and there is no save feature yet).
+- Tabs cannot be reordered by dragging or dragged out into floating windows; with too many tabs, they do not scroll or collapse.

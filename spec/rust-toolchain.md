@@ -1,24 +1,24 @@
-# Rust 工具链（rust-toolchain.toml）
+# Rust toolchain (rust-toolchain.toml)
 
-## 职责
+## Responsibility
 
-固定项目使用的 Rust 工具链，使所有开发者和 CI 用同一个编译器版本构建，并保证需要的组件已安装。
+Pins the Rust toolchain used by the project, so all developers and CI build with the same compiler version, and ensures the needed components are installed.
 
-## 行为规则
+## Behavior rules
 
-- `channel = "1.99.0"`：精确固定到 1.99.0（截至 2026-09-28 的最新稳定版），而不是浮动的 `stable`。rustup 在仓库目录中执行 `cargo` / `rustc` 时会自动选择并按需安装该版本。
-- `components = ["rustfmt", "clippy"]`：随工具链一起安装格式化和 lint 工具。
+- `channel = "1.99.0"`: pinned exactly to 1.99.0 (the latest stable release as of 2026-09-28), rather than a floating `stable`. When `cargo` / `rustc` run in the repository directory, rustup automatically selects this version and installs it if needed.
+- `components = ["rustfmt", "clippy"]`: the formatter and lint tool are installed along with the toolchain.
 
-## 边界情况
+## Edge cases
 
-- 本地没有 1.99.0 时，首次在仓库内运行 cargo 会触发 rustup 下载该工具链。
-- 设置了 `RUSTUP_TOOLCHAIN` 环境变量或使用 `cargo +<toolchain>` 时，会覆盖本文件的选择。
+- When 1.99.0 is not installed locally, the first cargo run inside the repository triggers rustup to download that toolchain.
+- Setting the `RUSTUP_TOOLCHAIN` environment variable or using `cargo +<toolchain>` overrides this file's choice.
 
-## 与其它模块的关系
+## Relationship to other modules
 
-- 根 `Cargo.toml` 中的 `rust-version = "1.95"` 是工作区的最低支持版本（由 eframe/egui 0.36 决定）；本文件固定的 1.99.0 高于它，满足要求。
-- 版本升级需要手动修改本文件，不会自动跟随新的稳定版。
+- `rust-version = "1.95"` in the root `Cargo.toml` is the workspace's minimum supported version (determined by eframe/egui 0.36); the 1.99.0 pinned by this file is higher, so it satisfies the requirement.
+- Upgrading the version requires editing this file manually; it does not automatically follow new stable releases.
 
-## 已知限制
+## Known limitations
 
-- 没有指定 `targets` 或 `profile`，交叉编译目标需要自行添加。
+- No `targets` or `profile` is specified; cross-compilation targets must be added manually.

@@ -1,62 +1,62 @@
-# dialogs/canvas_size.rs：Canvas Size 对话框
+# dialogs/canvas_size.rs: Canvas Size dialog
 
-## 组件职责
+## Component responsibilities
 
-Image › Canvas Size...（⌥⌘C）：改变画布尺寸而不缩放图像，对应 Photoshop 的同名对话框。对话框只收集参数，实际修改由 `lib.rs` 调用 `Document::resize_canvas` 完成并记录历史。
+Image › Canvas Size... (⌥⌘C): changes the canvas size without scaling the image, matching Photoshop's dialog of the same name. The dialog only collects parameters; the actual change is made by `lib.rs` calling `Document::resize_canvas`, which also records history.
 
-## 布局
+## Layout
 
-按 Photoshop 2026 的 Canvas Size 对话框（2x 截图）逐点量取，与 New Layer 同一类（UXP 样式）。对话框 458 × 372 pt，坐标为距对话框左上角的 pt：
+Measured point by point from Photoshop 2026's Canvas Size dialog (2x screenshots); same family as New Layer (UXP style). The dialog is 458 × 372 pt; coordinates are in pt from the dialog's top-left corner:
 
-- **标题栏**：与 New Layer 相同（`common::frame`，系统粗体 13 pt「Canvas Size」）。
-- 文字为 12 pt 面板字体（Adobe Clean，这里用 Source Sans 3），颜色 `#f1f1f1`，不可用时 `#8e8e8e`。
-- **Current Size: 13.5K**：粗体，左端 20，中心 y 57.5；其后 8 pt 起一条 1 pt 的 `#737373` 线，到 x 356。下面 Width、Height 两行（标签右对齐于 55，中心 y 81、102.5），数值从 64 起，如「64 px」。
-- **New Size: 13.5K**：粗体，中心 y 130.5，同样带线；随输入实时更新，输入无效时显示「—」。
-- Width、Height 输入框 (64–145，y 145–169 与 174–198；标签右对齐于 55)，单位下拉 (153–313，同样两行；文字左缩进 9 pt，下拉箭头离右边 13.5 pt)。
-- 「Relative to current dimension」复选框：12 pt 方框在 (64, 216)，文字在方框右 9.5 pt。
-- 「Anchor」：左端 20，中心 y 255。锚点格：3 × 3、每格 23 pt，1 pt `#787878` 线，左上角 (64, 246)。锚点格画直径 7 pt 的圆点；箭头长 13.25 pt，箭头头部长 7.75 pt、宽 7.5 pt，杆宽 2 pt，以格子中心为中心。
-- 「Canvas extension color」：左端 20.5，中心 y 341；下拉 (140–300，y 328–352)；色块 (308–356，y 328–352，3 pt 圆角，1 pt `#8e8e8e` 边，显示当前扩展颜色)。没有背景图层时文字变暗，下拉画成无边框的 `#5c5c5c` 平框、文字与箭头 `#8e8e8e`，不能点。
-- **OK**（默认按钮，粗体）(368–438，y 48–72) 与 **Cancel** (368–438，y 84–108)：`common::ps_button`。
+- **Title bar**: same as New Layer (`common::frame`, system bold 13 pt "Canvas Size").
+- Text is 12 pt panel font (Adobe Clean; Source Sans 3 here), color `#f1f1f1`, `#8e8e8e` when unavailable.
+- **Current Size: 13.5K**: bold, left edge 20, center y 57.5; followed 8 pt later by a 1 pt `#737373` line running to x 356. Below it, Width and Height rows (labels right-aligned at 55, center y 81 and 102.5), values starting at 64, e.g. "64 px".
+- **New Size: 13.5K**: bold, center y 130.5, with the same line; updates live with input, and shows "—" when the input is invalid.
+- Width and Height input fields (64–145, y 145–169 and 174–198; labels right-aligned at 55), unit dropdowns (153–313, same two rows; text indented 9 pt from the left, dropdown arrow 13.5 pt from the right edge).
+- "Relative to current dimension" checkbox: 12 pt box at (64, 216), text 9.5 pt to the right of the box.
+- "Anchor": left edge 20, center y 255. Anchor grid: 3 × 3, 23 pt per cell, 1 pt `#787878` lines, top-left corner (64, 246). The anchor cell draws a 7 pt diameter dot; arrows are 13.25 pt long, with an arrowhead 7.75 pt long and 7.5 pt wide and a 2 pt shaft, centered on the cell center.
+- "Canvas extension color": left edge 20.5, center y 341; dropdown (140–300, y 328–352); swatch (308–356, y 328–352, 3 pt corner radius, 1 pt `#8e8e8e` border, showing the current extension color). When there is no background layer the text dims, the dropdown is drawn as a borderless flat `#5c5c5c` box with `#8e8e8e` text and arrow, and it cannot be clicked.
+- **OK** (default button, bold) (368–438, y 48–72) and **Cancel** (368–438, y 84–108): `common::ps_button`.
 
-与 Photoshop 截图相比，各元素位置相差不超过 1 pt；文字宽度因字体不同略宽（长句约 3%）。
+Compared with Photoshop screenshots, element positions differ by no more than 1 pt; text is slightly wider because of the different font (about 3% on long sentences).
 
-## 尺寸大小显示
+## Size display
 
-按 Photoshop 的口径计算：宽 × 高 × 颜色通道数（RGB 为 3）× 每通道字节数，以 1024 进位。小于 1M 显示为 `263.7K`（一位小数），否则为 `1.70M`（两位小数），达到 1G 显示为 `1.25G`。
+Computed the way Photoshop does: width × height × number of color channels (3 for RGB) × bytes per channel, in units of 1024. Below 1M it shows as `263.7K` (one decimal), otherwise as `1.70M` (two decimals), and from 1G as `1.25G`.
 
-## 数值输入
+## Numeric input
 
-- 单位：Pixels、Percent、Inches、Centimeters、Millimeters、Points、Picas。Percent 相对于原始尺寸；物理单位按文档分辨率换算（1 英寸 = 2.54 厘米 = 72 点 = 6 派卡）。
-- 切换单位时，输入框里的数值换算成新单位，所表示的尺寸不变。显示精度：像素为整数，百分比最多 2 位小数，其余最多 3 位小数，去掉末尾的 0。
-- 勾选「Relative to current dimension」时，输入框表示增减量（勾选瞬间变为 0）；取消勾选时换回绝对值，结果尺寸不变。
-- 结果四舍五入到整像素。必须在 1 到 30000 像素之间（Photoshop 对普通文档的上限）；无法解析或超出范围时 New Size 显示「—」，OK 置灰。
+- Units: Pixels, Percent, Inches, Centimeters, Millimeters, Points, Picas. Percent is relative to the original size; physical units convert using the document resolution (1 inch = 2.54 centimeters = 72 points = 6 picas).
+- When switching units, the value in the input field is converted to the new unit and the size it represents stays the same. Display precision: integers for pixels, at most 2 decimals for percent, at most 3 decimals otherwise, with trailing zeros removed.
+- With "Relative to current dimension" checked, the input fields express an increase or decrease (they become 0 the moment it is checked); unchecking switches back to absolute values with the resulting size unchanged.
+- The result is rounded to whole pixels. It must be between 1 and 30000 pixels (Photoshop's limit for regular documents); when the input cannot be parsed or is out of range, New Size shows "—" and OK is grayed out.
 
-## 锚点
+## Anchor
 
-- 默认在中心。点击某格把锚点移到该格，锚点格显示圆点，相邻格显示箭头。
-- 箭头方向：画布在该方向放大（或不变）时指向外侧，缩小时指向锚点，与 Photoshop 一致；水平和垂直方向分别判断。
-- 锚点在中间且尺寸差为奇数时：放大画布，多出的 1 像素加在右侧/下侧；缩小画布，多裁掉的 1 像素在左侧/上侧（见 `crates/op-core/src/document.md`）。
+- Defaults to the center. Clicking a cell moves the anchor to that cell; the anchor cell shows a dot and adjacent cells show arrows.
+- Arrow direction: points outward when the canvas grows (or stays the same) in that direction, and toward the anchor when it shrinks, matching Photoshop; horizontal and vertical are judged separately.
+- With the anchor in the middle and an odd size difference: when enlarging the canvas, the extra 1 pixel goes on the right/bottom; when shrinking, the extra 1 pixel cropped is on the left/top (see `crates/op-core/src/document.md`).
 
-## 画布扩展颜色
+## Canvas extension color
 
-- 选项：Foreground、Background（默认）、White、Black、Gray（50% 灰，128）、Other...。色块显示当前选择对应的颜色。
-- 选择「Other...」或点击色块：打开 Color Picker（标题「Color Picker」，初始为当前扩展颜色，见 `color_picker.md`）。在 Color Picker 里确定后，扩展颜色切换为 Other... 并使用所选颜色；取消则保持原来的选择。
-- Color Picker 叠在本对话框上时，Enter 和 Esc 只作用于 Color Picker。
-- 只有文档有背景图层时可用；没有背景图层时下拉和色块置灰、文字变暗。扩展颜色只填充背景图层的新增区域，其它图层的新增区域是透明的；缩小画布时超出部分直接裁掉。
+- Options: Foreground, Background (default), White, Black, Gray (50% gray, 128), Other.... The swatch shows the color for the current choice.
+- Choosing "Other..." or clicking the swatch opens the Color Picker (title "Color Picker", starting at the current extension color, see `color_picker.md`). After confirming in the Color Picker, the extension color switches to Other... and uses the chosen color; canceling keeps the previous choice.
+- While the Color Picker is stacked on this dialog, Enter and Esc only act on the Color Picker.
+- Only available when the document has a background layer; without one, the dropdown and swatch are grayed out and the text dims. The extension color only fills the new area of the background layer; new areas of other layers are transparent. When shrinking the canvas, the excess is simply cropped.
 
-## 键盘与焦点
+## Keyboard and focus
 
-- 打开时宽度输入框获得焦点并全选，与 Photoshop 一致。焦点输入框有蓝色外框 `#1473e6`。
-- Enter：等同于 OK（输入有效时）。Esc：等同于 Cancel。
-- 对话框打开期间菜单与快捷键禁用。
+- On open, the width input field gets focus with its contents selected, matching Photoshop. The focused input field has a blue outline `#1473e6`.
+- Enter: same as OK (when the input is valid). Esc: same as Cancel.
+- Menus and shortcuts are disabled while the dialog is open.
 
-## 结果
+## Result
 
-- OK：返回新尺寸、锚点和扩展颜色。尺寸与当前相同时不做任何事，也不产生历史；否则修改画布并记录一条「Canvas Size」历史，可以撤销。
-- Cancel：不做任何修改。
+- OK: returns the new size, anchor and extension color. When the size is the same as the current one, nothing happens and no history is created; otherwise the canvas is changed and a "Canvas Size" history entry is recorded, which can be undone.
+- Cancel: makes no changes.
 
-## 已知限制
+## Known limitations
 
-- 不记住上次的设置，每次打开都恢复默认（中心锚点、Background、Pixels）。
-- 只能用鼠标点击锚点，不能用键盘移动锚点。
-- 对话框不能拖动。
+- Does not remember the last settings; every time it opens it resets to defaults (center anchor, Background, Pixels).
+- The anchor can only be set by clicking with the mouse, not moved with the keyboard.
+- The dialog cannot be dragged.

@@ -1,75 +1,75 @@
-# fill.rs：填充、清除与油漆桶
+# fill.rs: Fill, Clear and Paint Bucket
 
-## 职责
+## Responsibilities
 
-Edit › Fill、Edit › Clear 和油漆桶工具对当前图层像素的修改。
+Modifications to the current layer's pixels by Edit › Fill, Edit › Clear and the Paint Bucket tool.
 
-## 目标与错误
+## Target and Errors
 
-所有操作都作用于当前图层。不能操作时返回 `FillError`，`message(命令名)` 给出 Photoshop 的提示文字：
+All operations act on the current layer. When an operation is not possible, it returns `FillError`, and `message(command name)` gives Photoshop's message text:
 
-- 没有图层：「Could not complete the {命令} command because there is no layer.」
-- 图层锁定像素：「Could not complete the {命令} command because the layer is locked.」
-- 图层隐藏：「Could not complete the {命令} command because the target layer is hidden.」
+- No layer: "Could not complete the {command} command because there is no layer."
+- Layer pixels locked: "Could not complete the {command} command because the layer is locked."
+- Layer hidden: "Could not complete the {command} command because the target layer is hidden."
 
-## 填充（`fill`）
+## Fill (`fill`)
 
-- 用纯色填充选区；没有选区时填充整个图层。选中程度（羽化）按比例生效。
-- `FillOptions`：混合模式（全部 27 种，算法见 `blend.md`）、不透明度、保留透明区域。默认 Normal、100%、不保留。
-- 背景图层、锁定透明像素的图层，或勾选了保留透明区域时：只给已有像素着色，alpha 不变，完全透明的像素不受影响。
-- 其余情况：颜色按混合模式和 `不透明度 × 选中程度` 合成到像素上，可以让透明像素变为不透明。
+- Fills the selection with a solid color; with no selection, fills the whole layer. The degree of selection (feathering) takes effect proportionally.
+- `FillOptions`: blending mode (all 27, algorithms in `blend.md`), opacity, preserve transparency. Defaults are Normal, 100%, not preserved.
+- For the Background layer, a layer with transparent pixels locked, or when preserve transparency is checked: only existing pixels are colored, alpha is unchanged, and fully transparent pixels are unaffected.
+- In all other cases: the color is composited onto pixels by the blending mode and `opacity × degree of selection`, and can make transparent pixels opaque.
 
-## 清除（`clear`）
+## Clear (`clear`)
 
-- 普通图层：选区内像素的 alpha 乘以 `1 − 选中程度`（没有选区时清空整个图层）。
-- 背景图层或锁定透明像素的图层：改为用背景色填充，与 Photoshop 一致。
+- Regular layer: the alpha of pixels inside the selection is multiplied by `1 − degree of selection` (with no selection, the whole layer is cleared).
+- Background layer or a layer with transparent pixels locked: fills with the background color instead, matching Photoshop.
 
-## 油漆桶（`bucket`）
+## Paint Bucket (`bucket`)
 
-- `BucketOptions`：填充设置、容差（0–255，默认 32）、消除锯齿（默认开）、连续（默认开）、所有图层（默认关），与 Photoshop 的默认值一致。
-- 取样：默认取当前图层的像素；「所有图层」时取合成结果。
-- 区域：RGBA 四个通道与单击点的差都不超过容差的像素。「连续」时只取与单击点四邻域相连的部分，否则取整个图像中所有相似像素。
-- 消除锯齿：区域外紧邻区域的一圈像素按 50% 选中。
-- 区域再与当前选区相乘，然后按填充设置填充前景色。单击点在文档外时不做任何事（返回 `Ok(false)`）。
+- `BucketOptions`: fill settings, tolerance (0–255, default 32), anti-alias (default on), contiguous (default on), all layers (default off), matching Photoshop's defaults.
+- Sampling: by default samples the current layer's pixels; with "all layers", samples the composite.
+- Region: pixels whose difference from the clicked point in all four RGBA channels is within the tolerance. With "contiguous", only the part connected to the clicked point through 4-neighbors is taken; otherwise all similar pixels in the whole image.
+- Anti-alias: the ring of pixels immediately outside the region is selected at 50%.
+- The region is then multiplied by the current selection, and the foreground color is filled using the fill settings. When the clicked point is outside the document, nothing happens (returns `Ok(false)`).
 
-## 蒙版
+## Masks
 
-快速蒙版模式下填充不检查图层是否隐藏或锁定。编辑目标是蒙版（快速蒙版或图层蒙版）时，Fill（及 ⌥⌫、⌘⌫、油漆桶）把颜色换成灰度后写入蒙版；Clear（⌫）用背景色的灰度填充选区。
+In Quick Mask mode, filling does not check whether the layer is hidden or locked. When the editing target is a mask (Quick Mask or layer mask), Fill (and ⌥⌫, ⌘⌫, the paint bucket) converts the color to gray and writes it into the mask; Clear (⌫) fills the selection with the gray of the background color.
 
-## 魔棒（`magic_wand`）
+## Magic Wand (`magic_wand`)
 
-- `magic_wand(doc, x, y, options)`：魔棒单击得到的选区，区域规则与油漆桶完全相同（取样、容差、连续、消除锯齿），只是不填充。单击点在画布外、或不取所有图层时没有活动图层，返回 `None`。
-- 测试 `magic_wand_selects_the_clicked_area`：点黑色方块得到方块的范围，点白色得到方块以外的区域，画布外为 `None`。
+- `magic_wand(doc, x, y, options)`: the selection a Magic Wand click produces; the region rules are exactly the same as the paint bucket's (sampling, tolerance, contiguous, anti-alias), it just does not fill. When the clicked point is outside the canvas, or when not sampling all layers and there is no active layer, returns `None`.
+- Test `magic_wand_selects_the_clicked_area`: clicking a black square gives the square's extent, clicking white gives the area outside the square, and outside the canvas gives `None`.
 
-## 扩大选取与选取相似（`grow`）
+## Grow and Similar (`grow`)
 
-- `grow(doc, options, contiguous)`：Select › Grow（`contiguous` 为真）与 Select › Similar。取当前选区中选择程度 ≥ 128 的像素在各通道（RGBA）上的最小、最大值，再向两边放宽魔棒的容差；Grow 从这些像素出发，按四邻域扩展到落在范围内的相连像素；Similar 选取整幅图像中所有落在范围内的像素。按魔棒的消除锯齿选项处理边缘，结果与原选区合并（相加）。取样与魔棒相同（当前图层或所有图层）。没有选区时返回 `None`。
-- 测试 `grow_and_similar`：Grow 只扩到相连的同色方块，Similar 包括另一个方块但不包括中间的白色；没有选区时为 `None`。
+- `grow(doc, options, contiguous)`: Select › Grow (`contiguous` true) and Select › Similar. Takes the minimum and maximum per channel (RGBA) of pixels in the current selection with selection degree ≥ 128, then widens that range on both sides by the Magic Wand's tolerance; Grow starts from these pixels and expands through 4-neighbors to connected pixels within the range; Similar selects all pixels in the whole image within the range. Edges are handled by the Magic Wand's anti-alias option, and the result is merged (added) with the original selection. Sampling is the same as the Magic Wand (current layer or all layers). With no selection, returns `None`.
+- Test `grow_and_similar`: Grow expands only to the connected same-colored square; Similar includes the other square but not the white in between; with no selection, `None`.
 
-## 已知限制
+## Known Limitations
 
-- 填充内容只有纯色；Content-Aware、Pattern、History 没有实现。
-- 所有操作都遍历整个文档，没有按选区边界裁剪，大文档上较慢。
-- 消除锯齿只是一圈 50% 的边缘，与 Photoshop 的抗锯齿效果不完全相同。
+- Fill contents are solid color only; Content-Aware, Pattern and History are not implemented.
+- All operations traverse the whole document without clipping to the selection bounds, which is slow on large documents.
+- Anti-aliasing is just a ring of 50% edge, not exactly the same as Photoshop's anti-aliasing.
 
-## 图层组
+## Layer Groups
 
-当前图层是组时，Fill、油漆桶、调整（`adjust::check`）和滤镜返回 `FillError::Group`，提示「Could not complete the {命令} command because the target layer is a group.」。Photoshop 在这种情况下直接把这些菜单项置灰（Invert 已核对），界面层应据此禁用命令。魔棒、Grow/Similar 在当前图层是组且不取样所有图层时没有结果。
+When the current layer is a group, Fill, the paint bucket, adjustments (`adjust::check`) and filters return `FillError::Group`, with the message "Could not complete the {command} command because the target layer is a group.". In this case Photoshop simply grays out these menu items (verified for Invert), and the UI layer should disable the commands accordingly. The Magic Wand and Grow/Similar produce no result when the current layer is a group and not sampling all layers.
 
-## 魔术橡皮擦（`magic_erase`）
+## Magic Eraser (`magic_erase`)
 
-在当前图层上擦除一次魔棒单击（同样的 Tolerance、Contiguous、Anti-alias、Sample All Layers 规则）会选中的区域，强度为 Opacity，有选区时只在选区内。当前图层是背景时先转为普通图层「Layer 0」（与 Photoshop 一致）；锁定透明像素时改为把区域填成背景色。像素锁定、隐藏、组与没有图层时返回对应的错误。返回是否有像素改变。
+Erases on the current layer the region a Magic Wand click would select (same Tolerance, Contiguous, Anti-alias, Sample All Layers rules), with strength Opacity, and only inside the selection when there is one. If the current layer is the Background, it is first converted to the regular layer "Layer 0" (matching Photoshop); with transparent pixels locked, the region is filled with the background color instead. With pixels locked, hidden, a group, or no layer, returns the corresponding error. Returns whether any pixels changed.
 
-## 红眼（`red_eye`）
+## Red Eye (`red_eye`)
 
-在单击点附近（图像短边的 3%，至少 8 像素）找「红色程度」（R − max(G, B)）最高且超过阈值的像素（阈值 = 40 + (1 − Pupil Size) × 60），从它出发四连通地取红色程度超过阈值 60% 的像素（不超过搜索范围的 4 倍）。这些像素的 R 变为 G、B 的平均值，三个通道再按 Darken Amount 压暗（最多 60%），有选区时按选区程度混合。附近找不到红色时不做任何事。
+Near the clicked point (3% of the image's short side, at least 8 pixels), finds the pixel with the highest "redness" (R − max(G, B)) that exceeds the threshold (threshold = 40 + (1 − Pupil Size) × 60); starting from it, takes 4-connected pixels whose redness exceeds 60% of the threshold (no more than 4 times the search range). For these pixels, R becomes the average of G and B, then all three channels are darkened by Darken Amount (at most 60%); with a selection, blended by selection degree. When no red is found nearby, nothing happens.
 
-## 测试覆盖
+## Test Coverage
 
-- `magic_eraser_and_red_eye`：红色圆点附近单击红眼后去红，角落单击不变；魔术橡皮擦在白色上单击，背景变成普通图层、白色被擦掉而圆点保留。
+- `magic_eraser_and_red_eye`: clicking Red Eye near a red dot removes the red, clicking in a corner changes nothing; clicking the Magic Eraser on white turns the background into a regular layer, erasing the white while keeping the dot.
 
-- `fill_respects_selection_opacity_and_mode`：选区内按 50% 不透明度填充，选区外不变；Multiply 模式的结果。
-- `clear_erases_or_fills_background`：背景图层上清除得到背景色，普通图层上清除得到透明。
-- `preserve_transparency_keeps_alpha`：保留透明区域时只改颜色。
-- `bucket_fills_contiguous_region`：被一列黑色隔开时只填一侧；非连续时两侧相似像素都被填。
-- `locked_layer_refuses`：锁定像素时拒绝，提示文字与 Photoshop 一致。
+- `fill_respects_selection_opacity_and_mode`: fills inside the selection at 50% opacity, outside the selection is unchanged; the result in Multiply mode.
+- `clear_erases_or_fills_background`: clearing on the Background layer gives the background color; clearing on a regular layer gives transparency.
+- `preserve_transparency_keeps_alpha`: with preserve transparency, only the color changes.
+- `bucket_fills_contiguous_region`: when separated by a column of black, only one side is filled; when non-contiguous, similar pixels on both sides are filled.
+- `locked_layer_refuses`: refuses when pixels are locked, with message text matching Photoshop.

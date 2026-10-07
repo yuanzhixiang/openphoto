@@ -1,18 +1,18 @@
-# widgets.rs：通用小部件
+# widgets.rs: Common Widgets
 
-## 职责
+## Responsibilities
 
-各面板共用的小部件，统一 Photoshop 风格的外观。
+Small widgets shared by the panels, giving them a consistent Photoshop-style appearance.
 
-## 部件
+## Widgets
 
-- `icon_button`：正方形图标按钮。选中或按下时底色 `#383838`，悬停时 `#5e5e5e`，否则透明；圆角 4。禁用时图标变为禁用色。
-- `icon_button_sized`：同上，可分别指定按钮尺寸和图标字号。
-- `icon_button_font`：同上，可指定图标字体（工具栏用它画 Phosphor Bold 图标）。
-- `checkbox`：Photoshop 样式的复选框。10 pt 见方、圆角 2.5 pt；勾选时为 `#d4d4d4` 实心方块加 `#323232`、1.7 pt 粗的对勾（照 Photoshop 2x 截图描出的折线），悬停时方块变亮为 `#e6e6e6`；未勾选时只画 1 pt 的同色边框；禁用时按 Photoshop 实测画成 `#4d4d4d` 方块加 1 pt `#5e5e5e` 边框（勾选时方块为 `#5e5e5e`），文字为 `#878787`。文字在方块右侧 8 pt，颜色 `#f0f0f0`。点击方块或文字都会切换。
-- `dropdown`：Photoshop 选项栏的下拉框。18.5 pt 高，`#454545` 底、1 pt `#666666` 边框（悬停 `#808080`）、圆角 2.5 pt；值在左侧 7 pt 处，右侧 7.75 pt 处是描出的 V 形箭头。点击弹出 `menu` 填充的菜单。
-- `dropdown_with`：同上，但由参数决定是否可用；不可用时按 Photoshop 的禁用色绘制（`#4d4d4d` 底、`#5e5e5e` 边、`#878787` 字），不经 egui 对禁用控件的淡化，也不会弹出菜单。`dropdown` 用当前 Ui 是否可用调用它。
-- `ps_icon_button`：画 `ps_icons` 里描出的图标的按钮，悬停或按下时有圆角底色；禁用时图标用 `#989898`。
-- `hseparator`：整宽的横分隔线。
-- `checkerboard`：透明背景棋盘格，白色与 `#cccccc` 交替，用于缩略图背后。
-- `text_box(ui, rect, text, id, enabled)`：选项栏里可编辑的输入框，放在给定矩形里：`#454545` 底、1 pt `#666666` 边、圆角 2 pt，文字为面板字体、左缩进 6 pt；不可用时 `#4d4d4d` / `#5e5e5e` / `#878787`。裁剪工具的 W、H、分辨率框使用它。
+- `icon_button`: a square icon button. Background `#383838` when selected or pressed, `#5e5e5e` when hovered, otherwise transparent; corner radius 4. When disabled, the icon turns the disabled color.
+- `icon_button_sized`: same as above, with separately specified button size and icon font size.
+- `icon_button_font`: same as above, with a specified icon font (the toolbar uses it to draw Phosphor Bold icons).
+- `checkbox`: a Photoshop-style checkbox. 10 pt square, corner radius 2.5 pt; when checked, a solid `#d4d4d4` square with a `#323232`, 1.7 pt thick checkmark (a polyline traced from Photoshop 2x screenshots), and the square brightens to `#e6e6e6` on hover; when unchecked, only a 1 pt border of the same color is drawn; when disabled, per Photoshop measurements it is drawn as a `#4d4d4d` square with a 1 pt `#5e5e5e` border (the square is `#5e5e5e` when checked), with text `#878787`. The text is 8 pt to the right of the square, color `#f0f0f0`. Clicking either the square or the text toggles it.
+- `dropdown`: a Photoshop options bar dropdown. 18.5 pt high, `#454545` background, 1 pt `#666666` border (`#808080` on hover), corner radius 2.5 pt; the value is 7 pt from the left, and a traced chevron is 7.75 pt from the right. Clicking pops up a menu filled by `menu`.
+- `dropdown_with`: same as above, but whether it is enabled is decided by a parameter; when disabled it is drawn in Photoshop's disabled colors (`#4d4d4d` background, `#5e5e5e` border, `#878787` text), without egui's fading of disabled controls, and does not pop up the menu. `dropdown` calls it with whether the current Ui is enabled.
+- `ps_icon_button`: a button that draws an icon traced in `ps_icons`, with a rounded background on hover or press; when disabled, the icon uses `#989898`.
+- `hseparator`: a full-width horizontal divider line.
+- `checkerboard`: a transparency checkerboard, alternating white and `#cccccc`, used behind thumbnails.
+- `text_box(ui, rect, text, id, enabled)`: an editable input box in the options bar, placed in the given rectangle: `#454545` background, 1 pt `#666666` border, corner radius 2 pt, text in the panel font with a 6 pt left indent; when disabled, `#4d4d4d` / `#5e5e5e` / `#878787`. The Crop tool's W, H and resolution boxes use it.

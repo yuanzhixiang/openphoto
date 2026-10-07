@@ -1,39 +1,39 @@
-# dialogs/alert.rs：macOS 样式的提示框
+# dialogs/alert.rs: macOS-style alert box
 
-## 组件职责
+## Component responsibilities
 
-Photoshop 的错误提示和确认询问都是 macOS 原生提示框（NSAlert）。本组件按 Photoshop 2026 中的两种提示框（「Could not complete the Copy command because the selected area is empty.」与 Flatten Image 的「Discard hidden layers?」）实测的样子绘制，用于 `AppState::alert` 的所有错误提示和需要确认的询问。
+Photoshop's error messages and confirmation questions are native macOS alerts (NSAlert). This component draws them as measured from two alerts in Photoshop 2026 ("Could not complete the Copy command because the selected area is empty." and Flatten Image's "Discard hidden layers?"), and is used for all error messages and questions needing confirmation in `AppState::alert`.
 
-## 数据
+## Data
 
-- `Alert { message, icon, cancel, dont_show_again }`：消息；图标（`App` 应用图标，或 `Caution` 警告三角加应用小图标）；是否有 Cancel；「Don’t show again」复选框及是否勾选（`None` 表示没有）。
-- `Alert::error(message)`：应用图标、只有 OK。`Alert::caution(message)`：警告图标、Cancel 与 OK、带复选框。
-- `Alert::choose(message, choices)`：警告图标，按钮为一列横跨整宽的选项（第一个为蓝色默认按钮），见下文。
-- `show(ctx, alert)` 返回 `Option<Answer>`：`Ok { dont_show_again }`、`Cancel` 或 `Choice(序号)`；还没回答时为 `None`。
+- `Alert { message, icon, cancel, dont_show_again }`: the message; the icon (`App`, the app icon, or `Caution`, a warning triangle plus a small app icon); whether there is a Cancel; the "Don’t show again" checkbox and whether it is checked (`None` means there is none).
+- `Alert::error(message)`: app icon, OK only. `Alert::caution(message)`: warning icon, Cancel and OK, with the checkbox.
+- `Alert::choose(message, choices)`: warning icon, with the buttons as a column of full-width choices (the first is the blue default button), see below.
+- `show(ctx, alert)` returns `Option<Answer>`: `Ok { dont_show_again }`, `Cancel` or `Choice(index)`; `None` while not yet answered.
 
-## 布局（Photoshop 2026 实测，相对提示框左上角的 pt）
+## Layout (measured in Photoshop 2026, pt relative to the alert's top-left)
 
-- 宽 260，底色 `#b3b3b3`，0.5 pt `#ebebeb` 边，圆角 16，带阴影；居中显示，不压暗背后。
-- 应用图标：(26.5, 26.5) 起 51 pt 见方。OpenPhoto 自己的图标（深绿底圆角方块、浅绿「Op」），不是 Photoshop 的。警告图标：(22, 24)–(80, 76) 的黄色三角（白边、白色感叹号），右下 (55, 55) 起是 27 pt 的应用小图标。
-- 消息：粗体系统字体 13 pt（AppKit 的 opsz 17 与 13 pt 字距，见 `theme.md`）、颜色 `#1c1c1c`，从 x 22.5 开始，宽度超过 216 时换行；第一行大写字母从 y 103 开始，行距 16。
-- 复选框（有时）：消息下方 13 pt，16 pt 见方圆角 4，未勾选 `#9f9f9f`、勾选为蓝底白勾；「Don’t show again」在框右 7 pt，系统字体 13 pt（带字距）。点击框或文字切换。
-- 按钮：在最后一行消息下方 13 pt（有复选框时在复选框下方 16 pt），高 28 的胶囊，系统字体 13 pt（带字距），文字比胶囊正中高 1 pt。只有 OK 时 OK 横跨 (16, …)–(244, …)；有 Cancel 时 Cancel (16–126，`#a4a4a4` 底、深色字)、OK (134–244，`#3478f6` 底、白字)。按下时颜色变暗。
-- 竖排选项（`choices` 非空时）：每个按钮 28 pt 高、横跨 (16, …)–(244, …)，间距 34 pt，第一个蓝底白字，其余灰底；与 Photoshop 删除组时的「Group and Contents / Group Only / Cancel」一致。
-- 高度随消息行数变化：按钮下边再留 16 pt。
+- Width 260, fill `#b3b3b3`, 0.5 pt `#ebebeb` border, corner radius 16, with a shadow; displayed centered, without dimming what is behind.
+- App icon: 51 pt square starting at (26.5, 26.5). OpenPhoto's own icon (a dark green rounded square with a light green "Op"), not Photoshop's. Warning icon: a yellow triangle at (22, 24)–(80, 76) (white border, white exclamation mark), with a 27 pt small app icon at the lower right starting at (55, 55).
+- Message: bold system font 13 pt (AppKit's opsz 17 and 13 pt tracking, see `theme.md`), color `#1c1c1c`, starting at x 22.5, wrapping when wider than 216; the capitals of the first line start at y 103, line height 16.
+- Checkbox (when present): 13 pt below the message, 16 pt square with corner radius 4, `#9f9f9f` when unchecked, a white check on blue when checked; "Don’t show again" 7 pt to the right of the box, system font 13 pt (with tracking). Clicking the box or the text toggles it.
+- Buttons: 13 pt below the last line of the message (16 pt below the checkbox when there is one), 28-high capsules, system font 13 pt (with tracking), the text 1 pt above the capsule's center. With OK only, OK spans (16, …)–(244, …); with Cancel, Cancel (16–126, `#a4a4a4` fill, dark text) and OK (134–244, `#3478f6` fill, white text). Colors darken when pressed.
+- Vertical choices (when `choices` is non-empty): each button is 28 pt high, spans (16, …)–(244, …), with 34 pt spacing; the first is white text on blue, the rest on gray; matching Photoshop's "Group and Contents / Group Only / Cancel" when deleting a group.
+- The height varies with the number of message lines: 16 pt is left below the buttons.
 
-## 交互
+## Interaction
 
-- Enter：OK（竖排选项时为第一个）。Esc：竖排选项时为最后一个，有 Cancel 时为 Cancel，否则为 OK。点击按钮同理。
-- 显示期间是模态的，菜单和快捷键不生效。
+- Enter: OK (the first choice for vertical choices). Esc: the last choice for vertical choices, Cancel when there is a Cancel, otherwise OK. Clicking buttons works the same way.
+- It is modal while shown; menus and shortcuts have no effect.
 
-## 已知限制
+## Known limitations
 
-- 警告三角是直角折线，macOS 的是圆角渐变图形。
-- 不是真正的 NSAlert（为了能在无窗口测试中运行，并与其它对话框一样由 egui 绘制）。
+- The warning triangle is a sharp-cornered polyline; macOS's is a rounded gradient shape.
+- It is not a real NSAlert (so it can run in windowless tests and be drawn by egui like the other dialogs).
 
-## 测试覆盖
+## Test coverage
 
-- `constructors`（单元测试）：两种构造的默认值。
-- `flatten_asks_before_discarding_hidden_layers`（UI 测试）：有隐藏图层时 Flatten Image 先询问；Esc 取消后两个图层都在；勾选「Don’t show again」后点 OK 拼合为一个背景图层，之后再拼合不再询问。
-- `rename_layer_and_alerts`（UI 测试）：报错提示按 Enter 关闭（同时覆盖 Rename Layer...，见 `commands.md`）。
-- `screenshot_alerts`（截图，`#[ignore]`）：两种提示框，用于与 Photoshop 的截图比对。
+- `constructors` (unit test): defaults of the two constructors.
+- `flatten_asks_before_discarding_hidden_layers` (UI test): with hidden layers, Flatten Image asks first; after Esc cancels, both layers remain; after checking "Don’t show again" and clicking OK, the image flattens to one background layer, and later flattening no longer asks.
+- `rename_layer_and_alerts` (UI test): the error alert closes with Enter (also covers Rename Layer..., see `commands.md`).
+- `screenshot_alerts` (screenshot, `#[ignore]`): both alert types, for comparison with Photoshop screenshots.

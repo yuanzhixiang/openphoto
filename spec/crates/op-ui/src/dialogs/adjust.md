@@ -1,81 +1,81 @@
-# dialogs/adjust.rs：调整与滤镜对话框
+# dialogs/adjust.rs: Adjustment and filter dialogs
 
-## 组件职责
+## Component responsibilities
 
-带设置的调整与滤镜对话框：Image › Adjustments 下带对话框的调整，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Surface Blur...、Motion Blur...、Unsharp Mask...、Add Noise...、Dust & Scratches...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...、Emboss...、Twirl...、Pinch...、Spherize...、Polar Coordinates...、Custom...、Trace Contour...、Wind...。Levels...、Curves...、Brightness/Contrast...、Color Balance...、Hue/Saturation...、Channel Mixer...、Selective Color...、Vibrance...、Posterize...、Exposure...、Photo Filter...、Black & White...、Threshold...、Gradient Map... 已按 Photoshop 2026 重做（即全部带对话框的调整），布局与设置在各自的模块里（`levels.md`、`curves.md`、`brightness_contrast.md`、`color_balance.md`、`hue_saturation.md`、`channel_mixer.md`、`selective_color.md`、`vibrance.md`、`exposure.md`、`photo_filter.md`、`black_white.md`、`threshold.md`、`gradient_map.md`），本模块只为它们画窗口框与标题、转交 OK/Cancel 并处理预览。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
+Adjustment and filter dialogs with settings: the adjustments with dialogs under Image › Adjustments, and the Filter menu's Gaussian Blur..., Box Blur..., Surface Blur..., Motion Blur..., Unsharp Mask..., Add Noise..., Dust & Scratches..., Median..., Minimum..., Maximum..., High Pass..., Offset..., Mosaic..., Emboss..., Twirl..., Pinch..., Spherize..., Polar Coordinates..., Custom..., Trace Contour..., Wind.... Levels..., Curves..., Brightness/Contrast..., Color Balance..., Hue/Saturation..., Channel Mixer..., Selective Color..., Vibrance..., Posterize..., Exposure..., Photo Filter..., Black & White..., Threshold..., Gradient Map... have been rebuilt after Photoshop 2026 (that is, every adjustment with a dialog), with their layouts and settings in their own modules (`levels.md`, `curves.md`, `brightness_contrast.md`, `color_balance.md`, `hue_saturation.md`, `channel_mixer.md`, `selective_color.md`, `vibrance.md`, `exposure.md`, `photo_filter.md`, `black_white.md`, `threshold.md`, `gradient_map.md`); this module only draws their window frame and title, forwards OK/Cancel, and handles preview. The dialogs only manage settings and the Preview toggle; preview and apply are done by `lib.rs` (see "Hooking up adjustment and filter dialogs" in `lib.md`). See `adjust.md` and `filter.md` in `op-core` for the pixel algorithms.
 
-对话框的结果是 `Effect`：`Adjustment(Adjustment)` 或 `Filter(Filter)`。`Effect::name()` 是历史名称，`Effect::apply(doc, background)` 调用对应的 `op-core` 函数。
+A dialog's result is an `Effect`: `Adjustment(Adjustment)` or `Filter(Filter)`. `Effect::name()` is the history name, and `Effect::apply(doc, background)` calls the corresponding `op-core` function.
 
-## 数据输入
+## Data input
 
-- `AdjustDialog::new(kind, histogram, before)`：`kind` 为对话框种类；`histogram` 是打开时活动图层选区内的直方图（Threshold 用亮度）；`before` 是打开时的文档快照。
-- 每个设置是一个「参数」：标签、范围、默认值、小数位数，以及类型——数值（输入框 + 滑块）、选项（单选按钮，值为选中项的序号）、复选（值为 0 或 1）。输入框中的文字按小数位数格式化；Add Noise、Minimum、Maximum 与 Photoshop 一样去掉末尾的 0（显示「12.5」「1」），其余保留（Gaussian Blur 显示「1.0」）。默认值与范围同 Photoshop：
+- `AdjustDialog::new(kind, histogram, before)`: `kind` is the dialog kind; `histogram` is the histogram within the active layer's selection at open time (Threshold uses luminance); `before` is the document snapshot at open time.
+- Each setting is a "parameter": label, range, default value, number of decimal places, and type — numeric (input box + slider), choice (radio buttons, value is the index of the selected item), checkbox (value 0 or 1). Text in input boxes is formatted by the number of decimal places; Add Noise, Minimum and Maximum strip trailing zeros as Photoshop does (showing "12.5", "1"), the rest keep them (Gaussian Blur shows "1.0"). Defaults and ranges are the same as Photoshop:
 
-| 对话框 | 参数（范围，默认值） |
+| Dialog | Parameters (range, default) |
 |---|---|
-| Gaussian Blur | Radius (pixels)（0.1–1000.0，1.0） |
-| Box Blur | Radius (pixels)（1–2000，1） |
-| Unsharp Mask | Amount (%)（1–500，50）、Radius (pixels)（0.1–1000.0，1.0）、Threshold (levels)（0–255，0） |
-| Add Noise | Amount (%)（0.1–400，12.5，最多两位小数）、Distribution（Uniform / Gaussian，Uniform）、Monochromatic（不勾选） |
-| Median | Radius (pixels)（1–500，1） |
-| Minimum、Maximum | Radius (pixels)（0.2–500.0，1.0）、Preserve（Squareness / Roundness，Squareness） |
-| Motion Blur | Angle (°)（−360–360，0）、Distance (pixels)（1–2000，10） |
-| Emboss | Angle (°)（−180–180，135）、Height (pixels)（1–100，3）、Amount (%)（1–500，100） |
-| Twirl | Angle (°)（−999–999，50） |
-| Pinch | Amount (%)（−100–100，50） |
-| Spherize | Amount (%)（−100–100，100）、Mode（Normal / Horizontal only / Vertical only，Normal） |
-| Polar Coordinates | Options（Rectangular to Polar / Polar to Rectangular，Rectangular to Polar） |
-| High Pass | Radius (pixels)（0.1–1000.0，10.0） |
-| Offset | Horizontal (pixels right)、Vertical (pixels down)（−30000–30000，0）、Undefined Areas（Set to Transparent / Repeat Edge Pixels / Wrap Around，Set to Transparent） |
-| Mosaic | Cell Size (square)（2–200，10） |
-| Surface Blur | Radius (pixels)（1–100，5）、Threshold (levels)（2–255，15） |
-| Dust & Scratches | Radius (pixels)（1–500，1）、Threshold (levels)（0–255，0） |
-| Trace Contour | Level（0–255，128）、Edge（Lower / Upper，Upper） |
-| Wind | Method（Wind / Blast / Stagger，Wind）、Direction（From the Right / From the Left，From the Right） |
+| Gaussian Blur | Radius (pixels) (0.1–1000.0, 1.0) |
+| Box Blur | Radius (pixels) (1–2000, 1) |
+| Unsharp Mask | Amount (%) (1–500, 50), Radius (pixels) (0.1–1000.0, 1.0), Threshold (levels) (0–255, 0) |
+| Add Noise | Amount (%) (0.1–400, 12.5, at most two decimal places), Distribution (Uniform / Gaussian, Uniform), Monochromatic (unchecked) |
+| Median | Radius (pixels) (1–500, 1) |
+| Minimum, Maximum | Radius (pixels) (0.2–500.0, 1.0), Preserve (Squareness / Roundness, Squareness) |
+| Motion Blur | Angle (°) (−360–360, 0), Distance (pixels) (1–2000, 10) |
+| Emboss | Angle (°) (−180–180, 135), Height (pixels) (1–100, 3), Amount (%) (1–500, 100) |
+| Twirl | Angle (°) (−999–999, 50) |
+| Pinch | Amount (%) (−100–100, 50) |
+| Spherize | Amount (%) (−100–100, 100), Mode (Normal / Horizontal only / Vertical only, Normal) |
+| Polar Coordinates | Options (Rectangular to Polar / Polar to Rectangular, Rectangular to Polar) |
+| High Pass | Radius (pixels) (0.1–1000.0, 10.0) |
+| Offset | Horizontal (pixels right), Vertical (pixels down) (−30000–30000, 0), Undefined Areas (Set to Transparent / Repeat Edge Pixels / Wrap Around, Set to Transparent) |
+| Mosaic | Cell Size (square) (2–200, 10) |
+| Surface Blur | Radius (pixels) (1–100, 5), Threshold (levels) (2–255, 15) |
+| Dust & Scratches | Radius (pixels) (1–500, 1), Threshold (levels) (0–255, 0) |
+| Trace Contour | Level (0–255, 128), Edge (Lower / Upper, Upper) |
+| Wind | Method (Wind / Blast / Stagger, Wind), Direction (From the Right / From the Left, From the Right) |
 
-- 滤镜对话框记住上次按 OK 时的设置（Photoshop 的行为）：`settings()` 返回输入框里的文字，`lib.rs` 在应用时按 `Kind` 存进 `AppState::filter_settings`，`commands.rs` 下次打开同一对话框时用 `restore(values)` 放回（个数不符时忽略）。Cancel 不记住。只在本次运行内有效，不写入偏好。调整对话框（`Custom` 的各调整变体）每次打开都是默认值，`settings()` 返回 `None`；Custom 滤镜（`Custom::Kernel`）同样记住，内容见 `custom_filter.md`。
-- Preview 默认勾选。
+- Filter dialogs remember the settings from the last time OK was pressed (Photoshop's behavior): `settings()` returns the text in the input boxes, `lib.rs` stores it by `Kind` into `AppState::filter_settings` when applying, and `commands.rs` puts it back with `restore(values)` the next time the same dialog opens (ignored when the count does not match). Cancel is not remembered. This is valid only within the current run and is not written to preferences. Adjustment dialogs (the adjustment variants of `Custom`) open with default values every time, and `settings()` returns `None`; the Custom filter (`Custom::Kernel`) is likewise remembered, see `custom_filter.md` for details.
+- Preview is checked by default.
 
-## 布局与视觉
+## Layout and visuals
 
-### 经典滤镜对话框
+### Classic filter dialogs
 
-Gaussian Blur、Box Blur、Surface Blur、Motion Blur、Unsharp Mask、Add Noise、Dust & Scratches、Median、Minimum、Maximum、High Pass、Offset、Mosaic、Emboss、Trace Contour 按 Photoshop 2026 的经典对话框逐点重做（`classic_ui`），每个对话框的尺寸与各行位置在 `filter_layout.rs`（见 `filter_layout.md`）：
+Gaussian Blur, Box Blur, Surface Blur, Motion Blur, Unsharp Mask, Add Noise, Dust & Scratches, Median, Minimum, Maximum, High Pass, Offset, Mosaic, Emboss and Trace Contour are rebuilt point by point after Photoshop 2026's classic dialogs (`classic_ui`); each dialog's size and row positions are in `filter_layout.rs` (see `filter_layout.md`):
 
-- 窗口框与标题栏是 `common::frame`（标题 AppKit 13 pt 粗体）。
-- 右上角：OK（默认按钮）在 y 38.5、Cancel 在 73.5，左边距窗口右缘 90.5，宽 59.5（Gaussian Blur、High Pass 为 80，Offset 为 60），高 26；其下 Preview 复选框。
-- 左上角预览框（除 Offset 外都有）：`PANE` 区域里居中显示文档（带当前预览效果）的中心部分，100%（一个图像像素对应一个屏幕像素），不缩放、不平滑；纹理由 `lib.rs` 的 `pane_texture` 在打开时与预览变化后重新生成（截取中心不超过 392 × 392 像素）。预览框下方是缩放控件：缩小（100% 时变暗）、「100%」、放大，目前只是显示。已知差异：Photoshop 的预览框不论 Preview 是否勾选都显示效果，这里取消勾选时显示原图；也还不能缩放、拖动查看其他部分。
-- 数值行：右对齐到输入框的标签、19 pt 高的输入框（`appkit::field`，打开时第一个输入框获得焦点并全选）、单位文字（角度的「°」紧贴输入框）；下方 3 pt 灰色轨道，白色三角标记的尖端在轨道下 0.5 pt，标记从轨道起点左 2.25 pt 走到终点右 0.75 pt，位置按该行的 `Scale` 换算（Photoshop 的滑块大多不均匀）。
-- Motion Blur、Emboss 的角度在输入框右侧带角度盘：圆内一条从中心指向角度的线（Motion Blur 的线穿过中心两端）。
-- 选项：Minimum、Maximum 的 Preserve 为下拉框；Add Noise 的 Distribution、Offset 的 Undefined Areas 与 Trace Contour 的 Edge 为带标题的分组框加单选按钮；Add Noise 的 Monochromatic 为复选框。
+- The window frame and title bar are `common::frame` (title AppKit 13 pt bold).
+- Top right: OK (the default button) at y 38.5 and Cancel at 73.5, left edge 90.5 from the window's right edge, width 59.5 (80 for Gaussian Blur and High Pass, 60 for Offset), height 26; below them the Preview checkbox.
+- The preview pane at top left (present on all except Offset): within the `PANE` area, the center part of the document (with the current preview effect) is shown centered at 100% (one image pixel per screen pixel), without scaling or smoothing; the texture is regenerated by `pane_texture` in `lib.rs` on open and after the preview changes (cropping at most 392 × 392 pixels from the center). Below the preview pane are zoom controls: zoom out (dimmed at 100%), "100%", zoom in, currently display only. Known differences: Photoshop's preview pane shows the effect whether or not Preview is checked, while here it shows the original when unchecked; it also cannot yet zoom or be dragged to view other parts.
+- Numeric rows: a label right-aligned to the input box, a 19 pt tall input box (`appkit::field`; on open the first input box takes focus with its contents selected), unit text (the angle's "°" sits right against the input box); below, a 3 pt gray track, with the tip of a white triangle marker 0.5 pt below the track; the marker travels from 2.25 pt left of the track start to 0.75 pt right of the track end, its position converted by the row's `Scale` (most of Photoshop's sliders are non-uniform).
+- The angle in Motion Blur and Emboss has an angle dial to the right of the input box: a line inside the circle pointing from the center toward the angle (Motion Blur's line passes through the center to both ends).
+- Choices: Preserve in Minimum and Maximum is a dropdown; Add Noise's Distribution, Offset's Undefined Areas and Trace Contour's Edge are titled group boxes with radio buttons; Add Noise's Monochromatic is a checkbox.
 
-### 插件式扭曲对话框
+### Plugin-style distort dialogs
 
-Twirl、Pinch、Spherize、Polar Coordinates、Wind 按 Photoshop 2026 的插件式对话框重做（`distort_ui`），布局与绘制在 `distort.rs`（见 `distort.md`）：大预览框（带滚动槽与左下缩放条）、右上 OK / Cancel（89 × 26，13 pt 文字），预览框下方是设置（输入框 + 五边形滑块，或 Polar Coordinates、Wind 的单选分组），右下是扭曲示意图。设置仍存在本模块的参数表里，所以记忆、校验、预览与经典对话框相同。
+Twirl, Pinch, Spherize, Polar Coordinates and Wind are rebuilt after Photoshop 2026's plugin-style dialogs (`distort_ui`), with layout and drawing in `distort.rs` (see `distort.md`): a large preview pane (with scroll troughs and a zoom bar at bottom left), OK / Cancel at top right (89 × 26, 13 pt text), settings below the preview pane (input box + pentagon slider, or the radio groups of Polar Coordinates and Wind), and a distortion diagram at bottom right. The settings still live in this module's parameter table, so remembering, validation and preview are the same as for classic dialogs.
 
-每个滤镜对话框都有经典或插件式布局之一（`Kind::size` 在没有布局时 panic，`every_filter_dialog_has_an_effect` 会暴露遗漏）；旧的通用布局已删除。
+Every filter dialog has either a classic or a plugin-style layout (`Kind::size` panics when there is no layout, and `every_filter_dialog_has_an_effect` exposes omissions); the old generic layout has been removed.
 
-## 重做的对话框（`Custom`）
+## Rebuilt dialogs (`Custom`)
 
-- `AdjustDialog` 对这些对话框持有各自的状态（`Custom` 的各变体），`effect()` 取自它们，`show` 用它们的尺寸并调用它们的 `ui`；窗口框与标题栏仍是 `common::frame`（标题用 AppKit 13 pt 粗体）。
-- 它们返回 `uxp::Button`：OK → `Outcome::Apply`，Cancel → `Outcome::Cancel`，Brightness/Contrast 的 Auto → 按直方图算出 Auto 的取值（见 `brightness_contrast.md`）。
-- Custom 滤镜（`Custom::Kernel`，见 `custom_filter.md`）：宿主先画预览框与缩放控件（`wants_pane()` 对它为真），再画网格；它的 Load...、Save... 请求由宿主用系统文件对话框完成（`load_kernel` / `save_kernel`）。
-- `set_channel_histograms(h)`：打开 Levels、Curves 时由 `commands.rs` 传入红绿蓝三个通道的直方图。
-- `set_colorize_hue(hue)`：打开 Hue/Saturation 时由 `commands.rs` 传入前景色的色相，作为 Colorize 的初始色相（Photoshop 的行为）。
+- For these dialogs `AdjustDialog` holds their own state (the variants of `Custom`); `effect()` is taken from them, and `show` uses their size and calls their `ui`; the window frame and title bar are still `common::frame` (title in AppKit 13 pt bold).
+- They return `uxp::Button`: OK → `Outcome::Apply`, Cancel → `Outcome::Cancel`, Brightness/Contrast's Auto → computes the Auto values from the histogram (see `brightness_contrast.md`).
+- Custom filter (`Custom::Kernel`, see `custom_filter.md`): the host first draws the preview pane and zoom controls (`wants_pane()` is true for it), then the grid; its Load... and Save... requests are carried out by the host with the system file dialog (`load_kernel` / `save_kernel`).
+- `set_channel_histograms(h)`: when Levels or Curves opens, `commands.rs` passes in the histograms of the red, green and blue channels.
+- `set_colorize_hue(hue)`: when Hue/Saturation opens, `commands.rs` passes in the foreground color's hue as the initial Colorize hue (Photoshop's behavior).
 
-## 交互
+## Interaction
 
-- 输入框：任一参数超出范围或不是数字时，OK 置灰，也不预览。每个滤镜对话框都必须在 `effect()` 里映射到 `Filter`，否则 OK 永远置灰。
-- 三角标记：在轨道上按下或拖动时把它移到指针位置，按该行的比例换算取值（按小数位数取整）。插件式对话框的五边形滑块线性取整数。
-- 角度盘：在盘内按下或拖动时取指针方向的角度（整度）；Motion Blur 的角度折回 −90–90。
-- Preview：勾选时文档实时显示结果，取消勾选时恢复原样。
-- OK 或 Enter（所有值有效时）：返回 `Outcome::Apply(adjustment)`；Cancel 或 Esc：返回 `Outcome::Cancel`。
-- 打开期间是模态的。
+- Input boxes: when any parameter is out of range or not a number, OK is grayed out and there is no preview. Every filter dialog must map to a `Filter` in `effect()`, otherwise OK is always grayed out.
+- Triangle marker: pressing or dragging on the track moves it to the pointer position, converting the value by the row's scale (rounded to the number of decimal places). The pentagon sliders in plugin-style dialogs take integers linearly.
+- Angle dial: pressing or dragging inside the dial takes the angle of the pointer's direction (whole degrees); Motion Blur's angle wraps into −90–90.
+- Preview: when checked, the document shows the result live; when unchecked, it reverts to the original.
+- OK or Enter (when all values are valid): returns `Outcome::Apply(adjustment)`; Cancel or Esc: returns `Outcome::Cancel`.
+- Modal while open.
 
-## 测试覆盖
+## Test coverage
 
-- `defaults_match_photoshop`：Levels、Exposure、Hue/Saturation 的默认调整。
-- `filters_read_choices_and_checkboxes`：Add Noise 的分布与单色、Offset 的空白区域选项映射到对应的滤镜参数。
-- `fields_show_values_as_photoshop_does`：Gaussian Blur、Unsharp Mask 的半径显示「1.0」，Add Noise 显示「12.5」，Minimum、Maximum 显示「1」。
-- `every_filter_dialog_has_an_effect`：每种用参数表的滤镜对话框的默认值都能得到滤镜（漏掉映射会让 OK 置灰），并且都有布局。
-- `ui_tests.rs` 的 `filter_dialogs_remember_their_last_values`、`more_filters_from_the_menu` 与截图测试覆盖记忆、从菜单打开并应用、以及布局。
+- `defaults_match_photoshop`: the default adjustments for Levels, Exposure and Hue/Saturation.
+- `filters_read_choices_and_checkboxes`: Add Noise's distribution and monochromatic, and Offset's undefined areas options map to the corresponding filter parameters.
+- `fields_show_values_as_photoshop_does`: the radius in Gaussian Blur and Unsharp Mask shows "1.0", Add Noise shows "12.5", Minimum and Maximum show "1".
+- `every_filter_dialog_has_an_effect`: the default values of every filter dialog using the parameter table yield a filter (a missing mapping would gray out OK), and every one has a layout.
+- `filter_dialogs_remember_their_last_values` and `more_filters_from_the_menu` in `ui_tests.rs`, plus screenshot tests, cover remembering, opening from the menu and applying, and layout.

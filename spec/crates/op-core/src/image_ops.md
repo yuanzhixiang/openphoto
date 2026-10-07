@@ -1,64 +1,64 @@
-# image_ops.rs：画布变换（图像大小、旋转、翻转、裁剪、修整）
+# image_ops.rs: canvas transforms (image size, rotate, flip, crop, trim)
 
-## 职责
+## Responsibilities
 
-实现 Image 菜单中改变整个画布的操作：Image Size 的重采样、Image Rotation 的固定角度旋转与画布翻转、Crop、Trim。所有操作同时作用于每个图层和选区（包括可以 Reselect 的上一个选区），通过 `Document::transform_canvas` 完成，不记录历史。
+Implements the Image menu operations that change the whole canvas: Image Size resampling, Image Rotation's fixed-angle rotations and canvas flips, Crop, and Trim. Every operation acts on each layer and the selection at once (including the previous selection available to Reselect), is carried out through `Document::transform_canvas`, and records no history.
 
-## 对外接口与规则
+## Public interface and rules
 
-### 图像大小（重采样）
+### Image size (resampling)
 
-- `Resample`：Photoshop 2026 菜单里的八种方法，顺序与标签一致（`ALL`、`label`、`separator_after`）：
-  - `Automatic`（默认）：缩小时用 Bicubic Sharper，放大时用 Bicubic Smoother（`resolve`）。
-  - `PreserveDetails`、`PreserveDetails2`：Lanczos 3（半径 3）。Photoshop 的保留细节（2.0 用机器学习）有降噪等处理，这里只近似为 Lanczos。
-  - `BicubicSmoother`：Mitchell–Netravali（B = C = 1/3），更柔和。
-  - `BicubicSharper`：a = −0.75 的三次卷积，更锐利。
-  - `Bicubic`：a = −0.5 的三次卷积。
-  - `NearestNeighbor`、`Bilinear`。
-  测试 `resample_methods`：每种方法都保持纯色不变；Automatic 的选择；同一阶跃放大后的过冲 Sharper > Bicubic > Smoother，双线性不过冲。
-- `resize(doc, width, height, method)`：把每个图层和选区缩放到新尺寸（宽高必须大于 0）。先横向、再纵向分离重采样：目标像素中心对应源坐标 `(i + 0.5) / 比例 − 0.5`；双三次用 a = −0.5 的三次卷积核（半径 2），双线性用三角核（半径 1），权重归一化；缩小时核按比例加宽，每个源像素都参与（面积正确的缩小）；邻近取最近的源像素。颜色在预乘 alpha 下计算，结果限制在 0–255（双三次会过冲）；alpha 小于 0.5 的像素为全透明。选区的选择程度按同样的方法重采样。图层有画布外的像素时（`resize_with_outside`），画布连同周围的像素一起按同一比例缩放，并放回按比例缩放后的位置（Photoshop 2026 实测，见下方测试）。
+- `Resample`: the eight methods in the Photoshop 2026 menu, in the same order and with the same labels (`ALL`, `label`, `separator_after`):
+  - `Automatic` (default): uses Bicubic Sharper when reducing and Bicubic Smoother when enlarging (`resolve`).
+  - `PreserveDetails`, `PreserveDetails2`: Lanczos 3 (radius 3). Photoshop's Preserve Details (2.0 uses machine learning) includes noise reduction and other processing; here it is only approximated as Lanczos.
+  - `BicubicSmoother`: Mitchell–Netravali (B = C = 1/3), softer.
+  - `BicubicSharper`: cubic convolution with a = −0.75, sharper.
+  - `Bicubic`: cubic convolution with a = −0.5.
+  - `NearestNeighbor`, `Bilinear`.
+  Test `resample_methods`: every method keeps a solid color unchanged; Automatic's choice; after enlarging the same step, the overshoot is Sharper > Bicubic > Smoother, and bilinear does not overshoot.
+- `resize(doc, width, height, method)`: scales each layer and the selection to the new size (width and height must be greater than 0). Resamples separably, horizontally first, then vertically: the center of a target pixel corresponds to the source coordinate `(i + 0.5) / scale − 0.5`; bicubic uses a cubic convolution kernel with a = −0.5 (radius 2), bilinear uses a triangle kernel (radius 1), and the weights are normalized; when reducing, the kernel is widened in proportion so that every source pixel contributes (area-correct reduction); nearest neighbor takes the closest source pixel. Colors are computed in premultiplied alpha and the results are clamped to 0–255 (bicubic overshoots); pixels with alpha below 0.5 are fully transparent. The selection's degree of selection is resampled the same way. When a layer has pixels outside the canvas (`resize_with_outside`), the canvas together with the surrounding pixels is scaled by the same ratio and placed back at the proportionally scaled position (measured in Photoshop 2026, see the tests below).
 
-### 旋转与翻转
+### Rotate and flip
 
-- `Orientation`：`Rotate180`、`Rotate90Clockwise`、`Rotate90CounterClockwise`、`FlipHorizontal`、`FlipVertical`。`history_name()` 给出 Photoshop 的历史名称：旋转都是「Rotate Canvas」，翻转为「Flip Canvas Horizontal」/「Flip Canvas Vertical」。
-- `reorient(doc, orientation)`：逐像素重映射，无插值、无损。90° 旋转交换宽高。顺时针 90° 时原图左上角到右上角；逆时针 90° 时原图左上角到左下角；180° 时左上角到右下角。选区按同样的方式变换。图层有画布外的像素时，这些像素按同一映射（以画布为准，整数坐标可以为负）一起转动或翻转，而不是丢掉。
+- `Orientation`: `Rotate180`, `Rotate90Clockwise`, `Rotate90CounterClockwise`, `FlipHorizontal`, `FlipVertical`. `history_name()` gives Photoshop's history name: rotations are all "Rotate Canvas", flips are "Flip Canvas Horizontal" / "Flip Canvas Vertical".
+- `reorient(doc, orientation)`: remaps pixel by pixel, with no interpolation, losslessly. 90° rotations swap width and height. At 90° clockwise, the original top-left corner goes to the top right; at 90° counterclockwise, the original top-left corner goes to the bottom left; at 180°, the top-left corner goes to the bottom right. The selection is transformed the same way. When a layer has pixels outside the canvas, those pixels are rotated or flipped along with it by the same mapping (relative to the canvas; integer coordinates can be negative) rather than discarded.
 
-### 裁剪
+### Crop
 
-- `crop(doc, x0, y0, x1, y1)`：把画布裁成该矩形（右、下边界不含），矩形必须在画布内且非空，否则 panic。图层像素与选区一起平移，选区仍然盖在原来的图像内容上。
-- `crop_to_selection(doc)`：Image › Crop。裁到选区外接矩形；没有选区时返回 `false`。选区保留（羽化或非矩形选区的透明部分照常保留在选区中）。
+- `crop(doc, x0, y0, x1, y1)`: crops the canvas to that rectangle (right and bottom edges exclusive); the rectangle must be inside the canvas and non-empty, otherwise it panics. Layer pixels and the selection are translated together, so the selection still covers the original image content.
+- `crop_to_selection(doc)`: Image › Crop. Crops to the selection's bounding rectangle; returns `false` when there is no selection. The selection is kept (the transparent parts of a feathered or non-rectangular selection stay in the selection as usual).
 
-### 修整（Trim）
+### Trim
 
-- `TrimBasis`：`Transparent`（裁掉全透明像素，alpha 为 0）、`TopLeftColor`（裁掉与左上角像素颜色完全相同的像素）、`BottomRightColor`（与右下角像素完全相同）。颜色比较包括 alpha，不允许容差。
-- `TrimSides`：上、左、下、右四边是否裁剪，默认全选。
-- `trim_bounds(doc, basis, sides)`：在合成后的图像上找出所有「不被裁掉」的像素的外接矩形，未勾选的边保持原位置；所有像素都会被裁掉时返回 `None`。
-- `trim(doc, basis, sides)`：按 `trim_bounds` 裁剪；结果为 `None` 或与原画布相同时不改动并返回 `false`。
+- `TrimBasis`: `Transparent` (trims away fully transparent pixels, alpha 0), `TopLeftColor` (trims away pixels whose color is exactly the same as the top-left pixel), `BottomRightColor` (exactly the same as the bottom-right pixel). Color comparison includes alpha, with no tolerance allowed.
+- `TrimSides`: whether each of the top, left, bottom, and right sides is trimmed; all selected by default.
+- `trim_bounds(doc, basis, sides)`: finds, on the composited image, the bounding rectangle of all pixels that are "not trimmed away"; unchecked sides keep their original position; returns `None` when all pixels would be trimmed away.
+- `trim(doc, basis, sides)`: crops by `trim_bounds`; when the result is `None` or the same as the original canvas, makes no change and returns `false`.
 
-## 参考线
+## Guides
 
-- `reorient`：180° 时位置变为 `宽 − x` / `高 − y`；顺时针 90° 时垂直参考线 x 变为水平参考线 x、水平参考线 y 变为垂直参考线 `原高 − y`；逆时针 90° 时垂直参考线 x 变为水平参考线 `原宽 − x`、水平参考线 y 变为垂直参考线 y；水平翻转只改垂直参考线（`宽 − x`），垂直翻转只改水平参考线。
-- `crop` 按裁剪原点平移参考线；`resize` 按宽高比例缩放参考线。
-- 测试 `guides_follow_the_canvas`：旋转、裁剪、缩放后参考线的位置与方向。
+- `reorient`: at 180° the position becomes `width − x` / `height − y`; at 90° clockwise, a vertical guide at x becomes a horizontal guide at x, and a horizontal guide at y becomes a vertical guide at `original height − y`; at 90° counterclockwise, a vertical guide at x becomes a horizontal guide at `original width − x`, and a horizontal guide at y becomes a vertical guide at y; a horizontal flip changes only vertical guides (`width − x`), and a vertical flip changes only horizontal guides.
+- `crop` translates guides by the crop origin; `resize` scales guides by the width and height ratios.
+- Test `guides_follow_the_canvas`: the position and orientation of guides after rotation, cropping, and scaling.
 
 ## Reveal All
 
-`crop_extended(doc, (x0, y0, x1, y1), delete_cropped, background)`：裁剪工具的裁剪。范围可以超出画布：画布在那里扩大，背景图层的新区域填 `background`，其它图层透明（`place_canvas`）。`delete_cropped`（Delete Cropped Pixels）时删除新画布外的像素；否则保留在图层上，并且背景图层变成普通图层「Layer 0」（解除锁定）以保留它的画布外像素。空范围返回 `false`。测试 `crop_tool_crops_past_the_canvas_and_can_keep_pixels`。
+`crop_extended(doc, (x0, y0, x1, y1), delete_cropped, background)`: the Crop tool's crop. The range can extend past the canvas: the canvas is enlarged there, the new area of the background layer is filled with `background`, and other layers are transparent (`place_canvas`). With `delete_cropped` (Delete Cropped Pixels), pixels outside the new canvas are deleted; otherwise they are kept on the layers, and the background layer becomes the regular layer "Layer 0" (unlocked) to keep its pixels outside the canvas. An empty range returns `false`. Test `crop_tool_crops_past_the_canvas_and_can_keep_pixels`.
 
-`rotate_arbitrary(doc, degrees, background)`：Image › Image Rotation › Arbitrary...（Rotate Canvas）。整个文档绕中心旋转 `degrees`（正数顺时针）。画布扩大到旋转后图像的外接矩形并向上取整：200 × 100 转 30° 为 224 × 187，再转 −45° 为 291 × 291（Photoshop 2026 实测）。逐像素双线性重采样（预乘 alpha）；背景图层的新角落填 `background`（背景色）并截到画布内，其它图层的新角落透明，转出画布的像素保留在图层上；蒙版的新角落为显示（255）；选区随之旋转。360° 的整数倍什么也不做并返回 `false`。测试 `rotate_arbitrary_like_photoshop`：90° 时宽高互换、中心右侧的点转到中心下方；30° 与 −45° 的尺寸；背景角落为背景色、中心仍为原色。
+`rotate_arbitrary(doc, degrees, background)`: Image › Image Rotation › Arbitrary... (Rotate Canvas). The whole document rotates around its center by `degrees` (positive is clockwise). The canvas is enlarged to the bounding rectangle of the rotated image, rounded up: 200 × 100 rotated 30° becomes 224 × 187, and rotated a further −45° becomes 291 × 291 (measured in Photoshop 2026). Resamples pixel by pixel bilinearly (premultiplied alpha); the new corners of the background layer are filled with `background` (the background color) and clipped to the canvas, the new corners of other layers are transparent, and pixels rotated out of the canvas are kept on the layers; the new corners of masks are revealed (255); the selection rotates along with it. Integer multiples of 360° do nothing and return `false`. Test `rotate_arbitrary_like_photoshop`: at 90° width and height swap and a point to the right of center moves below center; the sizes at 30° and −45°; the background corners are the background color and the center is still the original color.
 
-`reveal_all(doc, background)`：Image › Reveal All。用 `Document::content_bounds` 求出画布与所有图层像素（包括画布外的）的并集，把画布扩大到这个范围（`place_canvas`，旧画布放在相应偏移处），背景图层的扩展区域填 `background`（背景色）。没有任何像素在画布外时什么也不做并返回 `false`。测试 `reveal_all_grows_the_canvas_to_the_hidden_pixels` 覆盖：左边外和右下外的像素都出现在新画布上，背景扩展为背景色，第二次调用返回 `false`。
+`reveal_all(doc, background)`: Image › Reveal All. Uses `Document::content_bounds` to find the union of the canvas and all layer pixels (including those outside the canvas), enlarges the canvas to that range (`place_canvas`, with the old canvas placed at the corresponding offset), and fills the extended area of the background layer with `background` (the background color). When no pixel is outside the canvas, it does nothing and returns `false`. Test `reveal_all_grows_the_canvas_to_the_hidden_pixels` covers: pixels off the left and off the bottom right both appear on the new canvas, the background is extended with the background color, and a second call returns `false`.
 
-## 已知限制
+## Known limitations
 
-- 裁剪总是删掉新画布外的像素（`clipped`，相当于 Photoshop 开启「Delete Cropped Pixels」）；Photoshop 裁剪工具可以关闭它而保留画布外像素。
-- `remapped` 会把整幅图像展开成缓冲区，内存占用为图像尺寸 × 4 字节，与图层稀疏程度无关。
+- Cropping always deletes pixels outside the new canvas (`clipped`, equivalent to Photoshop with "Delete Cropped Pixels" on); Photoshop's Crop tool can turn it off and keep pixels outside the canvas.
+- `remapped` expands the whole image into a buffer, using image size × 4 bytes of memory regardless of how sparse the layers are.
 
-## 测试覆盖
+## Test coverage
 
-- `rotations_and_flips_move_the_corners`：五种变换后角上像素的位置与尺寸。
-- `the_selection_turns_with_the_canvas`：顺时针旋转后选区移到右上角。
-- `crop_keeps_the_selected_area`：裁到选区后尺寸、像素与选区位置正确；没有选区时不裁剪。
-- `resize_scales_layers_and_selection`：4×2 中左半红色缩小一半后左像素以红为主、右像素接近白，选区跟随；邻近放大保持硬边；双线性放大在边缘混色。
-- `trim_removes_borders_of_the_corner_color`：按左上角颜色裁剪四边、按右下角颜色只裁上边；不透明背景上按透明像素裁剪不改动。
-- `pixels_outside_the_canvas_follow_merges_rotation_and_image_size`：100×100 文档里一半在左边外的方块与另一块合并，再顺时针旋转、缩小一半、水平翻转，每一步的图层范围（含画布外）都与 Photoshop 2026 实测相同：(−20, 10, 60, 60) → (40, −20, 90, 60) → (20, −10, 45, 30) → (5, −10, 30, 30)。
+- `rotations_and_flips_move_the_corners`: positions of corner pixels and sizes after the five transforms.
+- `the_selection_turns_with_the_canvas`: after a clockwise rotation the selection moves to the top-right corner.
+- `crop_keeps_the_selected_area`: after cropping to the selection, size, pixels, and selection position are correct; no crop with no selection.
+- `resize_scales_layers_and_selection`: a 4×2 image with a red left half reduced by half gives a mostly red left pixel and a near-white right pixel, with the selection following; nearest-neighbor enlargement keeps hard edges; bilinear enlargement blends colors at the edge.
+- `trim_removes_borders_of_the_corner_color`: trimming by the top-left color trims all four sides, trimming by the bottom-right color trims only the top; trimming by transparent pixels on an opaque background changes nothing.
+- `pixels_outside_the_canvas_follow_merges_rotation_and_image_size`: in a 100×100 document, a square half off the left side is merged with another block, then rotated clockwise, reduced by half, and flipped horizontally; at every step the layer range (including outside the canvas) matches Photoshop 2026 measurements: (−20, 10, 60, 60) → (40, −20, 90, 60) → (20, −10, 45, 30) → (5, −10, 30, 30).

@@ -1,78 +1,78 @@
-# free_transform.rs：自由变换的画布交互
+# free_transform.rs: Free Transform canvas interaction
 
-## 组件职责
+## Component responsibilities
 
-Edit › Free Transform（⌘T）进行中的画布交互：显示变换框、拖动移动/缩放/旋转、确认或取消。像素变换见 `op-core` 的 `transform.md`。
+The canvas interaction while Edit › Free Transform (⌘T) is in progress: shows the transform box, drags to move/scale/rotate, and commits or cancels. For the pixel transform see `op-core`'s `transform.md`.
 
-## 状态
+## State
 
-会话保存在 `DocState::free_transform`（`FreeTransform`）：开始时的文档快照 `before`、原始范围 `bounds`、平移 `offset`、缩放 `scale`、角度 `angle`、斜切 `skew`（水平与竖直，弧度）、参考点 `reference` 与是否显示 `show_reference`、相对定位 `relative`、宽高链接 `linked`、插值 `interpolation`、自由四角 `quad`（斜切、扭曲、透视之后才有：左上、右上、右下、左下，文档像素）、模式 `mode`（`TransformMode`：Free、Skew、Distort、Perspective）、进行中的拖动 `drag`，以及文档当前显示的变换 `applied`（`Projective`）。框的映射 `mapping()`：有自由四角时为范围到四角的投影变换（`Projective::rect_to_quad`），否则为「平移到范围中心 + offset · 旋转 angle · 斜切 skew · 缩放 scale · 平移回范围中心」。预览用所选插值（`transform_with`）。
+The session is stored in `DocState::free_transform` (`FreeTransform`): the document snapshot at the start `before`, the original bounds `bounds`, translation `offset`, scale `scale`, angle `angle`, skew `skew` (horizontal and vertical, in radians), reference point `reference` and whether it is shown `show_reference`, relative positioning `relative`, width/height link `linked`, interpolation `interpolation`, free corners `quad` (present only after skew, distort or perspective: top-left, top-right, bottom-right, bottom-left, in document pixels), mode `mode` (`TransformMode`: Free, Skew, Distort, Perspective), the drag in progress `drag`, and the transform currently shown in the document `applied` (`Projective`). The box mapping `mapping()`: with free corners, the projective transform from the bounds to the corners (`Projective::rect_to_quad`); otherwise "translate to the bounds center + offset · rotate by angle · skew by skew · scale by scale · translate back from the bounds center". The preview uses the chosen interpolation (`transform_with`).
 
-## 流程
+## Flow
 
-- `start(state)`：用 `transform::bounds` 检查并取得范围，保存快照，开始会话。`start_in(state, mode)`：Edit › Transform › Scale、Rotate（都是 Free）、Skew、Distort、Perspective；已在变换中时只切换模式。失败时由调用方弹出提示（例如背景图层无选区时「Could not complete the Free Transform command because the layer is locked.」）。
-- 进行中，每帧 `preview`：框的映射与 `applied` 不同时，先恢复快照，再对文档应用新的映射，文档实时显示结果。预览不记录历史。
-- 确认（`commit`）：Enter、在框内双击，或选项栏的 ✓ 按钮。映射不是恒等时记录「Free Transform」（无论从哪个模式开始，Photoshop 2026 都记这个名字，实测），并把映射记为 `AppState::last_transform`（供 Transform › Again 使用）；恒等时视为取消。
-- 取消（`cancel`）：Esc 或选项栏的 ⦸ 按钮，恢复快照。
-- 有输入框获得键盘焦点时，Enter 和 Esc 不作用于变换。
-- 会话期间 `AppState::transforming()` 为真，`modal_open()` 也为真：菜单命令与单键工具快捷键都不生效，与 Photoshop 一致。
+- `start(state)`: checks and obtains the bounds with `transform::bounds`, saves the snapshot and starts the session. `start_in(state, mode)`: Edit › Transform › Scale, Rotate (both Free), Skew, Distort, Perspective; when already transforming it only switches the mode. On failure the caller shows an alert (e.g. "Could not complete the Free Transform command because the layer is locked." on the background layer with no selection).
+- While in progress, `preview` runs every frame: when the box mapping differs from `applied`, it first restores the snapshot and then applies the new mapping to the document, so the document shows the result live. The preview records no history.
+- Commit (`commit`): Enter, double-clicking inside the box, or the ✓ button in the options bar. When the mapping is not the identity, it records "Free Transform" (Photoshop 2026 records this name whichever mode it started from, as measured) and stores the mapping as `AppState::last_transform` (for Transform › Again); the identity is treated as a cancel.
+- Cancel (`cancel`): Esc or the ⦸ button in the options bar restores the snapshot.
+- When an input field has keyboard focus, Enter and Esc do not act on the transform.
+- During the session `AppState::transforming()` is true, and so is `modal_open()`: menu commands and single-key tool shortcuts have no effect, as in Photoshop.
 
-## 变形（Warp）
+## Warp
 
-- Edit › Transform › Warp、右键菜单的 Warp、选项栏的变形切换按钮进入 Warp 模式（`set_mode`）：网格从平整网格开始，再经过框当前的映射，所以之前的缩放旋转保留。
-- 拖动：按在边界的控制点上（8 pt 以内）移动该控制点；按在曲面上时拉动那一点（`WarpMesh::pull`），曲面跟着弯；曲面外按下没有作用。
-- 外观（Photoshop 2026）：蓝色 `#5b8be6` 的曲面边界（1.5 pt）与三等分处的曲线（0.75 pt），边界上的 12 个控制点为蓝色圆点，角点更大。
-- 预览用 `transform::warp`；确认记录「Warp」（Photoshop 2026 实测），网格没动过时视为取消；不参与 Transform Again。
-- 选项栏变为变形栏（见 `options_bar.md`）。
+- Edit › Transform › Warp, Warp in the context menu, and the warp toggle button in the options bar enter Warp mode (`set_mode`): the mesh starts as a flat grid and then goes through the box's current mapping, so earlier scaling and rotation are kept.
+- Dragging: pressing on a control point on the border (within 8 pt) moves that control point; pressing on the surface pulls that point (`WarpMesh::pull`) and the surface bends with it; pressing outside the surface has no effect.
+- Appearance (Photoshop 2026): a blue `#5b8be6` surface border (1.5 pt) and curves at the thirds (0.75 pt); the 12 control points on the border are blue dots, larger at the corners.
+- The preview uses `transform::warp`; commit records "Warp" (measured in Photoshop 2026), and a mesh that has not moved counts as a cancel; it does not take part in Transform Again.
+- The options bar becomes the warp bar (see `options_bar.md`).
 
 ## Transform Selection
 
-Select › Transform Selection（`start_selection`，有选区时可用）：同样的变换框围住选区，但只移动选区的轮廓（`transform::transform_selection`），像素不动；确认记录「Transform Selection」，不更新 Transform Again。测试 `ui_tests::transform_selection_moves_only_the_outline`。
+Select › Transform Selection (`start_selection`, available when there is a selection): the same transform box surrounds the selection, but only the selection outline moves (`transform::transform_selection`), not the pixels; commit records "Transform Selection" and does not update Transform Again. Test `ui_tests::transform_selection_moves_only_the_outline`.
 
-## 交互（与 Photoshop 一致）
+## Interaction (matching Photoshop)
 
-- 按下时判定抓住的部位（屏幕坐标）：距 8 个控制点（四角与四边中点）8 pt 以内为缩放；在框内为移动；框外为旋转。
-- 移动：框随指针平移。
-- 缩放：
-  - 默认以对面的控制点为固定点；按住 ⌥ 以中心为固定点。
-  - 角控制点默认等比缩放（指针位移投影到框的对角线方向）；按住 Shift 自由缩放。
-  - 边控制点只改变一个方向的大小，另一方向的中心不动。
-  - 缩放比例的绝对值至少为 1 / 原始范围的较长边（框不会缩成 0）；越过固定点时翻转。
-  - 框旋转后，缩放在框自身的坐标轴上计算。
-- 旋转：绕当前中心，角度随指针相对中心的角度变化；按住 Shift 吸附到 15° 的倍数。
-- 斜切、扭曲、透视（Photoshop 的修饰键；在 Skew、Distort、Perspective 模式下不按修饰键也是这样）：
-  - ⌘ 拖角点：扭曲，只移动这个角；⌘ 拖边：这条边的两个角一起移动。
-  - ⌘⇧ 拖边：斜切，这条边沿自身方向滑动；Skew 模式下拖角点只沿水平或竖直中较大的方向移动。
-  - ⌘⌥⇧ 拖角点：透视，角点沿较大的方向移动，同一条边上的相邻角反向移动同样的距离。
-  - 有了自由四角后：普通拖控制点继续按扭曲处理；框内拖动平移四角；框外拖动让四角绕它们的中点转动（Shift 15°）。
-- 右键菜单（`context_menu`）：Free Transform、Scale、Rotate、Skew、Distort、Perspective（切换模式），置灰的 Warp、Content-Aware Scale、Puppet Warp，Rotate 180°、Rotate 90° Clockwise、Rotate 90° Counter Clockwise、Flip Horizontal、Flip Vertical（`turn_box`：转动或翻转框本身——参数框改角度或缩放符号，自由四角绕中点转动或翻转）。
-- 光标：框内为移动光标；框外为旋转（`Alias`）光标；控制点上为按框角度换算的双向箭头。
+- On press, the part grabbed is determined (in screen coordinates): within 8 pt of one of the 8 control points (the four corners and four edge midpoints) is scaling; inside the box is moving; outside the box is rotating.
+- Move: the box follows the pointer.
+- Scale:
+  - By default the opposite control point is the fixed point; holding ⌥ makes the center the fixed point.
+  - Corner control points scale proportionally by default (the pointer displacement is projected onto the box's diagonal); holding Shift scales freely.
+  - Edge control points change the size in one direction only; the center in the other direction stays put.
+  - The absolute scale factor is at least 1 / the longer side of the original bounds (the box never shrinks to 0); crossing the fixed point flips it.
+  - After the box is rotated, scaling is computed along the box's own axes.
+- Rotate: about the current center, the angle following the pointer's angle relative to the center; holding Shift snaps to multiples of 15°.
+- Skew, distort, perspective (Photoshop's modifier keys; in Skew, Distort and Perspective modes the same happens without modifier keys):
+  - ⌘-drag a corner: distort, moving only that corner; ⌘-drag an edge: both corners of that edge move together.
+  - ⌘⇧-drag an edge: skew, the edge slides along its own direction; in Skew mode dragging a corner moves it only along whichever of horizontal or vertical is larger.
+  - ⌘⌥⇧-drag a corner: perspective, the corner moves along the larger direction and the adjacent corner on the same edge moves the same distance in the opposite direction.
+  - Once there are free corners: an ordinary drag on a control point continues to be treated as distort; dragging inside the box translates the corners; dragging outside the box rotates the corners about their midpoint (Shift 15°).
+- Context menu (`context_menu`): Free Transform, Scale, Rotate, Skew, Distort, Perspective (switch mode), grayed-out Warp, Content-Aware Scale, Puppet Warp, Rotate 180°, Rotate 90° Clockwise, Rotate 90° Counter Clockwise, Flip Horizontal, Flip Vertical (`turn_box`: rotates or flips the box itself; the parametric box changes its angle or scale sign, free corners rotate or flip about their midpoint).
+- Cursor: the move cursor inside the box; the rotate (`Alias`) cursor outside the box; on control points, a double-headed arrow adjusted for the box's angle.
 
-## 外观
+## Appearance
 
-- 框：1 pt 蓝色（`#2c8be8`）细线。
-- 控制点：7 pt 白色方块，深灰描边。
-- 中心参考点：半径 4 pt 的圆加十字线。
-- 参考点（半径 4 pt 的圆加十字线）只在选项栏的参考点复选框打开时显示，位置为所选参考点（默认中心）变换后的位置；Photoshop 2026 默认不显示。
-- 选项栏（见 `options_bar.md`）：参考点、X、Y、W、H、角度、斜切、插值、取消与确认。
+- Box: a thin 1 pt blue (`#2c8be8`) line.
+- Control points: 7 pt white squares with a dark gray stroke.
+- Center reference point: a circle of radius 4 pt with crosshairs.
+- The reference point (a circle of radius 4 pt with crosshairs) is shown only when the reference point checkbox in the options bar is on, at the transformed position of the chosen reference point (center by default); Photoshop 2026 does not show it by default.
+- Options bar (see `options_bar.md`): reference point, X, Y, W, H, angle, skew, interpolation, cancel and commit.
 
-## 移动工具的变换控件
+## Move tool transform controls
 
-`controls_handle_at` 与 `draw_controls` 供移动工具的 Show Transform Controls 使用（见 `document_view.md`）：框和控制点的画法与自由变换共用 `draw_box`，没有中心参考点；`controls_handle_at` 判断指针是否抓住了某个控制点（与自由变换相同的 8 pt 抓取半径）。
+`controls_handle_at` and `draw_controls` are used by the Move tool's Show Transform Controls (see `document_view.md`): the box and control points are drawn with `draw_box`, shared with Free Transform, without the center reference point; `controls_handle_at` determines whether the pointer grabs a control point (the same 8 pt grab radius as Free Transform).
 
-## 已知限制
+## Known limitations
 
-- 选项栏的数值只读，不能输入；没有参考点位置选择、插值方式选择。
-- 变形没有 Split、网格大小、预设样式（Arc、Flag 等）与 Bend；从变形切回自由变换后，自由变换的拖动不再叠加到变形上。没有 Content-Aware Scale、Puppet Warp。鼠标的缩放与旋转仍以中心为轴（参考点只影响选项栏的数值修改与 X/Y）；参考点不能在画布上拖动。
+- The options bar values are read-only and cannot be typed in; there is no reference point position selection or interpolation method selection.
+- Warp has no Split, grid size, preset styles (Arc, Flag, etc.) or Bend; after switching from Warp back to Free Transform, Free Transform drags no longer stack on top of the warp. There is no Content-Aware Scale or Puppet Warp. Mouse scaling and rotation still pivot on the center (the reference point only affects numeric edits and X/Y in the options bar); the reference point cannot be dragged on the canvas.
 
-## 测试覆盖
+## Test coverage
 
-- `corner_scales_proportionally_from_the_opposite_corner`：角点拖动等比放大 2 倍时左上角不动；Shift 时只放大宽度。
-- `side_handles_move_and_rotate`：边控制点只缩放一个方向且对边不动；移动的偏移；Shift 旋转吸附到 90°。
-- `hit_testing_the_quad`：点是否在框内。
-- `distort_skew_and_perspective`：⌘ 拖右下角只移动它，之后普通拖动继续扭曲；透视模式下右上角外拉、左上角内收；⌘⇧ 拖右边沿自身滑动；映射跟随四角。
-- `turning_and_flipping_the_box`：右键菜单的旋转与翻转改变参数框的角度与缩放；自由四角绕中点转 180°。
-- `ui_tests::transform_distort_from_the_menu`：Edit › Transform › Distort 后拖右下角，确认记录「Free Transform」，远角变红而左上角不动，Transform Again 可用。
-- `options_bar_numbers_pivot_on_the_reference_point`：参考点在左上时 W 50% 保持左上角不动；绕中心转 90° 中心不动；45° 水平斜切让左上角左移。
-- `ui_tests::transform_bar_takes_typed_numbers`：在 W 框输入 50 回车，W、H 都变为 50% 且仍在变换中；角度输入 90 后中心不动。
-- `ui_tests::warp_pulls_the_surface`：Edit › Transform › Warp 后把右下控制点拖出 30 像素、把曲面中部上拉，确认记录「Warp」，拉伸的角有了像素。
+- `corner_scales_proportionally_from_the_opposite_corner`: dragging a corner to scale up 2× proportionally keeps the top-left corner fixed; with Shift only the width grows.
+- `side_handles_move_and_rotate`: edge control points scale in one direction only with the opposite edge fixed; the move offset; Shift rotation snaps to 90°.
+- `hit_testing_the_quad`: whether a point is inside the box.
+- `distort_skew_and_perspective`: ⌘-dragging the bottom-right corner moves only it, and ordinary drags afterwards continue to distort; in perspective mode the top-right corner pulls out and the top-left pulls in; ⌘⇧-dragging the right edge slides it along itself; the mapping follows the corners.
+- `turning_and_flipping_the_box`: the context menu's rotate and flip change the parametric box's angle and scale; free corners rotate 180° about their midpoint.
+- `ui_tests::transform_distort_from_the_menu`: after Edit › Transform › Distort, dragging the bottom-right corner and committing records "Free Transform"; the far corner turns red while the top-left stays put, and Transform Again is available.
+- `options_bar_numbers_pivot_on_the_reference_point`: with the reference point at the top-left, W 50% keeps the top-left corner fixed; rotating 90° about the center keeps the center fixed; a 45° horizontal skew moves the top-left corner left.
+- `ui_tests::transform_bar_takes_typed_numbers`: typing 50 in the W field and pressing Return makes both W and H 50% while still transforming; after entering 90 for the angle the center stays put.
+- `ui_tests::warp_pulls_the_surface`: after Edit › Transform › Warp, dragging the bottom-right control point out 30 pixels and pulling the middle of the surface up, committing records "Warp", and the stretched corner now has pixels.

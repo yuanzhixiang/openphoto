@@ -1,46 +1,46 @@
-# panels/color_panel.rs：Color 与 Swatches 面板
+# panels/color_panel.rs: Color and Swatches Panels
 
-## Color 面板
+## Color Panel
 
-### 组件职责
+### Component Responsibilities
 
-查看和编辑前景色或背景色，对应 Photoshop Color 面板的默认外观（左侧色块、中间饱和度/明度区域、右侧色相条）。
+Views and edits the foreground or background color, corresponding to the default appearance of Photoshop's Color panel (swatches on the left, saturation/brightness area in the middle, hue bar on the right).
 
-### 布局
+### Layout
 
-按 Photoshop 2026 实测，坐标相对面板内容区左上角，单位 pt：
+Per Photoshop 2026 measurements; coordinates are relative to the top-left of the panel's content area, in pt:
 
-- 左上角：前景色色块在 (9, 10)，背景色色块在 (19, 20)，都是 20 见方。前景色是 1 pt 深色框（`#363636`）加颜色，背景色是 1 pt 深色框、1 pt 白框再加颜色。正在编辑的那个画在上层，并在外面多一圈 1 pt 的浅灰框（`#8c8c8c`），它的深色框变为 `#252525`。
-- 中间：饱和度/明度区域，左上角在 (45, 7)，默认大小 224 × 94；横向是饱和度（左 0 右 1），纵向是明度（上 1 下 0），颜色为当前色相。
-- 右侧：竖向色相条，宽 19，距内容区右边 17，与饱和度/明度区域等高，两者之间隔 17；上端 360°、下端 0°（红—品红—蓝—青—绿—黄—红，与 Photoshop 一致）。
-- 改变组高度时，区域和色相条的下边始终离内容区底部 18（最矮 40）。
+- Top left: the foreground swatch at (9, 10) and the background swatch at (19, 20), both 20 square. The foreground color is a 1 pt dark frame (`#363636`) plus the color; the background color is a 1 pt dark frame, a 1 pt white frame, then the color. The one being edited is drawn on top with an extra 1 pt light gray frame (`#8c8c8c`) outside it, and its dark frame becomes `#252525`.
+- Middle: the saturation/brightness area, top-left at (45, 7), default size 224 × 94; horizontal is saturation (0 on the left, 1 on the right), vertical is brightness (1 at the top, 0 at the bottom), in the current hue.
+- Right: a vertical hue bar, 19 wide, 17 from the right edge of the content area, the same height as the saturation/brightness area, with 17 between them; 360° at the top, 0° at the bottom (red–magenta–blue–cyan–green–yellow–red, matching Photoshop).
+- When the group height changes, the bottom edges of the area and the hue bar always stay 18 from the bottom of the content area (minimum 40).
 
-### 交互
+### Interactions
 
-- 点击前景色或背景色色块：切换正在编辑的颜色；点击的是已经在编辑的那个时，打开对应的 Color Picker，与 Photoshop 一致。
-- 在饱和度/明度区域按下或拖动：设置饱和度和明度。
-- 在色相条（左右各放宽约 7 pt 的命中区域）按下或拖动：设置色相。
-- 修改立即写入 `AppState` 的前景色或背景色。
+- Clicking the foreground or background swatch: switches the color being edited; clicking the one already being edited opens the corresponding Color Picker, matching Photoshop.
+- Pressing or dragging in the saturation/brightness area: sets saturation and brightness.
+- Pressing or dragging on the hue bar (hit area widened by about 7 pt on each side): sets the hue.
+- Changes are written immediately to the foreground or background color in `AppState`.
 
-### 指示标记
+### Indicators
 
-- 饱和度/明度区域里是一个半径 5、线宽 1 的空心圆环，在浅色、低饱和区域（明度 > 0.6 且饱和度 < 0.5）为黑色，其余为白色，保证可见；圆环被裁剪在区域内（颜色在角上时只看到四分之一圆，与 Photoshop 一致）。
-- 色相条左侧是一个白色、1 pt 黑边的水滴形指针：左边是半径 4 的圆弧，右边尖端碰到色相条。
+- In the saturation/brightness area is a hollow ring of radius 5 and line width 1, black in light, low-saturation areas (brightness > 0.6 and saturation < 0.5) and white elsewhere, so it stays visible; the ring is clipped to the area (when the color is at a corner only a quarter circle is visible, matching Photoshop).
+- To the left of the hue bar is a white teardrop-shaped pointer with a 1 pt black edge: an arc of radius 4 on the left, with its tip touching the hue bar on the right.
 
-### 边界状态
+### Edge States
 
-颜色被别处改动时（吸管、色板、交换颜色），面板会重新从颜色计算 HSB。为避免灰色时色相跳回 0，只有颜色与缓存的 HSB 对应的颜色不一致时才重新计算。
+When the color is changed elsewhere (eyedropper, swatches, swapping colors), the panel recomputes HSB from the color. To keep the hue from jumping back to 0 for grays, it recomputes only when the color differs from the color corresponding to the cached HSB.
 
-### 渲染
+### Rendering
 
-饱和度/明度区域和色相条用细分网格的顶点颜色绘制（32×32 和 36 段），保证插值准确。
+The saturation/brightness area and the hue bar are drawn with vertex colors on subdivided meshes (32×32 and 36 segments) to keep the interpolation accurate.
 
-## Swatches 面板
+## Swatches Panel
 
-- 显示 `AppState::swatches`：初始为 36 个色板（6 个灰阶加若干彩色），Color Picker 的「Add to Swatches」会追加到末尾。24 见方、间距 4，按面板宽度自动换行。
-- 悬停时色板有白色描边；点击把该颜色设为当前正在编辑的颜色（前景或背景）。
+- Shows `AppState::swatches`: initially 36 swatches (6 grays plus a number of colors); the Color Picker's "Add to Swatches" appends to the end. 24 square, spaced 4 apart, wrapping automatically to the panel width.
+- A hovered swatch has a white outline; clicking sets that color as the color currently being edited (foreground or background).
 
-## 已知限制
+## Known Limitations
 
-- Color 面板只有这一种显示方式，没有 Photoshop 面板菜单里的 RGB 滑块、色轮等其它模式。
-- 色板只能通过 Color Picker 追加，不能删除、重命名、分组或导入，也不会保存到下次启动。
+- The Color panel has only this one display mode; it lacks the RGB sliders, color wheel and other modes from Photoshop's panel menu.
+- Swatches can only be appended through the Color Picker; they cannot be deleted, renamed, grouped or imported, and are not saved for the next launch.

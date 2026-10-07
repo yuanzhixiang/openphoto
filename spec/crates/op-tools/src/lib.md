@@ -1,61 +1,61 @@
-# op-tools：工具定义
+# op-tools: Tool Definitions
 
-## 职责
+## Responsibilities
 
-定义 Photoshop 2026 工具栏中的全部工具、它们在工具栏中的分组、显示名称和单键快捷键。工具的行为在 `op-ui` 中实现；这里只有静态定义和按键选择工具的规则。本 crate 没有依赖。
+Defines all the tools in the Photoshop 2026 toolbar, their grouping in the toolbar, their display names, and their single-key shortcuts. Tool behavior is implemented in `op-ui`; this crate contains only the static definitions and the rules for selecting tools by key. This crate has no dependencies.
 
-## 对外接口
+## Public Interface
 
 ### `Tool`
 
-70 个工具，涵盖 Photoshop 工具栏及各组弹出菜单里的全部工具，例如 `Move`、`Artboard`、`RectangularMarquee`、`EllipticalMarquee`、`SingleRowMarquee`、`SingleColumnMarquee`、`Lasso`、`PolygonalLasso`……`Hand`、`RotateView`、`Zoom`。
+70 tools, covering every tool in the Photoshop toolbar and in each group's flyout menu, for example `Move`, `Artboard`, `RectangularMarquee`, `EllipticalMarquee`, `SingleRowMarquee`, `SingleColumnMarquee`, `Lasso`, `PolygonalLasso`… `Hand`, `RotateView`, `Zoom`.
 
 ### `TOOLBAR`
 
-工具栏从上到下的各个「格」，每一格是共用一个按钮的一组工具，组内顺序与 Photoshop 弹出菜单一致：
+The toolbar's "slots" from top to bottom. Each slot is a group of tools sharing one button, and the order within a group matches Photoshop's flyout menu:
 
-| 格 | 工具组 |
+| Slot | Tool group |
 |---|---|
-| 1 | Move、Artboard |
+| 1 | Move, Artboard |
 | 2 | Rectangular / Elliptical / Single Row / Single Column Marquee |
-| 3 | Lasso、Polygonal Lasso、Magnetic Lasso、Selection Brush |
-| 4 | Object Selection、Quick Selection、Magic Wand |
-| 5 | Crop、Perspective Crop、Slice、Slice Select |
+| 3 | Lasso, Polygonal Lasso, Magnetic Lasso, Selection Brush |
+| 4 | Object Selection, Quick Selection, Magic Wand |
+| 5 | Crop, Perspective Crop, Slice, Slice Select |
 | 6 | Frame |
-| 7 | Eyedropper、Color Sampler、Ruler、Note、Count |
-| 8 | Spot Healing Brush、Remove、Healing Brush、Patch、Content-Aware Move、Red Eye |
-| 9 | Brush、Pencil、Color Replacement、Mixer Brush |
-| 10 | Clone Stamp、Pattern Stamp |
-| 11 | History Brush、Art History Brush |
-| 12 | Eraser、Background Eraser、Magic Eraser |
-| 13 | Gradient、Paint Bucket |
-| 14 | Blur、Sharpen、Smudge |
+| 7 | Eyedropper, Color Sampler, Ruler, Note, Count |
+| 8 | Spot Healing Brush, Remove, Healing Brush, Patch, Content-Aware Move, Red Eye |
+| 9 | Brush, Pencil, Color Replacement, Mixer Brush |
+| 10 | Clone Stamp, Pattern Stamp |
+| 11 | History Brush, Art History Brush |
+| 12 | Eraser, Background Eraser, Magic Eraser |
+| 13 | Gradient, Paint Bucket |
+| 14 | Blur, Sharpen, Smudge |
 | 15 | Adjustment Brush |
-| 16 | Dodge、Burn、Sponge |
-| 17 | Pen、Freeform Pen、Curvature Pen、Add / Delete Anchor Point、Convert Point |
-| 18 | Horizontal / Vertical Type、Vertical / Horizontal Type Mask |
-| 19 | Path Selection、Direct Selection |
-| 20 | Rectangle、Ellipse、Triangle、Polygon、Line、Custom Shape |
-| 21 | Hand、Rotate View |
+| 16 | Dodge, Burn, Sponge |
+| 17 | Pen, Freeform Pen, Curvature Pen, Add / Delete Anchor Point, Convert Point |
+| 18 | Horizontal / Vertical Type, Vertical / Horizontal Type Mask |
+| 19 | Path Selection, Direct Selection |
+| 20 | Rectangle, Ellipse, Triangle, Polygon, Line, Custom Shape |
+| 21 | Hand, Rotate View |
 | 22 | Zoom |
 
-### `Tool::name()`、`Tool::shortcut()`、`Tool::slot()`
+### `Tool::name()`, `Tool::shortcut()`, `Tool::slot()`
 
-- `name()`：与 Photoshop 相同的英文全名，例如 `"Elliptical Marquee Tool"`。
-- `shortcut()`：与 Photoshop 一致的单键快捷键。同组工具共用组的字母（V、M、L、W、C、K、I、J、B、S、Y、E、G、O、P、T、A、U、H、Z），Rotate View 单独用 R。Single Row/Column Marquee、Blur 组、Add/Delete Anchor Point、Convert Point、Selection Brush、Adjustment Brush 没有快捷键。
-- `slot()`：工具所在的格。
+- `name()`: the full English name, the same as Photoshop's, for example `"Elliptical Marquee Tool"`.
+- `shortcut()`: the single-key shortcut, matching Photoshop. Tools in the same group share the group's letter (V, M, L, W, C, K, I, J, B, S, Y, E, G, O, P, T, A, U, H, Z); Rotate View uses R on its own. Single Row/Column Marquee, the Blur group, Add/Delete Anchor Point, Convert Point, Selection Brush, and Adjustment Brush have no shortcut.
+- `slot()`: the slot the tool is in.
 
 ### `tool_for_key(key, shift, active, current)`
 
-按下字母键时选择哪个工具，规则与 Photoshop 一致：
+Which tool is selected when a letter key is pressed, following Photoshop's rules:
 
-- `current(slot)` 是每一格当前显示的工具（Photoshop 记住每组最近用过的那个）。
-- 不按 Shift：选中该字母所在格当前显示的工具；如果它不使用这个字母，则选中组内第一个使用这个字母的工具。
-- 按 Shift，且当前工具就在这一格：按组内顺序循环到下一个使用这个字母的工具，没有快捷键的工具被跳过。
-- 按 Shift 但当前工具在别的格：与不按 Shift 相同。
-- 一格内只有一个工具使用该字母时（例如 R、H）直接选中它。
+- `current(slot)` is the tool currently shown in each slot (Photoshop remembers the most recently used one in each group).
+- Without Shift: selects the tool currently shown in the slot that has this letter; if that tool does not use this letter, selects the first tool in the group that does.
+- With Shift, and the current tool is in this slot: cycles in group order to the next tool that uses this letter, skipping tools without a shortcut.
+- With Shift but the current tool is in another slot: same as without Shift.
+- When only one tool in a slot uses the letter (for example R, H), it is selected directly.
 
-## 测试覆盖
+## Test Coverage
 
-- `every_tool_appears_once`：70 个工具在工具栏中各出现一次，工具栏共 22 格。
-- `keys_select_the_group_and_shift_cycles`：M、⇧M 循环（跳过单行/单列选框）、格记忆、从其它格按 ⇧M、R 与 H 的处理、未使用的字母。
+- `every_tool_appears_once`: each of the 70 tools appears exactly once in the toolbar, and the toolbar has 22 slots.
+- `keys_select_the_group_and_shift_cycles`: M, ⇧M cycling (skipping the single row/column marquees), slot memory, pressing ⇧M from another slot, handling of R and H, unused letters.

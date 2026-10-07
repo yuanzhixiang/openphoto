@@ -1,16 +1,16 @@
-# panels/navigator.rs：Navigator 面板
+# panels/navigator.rs: Navigator panel
 
-## 组件职责
+## Component responsibilities
 
-文档的缩略图与当前视图位置，以及缩放控制。
+A thumbnail of the document and the current view position, plus zoom controls.
 
-## 内容与交互
+## Content and interaction
 
-- 缩略图：合成图像按比例缩放到面板内（`DocState::composite_texture`，按修订号缓存，最长边 256 像素），透明处显示棋盘格。
-- 视图框：窗口中可见的文档范围（`document_view::visible_rect`），裁到缩略图内，1 pt 红色线（Photoshop 的默认颜色）。
-- 在缩略图区域单击或拖动：把指针处的文档位置移到窗口中心（`document_view::center_on`）。
-- 底部：当前缩放百分比；缩小图标、对数刻度的缩放滑块（1%–12800%）、放大图标。拖动滑块以窗口中心为基准缩放（`zoom_to`）。
+- Thumbnail: the composite image scaled proportionally to fit the panel (`DocState::composite_texture`, cached by revision, longest side 256 pixels), with a checkerboard where transparent.
+- View box: the part of the document visible in the window (`document_view::visible_rect`), clipped to the thumbnail, a 1 pt red line (Photoshop's default color).
+- Clicking or dragging in the thumbnail area: moves the document position under the pointer to the window center (`document_view::center_on`).
+- Bottom: the current zoom percentage; a zoom out icon, a logarithmic zoom slider (1%–12800%) and a zoom in icon. Dragging the slider zooms about the window center (`zoom_to`).
 
-## 已知限制
+## Known limitations
 
-- 缩放百分比不能输入；缩小/放大图标不能点击；没有面板选项（视图框颜色）。
+- The zoom percentage cannot be typed; the zoom out/in icons cannot be clicked; there are no panel options (view box color).

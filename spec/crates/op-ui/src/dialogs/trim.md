@@ -1,30 +1,30 @@
-# dialogs/trim.rs：Image › Trim 对话框
+# dialogs/trim.rs: Image › Trim dialog
 
-## 组件职责
+## Component responsibilities
 
-选择 Trim 的依据和要裁掉的边，确定后由 `lib.rs` 执行 `image_ops::trim`（规则见 `op-core` 的 `image_ops.md`）。
+Chooses what Trim is based on and which edges to trim away; on OK, `lib.rs` runs `image_ops::trim` (for the rules see `op-core`'s `image_ops.md`).
 
-## 布局与视觉
+## Layout and visuals
 
-按 Photoshop 2026 的 Trim 对话框（2x 截图）逐点量取，与 New Layer、Canvas Size 同一类（UXP 样式）。对话框 258 × 248 pt，坐标为距对话框左上角的 pt：
+Measured point by point from Photoshop 2026's Trim dialog (2x screenshots), the same kind as New Layer and Canvas Size (UXP style). The dialog is 258 × 248 pt; coordinates are pt from the dialog's top-left:
 
-- 标题栏：`common::frame`，系统粗体 13 pt「Trim」。文字为 12 pt 面板字体（Source Sans 3 近似 Adobe Clean），`#f1f1f1`。
-- 「Based on」粗体标题，左端 20，中心 y 57。三个单选项（句首大写，与 Photoshop 2026 一致）：Transparent pixels、Top left pixel color、Bottom right pixel color，圆心 (26, 84 / 108 / 132)，直径 12 pt，文字在圆心右 15 pt。选中为 `#d6d6d6` 实心圆加深色圆点；未选中为 1 pt `#a0a0a0` 圆环；不能选时圆环与文字变暗。
-- 「Trim away」粗体标题，中心 y 166。四个复选框（`common::ps_checkbox`，12 pt）：Top (20, 186)、Left (97, 186)、Bottom (20, 210)、Right (97, 210)。
-- OK（默认按钮）(168–238，y 48–72)、Cancel (y 84–108)：`common::ps_button`。
+- Title bar: `common::frame`, system bold 13 pt "Trim". Text is the 12 pt panel font (Source Sans 3 approximating Adobe Clean), `#f1f1f1`.
+- "Based on" bold heading, left end at 20, centered at y 57. Three radio options (sentence case, matching Photoshop 2026): Transparent pixels, Top left pixel color, Bottom right pixel color, centered at (26, 84 / 108 / 132), 12 pt in diameter, with text 15 pt to the right of the center. Selected is a solid `#d6d6d6` circle with a dark dot; unselected is a 1 pt `#a0a0a0` ring; when not selectable, the ring and text are dimmed.
+- "Trim away" bold heading, centered at y 166. Four checkboxes (`common::ps_checkbox`, 12 pt): Top (20, 186), Left (97, 186), Bottom (20, 210), Right (97, 210).
+- OK (default button) (168–238, y 48–72), Cancel (y 84–108): `common::ps_button`.
 
-与 Photoshop 截图相比各元素相差不超过 1 pt。
+Compared with Photoshop screenshots, each element differs by no more than 1 pt.
 
-## 数据输入与默认值
+## Data input and defaults
 
-- `TrimDialog::new(has_background)`：文档有背景图层时，Transparent pixels 置灰，默认选 Top left pixel color；没有背景图层时默认选 Transparent pixels。四个边默认全部勾选。每次打开都重新取默认值，不记忆上次的选择。
+- `TrimDialog::new(has_background)`: when the document has a background layer, Transparent pixels is grayed out and Top left pixel color is selected by default; without a background layer, Transparent pixels is selected by default. All four edges are checked by default. Defaults are taken again on each open; the last choice is not remembered.
 
-## 交互
+## Interaction
 
-- OK 或 Enter：返回 `Outcome::Apply { basis, sides }`。
-- Cancel 或 Esc：返回 `Outcome::Cancel`。
-- 打开期间是模态的（`AppState::modal_open()` 为真）。
+- OK or Enter: returns `Outcome::Apply { basis, sides }`.
+- Cancel or Esc: returns `Outcome::Cancel`.
+- Modal while open (`AppState::modal_open()` is true).
 
-## 已知限制
+## Known limitations
 
-- Photoshop 会记住上次的选择；这里每次恢复默认值。
+- Photoshop remembers the last choice; here the defaults are restored each time.

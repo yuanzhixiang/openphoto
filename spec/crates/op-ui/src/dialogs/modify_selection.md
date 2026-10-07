@@ -1,30 +1,30 @@
-# dialogs/modify_selection.rs：Select › Modify 对话框
+# dialogs/modify_selection.rs: Select › Modify dialogs
 
-## 组件职责
+## Component responsibilities
 
-Select › Modify 的 Border...、Smooth...、Expand...、Contract...、Feather...（⇧F6）共用的单值对话框。确定后由 `lib.rs` 修改当前选区并记录「Border」「Smooth」「Expand」「Contract」「Feather」。选区运算见 `op-core` 的 `selection.md`。
+The single-value dialog shared by Select › Modify's Border..., Smooth..., Expand..., Contract... and Feather... (⇧F6). On OK, `lib.rs` modifies the current selection and records "Border", "Smooth", "Expand", "Contract" or "Feather". For the selection operations see `op-core`'s `selection.md`.
 
-## 布局与视觉
+## Layout and visuals
 
-按 Photoshop 2026 的五个对话框（UXP 样式，2x 截图）逐点量取，对话框都是 295 × 128 pt，坐标为距对话框左上角的 pt：
+Measured point by point from Photoshop 2026's five dialogs (UXP style, 2x screenshots); all dialogs are 295 × 128 pt, with coordinates in pt from the dialog's top-left:
 
-- 标题栏：`common::frame`，系统粗体 13 pt，标题分别为「Border Selection」「Smooth Selection」「Expand Selection」「Contract Selection」「Feather Selection」。文字为 12 pt 面板字体（`uxp::label`）。
-- 一行：标签（Photoshop 2026 不带冒号：「Width」「Sample Radius」「Expand By」「Contract By」「Feather Radius」）左端 20.5、中心 y 60；输入框紧跟标签，在标签右 9 pt，36 × 24（y 48–72，文字左缩进 11.5 pt，打开时获得焦点并全选，默认 1）；其后 5.5 pt 是「pixels」。
-- 五个对话框都有「Apply effect at canvas bounds」复选框 (20, 90)，默认不勾选（与 Photoshop 2026 一致）。
-- OK（默认按钮）(205–275，y 48–72)、Cancel (y 84–108)：`common::ps_button`。Enter 确定，Esc 取消。打开期间是模态的。
+- Title bar: `common::frame`, system bold 13 pt, with the titles "Border Selection", "Smooth Selection", "Expand Selection", "Contract Selection" and "Feather Selection". Text is the 12 pt panel font (`uxp::label`).
+- One row: the label (Photoshop 2026 uses no colon: "Width", "Sample Radius", "Expand By", "Contract By", "Feather Radius") with its left end at 20.5, centered at y 60; the input field follows the label, 9 pt to its right, 36 × 24 (y 48–72, text indented 11.5 pt from the left, focused with everything selected on open, default 1); 5.5 pt after it is "pixels".
+- All five dialogs have the "Apply effect at canvas bounds" checkbox (20, 90), unchecked by default (matching Photoshop 2026).
+- OK (default button) (205–275, y 48–72), Cancel (y 84–108): `common::ps_button`. Enter confirms, Esc cancels. Modal while open.
 
-标签用 Source Sans 3 近似 Adobe Clean，略宽（「Feather Radius」宽 2.5 pt），输入框随之右移；其余元素与 Photoshop 截图相差不超过 1 pt。
+Labels use Source Sans 3 to approximate Adobe Clean and are slightly wider ("Feather Radius" is 2.5 pt wider), so the input field shifts right accordingly; the other elements differ from the Photoshop screenshots by no more than 1 pt.
 
-## 取值范围
+## Value ranges
 
-Border 1–200；Smooth、Expand、Contract 1–500；Feather 0.1–1000。超出范围或不是数字时 OK 置灰。Smooth、Expand、Contract 的值四舍五入为整数。
+Border 1–200; Smooth, Expand, Contract 1–500; Feather 0.1–1000. When out of range or not a number, OK is grayed out. Values for Smooth, Expand and Contract are rounded to integers.
 
-## 已知限制
+## Known limitations
 
-- 「Apply effect at canvas bounds」只对 Contract 生效；Border、Expand、Smooth 与 Feather 显示这个选项但忽略它，在画布边缘的处理与 Photoshop 可能不同。
-- 每次打开都恢复默认值 1，不记忆上次的值。
+- "Apply effect at canvas bounds" only takes effect for Contract; Border, Expand, Smooth and Feather show the option but ignore it, and their handling at the canvas edges may differ from Photoshop.
+- Each time the dialog opens, the default value 1 is restored; the last value is not remembered.
 
-## 测试覆盖
+## Test coverage
 
-- `ranges`：Border 超过 200 无效；Feather 接受 0.5。
-- `ui_tests.rs` 的 `modify_selection_and_grow`（Expand 5 px）；`screenshot_feather_dialog`（`#[ignore]`）截出 Feather 对话框用于与 Photoshop 比对。
+- `ranges`: Border above 200 is invalid; Feather accepts 0.5.
+- `modify_selection_and_grow` in `ui_tests.rs` (Expand 5 px); `screenshot_feather_dialog` (`#[ignore]`) captures the Feather dialog for comparison with Photoshop.

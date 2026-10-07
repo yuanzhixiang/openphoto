@@ -1,44 +1,44 @@
-# gradient.rs：渐变工具（经典渐变）
+# gradient.rs: Gradient tool (classic gradient)
 
-## 职责
+## Responsibilities
 
-在活动图层上画两色渐变，限于选区。对应 Photoshop 渐变工具的「经典渐变」行为（直接改像素，而不是创建渐变填充图层）。不记录历史。
+Draws a two-color gradient on the active layer, limited to the selection. Corresponds to the "classic gradient" behavior of Photoshop's Gradient tool (changing pixels directly rather than creating a gradient fill layer). Records no history.
 
-## 对外接口
+## Public interface
 
-- `GradientKind`：`Linear`、`Radial`、`Angle`、`Reflected`、`Diamond`（`ALL` 为选项栏的顺序，`label()` 为「Linear Gradient」等）。
-- `GradientKind::position(a, b, x, y)`：点 (x, y) 在从 `a` 拖到 `b` 的渐变中的位置 t（0 为起点颜色，1 为终点颜色）。设拖动向量为 d、长度为 L：
-  - Linear：点在 d 方向上的投影比例，限制在 0–1。
-  - Radial：到起点的距离 / L，最大 1。
-  - Reflected：投影比例的绝对值，最大 1（起点两侧对称）。
-  - Diamond：在以 d 为轴的坐标系中 `(|u| + |v|) / L`，最大 1。
-  - Angle：绕起点从 d 方向开始转一圈，t 为转过的角度 / 360°（屏幕上逆时针方向递增）。
-  - 起止点重合时为 0。
-- `GradientOptions`：`kind`、`mode`（混合模式）、`opacity`（0–1）、`reverse`（交换起止颜色）。默认 Linear、Normal、100%、不反向。
-- `gradient(doc, a, b, colors, options)`：先做与调整相同的检查（`adjust::check`），然后对每个像素取像素中心的 t，在 RGB 中线性插值两种颜色，按混合模式、不透明度 × 选择程度合成到图层上。背景图层和锁定透明像素的图层保持原 alpha（完全透明的像素不画）。
+- `GradientKind`: `Linear`, `Radial`, `Angle`, `Reflected`, `Diamond` (`ALL` is the options bar order, `label()` gives "Linear Gradient" and so on).
+- `GradientKind::position(a, b, x, y)`: the position t of point (x, y) in a gradient dragged from `a` to `b` (0 is the start color, 1 is the end color). Let the drag vector be d with length L:
+  - Linear: the ratio of the point's projection onto the d direction, clamped to 0–1.
+  - Radial: distance to the start point / L, at most 1.
+  - Reflected: the absolute value of the projection ratio, at most 1 (symmetric on both sides of the start point).
+  - Diamond: `(|u| + |v|) / L` in the coordinate system with d as its axis, at most 1.
+  - Angle: one full turn around the start point beginning in the d direction; t is the angle turned / 360° (increasing counterclockwise on screen).
+  - 0 when the start and end points coincide.
+- `GradientOptions`: `kind`, `mode` (blend mode), `opacity` (0–1), `reverse` (swaps the start and end colors). Defaults: Linear, Normal, 100%, not reversed.
+- `gradient(doc, a, b, colors, options)`: first performs the same checks as adjustments (`adjust::check`), then for each pixel takes t at the pixel center, linearly interpolates the two colors in RGB, and composites onto the layer using the blend mode and opacity × degree of selection. The background layer and layers with locked transparent pixels keep their original alpha (fully transparent pixels are not painted).
 
-## 蒙版
+## Masks
 
-快速蒙版模式下不检查图层状态。编辑目标是蒙版（快速蒙版或图层蒙版）时，渐变在两种颜色的灰度之间进行并写入蒙版。
+In Quick Mask mode the layer state is not checked. When the editing target is a mask (Quick Mask or layer mask), the gradient runs between the gray levels of the two colors and is written to the mask.
 
-## 已知限制
+## Known limitations
 
-- 只有两色（前景到背景）渐变，没有渐变编辑器、预设、透明度色标、Dither 和插值方式选项。
-- 不创建渐变填充图层（Photoshop 2024 起渐变工具默认创建可编辑的渐变图层）。
+- Only two-color (foreground to background) gradients; there is no gradient editor, presets, opacity stops, Dither, or interpolation method option.
+- Does not create a gradient fill layer (since Photoshop 2024, the Gradient tool creates an editable gradient layer by default).
 
-## 测试覆盖
+## Test coverage
 
-- `positions_of_each_kind`：各类型在典型点的 t 值。
-- `paints_black_to_white`：5 像素黑到白得到 `[0, 64, 128, 191, 255]`，反向时颠倒。
-- `half_opacity_and_selection`：50% 不透明度只作用于选区内的像素。
+- `positions_of_each_kind`: t values of each kind at typical points.
+- `paints_black_to_white`: 5 pixels black to white gives `[0, 64, 128, 191, 255]`, reversed when reversed.
+- `half_opacity_and_selection`: 50% opacity affects only pixels inside the selection.
 
-## 渐变插值方法（`Method`、`blend_colors`）
+## Gradient interpolation methods (`Method`, `blend_colors`)
 
-量自 Photoshop 2026 的 Gradient Map（红→蓝、黑→白，各方法逐级对照）：
+Measured from Photoshop 2026's Gradient Map (red→blue, black→white, compared level by level for each method):
 
-- 两个色标之间的位置先做「经典缓动」：`t` 与 smoothstep `3t² − 2t³` 的平均（即 Photoshop 渐变 Smoothness 100%）。
-- `Classic`：在 sRGB 数值中按缓动后的位置插值（与 Photoshop 逐级相同）。
-- `Linear`：在线性光中插值（相差不超过 2 级）。
-- `Perceptual`：在 OKLab 中插值（相差不超过 2 级）。
-- `Smooth`（对话框默认）：OKLab 中插值，缓动只取经典缓动的 40%（测量较粗，相差不超过 6 级）。
-- 渐变工具本身仍按 RGB 线性插值，尚未使用这些方法。
+- The position between two stops first gets "classic easing": the average of `t` and smoothstep `3t² − 2t³` (i.e. Photoshop gradient Smoothness 100%).
+- `Classic`: interpolates in sRGB values at the eased position (identical to Photoshop level by level).
+- `Linear`: interpolates in linear light (differs by no more than 2 levels).
+- `Perceptual`: interpolates in OKLab (differs by no more than 2 levels).
+- `Smooth` (dialog default): interpolates in OKLab, with easing taking only 40% of classic easing (the measurement is coarser; differs by no more than 6 levels).
+- The Gradient tool itself still interpolates linearly in RGB and does not yet use these methods.

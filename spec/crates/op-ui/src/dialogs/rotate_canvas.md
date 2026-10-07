@@ -1,28 +1,28 @@
-# dialogs/rotate_canvas.rs：Rotate Canvas 对话框
+# dialogs/rotate_canvas.rs: Rotate Canvas dialog
 
-## 职责
+## Responsibilities
 
-Image › Image Rotation › Arbitrary... 的对话框：输入角度并选择方向，确定后由 `lib.rs` 调用 `op_core::image_ops::rotate_arbitrary`（背景色为当前背景色），记录「Rotate Canvas」历史（Photoshop 2026 实测的名字）。
+The dialog for Image › Image Rotation › Arbitrary...: enter an angle and choose a direction; on confirm, `lib.rs` calls `op_core::image_ops::rotate_arbitrary` (with the current background color as the background) and records a "Rotate Canvas" history entry (the name measured in Photoshop 2026).
 
-## 布局（Photoshop 2026 实测，350 × 128 pt，相对左上角）
+## Layout (measured in Photoshop 2026, 350 × 128 pt, relative to the top-left corner)
 
-这是 UXP 对话框：文字用 `theme::uxp` 12 pt（Adobe Clean 的替代 Source Sans 3），`#f0f0f0`；标题「Rotate Canvas」为窗口标题（13 pt 粗体系统字体）。
+This is a UXP dialog: text uses `theme::uxp` 12 pt (Source Sans 3 as a substitute for Adobe Clean), `#f0f0f0`; the title "Rotate Canvas" is the window title (13 pt bold system font).
 
-- 「Angle」在 x 20、中心 y 60；输入框 (55, 47)–(126, 73)，文字左缩进 12，数字后面紧跟「°」。打开时值为 0 并全选、获得焦点。
-- 单选按钮（12 pt，圆心 x 142.75）：Clockwise 中心 y 59.75（默认选中），Counter Clockwise 中心 y 83.75；文字在 x 158.5。选中时为浅色 `#d4d4d4` 圆盘、中间 4 pt 的深色圆点，未选中为 1 pt `#a0a0a0` 圆环。点击圆或文字选择。
-- 按钮：OK (260, 48)–(330, 72) 为默认按钮，Cancel (260, 84)–(330, 108)，都是 `common::ps_button` 的粗体样式。
+- "Angle" at x 20, center y 60; input field (55, 47)–(126, 73), text indented 12 from the left, with "°" directly after the number. On open the value is 0, selected, and the field has focus.
+- Radio buttons (12 pt, center x 142.75): Clockwise at center y 59.75 (selected by default), Counter Clockwise at center y 83.75; text at x 158.5. Selected is a light `#d4d4d4` disc with a 4 pt dark dot in the middle; unselected is a 1 pt `#a0a0a0` ring. Clicking the circle or the text selects it.
+- Buttons: OK (260, 48)–(330, 72) is the default button, Cancel (260, 84)–(330, 108), both in the bold style of `common::ps_button`.
 
-## 交互
+## Interaction
 
-- 角度可带「°」，绝对值必须小于 360；无法解析或超出范围时 OK 置灰。`degrees()` 返回有符号角度：顺时针为正，逆时针为负。
-- Enter 等于 OK，Esc 等于 Cancel；打开期间是模态的。
+- The angle may include "°", and its absolute value must be less than 360; OK is grayed out when it cannot be parsed or is out of range. `degrees()` returns a signed angle: clockwise is positive, counterclockwise negative.
+- Enter equals OK, Esc equals Cancel; the dialog is modal while open.
 
-## 已知限制
+## Known limitations
 
-- 输入框获得焦点时是框外 2 pt 的蓝色外圈（`common::text_field`），Photoshop 是把框线换成蓝色。
+- When the input field has focus it gets a blue ring 2 pt outside the box (`common::text_field`); Photoshop instead turns the box border blue.
 
-## 测试
+## Tests
 
-- `angle_and_direction`：0、30°、逆时针为负、360 与非数字无效。
-- `ui_tests::rotate_canvas_dialog`：输入 90、选 Counter Clockwise、Enter 后 734 × 811 的文档变为 811 × 734，记录「Rotate Canvas」。
-- `ui_tests::screenshot_rotate_canvas_dialog`（忽略）：与 Photoshop 截图对比用。
+- `angle_and_direction`: 0, 30°, counterclockwise is negative, 360 and non-numbers are invalid.
+- `ui_tests::rotate_canvas_dialog`: entering 90, choosing Counter Clockwise and pressing Enter turns a 734 × 811 document into 811 × 734 and records "Rotate Canvas".
+- `ui_tests::screenshot_rotate_canvas_dialog` (ignored): for comparison with Photoshop screenshots.

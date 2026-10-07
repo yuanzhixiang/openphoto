@@ -1,35 +1,35 @@
-# panels/properties.rs：Properties 面板
+# panels/properties.rs: Properties panel
 
-## 组件职责
+## Component responsibilities
 
-显示当前文档的属性，对应 Photoshop 在没有选中特定对象时 Properties 面板显示的「Document」内容：Canvas、Rulers & Grids、Guides、Quick Actions 四个分区。
+Shows the current document's properties, corresponding to the "Document" content Photoshop's Properties panel shows when no particular object is selected: four sections, Canvas, Rulers & Grids, Guides and Quick Actions.
 
-按 Photoshop 2026 实测逐点定位（坐标是相对面板内容区左上角的 pt），图标照 2x 截图描成矢量图形。标签文字 `#d6d6d6`，数值与分区标题 `#f0f0f0`，文字按大写字母的垂直中心对齐到下列 y。
+Positioned point by point from measurements of Photoshop 2026 (coordinates are pt relative to the top-left of the panel content area), with icons traced as vector shapes from 2x screenshots. Label text is `#d6d6d6`, values and section titles are `#f0f0f0`, and text is aligned by the vertical center of its capital letters to the y values below.
 
-1. 顶部：文档图标框 (10, 5)–(34, 29)，`#383838` 底、1 pt `#636363` 边，里面是折角页面图标（1 pt 线，`#d7d7d7`）；「Document」在 x 37.5、y 17.75。y 33 是一条 1 pt 的 `#3e3e3e` 分隔线。
-2. 四个可折叠分区，自上而下：每个分区从一条 1 pt 的 `#3e3e3e` 分隔线开始（第一条在 y 33），标题在线下 16.25：中心 (11, 线 + 16.5) 的 V 形箭头（折叠时为向右的 >），半粗体标题在 x 21。点击标题一带切换展开/折叠，状态保存在 egui 临时内存里，默认都展开。展开时的高度（实测）：Canvas 225.25、Rulers & Grids 68、Guides 68、Quick Actions 91；折叠时只剩标题，高 32。下列 y 是所有分区都展开时的位置，折叠上面的分区时整体上移。
-3. **Canvas**（标题 y 49.25）：
-   - 宽高链条图标：中心 (23.25, 84.25)，两节竖向的链环加中间一段短杆。
-   - W、H：标签右对齐到 x 59.5；输入框 (64, 64)–(118, 81) 和 (64, 88)–(118, 105)，1 pt `#666666` 边、`#454545` 底，值（例如 `734 px`）左侧留 4。只读外观。
-   - X、Y：标签右对齐到 x 138；输入框 (142.5, …)–(196.5, …)，禁用样式（`#4d4d4d` 底、`#5e5e5e` 边、`#6a6a6a` 字），值为 `0 px`。
-   - 方向：纵向图标中心 (78, 128)、横向 (104, 128)，都是相框里一个人像；与文档方向一致的那个（高 ≥ 宽时为纵向）有 26 pt 见方的选中框（同文档图标框的样式）。点击没有功能。
-   - 「Resolution: N pixels/inch」在 x 64.5、y 156.75。
-   - Mode：标签右对齐到 x 59、y 183.25；颜色模式下拉 (65, 174)–(197, 193)，列出 Photoshop 的全部模式，只有 RGB Color 可选。位深下拉 (65, 200)–(197, 219)：8/16/32 Bits/Channel，只有 8 Bits/Channel 可选。
-   - Fill：标签右对齐到 x 59、y 238.5；色块 (64.5, 229.25)–(82.5, 248.25)，1 pt `#363636` 边，没有背景图层时是空的（透明），有背景图层时为白色；下拉 (86.5, 229.25)–(196.5, 248.25) 显示「Transparent」或「White」，菜单列出 Photoshop 的选项（White、Black、Background Color、Transparent、Custom...），只有当前项可选。
-4. **Rulers & Grids**（分隔线 258.25，标题 274.25）：三个 26 pt 见方的图标按钮，中心 x 23、56、89，y 302.75：标尺（L 形带刻度）切换 `ViewOptions::rulers`；网格（3 × 3）切换 `ViewOptions::grid`；像素网格（棋盘格）没有功能。打开的选项画成按下框（`#383838` 底、`#636363` 边）。单位下拉 (119.5, 293.25)–(196.5, 312.25) 显示 Pixels，其它单位置灰。
-5. **Guides**（分隔线 326.25，标题 342.25）：图标按钮中心 x 23、56、89，y 371.25：显示参考线（四条参考线，文档没有参考线时暗色 `#989898`、不能点）、锁定参考线（加一把锁，切换 `ViewOptions::lock_guides`）、智能参考线（参考线、箭头与闪电，切换 `ViewOptions::smart_guides`，默认按下）。线型下拉 (119.5, 361.25)–(196.5, 380.25) 里画一条实线，菜单里只有 Lines 可选。
-6. **Quick Actions**（分隔线 394.25，标题 410.5）：四个 90 × 24 的按钮（`#454545` 底、1 pt `#666666` 边，文字居中）：Image Size (10.5, 426.75)、Crop (106.5, 426.75)、Trim (10.5, 456.75)、Rotate (106.5, 456.75)。与 Photoshop 2026 一样：Image Size 打开 Image Size 对话框，Crop 切换到裁剪工具，Trim 打开 Trim 对话框，Rotate 打开 Rotate Canvas（Image Rotation › Arbitrary...）。
-7. 内容区总高 485.25 pt（全部展开），超出面板高度时可以滚动。
+1. Top: document icon box (10, 5)–(34, 29), `#383838` fill, 1 pt `#636363` border, containing a page icon with a folded corner (1 pt lines, `#d7d7d7`); "Document" at x 37.5, y 17.75. At y 33 is a 1 pt `#3e3e3e` separator.
+2. Four collapsible sections, top to bottom: each section starts with a 1 pt `#3e3e3e` separator (the first at y 33), with the title 16.25 below the line: a V-shaped arrow centered at (11, line + 16.5) (a right-pointing > when collapsed) and a semibold title at x 21. Clicking around the title toggles expanded/collapsed; the state is kept in egui temporary memory, and all are expanded by default. Expanded heights (measured): Canvas 225.25, Rulers & Grids 68, Guides 68, Quick Actions 91; collapsed, only the title remains, 32 high. The y values below are positions when all sections are expanded; collapsing a section above moves everything up.
+3. **Canvas** (title y 49.25):
+   - Width/height link icon: centered at (23.25, 84.25), two vertical chain links with a short bar between them.
+   - W, H: labels right-aligned to x 59.5; input fields (64, 64)–(118, 81) and (64, 88)–(118, 105), 1 pt `#666666` border, `#454545` fill, value (e.g. `734 px`) inset 4 from the left. Read-only appearance.
+   - X, Y: labels right-aligned to x 138; input fields (142.5, …)–(196.5, …), disabled style (`#4d4d4d` fill, `#5e5e5e` border, `#6a6a6a` text), value `0 px`.
+   - Orientation: portrait icon centered at (78, 128), landscape at (104, 128), both a portrait figure in a frame; the one matching the document's orientation (portrait when height ≥ width) has a 26 pt square selection box (styled like the document icon box). Clicking does nothing.
+   - "Resolution: N pixels/inch" at x 64.5, y 156.75.
+   - Mode: label right-aligned to x 59, y 183.25; color mode dropdown (65, 174)–(197, 193), listing all of Photoshop's modes, only RGB Color selectable. Bit depth dropdown (65, 200)–(197, 219): 8/16/32 Bits/Channel, only 8 Bits/Channel selectable.
+   - Fill: label right-aligned to x 59, y 238.5; swatch (64.5, 229.25)–(82.5, 248.25), 1 pt `#363636` border, empty (transparent) when there is no background layer and white when there is one; dropdown (86.5, 229.25)–(196.5, 248.25) shows "Transparent" or "White", and the menu lists Photoshop's options (White, Black, Background Color, Transparent, Custom...), with only the current item selectable.
+4. **Rulers & Grids** (separator 258.25, title 274.25): three 26 pt square icon buttons centered at x 23, 56, 89, y 302.75: rulers (an L shape with ticks) toggles `ViewOptions::rulers`; grid (3 × 3) toggles `ViewOptions::grid`; pixel grid (checkerboard) does nothing. Options that are on are drawn as pressed boxes (`#383838` fill, `#636363` border). Unit dropdown (119.5, 293.25)–(196.5, 312.25) shows Pixels, with the other units grayed out.
+5. **Guides** (separator 326.25, title 342.25): icon buttons centered at x 23, 56, 89, y 371.25: show guides (four guides; dimmed `#989898` and not clickable when the document has no guides), lock guides (adds a lock, toggles `ViewOptions::lock_guides`), smart guides (guides, an arrow and a lightning bolt, toggles `ViewOptions::smart_guides`, pressed by default). The line style dropdown (119.5, 361.25)–(196.5, 380.25) shows a solid line, and only Lines is selectable in its menu.
+6. **Quick Actions** (separator 394.25, title 410.5): four 90 × 24 buttons (`#454545` fill, 1 pt `#666666` border, centered text): Image Size (10.5, 426.75), Crop (106.5, 426.75), Trim (10.5, 456.75), Rotate (106.5, 456.75). As in Photoshop 2026: Image Size opens the Image Size dialog, Crop switches to the Crop tool, Trim opens the Trim dialog, Rotate opens Rotate Canvas (Image Rotation › Arbitrary...).
+7. The content area's total height is 485.25 pt (all expanded); it scrolls when it exceeds the panel height.
 
-没有打开的文档时，面板中央显示「No Properties」。
+When no document is open, the panel shows "No Properties" in the center.
 
-## 已知限制
+## Known limitations
 
-- 宽高、分辨率不能在这里编辑（Photoshop 里可以直接改）。改画布尺寸请用 Image › Canvas Size。
-- 颜色模式与位深不能转换。
-- Photoshop 下拉框的边框比本应用细（约 0.5 pt）。
-- 标尺单位、参考线线型、像素网格、Fill 的其它选项还不能切换；智能参考线的开关还没有效果（没有画智能参考线）。
+- Width/height and resolution cannot be edited here (in Photoshop they can be changed directly). Use Image › Canvas Size to change the canvas size.
+- Color mode and bit depth cannot be converted.
+- Photoshop's dropdown borders are thinner than this app's (about 0.5 pt).
+- Ruler units, guide line style, the pixel grid and the other Fill options cannot be switched yet; the smart guides toggle has no effect yet (smart guides are not drawn).
 
-## 测试覆盖
+## Test coverage
 
-- `ui_tests.rs` 的 `properties_sections_toggle_views_and_run_quick_actions`：折叠 Canvas 后点标尺、网格按钮打开标尺与网格；折叠 Rulers & Grids 后点锁定参考线；折叠 Guides 后点 Crop 切到裁剪工具、点 Trim 打开 Trim 对话框。`screenshot_properties_sections`（`#[ignore]`）截出面板顶部、中部和底部，用于与 Photoshop 并排比对。
+- `properties_sections_toggle_views_and_run_quick_actions` in `ui_tests.rs`: after collapsing Canvas, clicking the rulers and grid buttons turns on rulers and grid; after collapsing Rulers & Grids, clicking lock guides; after collapsing Guides, clicking Crop switches to the Crop tool and clicking Trim opens the Trim dialog. `screenshot_properties_sections` (`#[ignore]`) captures the top, middle and bottom of the panel for side-by-side comparison with Photoshop.

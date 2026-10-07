@@ -1,81 +1,81 @@
 # history.rs
 
-## 职责
+## Responsibilities
 
-实现仿 Photoshop 历史记录面板的撤销历史：一个按时间顺序排列的命名状态列表，可以撤销、重做、跳转到任意状态、从某一状态起删除，以及 Edit > Toggle Last State。每个状态保存一份完整的文档快照；tile 在快照之间共享，只有被编辑过的 tile 额外占用内存。
+Implements an undo history modeled on Photoshop's History panel: a chronologically ordered list of named states that supports undo, redo, jumping to any state, deleting from a given state onward, and Edit > Toggle Last State. Each state holds a complete document snapshot; tiles are shared between snapshots, so only edited tiles take extra memory.
 
-## 对外接口
+## Public interface
 
-- `DEFAULT_LIMIT = 50`：最大状态数，对应 Photoshop「历史记录状态」偏好的默认值。该上限包含第一条状态。`History` 没有修改上限的接口，上限始终是 50。
-- `HistoryState`：公开字段 `name`（面板上显示的步骤名，例如 `"Open"`、`"New"`、`"Canvas Size"`）和 `id`（进程内唯一的编号，来自一个原子计数器，状态被删除后也不会复用），快照私有。
-- `current_id()`：当前状态的 `id`。界面层把保存时的 `current_id()` 记下来，之后不相等就表示有未保存的修改（撤销回保存时的状态视为没有修改）。
-- `History::new(doc, name)`：以文档当前内容作为第一条状态（通常名为 `"Open"` 或 `"New"`）。
-- `record(doc, name)`：在一次编辑之后调用，记录文档当前内容为新状态。
-- `states()`、`current()`：全部状态与当前状态下标。
-- `can_undo()` / `can_redo()`、`undo_name()` / `redo_name()`。
-- `undo(doc)` / `redo(doc)`：后退 / 前进一步。
-- `jump(index, doc)`：跳到任意状态（点击历史面板中的某一行）。
-- `delete_from(index, doc)`：历史面板的删除（垃圾桶）按钮。
-- `toggle_last_state(doc)`：Edit > Toggle Last State。
+- `DEFAULT_LIMIT = 50`: the maximum number of states, matching the default of Photoshop's "History States" preference. The limit includes the first state. `History` has no interface for changing the limit; it is always 50.
+- `HistoryState`: public fields `name` (the step name shown in the panel, e.g. `"Open"`, `"New"`, `"Canvas Size"`) and `id` (a number unique within the process, taken from an atomic counter and never reused even after the state is deleted); the snapshot is private.
+- `current_id()`: the `id` of the current state. The UI layer remembers `current_id()` at save time; whenever it differs afterwards, there are unsaved changes (undoing back to the saved state counts as no changes).
+- `History::new(doc, name)`: takes the document's current contents as the first state (usually named `"Open"` or `"New"`).
+- `record(doc, name)`: called after an edit; records the document's current contents as a new state.
+- `states()`, `current()`: all states and the current state's index.
+- `can_undo()` / `can_redo()`, `undo_name()` / `redo_name()`.
+- `undo(doc)` / `redo(doc)`: step back / forward one step.
+- `jump(index, doc)`: jump to any state (clicking a row in the History panel).
+- `delete_from(index, doc)`: the History panel's delete (trash can) button.
+- `toggle_last_state(doc)`: Edit > Toggle Last State.
 
-所有改变当前状态的方法都返回 `bool`，表示是否真的发生了跳转；为 `true` 时文档已被 `restore`（并因此递增了修订号）。
+Every method that changes the current state returns `bool`, indicating whether a jump actually happened; when it is `true`, the document has been `restore`d (and its revision number has therefore been incremented).
 
-## 行为规则
+## Behavior rules
 
-### 记录
+### Recording
 
-- 编辑操作先修改文档，再调用 `record`；`record` 本身不修改文档。
-- 若当前不在最后一条状态（有被撤销的状态），这些后续状态先被丢弃，与 Photoshop 一致。
-- 新状态追加到末尾并成为当前状态。
-- 超出上限时删除下标为 1 的状态（最早的一次编辑），保留第一条状态，使文档总能回到打开/新建时的样子。因为快照是完整的，删除中间状态不影响其他状态的正确性。
-- `record` 会结束正在进行的 Toggle Last State。
-- `record` 不去重：内容相同的连续编辑也会产生新状态。
+- An edit first modifies the document and then calls `record`; `record` itself does not modify the document.
+- If the current state is not the last one (some states have been undone), those later states are discarded first, as in Photoshop.
+- The new state is appended to the end and becomes the current state.
+- When the limit is exceeded, the state at index 1 (the earliest edit) is deleted and the first state is kept, so the document can always return to how it looked when opened/created. Because snapshots are complete, deleting an intermediate state does not affect the correctness of the other states.
+- `record` ends any Toggle Last State in progress.
+- `record` does not deduplicate: consecutive edits with identical content still produce new states.
 
-### 撤销与重做
+### Undo and redo
 
-- `can_undo` 当且仅当当前下标大于 0；`can_redo` 当且仅当当前之后还有状态。
-- `undo_name` 返回当前状态的名字（即撤销会还原的那一步），`redo_name` 返回下一条状态的名字；不可撤销/重做时返回 `None`。
-- `undo` / `redo` 通过 `jump` 实现，因此也会结束 Toggle Last State。
+- `can_undo` is true if and only if the current index is greater than 0; `can_redo` is true if and only if there are states after the current one.
+- `undo_name` returns the current state's name (i.e. the step that undo would revert), and `redo_name` returns the next state's name; both return `None` when undo/redo is not possible.
+- `undo` / `redo` are implemented through `jump`, so they also end Toggle Last State.
 
-### 跳转
+### Jumping
 
-- `jump` 到越界下标或当前下标时返回 `false`，不做任何事。
-- 跳转不丢弃任何状态；跳到较早的状态后，后续状态仍可重做，直到下一次 `record`。
+- `jump` to an out-of-range index or to the current index returns `false` and does nothing.
+- Jumping discards no states; after jumping to an earlier state, the later states can still be redone until the next `record`.
 
-### 删除
+### Deleting
 
-- `delete_from(index)` 删除 `index` 及之后的所有状态，把文档恢复为 `index - 1` 的快照并将其设为当前状态。
-- 第一条状态不能删除：`index == 0` 或越界时返回 `false`。
-- 删除会结束 Toggle Last State。
-- `index` 位于当前状态之后时同样生效：文档会被恢复到 `index - 1`，即使那是一条尚未重做的状态，此时文档会向前移动。
+- `delete_from(index)` deletes `index` and all states after it, restores the document to the snapshot at `index - 1`, and makes that the current state.
+- The first state cannot be deleted: `index == 0` or an out-of-range index returns `false`.
+- Deleting ends Toggle Last State.
+- It also works when `index` is after the current state: the document is restored to `index - 1`, even if that is a state not yet redone, in which case the document moves forward.
 
 ### Toggle Last State
 
-- 未处于切换中时：若当前下标大于 0，跳到上一条状态，并记住出发点；当前为第一条状态时返回 `false`。
-- 处于切换中时：跳回记住的出发点并清除切换标记。因此连续两次切换会回到原处，第三次又会退一步。
-- 若记住的出发点因历史被修改而越界，则按「未处于切换中」处理。
-- 普通的撤销、重做、跳转、删除和记录都会清除切换标记。
+- When not toggling: if the current index is greater than 0, jumps to the previous state and remembers the starting point; returns `false` when the current state is the first one.
+- When toggling: jumps back to the remembered starting point and clears the toggle flag. So two toggles in a row return to the original place, and a third steps back again.
+- If the remembered starting point is out of range because the history was modified, it is treated as "not toggling".
+- Ordinary undo, redo, jump, delete and record all clear the toggle flag.
 
-## 边界情况
+## Edge cases
 
-- 只有一条状态时，撤销、Toggle Last State 和删除都返回 `false`。
-- 状态数达到上限后，每次 `record` 都会删掉一条最早的编辑步骤，状态数保持为 50。
-- 撤销历史只覆盖 `Snapshot` 包含的字段（宽高、分辨率、图层、活动图层）；文档标题、颜色模式和位深的变化不会被撤销。
+- With only one state, undo, Toggle Last State and delete all return `false`.
+- Once the number of states reaches the limit, every `record` deletes the earliest edit step, keeping the count at 50.
+- The undo history covers only the fields contained in `Snapshot` (width and height, resolution, layers, active layer); changes to the document title, color mode and bit depth are not undone.
 
-## 与其它模块的关系
+## Relationship to other modules
 
-- 依赖 `document.rs` 的 `snapshot()` / `restore()`。
-- `op-ui` 的每个文档状态持有一个 `History`；菜单、快捷键和历史面板调用这里的方法。
+- Depends on `document.rs`'s `snapshot()` / `restore()`.
+- Each document state in `op-ui` holds a `History`; menus, shortcuts and the History panel call the methods here.
 
-## 已知限制
+## Known limitations
 
-- 历史只存在于内存中，不随文件保存。
-- 没有历史快照（Snapshot）功能和非线性历史。
-- 上限固定为 50，不可配置。
+- History exists only in memory and is not saved with the file.
+- There is no history Snapshot feature and no non-linear history.
+- The limit is fixed at 50 and is not configurable.
 
-## 测试覆盖
+## Test coverage
 
-- `undo_redo_and_truncate`：记录后 `undo_name` 正确；撤销恢复尺寸，第一条状态无法再撤销；重做恢复；撤销后再记录会丢弃可重做的状态。
-- `delete_from_drops_later_states`：从下标 2 删除后只剩两条状态、当前为 1 且文档恢复到对应尺寸；删除第一条状态返回 `false`。
-- `toggle_last_state_round_trips`：连续两次切换回到原状态；切换后的普通撤销会结束切换，此时位于第一条状态，再次切换返回 `false`。
-- `limit_keeps_first_state`：记录 55 次编辑后状态数为 50，第一条仍是 `"Open"`，并且可以跳回第一条恢复原始尺寸。
+- `undo_redo_and_truncate`: after recording, `undo_name` is correct; undo restores the size and the first state cannot be undone further; redo restores; recording after an undo discards the redoable states.
+- `delete_from_drops_later_states`: after deleting from index 2, only two states remain, the current one is 1, and the document is restored to the corresponding size; deleting the first state returns `false`.
+- `toggle_last_state_round_trips`: two toggles in a row return to the original state; an ordinary undo after a toggle ends the toggle, leaving the first state current, and toggling again returns `false`.
+- `limit_keeps_first_state`: after recording 55 edits there are 50 states, the first is still `"Open"`, and jumping back to the first restores the original size.

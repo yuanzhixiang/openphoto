@@ -1,147 +1,147 @@
 # document.rs
 
-## 职责
+## Responsibilities
 
-定义 `Document`：一个打开的图像文档，包括尺寸、分辨率、颜色模式、位深、图层列表和活动图层。负责新建/从像素构建文档、生成与恢复可撤销快照、调整画布尺寸（Image > Canvas Size），以及在 CPU 上把所有可见图层合成为一张 RGBA8 图像。
+Defines `Document`: an open image document, including its size, resolution, color mode, bit depth, layer list and active layer. Responsible for creating documents new or from pixels, producing and restoring undoable snapshots, resizing the canvas (Image > Canvas Size), and compositing all visible layers into a single RGBA8 image on the CPU.
 
-## 对外接口
+## Public interface
 
 ### `DocId`
 
-文档 ID，`u64` 包装。与 `LayerId` 共用同一个进程级原子计数器（从 1 开始，`Relaxed` 递增），所以进程内所有文档 ID 与图层 ID 互不重复。
+The document ID, a `u64` wrapper. It shares a single process-wide atomic counter with `LayerId` (starting at 1, incremented with `Relaxed`), so no document ID and layer ID within the process ever coincide.
 
 ### `Anchor`
 
-Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化时原图像被钉在新画布的哪里。
+A position in the 3×3 anchor grid of the Canvas Size dialog, which decides where the original image is pinned on the new canvas when the canvas size changes.
 
-- `x`：0 = 左，1 = 中，2 = 右；`y`：0 = 上，1 = 中，2 = 下。
-- `Anchor::CENTER` 为 (1, 1)。
-- 单轴偏移规则（原图左上角在新画布中的坐标，`diff = new - old`）：
-  - 0：偏移 0；
-  - 1：`diff.div_euclid(2)`，即向下取整；
-  - 其他任何值（包括 2 以及大于 2 的非法值）：偏移 `diff`。
-- 居中时尺寸差为奇数的取舍：放大时多出的那 1 像素加在右侧/底部（例如宽度 +3，左边加 1、右边加 2）；缩小时由于向负无穷取整，多裁掉的那 1 像素来自左侧/顶部（例如宽度 −3，左边裁 2、右边裁 1）。
+- `x`: 0 = left, 1 = center, 2 = right; `y`: 0 = top, 1 = center, 2 = bottom.
+- `Anchor::CENTER` is (1, 1).
+- Per-axis offset rule (the coordinate of the original image's top-left corner on the new canvas, `diff = new - old`):
+  - 0: offset 0;
+  - 1: `diff.div_euclid(2)`, i.e. rounded down;
+  - any other value (including 2 and illegal values greater than 2): offset `diff`.
+- How odd size differences are split when centered: when enlarging, the extra 1 pixel is added on the right/bottom (e.g. width +3 adds 1 on the left and 2 on the right); when shrinking, because rounding is toward negative infinity, the extra 1 pixel cropped comes from the left/top (e.g. width −3 crops 2 on the left and 1 on the right).
 
 ### `Guide`
 
-参考线：`vertical`（垂直还是水平）与 `position`（文档像素，可以在画布外）。
+A guide: `vertical` (vertical or horizontal) and `position` (in document pixels; may be outside the canvas).
 
 ### `Snapshot`
 
-文档中可撤销的部分：`width`、`height`、`resolution`、`layers`、`active_layer`、`selection`、`last_selection`、`guides`、`quick_mask`。字段私有，只能通过 `Document::snapshot()` 创建、`Document::restore()` 使用。克隆代价低，因为图层里的 tile 通过 `Arc` 共享。
+The undoable part of the document: `width`, `height`, `resolution`, `layers`, `active_layer`, `selection`, `last_selection`, `guides`, `quick_mask`. The fields are private; it can only be created by `Document::snapshot()` and used by `Document::restore()`. Cloning is cheap because the tiles in the layers are shared through `Arc`.
 
-`title`、`id`、`color_mode`、`bit_depth` 和 `revision` 不在快照中，撤销/重做不会改变它们。
+`title`, `id`, `color_mode`, `bit_depth` and `revision` are not in the snapshot, and undo/redo does not change them.
 
 ### `Document`
 
-公开字段：`id`、`title`、`width`、`height`、`resolution`（ppi）、`color_mode`、`bit_depth`、`layers`（自底向上）、`active_layer`、`guides`（参考线，与编辑一样可撤销，Photoshop 也是如此）。私有字段 `revision`。
+Public fields: `id`, `title`, `width`, `height`, `resolution` (ppi), `color_mode`, `bit_depth`, `layers` (bottom to top), `active_layer`, `guides` (guides, undoable like edits, as in Photoshop). Private field `revision`.
 
-- `new_with_background(title, width, height, background)`：File > New。生成单一背景图层（名为 `"Background"`、`is_background = true`），用 `background` 颜色填满，并设为活动图层。分辨率 72 ppi，RGB，8 位。
-- `from_rgba8(title, width, height, pixels)`：从紧密排列的 RGBA8 缓冲区打开一个扁平位图，得到单一图层并设为活动图层，规则与 Photoshop 打开图片时一致：所有像素的 alpha 都是 255 时，是名为 `"Background"` 的背景图层（`is_background = true`）；只要有一个像素的 alpha 小于 255，就是名为 `"Layer 0"` 的普通图层，文档因此没有背景图层。其余元数据同上（72 ppi、RGB、8 位）。
-- `new_layer_id()`：从全局计数器分配新的 `LayerId`；它不修改文档，也不把图层加入列表。
-- `next_layer_name()`：新图层的名字「Layer N」，N 为现有「Layer 数字」名称中最大的数字加 1，没有时为 1，与 Photoshop 一致。
-- `insert_above_active(layer)`：把图层插到活动图层正上方并进入活动图层所在的组；活动图层是展开的组时，插到组内最上面（与 Photoshop 一致）；没有活动图层时放在最上面。设为活动图层，并 `mark_dirty()`。
-- `insertion_point()`：新图层的插入位置和所在组（`insert_above_active` 与复制到其它文档用）。
-- `next_group_name()`：新组的名字「Group N」，规则同 `next_layer_name`。`block(id)`：图层（组时连同其中的内容）在 `layers` 中占据的连续区间。`set_selected_layers(ids)`：恰好选中这些图层，最后一个为活动图层。
-- `revision()` / `mark_dirty()`：读取 / 递增修订号。修订号在每次像素或图层属性变化时递增，渲染层与图层缩略图缓存据此判断是否需要刷新。
-- `snapshot()` / `restore(snapshot)`：生成 / 恢复快照。`restore` 会覆盖宽高、分辨率、图层与活动图层，并调用 `mark_dirty()`。
-- `resize_canvas(width, height, anchor, fill)`：Image > Canvas Size。
-- `transform_canvas(width, height, image, selection)`：把画布换成 `width`×`height`：每个图层的图像、图层蒙版和快速蒙版都经过 `image` 函数、当前选区和可 Reselect 的选区经过 `selection` 函数，然后更新尺寸、选区修订号并 `mark_dirty()`。Crop、Trim、Image Rotation 和画布翻转都通过它实现（见 `image_ops.md`）。不记录历史。
-- `map_guides(f)`：用 `f` 变换每条参考线（裁剪、扩展画布、缩放、旋转、翻转时调用）。`resize_canvas` 自己按锚点偏移参考线。
-- `mask_target`：编辑目标是当前图层的蒙版（在 Layers 面板点了蒙版缩略图）还是像素。不在快照里，撤销不会改变它。
-- `quick_mask`：快速蒙版模式（Q）下的灰度图像（白 = 选中，黑 = 未选中），在快照里，所以在快速蒙版上的绘画可以撤销。
-- `enter_quick_mask()`：把当前选区转为灰度图像（没有选区时整幅为白），并取消选区（选区在退出前不存在）。
-- `exit_quick_mask()`：把灰度图像转回选区；全白或全黑时没有选区。
-- `editing_mask()`：`mask_target` 为真且当前图层确实有蒙版。
-- `edit_target()`：像素编辑（绘画、填充、渐变）的目标 `EditTarget`，优先级为快速蒙版 > 图层蒙版 > 图层像素：要写入的图像（图层像素或蒙版）、是否是蒙版（颜色要换成灰度）、是否要保持 alpha（背景图层、锁定透明像素，或蒙版）。
-- `has_background()`：是否存在背景图层。它决定 Canvas Size 中「画布扩展颜色」是否有意义：没有背景图层时，所有扩展区域都是透明的。
-- `layer(id)` / `layer_mut(id)`：按 ID 线性查找图层。
-- `content_bounds()`：画布与所有图层像素（包括画布外的）的并集外框，Reveal All 用它。
-- `place_canvas(width, height, dx, dy, fill)`：换成新尺寸的画布，旧画布放在 (`dx`, `dy`)；Canvas Size 与 Reveal All 共用，规则见下文「画布尺寸调整」。
-- 图层多选（Layers 面板的 ⌘/⇧ 单击）：私有字段 `selected_layers` 只在包含活动图层时有效，所以任何代码直接改 `active_layer` 都会自然回到单选，不会留下错乱的选中状态；不在快照里，与 Photoshop 一样不记录历史。
-  - `selected_layers()`：选中的图层，自底向上；多选不包含活动图层时就是 `[活动图层]`，没有活动图层时为空。`is_layer_selected(id)`。
-  - `select_layer(id)`：单击，只选中它。`toggle_layer_selection(id)`：⌘ 单击，加入（并成为活动图层）或移出（移出活动图层时最后一个选中的成为活动图层；只剩一个时不移出）。`select_layer_range(id)`：⇧ 单击，选中活动图层到 `id` 之间（按图层顺序）的全部图层，`id` 成为活动图层。
-  - `select_all_layers()`：Select › All Layers，选中除背景外的所有图层（没有时返回 false）。`deselect_layers()`：Select › Deselect Layers，一个都不选。
-- `layer_at(x, y)`：移动工具 Auto-Select 用。从上往下找第一个在 (x, y) 处显示出像素的图层：图层可见、不透明度与填充不为 0、像素 alpha 大于 0，且没有被启用的图层蒙版以 0 值遮住。坐标在画布外或没有这样的图层时为 `None`。
-- `composite_rgba8()`：合成为紧密排列的直通 RGBA8 缓冲区，长度为 `width * height * 4`。
-- `sample_source(scope)`：工具的「Sample:」取样来源（`SampleScope`）：`Current` 为当前图层的像素，`CurrentAndBelow` 为图层列表中到当前图层为止的合成，`All` 为全部合成；没有当前图层时为 `None`。
-- `composite_layers_rgba8(layers)`：按同样的规则只合成给定的图层列表（自底向上，尺寸与文档一致），供合并图层使用；`composite_rgba8` 就是对文档全部图层调用它。
+- `new_with_background(title, width, height, background)`: File > New. Creates a single background layer (named `"Background"`, `is_background = true`), fills it with the `background` color, and makes it the active layer. Resolution 72 ppi, RGB, 8-bit.
+- `from_rgba8(title, width, height, pixels)`: opens a flat bitmap from a tightly packed RGBA8 buffer, producing a single layer that becomes the active layer, following the same rules as Photoshop when opening an image: when every pixel's alpha is 255, it is a background layer named `"Background"` (`is_background = true`); as soon as one pixel's alpha is less than 255, it is a normal layer named `"Layer 0"`, and the document therefore has no background layer. The other metadata is the same as above (72 ppi, RGB, 8-bit).
+- `new_layer_id()`: allocates a new `LayerId` from the global counter; it does not modify the document or add a layer to the list.
+- `next_layer_name()`: the name of a new layer, "Layer N", where N is the largest number among existing "Layer number" names plus 1, or 1 if there are none, as in Photoshop.
+- `insert_above_active(layer)`: inserts the layer directly above the active layer, into the group the active layer is in; when the active layer is an expanded group, inserts it at the top inside the group (as in Photoshop); with no active layer, places it at the top. Makes it the active layer and calls `mark_dirty()`.
+- `insertion_point()`: the insertion position and containing group for a new layer (used by `insert_above_active` and by copying to another document).
+- `next_group_name()`: the name of a new group, "Group N", by the same rule as `next_layer_name`. `block(id)`: the contiguous range in `layers` occupied by a layer (together with its contents when it is a group). `set_selected_layers(ids)`: selects exactly these layers, the last one being the active layer.
+- `revision()` / `mark_dirty()`: read / increment the revision number. The revision is incremented on every change to pixels or layer properties, and the rendering layer and the layer thumbnail cache use it to decide whether to refresh.
+- `snapshot()` / `restore(snapshot)`: produce / restore a snapshot. `restore` overwrites the width and height, resolution, layers and active layer, and calls `mark_dirty()`.
+- `resize_canvas(width, height, anchor, fill)`: Image > Canvas Size.
+- `transform_canvas(width, height, image, selection)`: replaces the canvas with one of `width`×`height`: each layer's image, layer mask and the quick mask go through the `image` function, the current selection and the reselectable selection go through the `selection` function, and then the size and selection revision are updated and `mark_dirty()` is called. Crop, Trim, Image Rotation and canvas flips are all implemented through it (see `image_ops.md`). It records no history.
+- `map_guides(f)`: transforms every guide with `f` (called when cropping, extending the canvas, scaling, rotating, flipping). `resize_canvas` offsets the guides by the anchor itself.
+- `mask_target`: whether the editing target is the current layer's mask (the mask thumbnail was clicked in the Layers panel) or its pixels. Not in the snapshot; undo does not change it.
+- `quick_mask`: the grayscale image in Quick Mask mode (Q) (white = selected, black = unselected); it is in the snapshot, so painting on the quick mask can be undone.
+- `enter_quick_mask()`: converts the current selection into a grayscale image (entirely white when there is no selection) and deselects (the selection does not exist until exiting).
+- `exit_quick_mask()`: converts the grayscale image back into a selection; all white or all black results in no selection.
+- `editing_mask()`: `mask_target` is true and the current layer actually has a mask.
+- `edit_target()`: the `EditTarget` of pixel edits (painting, fill, gradient), with priority quick mask > layer mask > layer pixels: the image to write to (layer pixels or mask), whether it is a mask (colors must be converted to grayscale), and whether alpha must be preserved (background layer, locked transparent pixels, or a mask).
+- `has_background()`: whether a background layer exists. It decides whether Canvas Size's "Canvas extension color" is meaningful: without a background layer, all extended areas are transparent.
+- `layer(id)` / `layer_mut(id)`: find a layer by ID with a linear search.
+- `content_bounds()`: the bounding box of the union of the canvas and all layer pixels (including those outside the canvas); used by Reveal All.
+- `place_canvas(width, height, dx, dy, fill)`: switches to a canvas of the new size with the old canvas placed at (`dx`, `dy`); shared by Canvas Size and Reveal All; see "Canvas resizing" below for the rules.
+- Layer multi-selection (⌘/⇧-click in the Layers panel): the private field `selected_layers` is valid only when it contains the active layer, so any code that changes `active_layer` directly naturally falls back to single selection without leaving an inconsistent selection state; it is not in the snapshot and, as in Photoshop, records no history.
+  - `selected_layers()`: the selected layers, bottom to top; when the multi-selection does not contain the active layer it is `[active layer]`, and with no active layer it is empty. `is_layer_selected(id)`.
+  - `select_layer(id)`: click, selecting only it. `toggle_layer_selection(id)`: ⌘-click, adds it (and makes it the active layer) or removes it (when removing the active layer, the last selected one becomes the active layer; when only one remains it is not removed). `select_layer_range(id)`: ⇧-click, selects all layers between the active layer and `id` (in layer order), and `id` becomes the active layer.
+  - `select_all_layers()`: Select › All Layers, selects all layers except the background (returns false when there are none). `deselect_layers()`: Select › Deselect Layers, selects none.
+- `layer_at(x, y)`: used by the Move tool's Auto-Select. Searches from top to bottom for the first layer showing a pixel at (x, y): the layer is visible, its opacity and fill are not 0, the pixel's alpha is greater than 0, and it is not hidden by an enabled layer mask with value 0. `None` when the coordinate is outside the canvas or there is no such layer.
+- `composite_rgba8()`: composites into a tightly packed straight RGBA8 buffer of length `width * height * 4`.
+- `sample_source(scope)`: a tool's "Sample:" source (`SampleScope`): `Current` is the current layer's pixels, `CurrentAndBelow` is the composite of the layer list up to the current layer, `All` is the full composite; `None` when there is no current layer.
+- `composite_layers_rgba8(layers)`: composites only the given layer list by the same rules (bottom to top, same size as the document), used for merging layers; `composite_rgba8` is just this called on all of the document's layers.
 
-## 行为规则
+## Behavior rules
 
-### 画布尺寸调整
+### Canvas resizing
 
-- 按 `Anchor` 规则分别计算 x、y 偏移，然后调用 `place_canvas`：对每个图层调用 `TiledImage::with_canvas`。图层蒙版同样移动，新增区域填白（显示）。
-- 背景图层的扩展区域用 `fill` 的 RGB 填充，alpha 强制为 255（无论 `fill` 本身的 alpha 是多少），保持背景图层不透明。
-- 非背景图层的扩展区域填充为全透明。
-- 缩小画布时，非背景图层超出新画布的像素保留在画布外（再次扩大画布或 Reveal All 时重新出现）；背景图层被裁到新画布（`clipped`），与 Photoshop 一致。
-- 所有图层改写完成后更新文档宽高并调用 `mark_dirty()`。
-- 本方法不记录历史；由调用方在之后调用 `History::record`。
+- The x and y offsets are computed separately by the `Anchor` rules, and then `place_canvas` is called: `TiledImage::with_canvas` is called on each layer. Layer masks move the same way, with new areas filled white (revealed).
+- The extended area of the background layer is filled with the RGB of `fill`, with alpha forced to 255 (whatever the alpha of `fill` itself), keeping the background layer opaque.
+- The extended areas of non-background layers are filled fully transparent.
+- When the canvas shrinks, pixels of non-background layers beyond the new canvas are kept outside the canvas (reappearing when the canvas is enlarged again or on Reveal All); the background layer is cropped to the new canvas (`clipped`), as in Photoshop.
+- After all layers have been rewritten, the document width and height are updated and `mark_dirty()` is called.
+- This method records no history; the caller calls `History::record` afterward.
 
-### 图层组
+### Layer groups
 
-- `descendants(id)`：组里（任意深度）的图层。`pixel_layers(ids)`：把其中的组换成组里的像素图层，按图层顺序、去重。
-- `is_shown(id)`：图层本身及它所在的每一层组都可见。移动、自由变换、Auto-Select（`layer_at`）都按它判断可见性。
-- 合成按 tile 行对齐的行带分到各个 CPU 线程（`std::thread::available_parallelism`）各自完成再拼接，结果与单线程相同：3000 × 1080 的文档拖动图层时每帧都要重新合成，单线程约 37 ms，并行后约 5 ms。Normal 模式的图层走直通 source-over 的快速路径（不经通用混合函数，结果与 `blend::composite` 的 Normal 相同）。
-- 合成（`composite_layers_rgba8`）按组递归：同一层级的图层按顺序处理；组为 Pass Through、不透明度（含填充）100% 且没有蒙版时，组里的图层直接合成到下方；否则先把组里的图层合成到一张透明缓冲，再按组的混合模式（Pass Through 当作 Normal）、不透明度和蒙版整体混合上去。隐藏的组不参与。只给出部分图层时（合并），父组不在其中的图层当作顶层。
-- `edit_target` 对组返回 `None`（组没有像素可编辑）。Canvas Size 等画布变换跳过组的像素（组没有），但会处理组的蒙版。
+- `descendants(id)`: the layers in a group (at any depth). `pixel_layers(ids)`: replaces the groups among them with the pixel layers inside those groups, in layer order, deduplicated.
+- `is_shown(id)`: the layer itself and every group containing it are visible. Move, Free Transform and Auto-Select (`layer_at`) all judge visibility by it.
+- Compositing is split into row bands aligned to tile rows, distributed across CPU threads (`std::thread::available_parallelism`), each done separately and then joined; the result is the same as single-threaded: dragging a layer in a 3000 × 1080 document re-composites every frame, taking about 37 ms single-threaded and about 5 ms in parallel. Normal-mode layers take a straight source-over fast path (bypassing the generic blend function, with the same result as `blend::composite`'s Normal).
+- Compositing (`composite_layers_rgba8`) recurses through groups: layers at the same level are processed in order; when a group is Pass Through with opacity (including fill) 100% and no mask, its layers are composited directly onto what is below; otherwise the group's layers are first composited into a transparent buffer, which is then blended on as a whole with the group's blend mode (Pass Through treated as Normal), opacity and mask. Hidden groups do not take part. When only some layers are given (merging), layers whose parent group is not among them are treated as top-level.
+- `edit_target` returns `None` for groups (groups have no pixels to edit). Canvas transforms such as Canvas Size skip group pixels (groups have none) but do process group masks.
 
-### 合成
+### Compositing
 
-- 从底到顶遍历 `visible` 为真的图层；`opacity * fill` 小于等于 0 的图层整层跳过。
-- 遍历图层已分配的 tile，未分配的 tile 视为透明直接跳过。
-- 每个像素按图层的混合模式合成（`blend::composite`，算法见 `blend.md`）：源 alpha 为像素 alpha × `opacity` × `fill` ×（启用的蒙版值 / 255），结果为直通 alpha。源 alpha 为 0 的像素跳过。蒙版与图层使用相同的 tile 网格，按 tile 读取；蒙版缺少某个 tile 时该 tile 视为完全隐藏。
-- 混合在 gamma 编码（sRGB）空间进行，与 Photoshop 的默认设置一致（理由见 `README.md`）。
-- 累积使用 `f32` 缓冲区，最终每个分量 clamp 到 0..=1 后按 `×255 + 0.5` 截断量化为 `u8`。
-- 结果中没有任何图层覆盖的像素为 `[0, 0, 0, 0]`。
-- 例：白色背景上叠一层 50% 不透明度的黑色，得到 `[128, 128, 128, 255]`。
+- Iterates bottom to top over layers whose `visible` is true; layers whose `opacity * fill` is less than or equal to 0 are skipped entirely.
+- Iterates over the layer's allocated tiles; unallocated tiles are treated as transparent and skipped.
+- Each pixel is composited with the layer's blend mode (`blend::composite`; see `blend.md` for the algorithm): the source alpha is pixel alpha × `opacity` × `fill` × (enabled mask value / 255), and the result is straight alpha. Pixels with source alpha 0 are skipped. Masks use the same tile grid as the layer and are read tile by tile; when the mask is missing a tile, that tile is treated as fully hidden.
+- Blending happens in gamma-encoded (sRGB) space, matching Photoshop's default settings (see `README.md` for the reasoning).
+- Accumulation uses an `f32` buffer; finally each component is clamped to 0..=1 and quantized to `u8` by truncating `×255 + 0.5`.
+- Pixels not covered by any layer are `[0, 0, 0, 0]` in the result.
+- Example: a 50%-opacity black layer over a white background gives `[128, 128, 128, 255]`.
 
-## 边界情况
+## Edge cases
 
-- 宽或高为 0：允许创建和调整到 0 尺寸，不分配 tile，`composite_rgba8` 返回空缓冲区。本模块不校验尺寸下限或上限，这些限制由调用方（例如 Canvas Size 对话框）负责。
-- `from_rgba8` 的缓冲区长度必须等于 `width * height * 4`，否则 panic（校验在 `TiledImage::from_rgba8` 中）。
-- 用 alpha 为 0 的颜色调用 `new_with_background` 会得到一个不分配 tile、完全透明的背景图层。
-- 没有任何图层或所有图层都不可见时，合成结果全透明。
-- `composite_rgba8` 假设每个图层的图像尺寸与文档一致。若有图层比文档更大（只能通过直接改写公开字段造成），计算剩余宽高时会发生 `usize` 下溢。
-- `layer` / `layer_mut` 找不到 ID 时返回 `None`；`active_layer` 指向的图层是否存在由调用方保证。
+- Width or height 0: creating and resizing to a 0 size is allowed; no tiles are allocated and `composite_rgba8` returns an empty buffer. This module does not validate lower or upper size limits; those limits are the caller's responsibility (e.g. the Canvas Size dialog).
+- The buffer length for `from_rgba8` must equal `width * height * 4`, or it panics (the check is in `TiledImage::from_rgba8`).
+- Calling `new_with_background` with a color whose alpha is 0 gives a fully transparent background layer with no tiles allocated.
+- With no layers, or all layers invisible, the composite is fully transparent.
+- `composite_rgba8` assumes each layer's image has the same size as the document. If a layer is larger than the document (which can only happen by writing the public fields directly), computing the remaining width and height underflows `usize`.
+- `layer` / `layer_mut` return `None` when the ID is not found; the caller guarantees that the layer `active_layer` points to exists.
 
-## 与其它模块的关系
+## Relationship to other modules
 
-- 依赖 `tile.rs`（像素存储、`with_canvas`）、`layer.rs`（图层）、`color.rs`（颜色量化）、`pixel.rs`（元数据）。
-- `history.rs` 通过 `snapshot()` / `restore()` 实现撤销。
-- `op-io` 用 `from_rgba8` 打开文件、用 `composite_rgba8` 导出。
-- `op-ui` 新建文档、调用 Canvas Size、修改图层后调用 `mark_dirty()`，并把 `composite_rgba8` 的结果交给 `op-render` 显示。
+- Depends on `tile.rs` (pixel storage, `with_canvas`), `layer.rs` (layers), `color.rs` (color quantization), `pixel.rs` (metadata).
+- `history.rs` implements undo through `snapshot()` / `restore()`.
+- `op-io` opens files with `from_rgba8` and exports with `composite_rgba8`.
+- `op-ui` creates documents, calls Canvas Size, calls `mark_dirty()` after modifying layers, and hands the result of `composite_rgba8` to `op-render` for display.
 
-## 已知限制
+## Known limitations
 
-- 合成完全在 CPU 上进行，每次都整幅重算，不做脏区增量合成。
-- 合成不区分 `opacity` 与 `fill`，两者相乘作为图层 alpha。
-- Canvas Size 只支持像素尺寸变化，不做重采样（那属于 Image Size）。
+- Compositing is done entirely on the CPU and recomputes the whole image every time, with no incremental dirty-region compositing.
+- Compositing does not distinguish `opacity` from `fill`; the two are multiplied to form the layer alpha.
+- Canvas Size supports only pixel size changes and does no resampling (that belongs to Image Size).
 
-## 选区
+## Selection
 
-- 文档保存当前选区 `selection`（`None` 表示没有选区，此时编辑作用于整个文档）和上一次取消的选区 `last_selection`（用于 Select › Reselect）。两者都在快照里，所以选区变化可以撤销，与 Photoshop 一致。
-- `set_selection(s)`：替换选区；空选区视为没有选区。取消选区（设为 `None`）时，原选区被记为 `last_selection`。
-- `reselect()`：恢复上一次取消的选区；`can_reselect()` 在没有选区且有可恢复的选区时为真。
-- `selection_revision()`：选区每次变化（包括撤销恢复和画布尺寸变化）都会递增，界面据此缓存蚂蚁线轮廓。选区变化不改变像素，不触发重新合成。
-- `resize_canvas` 同时平移选区和 `last_selection`。
+- The document stores the current selection `selection` (`None` means no selection, in which case edits apply to the whole document) and the last deselected selection `last_selection` (for Select › Reselect). Both are in the snapshot, so selection changes can be undone, as in Photoshop.
+- `set_selection(s)`: replaces the selection; an empty selection is treated as no selection. When deselecting (setting `None`), the previous selection is recorded as `last_selection`.
+- `reselect()`: restores the last deselected selection; `can_reselect()` is true when there is no selection and there is one to restore.
+- `selection_revision()`: incremented on every selection change (including restoring by undo and canvas size changes); the UI uses it to cache the marching ants outline. Selection changes do not change pixels and do not trigger re-compositing.
+- `resize_canvas` also translates the selection and `last_selection`.
 
-## 测试覆盖
+## Test coverage
 
-- `selection_deselect_reselect_and_undo`：取消选区后可以重新选择，恢复快照会恢复快照里的选区，空选区视为没有选区。
-- `opaque_bitmap_opens_as_background`：完全不透明的像素打开为背景图层。
-- `transparent_bitmap_opens_as_regular_layer`：含半透明像素时打开为「Layer 0」普通图层，文档没有背景图层，该图层为活动图层。
-- `resize_canvas_centered`：2×2 白色背景居中扩展到 4×5、扩展色黑色，验证新尺寸、四周为黑、原图位于 (1,1)–(2,2)，且高度差为奇数时多出的一行在底部（第 3 行为黑）。
-- `resize_canvas_keeps_layers_transparent`：左上锚点扩展到 3×3 时，非背景图层的扩展区域保持透明，原像素位置不变。
-- `groups_composite_their_layers`：组里的黑色图层在穿透模式下直接显示；隐藏组后其中的图层不显示、`is_shown` 为假、Auto-Select 落到背景；组不透明度 50% 时整体混合为灰色；`descendants`、`pixel_layers` 正确。
-- `layer_multi_selection`：单击、⇧ 范围、⌘ 移出活动图层后最后一个成为活动图层、⌘ 加入背景、直接设活动图层回到单选、All Layers 不含背景、Deselect Layers。
-- `canvas_size_keeps_hidden_pixels_except_on_the_background`：缩小画布后普通图层的内容范围伸到画布外，背景图层没有画布外像素；再扩大回来，隐藏的像素重新出现。
-- `layer_at_finds_the_topmost_visible_pixel`：上层有像素处选中上层，透明处落到背景，隐藏上层后落到背景，画布外为 `None`。
-- `composite_half_opacity_over_white`：50% 不透明度黑色图层叠在白色背景上得到 `[128, 128, 128, 255]`，验证 gamma 空间混合与量化规则。
+- `selection_deselect_reselect_and_undo`: after deselecting, the selection can be reselected; restoring a snapshot restores the selection in it; an empty selection is treated as no selection.
+- `opaque_bitmap_opens_as_background`: fully opaque pixels open as a background layer.
+- `transparent_bitmap_opens_as_regular_layer`: with semi-transparent pixels it opens as a normal layer "Layer 0", the document has no background layer, and that layer is the active layer.
+- `resize_canvas_centered`: a 2×2 white background extended centered to 4×5 with black as the extension color; verifies the new size, black all around, the original image at (1,1)–(2,2), and that with an odd height difference the extra row is at the bottom (row 3 is black).
+- `resize_canvas_keeps_layers_transparent`: when extending to 3×3 with the top-left anchor, the extended area of a non-background layer stays transparent and the original pixels keep their positions.
+- `groups_composite_their_layers`: a black layer in a group shows directly in pass-through mode; after hiding the group its layers are not shown, `is_shown` is false and Auto-Select falls through to the background; with group opacity 50% the whole blends to gray; `descendants` and `pixel_layers` are correct.
+- `layer_multi_selection`: click, ⇧ range, ⌘-removing the active layer makes the last one the active layer, ⌘-adding the background, setting the active layer directly returns to single selection, All Layers excludes the background, Deselect Layers.
+- `canvas_size_keeps_hidden_pixels_except_on_the_background`: after shrinking the canvas, a normal layer's content bounds extend beyond the canvas while the background layer has no pixels outside the canvas; after enlarging again, the hidden pixels reappear.
+- `layer_at_finds_the_topmost_visible_pixel`: where the upper layer has pixels it picks the upper layer, at transparent spots it falls through to the background, after hiding the upper layer it falls through to the background, and outside the canvas it is `None`.
+- `composite_half_opacity_over_white`: a 50%-opacity black layer over a white background gives `[128, 128, 128, 255]`, verifying gamma-space blending and the quantization rule.
 
-## 有效锁定
+## Effective locks
 
-图层组的锁定作用于组里的所有图层（Photoshop 2026 实测：组 Lock all 后，组内图层的 `allLocked` 等也报告为 true）。编辑操作一律用 `Document` 上考虑祖先组的方法判断，而不是只看图层自身：
+A layer group's locks apply to all layers in the group (measured in Photoshop 2026: after Lock all on a group, layers in the group also report `allLocked` etc. as true). Edit operations always decide using the methods on `Document` that take ancestor groups into account, rather than looking only at the layer itself:
 
-- `transparency_locked(id)`、`pixels_locked(id)`、`position_locked(id)`：图层自身或任一所在组有对应的锁定（各自的 `Layer::*_locked`，包括 Lock all）。
-- `in_locked_group(id)`：所在的某个组开启了 Lock all。这样的图层不能删除、不能改混合模式与不透明度、不能加图层样式（Layers 面板中锁定行、混合模式、不透明度、fx 与垃圾桶都置灰）。
+- `transparency_locked(id)`, `pixels_locked(id)`, `position_locked(id)`: the layer itself or any group containing it has the corresponding lock (the respective `Layer::*_locked`, including Lock all).
+- `in_locked_group(id)`: some group containing it has Lock all turned on. Such a layer cannot be deleted, cannot have its blend mode or opacity changed, and cannot have layer styles added (in the Layers panel, the lock row, blend mode, opacity, fx and trash can are all grayed out).

@@ -1,60 +1,60 @@
-# psd.rs：Photoshop 文档读写
+# psd.rs: Photoshop Document Reading and Writing
 
-## 职责
+## Responsibilities
 
-读写 Photoshop 文档（.psd），按 Adobe《Photoshop File Formats Specification》实现，支持 8 位 RGB 的像素图层。没有外部依赖。
+Reads and writes Photoshop documents (.psd), implemented according to Adobe's "Photoshop File Formats Specification", supporting 8-bit RGB pixel layers. No external dependencies.
 
-## 写入（`write(doc)`）
+## Writing (`write(doc)`)
 
-生成整个文件的字节：
+Produces the bytes of the whole file:
 
-1. 文件头：`8BPS`、版本 1、通道数（合成图完全不透明时 3，否则 4）、高、宽、位深 8、颜色模式 3（RGB）。
-2. 颜色模式数据：空。
-3. 图像资源：只有 ResolutionInfo（ID 1005），水平与垂直分辨率都取 `doc.resolution`（16.16 定点），单位像素/英寸。
-4. 图层与蒙版信息：
-   - 文档只有一个背景图层时不写任何图层，只写合成图——与 Photoshop 保存单一背景文档的方式相同。
-   - 否则写全部图层（自底向上）。合成图有透明时图层数写为负数（表示合成图的 alpha 通道就是合并后的透明度）。
-   - 图层组：从下往上，每个组最下面的图层（空组则为组本身）之前写一条名为「</Layer group>」的分隔记录（`lsct` 类型 3），组本身写成没有像素的记录，`lsct` 为 1（展开）或 2（折叠）并带「8BIM」与组的混合模式键（穿透为 `pass`）；嵌套时外层组的分隔记录在前。用 Photoshop 2026 打开验证过嵌套结构、组的不透明度与混合模式；Photoshop 保存的嵌套组文件也能正确读回。
-   - 每个图层记录：图层范围为非透明像素（包括画布外的）的外接矩形，可以为负或超出画布（全透明图层范围为空）；通道（−1 = alpha，0/1/2 = R/G/B；背景图层与 Photoshop 一样没有 alpha 通道，只写 0/1/2）；混合模式键（`norm`、`mul `、`scrn` 等 27 种，与 `BlendMode` 一一对应）；不透明度（0–255）；标志位 bit 0「透明像素受保护」（背景图层或锁定透明像素时设置）、bit 1「隐藏」、bit 3（表示 bit 4 有效，Photoshop 5 以后总是设置）；Pascal 格式图层名（非 ASCII 字符写成「?」，补齐到 4 的倍数）；`luni` 附加信息（UTF-16 的完整名称）；`iOpa` 附加信息（填充不透明度）；有颜色标签时写 `lclr`（2 字节编号加 6 字节 0）；图像资源里写图层链接 1026（Layer Group Information：每条图层记录一个 u16，包括组的结束记录，自下而上；同号的图层链接在一起，0 为未链接；按首次出现重新编号为 1、2……；没有链接时不写）；非背景图层有锁定时写 `lspf`（4 字节：bit 0 透明、bit 1 像素、bit 2 位置、bit 3 防止自动嵌套、bit 31 全部锁定，用 Photoshop 2026 保存的文件核对过）；背景图层还有 `lnsr` = `bgnd`（名称来源）。这些都与 Photoshop 2026 保存的文件一致（用 Photoshop 另存的 PSD 逐字段核对过）。
-   - 有图层蒙版时多写一个通道 −2（覆盖整个画布的蒙版值），并在附加数据的「图层蒙版数据」中写 20 字节：蒙版矩形（整个画布）、矩形外的默认值 255、标志（bit 1 表示蒙版停用）和 2 字节填充。
-   - 通道数据逐图层、逐通道写在记录之后，全部使用 PackBits（RLE）压缩：先是每行压缩后的字节数（u16），再是各行数据。
-5. 合成图数据：`Document::composite_rgba8` 的结果，RLE 压缩，按 R、G、B（、A）平面顺序。
+1. File header: `8BPS`, version 1, channel count (3 when the composite is fully opaque, otherwise 4), height, width, bit depth 8, color mode 3 (RGB).
+2. Color mode data: empty.
+3. Image resources: only ResolutionInfo (ID 1005); horizontal and vertical resolution both take `doc.resolution` (16.16 fixed point), in pixels/inch.
+4. Layer and mask information:
+   - When the document has only a background layer, no layers are written, only the composite—the same way Photoshop saves a document with a single background.
+   - Otherwise all layers are written (bottom to top). When the composite has transparency, the layer count is written as a negative number (meaning the composite's alpha channel is the merged transparency).
+   - Layer groups: going from bottom to top, a divider record named "</Layer group>" (`lsct` type 3) is written before each group's bottommost layer (or the group itself for an empty group); the group itself is written as a record without pixels, with `lsct` 1 (expanded) or 2 (collapsed) plus "8BIM" and the group's blend mode key (`pass` for Pass Through); when nested, the outer group's divider record comes first. Verified by opening in Photoshop 2026: the nested structure, group opacity, and blend mode; files with nested groups saved by Photoshop are also read back correctly.
+   - Each layer record: the layer bounds are the bounding rectangle of the non-transparent pixels (including those outside the canvas), which may be negative or extend past the canvas (a fully transparent layer has empty bounds); channels (−1 = alpha, 0/1/2 = R/G/B; as in Photoshop, the background layer has no alpha channel and only 0/1/2 are written); the blend mode key (`norm`, `mul `, `scrn`, etc., 27 in all, mapping one-to-one to `BlendMode`); opacity (0–255); flag bit 0 "transparency protected" (set for the background layer or when transparent pixels are locked), bit 1 "hidden", bit 3 (indicates bit 4 is valid, always set since Photoshop 5); the Pascal-format layer name (non-ASCII characters written as "?", padded to a multiple of 4); the `luni` additional info (the full name in UTF-16); the `iOpa` additional info (fill opacity); `lclr` when there is a color label (a 2-byte number plus 6 bytes of 0); layer links in image resource 1026 (Layer Group Information: one u16 per layer record, including group end records, bottom to top; layers with the same number are linked together, 0 is unlinked; renumbered 1, 2… in order of first appearance; not written when there are no links); `lspf` when a non-background layer has locks (4 bytes: bit 0 transparency, bit 1 pixels, bit 2 position, bit 3 prevent auto-nesting, bit 31 lock all; checked against files saved by Photoshop 2026); the background layer also has `lnsr` = `bgnd` (name source). All of these match files saved by Photoshop 2026 (checked field by field against PSDs re-saved by Photoshop).
+   - When there is a layer mask, an extra channel −2 is written (mask values covering the whole canvas), and 20 bytes are written to the "layer mask data" of the extra data: the mask rectangle (the whole canvas), the default value 255 outside the rectangle, flags (bit 1 means the mask is disabled), and 2 bytes of padding.
+   - Channel data is written after the records, layer by layer and channel by channel, all compressed with PackBits (RLE): first the compressed byte count of each row (u16), then each row's data.
+5. Composite image data: the result of `Document::composite_rgba8`, RLE-compressed, in R, G, B (, A) plane order.
 
-PackBits 编码：3 个以上相同字节编码为重复段（最长 128），其余为字面段（最长 128）。
+PackBits encoding: runs of 3 or more identical bytes are encoded as repeat segments (at most 128); the rest are literal segments (at most 128).
 
-## 读取（`read(data, title)`）
+## Reading (`read(data, title)`)
 
-1. 校验 `8BPS` 签名和版本 1（版本 2 的 PSB 不支持）；只接受 8 位 RGB，否则返回 `IoError::Psd`。
-2. 跳过颜色模式数据；从图像资源中读取 ResolutionInfo 的水平分辨率作为文档分辨率（没有时为 72）。
-3. 读图层：名称优先用 `luni`，其次是 Pascal 名；`iOpa` 为填充不透明度；`lclr` 为颜色标签；带 `lsct`/`lsdk` 的记录是图层组：类型 3 是组底部的分隔记录（读到时记下位置），类型 1/2 是组本身（展开/折叠），读到时生成组图层，从对应分隔记录以来还没有父组的图层都归入它，嵌套组用栈还原。通道数据支持不压缩（0）和 RLE（1），ZIP（2、3）返回错误；带图层蒙版数据时读取通道 −2，按蒙版矩形和默认值还原成整幅画布的蒙版，并读取启用状态；−3（真实用户蒙版）及其它通道被跳过。图层像素按记录中的范围放到图层上，超出画布的部分保留在画布外（与 Photoshop 一致）；背景图层被裁到画布。
-4. 最底层的记录如果「透明像素受保护」，并且没有 alpha 通道（Photoshop 的写法）或名为「Background」，就是背景图层；其它记录的锁定取自 `lspf`；没有 `lspf` 时，这个标志位映射为锁定透明像素。有 `lspf` 时不看这个标志位：Photoshop 锁定像素时也会设置它，只看它会误读出透明锁定。可见性、不透明度、填充不透明度、混合模式（未知的键按 Normal）照记录设置。最上面的图层成为活动图层。
-5. 没有图层时读取合成图（不压缩或 RLE），按 `Document::from_rgba8` 的规则打开（完全不透明则为背景图层）。
+1. Verifies the `8BPS` signature and version 1 (version 2 PSB is not supported); only 8-bit RGB is accepted, otherwise `IoError::Psd` is returned.
+2. Skips the color mode data; reads ResolutionInfo's horizontal resolution from the image resources as the document resolution (72 when absent).
+3. Reads layers: the name prefers `luni`, then the Pascal name; `iOpa` is fill opacity; `lclr` is the color label; records with `lsct`/`lsdk` are layer groups: type 3 is the divider record at the bottom of a group (its position is noted when read), types 1/2 are the group itself (expanded/collapsed), and reading one creates a group layer into which all layers since the corresponding divider record that do not yet have a parent group are placed; nested groups are restored with a stack. Channel data supports uncompressed (0) and RLE (1); ZIP (2, 3) returns an error. When layer mask data is present, channel −2 is read and restored to a full-canvas mask using the mask rectangle and default value, and the enabled state is read; −3 (real user mask) and other channels are skipped. Layer pixels are placed on the layer according to the bounds in the record, and parts outside the canvas are kept outside the canvas (matching Photoshop); the background layer is clipped to the canvas.
+4. If the bottommost record is "transparency protected" and either has no alpha channel (Photoshop's way of writing it) or is named "Background", it is the background layer; other records take their locks from `lspf`; without `lspf`, this flag bit maps to locking transparent pixels. When `lspf` is present this flag bit is ignored: Photoshop also sets it when pixels are locked, and looking only at it would misread a transparency lock. Visibility, opacity, fill opacity, and blend mode (unknown keys become Normal) are set as recorded. The topmost layer becomes the active layer.
+5. When there are no layers, the composite is read (uncompressed or RLE) and opened according to the rules of `Document::from_rgba8` (fully opaque becomes a background layer).
 
-## 已知限制
+## Known Limitations
 
-- 不支持图层组（打开时展开、保存时没有组）、矢量蒙版、调整图层、文字图层、智能对象、图层样式、剪贴蒙版、通道与路径，以及 16/32 位、灰度、CMYK 等模式。
-- 不读写 ICC 配置文件与其它图像资源（参考线、切片、缩略图等）。
-- 保存时不写入缩略图，Finder 中的 PSD 预览可能依赖系统自行渲染合成图。
-- 已验证：Photoshop 2026 打开 OpenPhoto 写出的 PSD，图层名、不透明度、混合模式、可见性与背景图层都正确；OpenPhoto 读取 Photoshop 保存的 PSD，背景图层与普通图层都正确。图层蒙版尚未用 Photoshop 验证。
+- Not supported: layer groups (expanded on open, no groups on save), vector masks, adjustment layers, type layers, smart objects, layer styles, clipping masks, channels and paths, and 16/32-bit, grayscale, CMYK, and other modes.
+- ICC profiles and other image resources (guides, slices, thumbnails, etc.) are not read or written.
+- No thumbnail is written on save; PSD previews in Finder may rely on the system rendering the composite itself.
+- Verified: when Photoshop 2026 opens a PSD written by OpenPhoto, layer names, opacity, blend modes, visibility, and the background layer are all correct; when OpenPhoto reads a PSD saved by Photoshop, both the background layer and normal layers are correct. Layer masks have not yet been verified with Photoshop.
 
-## 测试覆盖
+## Test Coverage
 
-- `groups_round_trip`：嵌套组 Outer { Inner { a }, b } 与顶层图层写出再读回，顺序、父子关系、折叠状态、穿透模式和组的不透明度都不变。`write_group_sample`（`#[ignore]`）写出供 Photoshop 打开核对的样例。
+- `groups_round_trip`: nested groups Outer { Inner { a }, b } and top-level layers are written and read back with order, parent-child relationships, collapsed state, Pass Through mode, and group opacity unchanged. `write_group_sample` (`#[ignore]`) writes a sample to open and check in Photoshop.
 
-- `color_labels_round_trip`：带 Violet 标签的图层写出再读回标签不变，背景图层没有标签。用 Photoshop 2026 依次设了 Red…Gray 七种标签并保存的文件，本模块读出的标签与之一一对应。
+- `color_labels_round_trip`: a layer with a Violet label is written and read back with the label unchanged; the background layer has no label. For a file in which Photoshop 2026 set the seven labels Red…Gray in turn and saved, the labels read by this module correspond one-to-one.
 
-- `pixels_outside_the_canvas_round_trip`：图层在画布左边外、右下外和画布内各有像素，写出再读回后内容范围和三个像素都不变。写出的文件用 Photoshop 2026 打开验证过：图层范围为 (20, −5)–(90, 30)，与写入的一致。
+- `pixels_outside_the_canvas_round_trip`: a layer has pixels outside the canvas to the left, outside to the bottom right, and inside the canvas; after writing and reading back, the content bounds and the three pixels are unchanged. The written file was verified by opening it in Photoshop 2026: the layer bounds are (20, −5)–(90, 30), matching what was written.
 
-- `packbits_round_trip`：长重复段、256 个不同字节和短重复混合的一行，压缩后变短，解压后不变。
-- `layers_round_trip`：背景加一个带 Unicode 名称、50% 不透明度、25% 填充、Multiply、隐藏的图层，写入后读回所有属性与像素（包括半透明像素和空白处）一致，分辨率 300 保留，最上层为活动图层。
-- `masks_round_trip`：停用的蒙版写入后读回，值和启用状态一致。
-- `a_lone_background_is_stored_as_the_merged_image`：只有背景时写为合成图，读回仍是背景图层，像素一致。
-- `rejects_other_files`：非 PSD 数据返回错误。
-- `photoshop_check::write_sample`（`#[ignore]`）：写出 `target/psd-check/ours.psd`，供用 Photoshop 或其它软件打开检查。
-- `photoshop_check::read_photoshop_file`（`#[ignore]`）：读取环境变量 `OPENPHOTO_PSD` 指定的、由 Photoshop 保存的 PSD，最底层应为背景图层。
+- `packbits_round_trip`: a row mixing a long repeat run, 256 distinct bytes, and short repeats becomes shorter when compressed and is unchanged after decompression.
+- `layers_round_trip`: a background plus one layer with a Unicode name, 50% opacity, 25% fill, Multiply, and hidden; after writing and reading back, all properties and pixels (including semi-transparent pixels and blank areas) match, resolution 300 is kept, and the topmost layer is the active layer.
+- `masks_round_trip`: a disabled mask is written and read back with matching values and enabled state.
+- `a_lone_background_is_stored_as_the_merged_image`: with only a background, it is written as the composite and reads back as a background layer with matching pixels.
+- `rejects_other_files`: non-PSD data returns an error.
+- `photoshop_check::write_sample` (`#[ignore]`): writes `target/psd-check/ours.psd` for inspection in Photoshop or other software.
+- `photoshop_check::read_photoshop_file` (`#[ignore]`): reads the Photoshop-saved PSD specified by the environment variable `OPENPHOTO_PSD`; the bottommost layer should be the background layer.
 
-### 锁定的测试
+### Lock Tests
 
-- `locks_round_trip`：五个锁定标志写出再读回不变。
-- `reads_photoshop_locks`：读 `fixtures/photoshop_locks.psd`（Photoshop 2026 保存，每个图层一种锁定：tp、px、pos、nest、all），每个图层只读出对应的那一种锁定。
-- `reads_photoshop_links`：读 `fixtures/photoshop_links.psd`（Photoshop 2026 保存：A 与 B 链接、C 与背景链接、D 未链接），链接关系正确；写出再读回，链接在一起的图层不变（编号可以不同）。
+- `locks_round_trip`: the five lock flags are written and read back unchanged.
+- `reads_photoshop_locks`: reads `fixtures/photoshop_locks.psd` (saved by Photoshop 2026, one lock per layer: tp, px, pos, nest, all); each layer reads back only its corresponding lock.
+- `reads_photoshop_links`: reads `fixtures/photoshop_links.psd` (saved by Photoshop 2026: A linked with B, C linked with the background, D unlinked); the link relationships are correct; after writing and reading back, the layers linked together are unchanged (the numbers may differ).

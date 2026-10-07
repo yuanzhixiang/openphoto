@@ -1,52 +1,52 @@
-# panels/mod.rs：右侧面板列与图标列
+# panels/mod.rs: Right panel column and icon column
 
-## 组件职责
+## Component responsibility
 
-- 右侧面板列：三组带标签的面板上下排列，对应 Photoshop 默认工作区右侧的面板。
-- 图标列：面板列左边一列竖向图标，对应 Photoshop 收起成图标的面板（History、Comments）。
+- Right panel column: three tabbed panel groups stacked vertically, corresponding to the panels on the right of Photoshop's default workspace.
+- Icon column: a vertical column of icons to the left of the panel column, corresponding to Photoshop panels collapsed to icons (History, Comments).
 
-## 面板列
+## Panel column
 
-### 布局
+### Layout
 
-以下尺寸都按 Photoshop 2026 默认 Essentials 工作区实测（2x 截图逐像素量取），单位 pt。面板列宽 322。
+All sizes below are measured from Photoshop 2026's default Essentials workspace (measured pixel by pixel from 2x screenshots), in pt. The panel column is 322 wide.
 
-- 顶部是 13 pt 高的折叠条（与工具栏、图标列相同，见 `toolbar.md` 的 `header`），右端是细线「»」（只有外观）。
-- 三组面板紧接折叠条，组之间是 3 pt 的分隔条（`#383838`、`#474747`、`#383838` 三条 1 pt 线）：
-  1. Color、Swatches、Gradients、Patterns，默认高 147（含标签栏）。
-  2. Properties、Adjustments、Libraries，占用剩余空间（伸缩组）。
-  3. Layers、Channels、Paths，默认高 286。
-  在 1350 × 800 的窗口里，三组的标签栏分别从 y 75、225、514 开始，与 Photoshop 相同。
-- 每组顶部是标签栏：27 pt 高、底色 `#424242`，下面一条 1 pt 的 `#383838` 线（共 28 pt）；右端是面板菜单图标：四条 10 × 1 pt、间距 2 pt 的 `#a8a8a8` 横线，距右边 5.5 pt、距标签栏顶部 10 pt（只有外观）。下面是面板内容，底色 `#535353`。
+- At the top is a 13 pt high collapse bar (the same as the toolbar and icon column, see `header` in `toolbar.md`), with a thin "»" at the right end (appearance only).
+- The three panel groups follow directly after the collapse bar, with a 3 pt divider between groups (three 1 pt lines: `#383838`, `#474747`, `#383838`):
+  1. Color, Swatches, Gradients, Patterns, default height 147 (including the tab bar).
+  2. Properties, Adjustments, Libraries, taking the remaining space (the flexible group).
+  3. Layers, Channels, Paths, default height 286.
+  In a 1350 × 800 window, the three groups' tab bars start at y 75, 225, and 514 respectively, the same as Photoshop.
+- At the top of each group is a tab bar: 27 pt high, background `#424242`, with a 1 pt `#383838` line below it (28 pt total); at the right end is the panel menu icon: four 10 × 1 pt `#a8a8a8` horizontal lines spaced 2 pt apart, 5.5 pt from the right edge and 10 pt from the top of the tab bar (appearance only). Below is the panel content, background `#535353`.
 
-### 标签
+### Tabs
 
-- 标签宽度为文字宽度加 19（文字左侧 9、右侧约 10），四舍五入到整点，每个标签右边是一条 1 pt 的 `#383838` 竖线；文字半粗体。
-- 激活标签底色 `#535353`，并盖住标签栏下方的线与内容连成一片；文字 `#f0f0f0`。未激活标签与标签栏同色，文字 `#b0b0b0`，悬停时变为 `#f0f0f0`。
-- 点击切换该组显示的面板。
+- Tab width is the text width plus 19 (9 left of the text, about 10 to the right), rounded to a whole point; to the right of each tab is a 1 pt `#383838` vertical line; the text is semibold.
+- The active tab has background `#535353` and covers the line below the tab bar so it joins the content; text `#f0f0f0`. Inactive tabs are the same color as the tab bar, with text `#b0b0b0`, which becomes `#f0f0f0` on hover.
+- Clicking switches the panel shown in that group.
 
-### 调整高度
+### Resizing
 
-拖动组间分隔条可以改变高度（光标变为上下箭头）。拖动伸缩组旁边的分隔条时，改变的是另一侧的固定高度组，伸缩组自动吸收差值。每组最小高度为标签栏加 40。
+Dragging the divider between groups changes the heights (the cursor becomes an up-down arrow). When dragging a divider next to the flexible group, it is the fixed-height group on the other side that changes, and the flexible group absorbs the difference automatically. Each group's minimum height is the tab bar plus 40.
 
-### 各面板
+### Panels
 
-- Color、Swatches：见 `color_panel.md`。
-- Properties：见 `properties.md`。
-- Layers：见 `layers.md`。
-- Gradients、Patterns、Adjustments、Libraries、Channels、Paths：显示「{名称} — not implemented yet」占位文字。
+- Color, Swatches: see `color_panel.md`.
+- Properties: see `properties.md`.
+- Layers: see `layers.md`.
+- Gradients, Patterns, Adjustments, Libraries, Channels, Paths: show the placeholder text "{name} — not implemented yet".
 
-## 图标列
+## Icon column
 
-- 宽 43 pt：左右各一条 3 pt 的分隔条（`#383838`、`#474747`、`#383838`），左边紧挨文档的垂直滚动条，右边紧挨面板列；中间 37 pt 是图标区域。
-- 顶部是 13 pt 的折叠条，右端是细线「«」（只有外观）。
-- 折叠条下方（距列顶 16 pt）是拖动手柄：10 条 1 × 4 pt 的 `#454545` 短竖线，间距 2 pt，从图标区域左边 9 pt 开始（只有外观）。
-- History 按钮：图标中心距列顶 35.5 pt，是照 Photoshop 描出的图标（两个空心小方块叠在一个实心小方块上，右侧一条弧形箭头）；点击打开或收起 History 弹出面板（见 `history.md`），打开时按钮显示为选中状态。
-- Comments 按钮：图标中心距列顶 63.5 pt，实心对话气泡；只有外观。
-- 距列顶 81 pt 有一条横跨图标区域的 1 pt `#383838` 线。
-- 返回 History 按钮的位置，供弹出面板定位。
+- 43 pt wide: a 3 pt divider on each side (`#383838`, `#474747`, `#383838`); the left one is directly against the document's vertical scrollbar and the right one directly against the panel column; the 37 pt in between is the icon area.
+- At the top is a 13 pt collapse bar, with a thin "«" at the right end (appearance only).
+- Below the collapse bar (16 pt from the top of the column) is the drag handle: 10 short 1 × 4 pt `#454545` vertical lines spaced 2 pt apart, starting 9 pt from the left of the icon area (appearance only).
+- History button: icon center 35.5 pt from the top of the column, an icon traced from Photoshop (two hollow small squares stacked on a solid small square, with a curved arrow on the right); clicking opens or closes the History flyout panel (see `history.md`), and while it is open the button is shown in its selected state.
+- Comments button: icon center 63.5 pt from the top of the column, a solid speech bubble; appearance only.
+- At 81 pt from the top of the column is a 1 pt `#383838` line spanning the icon area.
+- Returns the position of the History button, for positioning the flyout panel.
 
-## 已知限制
+## Known limitations
 
-- 面板不能拖动重新停靠、不能拖出成浮动窗口、不能收起成图标。
-- 面板菜单（右上角三横线）没有内容。
+- Panels cannot be dragged to re-dock, dragged out into floating windows, or collapsed to icons.
+- The panel menu (the three lines at the top right) has no content.

@@ -1,14 +1,14 @@
-# commands.rs：命令与快捷键
+# commands.rs: Commands and shortcuts
 
-## 职责
+## Responsibilities
 
-把菜单项和快捷键统一成 `Command`，由 `run()` 在一处执行。菜单只负责发出命令，快捷键只负责识别按键。
+Unifies menu items and shortcuts into `Command`, executed in one place by `run()`. Menus are only responsible for issuing commands, and shortcuts only for recognizing keys.
 
-## 命令与快捷键
+## Commands and shortcuts
 
-快捷键与 Photoshop 2026 默认值一致（通过辅助功能接口读取 Photoshop 菜单得到）。⌘ 在其它平台对应 Ctrl。
+Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's menus through the accessibility interface). ⌘ corresponds to Ctrl on other platforms.
 
-| 命令 | 菜单位置 | 快捷键 |
+| Command | Menu location | Shortcut |
 |---|---|---|
 | New | File › New... | ⌘N |
 | Open | File › Open... | ⌘O |
@@ -26,242 +26,242 @@
 | ToggleLastState | Edit › Toggle Last State | ⌥⌘Z |
 | CanvasSize | Image › Canvas Size... | ⌥⌘C |
 | ImageSize | Image › Image Size... | ⌥⌘I |
-| Rotate180 | Image › Image Rotation › 180° | 无 |
-| TransformSelection | Select › Transform Selection：用变换框只变换选区轮廓（`free_transform.md`）；有选区时可用 | 无 |
-| RotateArbitrary | Image › Image Rotation › Arbitrary...：打开 Rotate Canvas 对话框（`dialogs/rotate_canvas.md`） | 无 |
-| Rotate90Clockwise | Image › Image Rotation › 90° Clockwise | 无 |
-| Rotate90CounterClockwise | Image › Image Rotation › 90° Counter Clockwise | 无 |
-| FlipCanvasHorizontal | Image › Image Rotation › Flip Canvas Horizontal | 无 |
-| FlipCanvasVertical | Image › Image Rotation › Flip Canvas Vertical | 无 |
-| Crop | Image › Crop | 无 |
-| Trim | Image › Trim... | 无 |
-| RevealAll | Image › Reveal All：把画布扩大到所有图层像素（包括画布外的）的范围，背景图层扩展为背景色（`image_ops::reveal_all`），记录「Reveal All」；没有画布外像素时什么也不做 | 无 |
+| Rotate180 | Image › Image Rotation › 180° | None |
+| TransformSelection | Select › Transform Selection: transforms only the selection outline with the transform box (`free_transform.md`); available when there is a selection | None |
+| RotateArbitrary | Image › Image Rotation › Arbitrary...: opens the Rotate Canvas dialog (`dialogs/rotate_canvas.md`) | None |
+| Rotate90Clockwise | Image › Image Rotation › 90° Clockwise | None |
+| Rotate90CounterClockwise | Image › Image Rotation › 90° Counter Clockwise | None |
+| FlipCanvasHorizontal | Image › Image Rotation › Flip Canvas Horizontal | None |
+| FlipCanvasVertical | Image › Image Rotation › Flip Canvas Vertical | None |
+| Crop | Image › Crop | None |
+| Trim | Image › Trim... | None |
+| RevealAll | Image › Reveal All: enlarges the canvas to the extent of all layer pixels (including those outside the canvas), extending the background layer with the background color (`image_ops::reveal_all`), and records "Reveal All"; does nothing when there are no pixels outside the canvas | None |
 | Invert | Image › Adjustments › Invert | ⌘I |
 | Desaturate | Image › Adjustments › Desaturate | ⇧⌘U |
-| Equalize | Image › Adjustments › Equalize | 无 |
-| Threshold | Image › Adjustments › Threshold... | 无 |
-| Posterize | Image › Adjustments › Posterize... | 无 |
+| Equalize | Image › Adjustments › Equalize | None |
+| Threshold | Image › Adjustments › Threshold... | None |
+| Posterize | Image › Adjustments › Posterize... | None |
 | Levels | Image › Adjustments › Levels... | ⌘L |
 | HueSaturation | Image › Adjustments › Hue/Saturation... | ⌘U |
-| Exposure | Image › Adjustments › Exposure... | 无 |
-| BrightnessContrast | Image › Adjustments › Brightness/Contrast... | 无 |
+| Exposure | Image › Adjustments › Exposure... | None |
+| BrightnessContrast | Image › Adjustments › Brightness/Contrast... | None |
 | Curves | Image › Adjustments › Curves... | ⌘M |
 | ColorBalance | Image › Adjustments › Color Balance... | ⌘B |
 | BlackWhite | Image › Adjustments › Black & White... | ⌥⇧⌘B |
-| Vibrance | Image › Adjustments › Vibrance... | 无 |
-| ChannelMixer | Image › Adjustments › Channel Mixer... | 无 |
-| SelectiveColor | Image › Adjustments › Selective Color... | 无 |
-| PhotoFilter | Image › Adjustments › Photo Filter... | 无 |
-| GradientMap | Image › Adjustments › Gradient Map... | 无 |
+| Vibrance | Image › Adjustments › Vibrance... | None |
+| ChannelMixer | Image › Adjustments › Channel Mixer... | None |
+| SelectiveColor | Image › Adjustments › Selective Color... | None |
+| PhotoFilter | Image › Adjustments › Photo Filter... | None |
+| GradientMap | Image › Adjustments › Gradient Map... | None |
 | AutoTone | Image › Auto Tone | ⇧⌘L |
 | AutoContrast | Image › Auto Contrast | ⌥⇧⌘L |
 | AutoColor | Image › Auto Color | ⇧⌘B |
 | LastFilter | Filter › Last Filter | ⌃⌘F |
-| Average | Filter › Blur › Average | 无 |
-| BoxBlur | Filter › Blur › Box Blur... | 无 |
-| GaussianBlur | Filter › Blur › Gaussian Blur... | 无 |
-| AddNoise | Filter › Noise › Add Noise... | 无 |
-| Median | Filter › Noise › Median... | 无 |
-| Mosaic | Filter › Pixelate › Mosaic... | 无 |
-| UnsharpMask | Filter › Sharpen › Unsharp Mask... | 无 |
-| Solarize | Filter › Stylize › Solarize | 无 |
-| HighPass | Filter › Other › High Pass... | 无 |
-| Maximum | Filter › Other › Maximum... | 无 |
-| Minimum | Filter › Other › Minimum... | 无 |
-| Offset | Filter › Other › Offset... | 无 |
-| NewLayer | Layer › New › Layer...：打开 New Layer 对话框（`dialogs/new_layer.md`），默认名称为下一个「Layer N」 | ⇧⌘N |
-| NewLayerNoDialog | 不弹对话框直接新建图层（`panels::new_layer`），与 Photoshop 的 ⌥⇧⌘N 一致；不在菜单里 | ⌥⇧⌘N |
-| DeleteLayer | Layer › Delete › Layer | 无 |
+| Average | Filter › Blur › Average | None |
+| BoxBlur | Filter › Blur › Box Blur... | None |
+| GaussianBlur | Filter › Blur › Gaussian Blur... | None |
+| AddNoise | Filter › Noise › Add Noise... | None |
+| Median | Filter › Noise › Median... | None |
+| Mosaic | Filter › Pixelate › Mosaic... | None |
+| UnsharpMask | Filter › Sharpen › Unsharp Mask... | None |
+| Solarize | Filter › Stylize › Solarize | None |
+| HighPass | Filter › Other › High Pass... | None |
+| Maximum | Filter › Other › Maximum... | None |
+| Minimum | Filter › Other › Minimum... | None |
+| Offset | Filter › Other › Offset... | None |
+| NewLayer | Layer › New › Layer...: opens the New Layer dialog (`dialogs/new_layer.md`), with the next "Layer N" as the default name | ⇧⌘N |
+| NewLayerNoDialog | Creates a new layer directly without a dialog (`panels::new_layer`), consistent with Photoshop's ⌥⇧⌘N; not in the menu | ⌥⇧⌘N |
+| DeleteLayer | Layer › Delete › Layer | None |
 | ToggleLayerVisibility | Layer › Hide Layers / Show Layers | ⌘, |
-| LayerFromBackground | Layer › New › Layer from Background...：打开 New Layer 对话框的 Layer from Background 版本（`dialogs/new_layer.md`） | 无 |
+| LayerFromBackground | Layer › New › Layer from Background...: opens the Layer from Background version of the New Layer dialog (`dialogs/new_layer.md`) | None |
 | LayerViaCopy | Layer › New › Layer Via Copy | ⌘J |
 | LayerViaCut | Layer › New › Layer Via Cut | ⇧⌘J |
-| DuplicateLayer | Layer › Duplicate Layer...：打开 Duplicate Layer 对话框（`dialogs/duplicate_layer.md`），文档列表为当前文档在前、其余打开的文档按标签顺序，新文档的默认标题为下一个「Untitled-N」 | 无 |
-| DeleteHiddenLayers | Layer › Delete › Hidden Layers | 无 |
+| DuplicateLayer | Layer › Duplicate Layer...: opens the Duplicate Layer dialog (`dialogs/duplicate_layer.md`); the document list has the current document first, then the other open documents in tab order; the default title for a new document is the next "Untitled-N" | None |
+| DeleteHiddenLayers | Layer › Delete › Hidden Layers | None |
 | BringToFront | Layer › Arrange › Bring to Front | ⇧⌘] |
 | BringForward | Layer › Arrange › Bring Forward | ⌘] |
 | SendBackward | Layer › Arrange › Send Backward | ⌘[ |
 | SendToBack | Layer › Arrange › Send to Back | ⇧⌘[ |
 | MergeDown | Layer › Merge Down | ⌘E |
 | MergeVisible | Layer › Merge Visible | ⇧⌘E |
-| FlattenImage | Layer › Flatten Image：有隐藏图层时先用 macOS 提示框问「Discard hidden layers?」（警告图标、「Don’t show again」复选框、Cancel 与 OK），OK 后拼合（丢弃隐藏图层）并记录「Flatten Image」；勾选「Don’t show again」后本次运行不再询问 | 无 |
-| SelectAllLayers | Select › All Layers：选中除背景外的所有图层 | ⌥⌘A |
-| DeselectLayers | Select › Deselect Layers：不选任何图层 | 无 |
-| Align(how) | Layer › Align › Top Edges…Right Edges（`op_core::align::align`），记录如「Align Left Edges」；移动工具选项栏的对齐按钮也执行它 | 无 |
-| Distribute(how) | Layer › Distribute › Top Edges…Vertically（`op_core::align::distribute`），记录如「Distribute Vertical Centers」 | 无 |
-| ArrangeReverse | Layer › Arrange › Reverse（`layer_ops::reverse_selected`），记录「Reverse」 | 无 |
-| GroupLayers | Layer › Group Layers：选中的图层编组（`layer_ops::group_selected`），记录「Group Layers」；选中背景图层时不可用 | ⌘G |
-| UngroupLayers | Layer › Ungroup Layers：取消当前组（`layer_ops::ungroup`），记录「Ungroup Layers」；当前图层是组时可用 | ⇧⌘G |
-| NewGroup | Layer › New › Group...：打开 New Group 对话框 | 无 |
-| NewGroupFromLayers | Layer › New › Group from Layers...：打开 New Group from Layers 对话框；可用条件同 GroupLayers | 无 |
-| LockLayers | Layer › Lock Layers...：打开 Lock Layers 对话框（`dialogs/lock_layers.md`），确认后把锁定设到选中的非背景图层上，记录「Lock Layers」；只选中背景时不可用。菜单项显示 ⌘/，但按 ⌘/ 运行的是 ToggleLockAll，只有从菜单选择才打开对话框（macOS 上由菜单事件发生时是否是按键事件区分，见 `app_kit::handling_key_press`），与 Photoshop 一致 | ⌘/（仅显示） |
-| ToggleLockAll | ⌘/：选中的图层未全部「全部锁定」时打开全部锁定，记录「Lock Layer」；已全部锁定时清除所有锁定，记录「Unlock Layer」（`layer_ops::toggle_lock_all`）。只选中背景时弹出「The command “Set” is not currently available.」；这时菜单项不可用，⌘/ 由 egui 收到（`from_shortcuts_beside_menu`）。不在菜单中 | ⌘/ |
-| LinkLayers | Layer › Link Layers / Unlink Layers 与 Layers 面板的链接按钮：所有选中图层都已链接时取消它们的链接（记录「Unlink Layers」），否则把选中的图层连同已与它们链接的图层链接成一组（记录「Link Layers」）。选中两个以上的图层、或选中的图层都已链接时可用；菜单标签随之变成「Unlink Layers」（`link::can_unlink`） | 无 |
-| SelectLinkedLayers | Layer › Select Linked Layers：把与选中图层链接的图层加进选中，活动图层不变；只在会多选中图层时可用。不记录历史 | 无 |
-| RenameLayer | Layer › Rename Layer...：在 Layers 面板里就地改名当前图层（与 Photoshop 2026 一样没有对话框）；当前图层是背景图层时不可用 | 无 |
+| FlattenImage | Layer › Flatten Image: when there are hidden layers, first asks "Discard hidden layers?" with a macOS alert (warning icon, "Don’t show again" checkbox, Cancel and OK); after OK, flattens (discarding hidden layers) and records "Flatten Image"; once "Don’t show again" is checked, it does not ask again for the current run | None |
+| SelectAllLayers | Select › All Layers: selects all layers except the background | ⌥⌘A |
+| DeselectLayers | Select › Deselect Layers: selects no layers | None |
+| Align(how) | Layer › Align › Top Edges…Right Edges (`op_core::align::align`), records e.g. "Align Left Edges"; the align buttons in the Move tool options bar also execute it | None |
+| Distribute(how) | Layer › Distribute › Top Edges…Vertically (`op_core::align::distribute`), records e.g. "Distribute Vertical Centers" | None |
+| ArrangeReverse | Layer › Arrange › Reverse (`layer_ops::reverse_selected`), records "Reverse" | None |
+| GroupLayers | Layer › Group Layers: groups the selected layers (`layer_ops::group_selected`), records "Group Layers"; unavailable when the background layer is selected | ⌘G |
+| UngroupLayers | Layer › Ungroup Layers: ungroups the current group (`layer_ops::ungroup`), records "Ungroup Layers"; available when the current layer is a group | ⇧⌘G |
+| NewGroup | Layer › New › Group...: opens the New Group dialog | None |
+| NewGroupFromLayers | Layer › New › Group from Layers...: opens the New Group from Layers dialog; same availability as GroupLayers | None |
+| LockLayers | Layer › Lock Layers...: opens the Lock Layers dialog (`dialogs/lock_layers.md`); on confirm, sets the locks on the selected non-background layers and records "Lock Layers"; unavailable when only the background is selected. The menu item shows ⌘/, but pressing ⌘/ runs ToggleLockAll; only choosing it from the menu opens the dialog (on macOS, distinguished by whether the menu event occurs during a key event, see `app_kit::handling_key_press`), consistent with Photoshop | ⌘/ (display only) |
+| ToggleLockAll | ⌘/: when not all selected layers are "Lock All", turns on Lock All and records "Lock Layer"; when all are fully locked, clears all locks and records "Unlock Layer" (`layer_ops::toggle_lock_all`). When only the background is selected, shows "The command “Set” is not currently available."; in that case the menu item is unavailable and ⌘/ is received by egui (`from_shortcuts_beside_menu`). Not in the menu | ⌘/ |
+| LinkLayers | Layer › Link Layers / Unlink Layers and the link button in the Layers panel: when all selected layers are already linked, unlinks them (records "Unlink Layers"); otherwise links the selected layers, together with the layers already linked to them, into one group (records "Link Layers"). Available when two or more layers are selected, or when the selected layers are all linked; the menu label changes to "Unlink Layers" accordingly (`link::can_unlink`) | None |
+| SelectLinkedLayers | Layer › Select Linked Layers: adds the layers linked to the selected layers to the selection, leaving the active layer unchanged; available only when it would select more layers. No history is recorded | None |
+| RenameLayer | Layer › Rename Layer...: renames the current layer in place in the Layers panel (no dialog, as in Photoshop 2026); unavailable when the current layer is the background layer | None |
 | Fill | Edit › Fill... | ⇧F5 |
-| FillForeground | 无（Photoshop 的隐藏快捷键） | ⌥⌫ |
-| FillBackground | 无（Photoshop 的隐藏快捷键） | ⌘⌫ |
+| FillForeground | None (a hidden Photoshop shortcut) | ⌥⌫ |
+| FillBackground | None (a hidden Photoshop shortcut) | ⌘⌫ |
 | Clear | Edit › Clear | ⌫ / Delete |
 | FreeTransform | Edit › Free Transform | ⌘T |
 | TransformAgain | Edit › Transform › Again | ⇧⌘T |
-| TransformRotate180 | Edit › Transform › Rotate 180° | 无 |
-| TransformRotate90Clockwise | Edit › Transform › Rotate 90° Clockwise | 无 |
-| TransformRotate90CounterClockwise | Edit › Transform › Rotate 90° Counter Clockwise | 无 |
-| TransformFlipHorizontal | Edit › Transform › Flip Horizontal | 无 |
-| TransformFlipVertical | Edit › Transform › Flip Vertical | 无 |
+| TransformRotate180 | Edit › Transform › Rotate 180° | None |
+| TransformRotate90Clockwise | Edit › Transform › Rotate 90° Clockwise | None |
+| TransformRotate90CounterClockwise | Edit › Transform › Rotate 90° Counter Clockwise | None |
+| TransformFlipHorizontal | Edit › Transform › Flip Horizontal | None |
+| TransformFlipVertical | Edit › Transform › Flip Vertical | None |
 | Cut | Edit › Cut | ⌘X |
 | Copy | Edit › Copy | ⌘C |
 | CopyMerged | Edit › Copy Merged | ⇧⌘C |
 | Paste | Edit › Paste | ⌘V |
 | PasteInPlace | Edit › Paste Special › Paste in Place | ⇧⌘V |
 | PasteInto | Edit › Paste Special › Paste Into | ⌥⇧⌘V |
-| PasteOutside | Edit › Paste Special › Paste Outside | 无 |
-| MaskRevealAll | Layer › Layer Mask › Reveal All | 无 |
-| MaskHideAll | Layer › Layer Mask › Hide All | 无 |
-| MaskRevealSelection | Layer › Layer Mask › Reveal Selection | 无 |
-| MaskHideSelection | Layer › Layer Mask › Hide Selection | 无 |
-| MaskDelete | Layer › Layer Mask › Delete | 无 |
-| MaskApply | Layer › Layer Mask › Apply | 无 |
-| MaskToggle | Layer › Layer Mask › Disable / Enable | 无 |
+| PasteOutside | Edit › Paste Special › Paste Outside | None |
+| MaskRevealAll | Layer › Layer Mask › Reveal All | None |
+| MaskHideAll | Layer › Layer Mask › Hide All | None |
+| MaskRevealSelection | Layer › Layer Mask › Reveal Selection | None |
+| MaskHideSelection | Layer › Layer Mask › Hide Selection | None |
+| MaskDelete | Layer › Layer Mask › Delete | None |
+| MaskApply | Layer › Layer Mask › Apply | None |
+| MaskToggle | Layer › Layer Mask › Disable / Enable | None |
 | SelectAll | Select › All | ⌘A |
 | Deselect | Select › Deselect | ⌘D |
 | Reselect | Select › Reselect | ⇧⌘D |
 | SelectInverse | Select › Inverse | ⇧⌘I |
-| ModifyBorder | Select › Modify › Border... | 无 |
-| ModifySmooth | Select › Modify › Smooth... | 无 |
-| ModifyExpand | Select › Modify › Expand... | 无 |
-| ModifyContract | Select › Modify › Contract... | 无 |
+| ModifyBorder | Select › Modify › Border... | None |
+| ModifySmooth | Select › Modify › Smooth... | None |
+| ModifyExpand | Select › Modify › Expand... | None |
+| ModifyContract | Select › Modify › Contract... | None |
 | ModifyFeather | Select › Modify › Feather... | ⇧F6 |
-| Grow | Select › Grow | 无 |
-| Similar | Select › Similar | 无 |
-| QuickMask | Select › Edit in Quick Mask Mode | Q（单键，见 `actions.md`） |
-| ZoomIn | View › Zoom In | ⌘+（同时接受 ⌘=） |
+| Grow | Select › Grow | None |
+| Similar | Select › Similar | None |
+| QuickMask | Select › Edit in Quick Mask Mode | Q (single key, see `actions.md`) |
+| ZoomIn | View › Zoom In | ⌘+ (also accepts ⌘=) |
 | ZoomOut | View › Zoom Out | ⌘- |
 | FitOnScreen | View › Fit on Screen | ⌘0 |
-| FitLayers | View › Fit Layer(s) on Screen | 无 |
+| FitLayers | View › Fit Layer(s) on Screen | None |
 | ActualPixels | View › 100% | ⌘1 |
-| Zoom200 | View › 200% | 无 |
-| PrintSize | View › Print Size | 无 |
+| Zoom200 | View › 200% | None |
+| PrintSize | View › Print Size | None |
 | ToggleExtras | View › Extras | ⌘H |
 | ToggleGrid | View › Show › Grid | ⌘' |
 | ToggleGuides | View › Show › Guides | ⌘; |
 | ToggleRulers | View › Rulers | ⌘R |
 | LockGuides | View › Guides › Lock Guides | ⌥⌘; |
-| ClearGuides | View › Guides › Clear Guides | 无 |
-| NewGuide | View › Guides › New Guide... | 无 |
+| ClearGuides | View › Guides › Clear Guides | None |
+| NewGuide | View › Guides › New Guide... | None |
 | HideApp | OpenPhoto › Hide OpenPhoto | ⌃⌘H |
-| ToggleHistory | Window › History | 无 |
-| ToggleHistogram | Window › Histogram | 无 |
+| ToggleHistory | Window › History | None |
+| ToggleHistogram | Window › Histogram | None |
 | ToggleInfo | Window › Info | F8 |
-| ToggleNavigator | Window › Navigator | 无 |
+| ToggleNavigator | Window › Navigator | None |
 
-## 可用条件（`enabled`）
+## Availability (`enabled`)
 
-同时决定命令能否执行和菜单项是否置灰：
+Determines both whether a command can execute and whether its menu item is grayed out:
 
-- 有输入框获得键盘焦点时（`AppState::typing`），Cut、Copy、CopyMerged、Paste、PasteInPlace 始终可用（包括模态对话框里的输入框），执行时作用于输入框的文字（见下文「剪贴板」）。
-- 除此之外，有模态对话框打开时所有命令不可用。
-- New、Open、ToggleHistory、ToggleInfo、ToggleNavigator、ToggleHistogram、Quit、HideApp 与五个视图开关（Rulers、Extras、Guides、Grid、Lock Guides）始终可用（有模态对话框时除外）；ClearGuides 在当前文档有参考线时可用；FitLayers、Zoom200、PrintSize、NewGuide 有当前文档时可用。
-- Revert：当前文档有文件且有未保存修改时可用。Save、Save As、Save a Copy：有当前文档时可用。
-- Undo、ToggleLastState：当前文档能撤销时可用；Redo：能重做时可用。
-- DeleteLayer：当前文档的图层多于 1 个时可用。
-- CloseOthers：打开的文档多于 1 个时可用。
-- ToggleLayerVisibility 作用于所有选中图层（全部隐藏时显示，菜单标签相应为 Show Layers / Hide Layers）；DeleteLayer 删除所有选中图层，选中的不是全部图层时可用；Align 要求 `can_align`，Distribute 要求 `can_distribute`；SelectAllLayers 要求有非背景图层，DeselectLayers 要求有活动图层。
-- ToggleLayerVisibility、DuplicateLayer、LayerViaCopy：当前文档有选中图层时可用；LayerViaCut 还要求有选区。
-- Crop、PasteInto、PasteOutside：当前文档有选区时可用。MaskRevealAll、MaskHideAll：当前图层可以加蒙版时可用；MaskRevealSelection、MaskHideSelection 还要求有选区；MaskDelete、MaskApply、MaskToggle：当前图层有蒙版时可用。TransformAgain：有当前文档且本次运行中做过变换时可用。LastFilter：有当前文档且本次运行中用过滤镜时可用。
-- LayerFromBackground：文档有背景图层时可用。DeleteHiddenLayers：既有隐藏图层也有可见图层时可用。
-- Arrange 四项：当前图层按该命令能移动时可用（`layer_ops::arrange_target`）。MergeDown：当前图层是非空组时为 Merge Group（`layer_ops::merge_group`，记录「Merge Group」，菜单标签「Merge Group」）；选中多个图层时为 Merge Layers（`layer_ops::merge_selected`，记录「Merge Layers」，菜单标签随之改为「Merge Layers」），其中至少两个可见时可用；只选一个时为 Merge Down，当前图层和它下面的图层都可见时可用；MergeVisible：可见图层多于一个时可用；FlattenImage：文档不是只有一个背景图层时可用。
-- Deselect、SelectInverse、Modify 五项、Grow、Similar：当前文档有选区时可用；Reselect：没有选区且有可恢复的选区时可用；SelectAll：有当前文档时可用。
-- 其余命令：有当前文档时可用。Paste 不检查剪贴板里有没有内容（读取系统剪贴板里的图片代价较高，不适合每帧检查），剪贴板为空时执行 Paste 什么也不做。
+- When an input box has keyboard focus (`AppState::typing`), Cut, Copy, CopyMerged, Paste and PasteInPlace are always available (including input boxes in modal dialogs), and act on the input box's text when executed (see "Clipboard" below).
+- Apart from that, all commands are unavailable while a modal dialog is open.
+- New, Open, ToggleHistory, ToggleInfo, ToggleNavigator, ToggleHistogram, Quit, HideApp and the five view toggles (Rulers, Extras, Guides, Grid, Lock Guides) are always available (except when a modal dialog is open); ClearGuides is available when the current document has guides; FitLayers, Zoom200, PrintSize and NewGuide are available when there is a current document.
+- Revert: available when the current document has a file and unsaved changes. Save, Save As, Save a Copy: available when there is a current document.
+- Undo, ToggleLastState: available when the current document can undo; Redo: available when it can redo.
+- DeleteLayer: available when the current document has more than 1 layer.
+- CloseOthers: available when more than 1 document is open.
+- ToggleLayerVisibility acts on all selected layers (shows them when all are hidden, with the menu label correspondingly Show Layers / Hide Layers); DeleteLayer deletes all selected layers and is available when the selection is not all layers; Align requires `can_align`, Distribute requires `can_distribute`; SelectAllLayers requires a non-background layer, DeselectLayers requires an active layer.
+- ToggleLayerVisibility, DuplicateLayer, LayerViaCopy: available when the current document has selected layers; LayerViaCut additionally requires a selection.
+- Crop, PasteInto, PasteOutside: available when the current document has a selection. MaskRevealAll, MaskHideAll: available when a mask can be added to the current layer; MaskRevealSelection, MaskHideSelection additionally require a selection; MaskDelete, MaskApply, MaskToggle: available when the current layer has a mask. TransformAgain: available when there is a current document and a transform has been done in the current run. LastFilter: available when there is a current document and a filter has been used in the current run.
+- LayerFromBackground: available when the document has a background layer. DeleteHiddenLayers: available when there are both hidden and visible layers.
+- The four Arrange items: available when the current layer can move by that command (`layer_ops::arrange_target`). MergeDown: when the current layer is a non-empty group, it is Merge Group (`layer_ops::merge_group`, records "Merge Group", menu label "Merge Group"); when multiple layers are selected, it is Merge Layers (`layer_ops::merge_selected`, records "Merge Layers", with the menu label changing to "Merge Layers"), available when at least two of them are visible; when only one is selected, it is Merge Down, available when both the current layer and the layer below it are visible; MergeVisible: available when more than one layer is visible; FlattenImage: available when the document is not just a single background layer.
+- Deselect, SelectInverse, the five Modify items, Grow, Similar: available when the current document has a selection; Reselect: available when there is no selection and there is a selection that can be restored; SelectAll: available when there is a current document.
+- All other commands: available when there is a current document. Paste does not check whether the clipboard has content (reading an image from the system clipboard is expensive and unsuitable for checking every frame); executing Paste with an empty clipboard does nothing.
 
-## 填充与清除
+## Fill and Clear
 
-- Fill：打开 Fill 对话框（见 `dialogs/fill.md`）。
-- FillForeground / FillBackground：立即用前景色 / 背景色填充当前图层的选区（没有选区时整个图层），Normal、100%，记录「Fill」。不能填充时弹出 Photoshop 的提示。
-- Clear：有选区时清除选区内容（背景图层上填背景色），记录「Clear」；没有选区时删除当前图层（图层多于一个时），与 Photoshop 2026 一致。
-- ⌥⌫、⌘⌫、⌫ 不是菜单快捷键：macOS 上由 `from_shortcuts_beside_menu`、其它平台由 `from_shortcuts` 在 egui 里识别。正在输入框里输入文字时不处理这些键，以免影响删除文字。
+- Fill: opens the Fill dialog (see `dialogs/fill.md`).
+- FillForeground / FillBackground: immediately fills the current layer's selection (the whole layer when there is no selection) with the foreground / background color, Normal, 100%, recording "Fill". When filling is not possible, shows Photoshop's alert.
+- Clear: with a selection, clears the selection's content (fills with the background color on the background layer), recording "Clear"; with no selection, deletes the current layer (when there is more than one layer), consistent with Photoshop 2026.
+- ⌥⌫, ⌘⌫ and ⌫ are not menu shortcuts: they are recognized in egui by `from_shortcuts_beside_menu` on macOS and by `from_shortcuts` on other platforms. These keys are not handled while typing in an input box, so as not to interfere with deleting text.
 
-## 选区命令的历史记录
+## History records for selection commands
 
-QuickMask 进入或退出快速蒙版（`toolbar::toggle_quick_mask`），两种情况都记录「Quick Mask」；菜单项带勾选标记表示当前文档在快速蒙版中。Modify 五项打开对应对话框（`dialogs/modify_selection.md`）；Grow、Similar 按魔棒选项（`AppState::wand` 的容差、消除锯齿、所有图层）立即扩大选区，记录「Grow」「Similar」。
-
-
-Select All、Deselect、Reselect、Inverse 各记录一条历史，名称分别为「Select All」「Deselect」「Reselect」「Select Inverse」，与 Photoshop 一致。
-
-## 视图命令
-
-- ToggleInfo、ToggleNavigator、ToggleHistogram 打开或关闭对应的浮动面板（`panels/floating.md`），菜单项带勾选标记；History 菜单项同样带勾选。
-- 五个视图开关切换 `AppState::view` 对应的字段（见 `rulers.md`），菜单项显示勾选状态（`Command::checked`）。
-- Zoom200：以窗口中心缩放到 200%。PrintSize：缩放到让 1 英寸（文档分辨率个像素）在屏幕上为 72 pt。FitLayers：让当前图层的非透明像素充满窗口并居中（空图层时不动）。
-- ClearGuides：删除当前文档的全部参考线，记录「Clear Guides」。NewGuide：打开 New Guide 对话框（`dialogs/new_guide.md`）。
-- HideApp：隐藏应用（`app_kit::hide_app`，只在 macOS 上有效）。Photoshop 把系统的「隐藏」改成 ⌃⌘H，把 ⌘H 给了 Extras，这里一致。
-
-## 变换命令
-
-- FreeTransform：开始自由变换（`free_transform.md`）；不能变换时弹出提示。
-- Transform 的五个固定变换：以 `transform::bounds` 的范围中心为基准做 `FixedTransform` 映射，记录对应名称（如「Flip Horizontal」），并记为 `last_transform`。
-- TransformAgain：把 `last_transform` 的映射再应用一次，记录「Transform Again」。
-- 失败时弹出 Photoshop 的提示。
-
-## 画布命令
-
-- Image Rotation 五项：旋转或翻转整个文档（`image_ops::reorient`），旋转记录「Rotate Canvas」，翻转记录「Flip Canvas Horizontal」/「Flip Canvas Vertical」。
-- Crop：裁剪到选区外接矩形（`image_ops::crop_to_selection`），记录「Crop」。
-- Trim：打开 Trim 对话框（见 `dialogs/trim.md`）。
-- ImageSize：以当前文档的宽、高、分辨率打开 Image Size 对话框（见 `dialogs/image_size.md`）。
-
-## 调整命令
-
-- Invert、Desaturate、Equalize、Auto Tone、Auto Contrast、Auto Color：立即对当前图层（选区内）应用（`op-core` 的 `adjust.md`），记录同名历史；图层隐藏或像素锁定时弹出 Photoshop 的提示（例如「Could not complete the Invert command because the target layer is hidden.」）。
-- 其余带对话框的调整（Threshold、Posterize、Levels、Curves、Hue/Saturation、Exposure、Brightness/Contrast、Color Balance、Black & White、Vibrance、Channel Mixer、Selective Color、Photo Filter、Gradient Map）：先做同样的检查，失败时弹出提示；通过后计算直方图（Threshold 等用亮度直方图）、保存文档快照，打开对话框（见 `dialogs/adjust.md`，预览流程见 `lib.md`）；Gradient Map 取前景色与背景色，Hue/Saturation 的 Colorize 以前景色的色相起步；Levels、Curves 另取红绿蓝三个通道的直方图（`adjust::rgb_histograms`）。
-
-## 滤镜命令
-
-- Average、Solarize：立即对当前图层应用（`op-core` 的 `filter.md`），记录同名历史，并记为 `last_filter`。
-- 带设置的滤镜（Box Blur、Gaussian Blur、Add Noise、Median、Mosaic、Unsharp Mask、High Pass、Maximum、Minimum、Offset）：检查同调整命令，通过后保存快照并打开对话框（`dialogs/adjust.md`）。
-- LastFilter：用 `last_filter` 的设置立即再应用一次，记录该滤镜的名称，不弹出对话框。
-- 失败时弹出 Photoshop 的提示，例如「Could not complete the Gaussian Blur command because the target layer is hidden.」。
-
-## 图层命令
-
-图层蒙版命令调用 `layer_ops` 的蒙版函数，分别记录「Add Layer Mask」「Delete Layer Mask」「Apply Layer Mask」「Disable Layer Mask」/「Enable Layer Mask」。
+QuickMask enters or exits Quick Mask (`toolbar::toggle_quick_mask`), recording "Quick Mask" in both cases; the menu item carries a check mark to show that the current document is in Quick Mask. The five Modify items open the corresponding dialogs (`dialogs/modify_selection.md`); Grow and Similar immediately enlarge the selection using the Magic Wand options (`AppState::wand`'s tolerance, anti-alias, sample all layers), recording "Grow" and "Similar".
 
 
-像素与顺序规则见 `op-core` 的 `layer_ops.md`。成功后记录的历史名称：Duplicate Layer →「Duplicate Layer」，Layer Via Copy / Cut →「Layer Via Copy」/「Layer Via Cut」，Layer from Background →「Layer From Background」，Delete › Hidden Layers →「Delete Hidden Layers」，Arrange 四项 →「Layer Order」，Merge Down / Merge Visible / Flatten Image → 同名。Layer Via Copy / Cut 失败时弹出 Photoshop 的提示（例如选区内只有透明像素时「Could not complete the Layer Via Copy command because the selected area is empty.」）。
+Select All, Deselect, Reselect and Inverse each record one history entry, named "Select All", "Deselect", "Reselect" and "Select Inverse" respectively, consistent with Photoshop.
 
-菜单快捷键里的 `[`、`]` 在传给 muda 时写成符号本身（muda 不认识 egui 的 `OpenBracket` / `CloseBracket` 名称）。
+## View commands
 
-## 剪贴板
+- ToggleInfo, ToggleNavigator and ToggleHistogram open or close the corresponding floating panels (`panels/floating.md`), with check marks on the menu items; the History menu item likewise carries a check mark.
+- The five view toggles switch the corresponding fields of `AppState::view` (see `rulers.md`), and the menu items show their checked state (`Command::checked`).
+- Zoom200: zooms to 200% around the window center. PrintSize: zooms so that 1 inch (the document resolution's number of pixels) is 72 pt on screen. FitLayers: makes the current layer's non-transparent pixels fill the window and centers them (no change for an empty layer).
+- ClearGuides: deletes all guides in the current document, recording "Clear Guides". NewGuide: opens the New Guide dialog (`dialogs/new_guide.md`).
+- HideApp: hides the application (`app_kit::hide_app`, effective only on macOS). Photoshop changes the system "Hide" to ⌃⌘H and gives ⌘H to Extras; this is the same here.
 
-Cut、Copy、CopyMerged、Paste、PasteInPlace 由 `actions::clipboard` 执行：
+## Transform commands
 
-- 有输入框获得焦点时，把操作转交给输入框：Cut/Copy（CopyMerged 视同 Copy）转成 egui 的 `Event::Cut` / `Event::Copy`，Paste/PasteInPlace 读取系统剪贴板的文字转成 `Event::Paste`（没有文字时什么也不做）。这些事件放进 `AppState::forward_events`，由 `OpenPhotoApp::raw_input_hook` 注入 egui 的下一帧输入，并请求重绘。macOS 上这几个菜单项带 ⌘X/⌘C/⌘V 快捷键，按键被原生菜单接住、egui 收不到，所以需要这样转交，输入框里的剪切、复制、粘贴才能正常工作。
-- 否则对当前文档执行（像素规则见 `op-core` 的 `clipboard.md`）：
-  - Copy / Copy Merged：复制成功后放进剪贴板（见 `clipboard.md`），不记录历史。
-  - Cut：复制并清除，记录「Cut」。
-  - Paste Into / Paste Outside：内容居中放在选区外接矩形的中心，粘贴为新图层后按原选区加蒙版（Into 显示选区内、Outside 显示选区外），取消选区，记录「Paste Into」/「Paste Outside」。
-  - Paste / Paste in Place：从剪贴板取出内容，按当前视图的可见区域（`document_view::visible_rect`）计算位置，粘贴为新图层，记录「Paste」。剪贴板为空时什么也不做。
-  - 失败时弹出 Photoshop 的提示，例如「Could not complete the Copy command because the selected area is empty.」。
+- FreeTransform: starts Free Transform (`free_transform.md`); shows an alert when transforming is not possible.
+- The five fixed transforms under Transform: apply a `FixedTransform` mapping around the center of the `transform::bounds` extent, record the corresponding name (e.g. "Flip Horizontal"), and are stored as `last_transform`.
+- TransformAgain: applies the `last_transform` mapping once more, recording "Transform Again".
+- On failure, shows Photoshop's alert.
 
-`run()` 执行前会再检查一次 `enabled`，不可用的命令直接忽略。
+## Canvas commands
 
-## 快捷键识别
+- The five Image Rotation items: rotate or flip the whole document (`image_ops::reorient`); rotation records "Rotate Canvas", flipping records "Flip Canvas Horizontal" / "Flip Canvas Vertical".
+- Crop: crops to the selection's bounding rectangle (`image_ops::crop_to_selection`), recording "Crop".
+- Trim: opens the Trim dialog (see `dialogs/trim.md`).
+- ImageSize: opens the Image Size dialog with the current document's width, height and resolution (see `dialogs/image_size.md`).
 
-- **macOS**：带 ⌘ 的快捷键由原生菜单的 key equivalent 处理，egui 收不到这些按键。唯一的例外是 Zoom In：菜单项显示为 Photoshop 的 ⌘+，而 macOS 只在按住 Shift 时才匹配「+」，所以 `from_shortcuts_beside_menu` 额外在 egui 里捕获 ⌘=，转成 ZoomIn。
-- `Shortcut` 有 `cmd`（macOS 上为 Command）、`shift`、`alt`、`ctrl`（macOS 上的 Control 键）四个修饰键。传给 muda 时 `ctrl` 写作 `Ctrl+`，在 macOS 上就是 Control 键。
-- **没有原生菜单时**（其它平台，以及 macOS 上的无窗口测试）：有模态对话框时 `from_shortcuts` 不消费任何按键（所有命令此时都不可用，按键留给对话框，例如确认框里的 ⌘D「Don't Save」）；否则在 egui 里按 `SHORTCUT_ORDER` 依次匹配全部快捷键。egui 的 `consume_key` 会忽略多按的 Shift/Alt，所以列表必须把更具体的组合放在前面（例如 ⇧⌘Z 在 ⌘Z 之前、⌥⌘W 在 ⌘W 之前、⇧⌘C 在 ⌘C 之前），否则会被误触发成另一个命令。ZoomIn 同时接受 ⌘= 和 ⌘+。
-- egui-winit 不把 ⌘X/⌘C/⌘V 作为按键送出，而是转成 `Event::Cut`、`Event::Copy`、`Event::Paste`（而且只在系统剪贴板有文字时才送出 `Paste`）。`from_shortcuts` 把这些事件识别为 Cut、Copy（按住 Shift 时为 CopyMerged）、Paste（按住 Shift 时为 PasteInPlace）。正在输入框里输入时不识别剪贴板快捷键和事件，由输入框自己处理。
+## Adjustment commands
 
-## 与 Photoshop 的差异
+- Invert, Desaturate, Equalize, Auto Tone, Auto Contrast, Auto Color: apply immediately to the current layer (within the selection) (`adjust.md` in `op-core`), recording history under the same name; when the layer is hidden or its pixels are locked, Photoshop's alert is shown (e.g. "Could not complete the Invert command because the target layer is hidden.").
+- The other adjustments with dialogs (Threshold, Posterize, Levels, Curves, Hue/Saturation, Exposure, Brightness/Contrast, Color Balance, Black & White, Vibrance, Channel Mixer, Selective Color, Photo Filter, Gradient Map): perform the same checks first, showing an alert on failure; if they pass, compute the histogram (Threshold and others use the luminance histogram), save a document snapshot, and open the dialog (see `dialogs/adjust.md`; see `lib.md` for the preview flow); Gradient Map takes the foreground and background colors, Hue/Saturation's Colorize starts from the foreground color's hue; Levels and Curves additionally take the histograms of the red, green and blue channels (`adjust::rgb_histograms`).
 
-- 没有原生菜单的平台上，系统剪贴板只有图片时 ⌘V 收不到任何事件（见上文），只能通过菜单粘贴。
+## Filter commands
 
-- Photoshop 的 Layer › New › Layer... 会弹出「New Layer」对话框；这里直接创建图层，所以菜单项文字不带省略号。
-- Layer from Background、Duplicate Layer 在 Photoshop 中会先弹出对话框，这里直接执行；Flatten Image 在有隐藏图层时 Photoshop 会询问是否丢弃，这里直接丢弃。
-- Equalize：有选区时不直接执行，先弹出 Equalize 询问框（`dialogs/equalize.md`）。
-- Filter › Blur › Blur、Blur More，Sharpen › Sharpen、Sharpen More，Stylize › Find Edges：与 Average、Solarize 一样直接执行（检查同调整），记录同名历史并成为 Last Filter。Motion Blur...、Emboss... 打开滤镜对话框（`dialogs/adjust.md`）。
-- Filter › Distort › Twirl...、Pinch...、Spherize...、Polar Coordinates... 打开滤镜对话框。
-- Filter › Blur › Surface Blur...、Noise › Dust & Scratches... 打开滤镜对话框；Pixelate › Fragment 直接执行（同 Blur），记录「Fragment」并成为 Last Filter。Other › Custom... 打开 Custom 滤镜对话框（`dialogs/custom_filter.md`），记录「Custom」。Noise › Despeckle、Sharpen › Sharpen Edges 直接执行（同 Blur）；Stylize › Trace Contour...、Wind... 打开滤镜对话框。
-- 打开滤镜对话框时，若 `AppState::filter_settings` 里有该对话框上次按 OK 时的设置，先用 `restore` 放回（Photoshop 的滤镜对话框记住上次的值；见 `dialogs/adjust.md`）。
-- 文字输入框获得焦点时，Select All（⌘A）全选输入框里的文字，而不是全选画布（快捷键交给输入框；macOS 原生菜单先收到 ⌘A 时，转成按键事件交给输入框）。
+- Average, Solarize: apply immediately to the current layer (`filter.md` in `op-core`), recording history under the same name, and are stored as `last_filter`.
+- Filters with settings (Box Blur, Gaussian Blur, Add Noise, Median, Mosaic, Unsharp Mask, High Pass, Maximum, Minimum, Offset): checked the same way as adjustment commands; if the checks pass, save a snapshot and open the dialog (`dialogs/adjust.md`).
+- LastFilter: immediately applies again with `last_filter`'s settings, recording that filter's name, without showing a dialog.
+- On failure, shows Photoshop's alert, e.g. "Could not complete the Gaussian Blur command because the target layer is hidden.".
+
+## Layer commands
+
+Layer mask commands call the mask functions in `layer_ops`, recording "Add Layer Mask", "Delete Layer Mask", "Apply Layer Mask", and "Disable Layer Mask" / "Enable Layer Mask" respectively.
+
+
+See `layer_ops.md` in `op-core` for pixel and ordering rules. History names recorded on success: Duplicate Layer → "Duplicate Layer", Layer Via Copy / Cut → "Layer Via Copy" / "Layer Via Cut", Layer from Background → "Layer From Background", Delete › Hidden Layers → "Delete Hidden Layers", the four Arrange items → "Layer Order", Merge Down / Merge Visible / Flatten Image → the same names. When Layer Via Copy / Cut fails, Photoshop's alert is shown (e.g. when the selection contains only transparent pixels, "Could not complete the Layer Via Copy command because the selected area is empty.").
+
+The `[` and `]` in menu shortcuts are written as the symbols themselves when passed to muda (muda does not recognize egui's `OpenBracket` / `CloseBracket` names).
+
+## Clipboard
+
+Cut, Copy, CopyMerged, Paste and PasteInPlace are executed by `actions::clipboard`:
+
+- When an input box has focus, the operation is forwarded to the input box: Cut/Copy (CopyMerged is treated as Copy) become egui's `Event::Cut` / `Event::Copy`, and Paste/PasteInPlace read the text from the system clipboard and become `Event::Paste` (doing nothing when there is no text). These events are put into `AppState::forward_events`, injected into egui's next frame of input by `OpenPhotoApp::raw_input_hook`, and a repaint is requested. On macOS these menu items carry the ⌘X/⌘C/⌘V shortcuts, and the key presses are caught by the native menu so egui never receives them; this forwarding is therefore needed for cut, copy and paste to work in input boxes.
+- Otherwise they act on the current document (see `clipboard.md` in `op-core` for pixel rules):
+  - Copy / Copy Merged: on success, put the copy on the clipboard (see `clipboard.md`); no history is recorded.
+  - Cut: copies and clears, recording "Cut".
+  - Paste Into / Paste Outside: the content is centered on the center of the selection's bounding rectangle, pasted as a new layer, and then given a mask from the original selection (Into reveals inside the selection, Outside reveals outside it); the selection is deselected, recording "Paste Into" / "Paste Outside".
+  - Paste / Paste in Place: takes the content from the clipboard, computes the position from the visible area of the current view (`document_view::visible_rect`), pastes it as a new layer, and records "Paste". Does nothing when the clipboard is empty.
+  - On failure, shows Photoshop's alert, e.g. "Could not complete the Copy command because the selected area is empty.".
+
+`run()` checks `enabled` once more before executing; unavailable commands are simply ignored.
+
+## Shortcut recognition
+
+- **macOS**: shortcuts with ⌘ are handled by the native menu's key equivalents, and egui does not receive those key presses. The only exception is Zoom In: the menu item displays Photoshop's ⌘+, but macOS only matches "+" while Shift is held, so `from_shortcuts_beside_menu` additionally captures ⌘= in egui and turns it into ZoomIn.
+- `Shortcut` has four modifiers: `cmd` (Command on macOS), `shift`, `alt`, `ctrl` (the Control key on macOS). When passed to muda, `ctrl` is written as `Ctrl+`, which is the Control key on macOS.
+- **Without a native menu** (other platforms, and windowless tests on macOS): while a modal dialog is open, `from_shortcuts` consumes no keys (all commands are unavailable then, and keys are left to the dialog, e.g. ⌘D "Don't Save" in a confirmation box); otherwise it matches all shortcuts in egui in `SHORTCUT_ORDER`. egui's `consume_key` ignores extra Shift/Alt, so the list must put more specific combinations first (e.g. ⇧⌘Z before ⌘Z, ⌥⌘W before ⌘W, ⇧⌘C before ⌘C), otherwise they would be mistakenly triggered as another command. ZoomIn accepts both ⌘= and ⌘+.
+- egui-winit does not send ⌘X/⌘C/⌘V as key presses, but turns them into `Event::Cut`, `Event::Copy` and `Event::Paste` (and only sends `Paste` when the system clipboard has text). `from_shortcuts` recognizes these events as Cut, Copy (CopyMerged when Shift is held) and Paste (PasteInPlace when Shift is held). While typing in an input box, clipboard shortcuts and events are not recognized and are left to the input box itself.
+
+## Differences from Photoshop
+
+- On platforms without a native menu, ⌘V receives no event when the system clipboard holds only an image (see above); pasting is only possible through the menu.
+
+- Photoshop's Layer › New › Layer... shows the "New Layer" dialog; here the layer is created directly, so the menu item text has no ellipsis.
+- In Photoshop, Layer from Background and Duplicate Layer first show a dialog; here they execute directly; for Flatten Image with hidden layers, Photoshop asks whether to discard them, while here they are discarded directly.
+- Equalize: with a selection, it does not execute directly but first shows the Equalize prompt (`dialogs/equalize.md`).
+- Filter › Blur › Blur, Blur More, Sharpen › Sharpen, Sharpen More, Stylize › Find Edges: execute directly like Average and Solarize (checked the same as adjustments), recording history under the same name and becoming the Last Filter. Motion Blur... and Emboss... open filter dialogs (`dialogs/adjust.md`).
+- Filter › Distort › Twirl..., Pinch..., Spherize..., Polar Coordinates... open filter dialogs.
+- Filter › Blur › Surface Blur... and Noise › Dust & Scratches... open filter dialogs; Pixelate › Fragment executes directly (like Blur), recording "Fragment" and becoming the Last Filter. Other › Custom... opens the Custom filter dialog (`dialogs/custom_filter.md`), recording "Custom". Noise › Despeckle and Sharpen › Sharpen Edges execute directly (like Blur); Stylize › Trace Contour... and Wind... open filter dialogs.
+- When opening a filter dialog, if `AppState::filter_settings` holds the settings from the last time OK was pressed in that dialog, they are first put back with `restore` (Photoshop's filter dialogs remember the last values; see `dialogs/adjust.md`).
+- When a text input box has focus, Select All (⌘A) selects all the text in the input box rather than the whole canvas (the shortcut is handed to the input box; when the macOS native menu receives ⌘A first, it is turned into a key event and handed to the input box).

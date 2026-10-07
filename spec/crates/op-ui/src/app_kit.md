@@ -1,15 +1,15 @@
-# app_kit.rs：少量 AppKit 调用（仅 macOS）
+# app_kit.rs: A few AppKit calls (macOS only)
 
-## 职责
+## Responsibilities
 
-winit 和 muda 没有提供、但要和 Photoshop 行为一致才需要的几个 AppKit 调用。
+A few AppKit calls that winit and muda do not provide but that are needed to match Photoshop's behavior.
 
-## 函数
+## Functions
 
-- `hide_app()`：隐藏应用，等同于标准的「Hide」菜单项。OpenPhoto 自己的 Hide 菜单项用 Photoshop 的 ⌃⌘H，所以要自己调用。
-- `handling_key_press()`：当前处理的 `NSApp.currentEvent` 是否是按键（`NSEventTypeKeyDown`）。菜单事件处理里用它区分「用快捷键触发」和「用鼠标选择」：Lock Layers... 的菜单项显示 ⌘/，但按 ⌘/ 应该切换全部锁定而不是打开对话框（见 `commands.md`）。
+- `hide_app()`: hides the application, equivalent to the standard "Hide" menu item. OpenPhoto's own Hide menu item uses Photoshop's ⌃⌘H, so it has to make the call itself.
+- `handling_key_press()`: whether the `NSApp.currentEvent` currently being handled is a key press (`NSEventTypeKeyDown`). Menu event handling uses it to tell "triggered by shortcut" apart from "chosen with the mouse": the Lock Layers... menu item shows ⌘/, but pressing ⌘/ should toggle Lock All instead of opening the dialog (see `commands.md`).
 
-## 约束
+## Constraints
 
-- 都只能在主线程调用（菜单事件和事件循环都在主线程）。
-- 找不到 `NSApplication` 或没有当前事件时安全返回（`handling_key_press` 返回 `false`，即按菜单选择处理）。
+- All of them may only be called on the main thread (menu events and the event loop are both on the main thread).
+- They return safely when `NSApplication` cannot be found or there is no current event (`handling_key_press` returns `false`, i.e. the event is treated as a menu selection).

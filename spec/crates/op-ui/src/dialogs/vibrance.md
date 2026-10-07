@@ -1,19 +1,19 @@
-# dialogs/vibrance.rs：Vibrance 与 Posterize 对话框
+# dialogs/vibrance.rs: Vibrance and Posterize dialogs
 
-## 组件职责
+## Component responsibilities
 
-Image › Adjustments › Vibrance... 与 Posterize... 的对话框，按 Photoshop 2026 的 UXP 对话框重做（401 × 166 与 401 × 164 pt）。
+The dialogs for Image › Adjustments › Vibrance... and Posterize..., rebuilt after the Photoshop 2026 UXP dialogs (401 × 166 and 401 × 164 pt).
 
 ## Vibrance
 
-- Vibrance、Saturation（−100–100，默认 0）。标签 (20, 60.5) / (20, 115.5)，输入框 x 215–260、y 48 / 103，轨道 y 84 / 139（x 20–260，`#737373`，0 居中）。打开时 Vibrance 框获得焦点并全选。
-- 「Preview (Opt+P)」(272, 127)；右侧 OK、Cancel。
+- Vibrance, Saturation (−100–100, default 0). Labels at (20, 60.5) / (20, 115.5), input boxes at x 215–260, y 48 / 103, tracks at y 84 / 139 (x 20–260, `#737373`, 0 centered). On open, the Vibrance box takes focus with its contents selected.
+- "Preview (Opt+P)" at (272, 127); OK and Cancel on the right.
 
 ## Posterize
 
-- Levels（2–255，默认 4）：标签 (20, 60.5)，输入框 (220, 48)–(260, 72)，轨道 y 84，从左端 2 到右端 255 线性取值（`uxp::linear_slider`）。打开时输入框获得焦点并全选。
-- 「Preview (Opt+P)」(272, 127)。
+- Levels (2–255, default 4): label at (20, 60.5), input box (220, 48)–(260, 72), track at y 84, mapping linearly from 2 at the left end to 255 at the right end (`uxp::linear_slider`). On open, the input box takes focus with its contents selected.
+- "Preview (Opt+P)" at (272, 127).
 
-## 测试覆盖
+## Test coverage
 
-- `defaults_and_ranges`；`ui_tests::small_uxp_adjustment_dialogs_apply`；截图 `vibrance_dialog.png`、`posterize_dialog.png`。
+- `defaults_and_ranges`; `ui_tests::small_uxp_adjustment_dialogs_apply`; screenshots `vibrance_dialog.png`, `posterize_dialog.png`.

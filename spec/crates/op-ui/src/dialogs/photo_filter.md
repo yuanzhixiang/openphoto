@@ -1,20 +1,20 @@
-# dialogs/photo_filter.rs：Photo Filter 对话框
+# dialogs/photo_filter.rs: Photo Filter dialog
 
-## 组件职责
+## Component responsibilities
 
-Image › Adjustments › Photo Filter... 的对话框，按 Photoshop 2026 的 UXP 对话框重做（401 × 217 pt）。
+The dialog for Image › Adjustments › Photo Filter..., rebuilt after Photoshop 2026's UXP dialog (401 × 217 pt).
 
-## 数据与布局
+## Data and layout
 
-- Filter 单选 (26, 60.5) 与下拉 (78.5, 48.5)–(260, 72.5)：Photoshop 的 20 种预设（`FILTERS`，默认 Warming Filter (85)）；选择预设时回到 Filter 模式。
-- Color 单选 (26, 94.5) 与色块 (79.5, 82.5)–(127, 105.5)：显示当前颜色，点击打开取色弹窗（egui 的取色器，不是 Photoshop 的 Color Picker），取色后切到 Color 模式。
-- 「Density」(20, 131.5)，输入框 (213, 118.5)–(260, 142.5) 显示「25%」；滑块 y 154 按 0–100% 线性画（1% 以下不接受）。
-- 「Preserve luminosity」复选框 (20, 179.5)，默认勾选；「Preview (Opt+P)」(272, 127)；右侧 OK、Cancel。打开时没有输入框持有焦点。
+- Filter radio (26, 60.5) and dropdown (78.5, 48.5)–(260, 72.5): Photoshop's 20 presets (`FILTERS`, default Warming Filter (85)); choosing a preset returns to Filter mode.
+- Color radio (26, 94.5) and swatch (79.5, 82.5)–(127, 105.5): shows the current color; clicking opens a color popup (egui's color picker, not Photoshop's Color Picker), and picking a color switches to Color mode.
+- "Density" (20, 131.5), input field (213, 118.5)–(260, 142.5) showing "25%"; the slider at y 154 is drawn linearly over 0–100% (values below 1% are not accepted).
+- "Preserve luminosity" checkbox (20, 179.5), checked by default; "Preview (Opt+P)" (272, 127); OK and Cancel on the right. No input field has focus on open.
 
-## 已知限制
+## Known limitations
 
-- Photoshop 打开时 Filter 单选带键盘焦点环；色块取色不是 Photoshop 的拾色器。
+- When Photoshop opens it, the Filter radio has the keyboard focus ring; the swatch's color picking is not Photoshop's Color Picker.
 
-## 测试覆盖
+## Test coverage
 
-- `filter_or_color`；`ui_tests::small_uxp_adjustment_dialogs_apply`；截图 `photo_filter_dialog.png`。
+- `filter_or_color`; `ui_tests::small_uxp_adjustment_dialogs_apply`; screenshot `photo_filter_dialog.png`.

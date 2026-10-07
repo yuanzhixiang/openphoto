@@ -1,34 +1,34 @@
 # color.rs
 
-## 职责
+## Responsibilities
 
-定义 `Color`：文档颜色空间中的直通（非预乘）RGBA 颜色，四个分量都是 `f32`，约定取值 0..=1。目前文档颜色空间总是 sRGB，所以分量是 sRGB 编码值而不是线性光值。前景色、背景色、画布扩展色等都用它表示。
+Defines `Color`: a straight (non-premultiplied) RGBA color in the document color space. All four components are `f32`, by convention in the range 0..=1. The document color space is currently always sRGB, so the components are sRGB-encoded values, not linear-light values. Foreground color, background color, canvas extension color and the like are all represented with it.
 
-## 对外接口
+## Public interface
 
-- 字段 `r`、`g`、`b`、`a` 全部公开，可直接读写。
-- 常量：`BLACK`（0,0,0,1）、`WHITE`（1,1,1,1）、`TRANSPARENT`（0,0,0,0）。
-- `rgb(r, g, b)`：alpha 固定为 1；`rgba(r, g, b, a)`：四个分量原样存入。二者都是 `const fn`，不做范围检查。
-- `from_rgba8([u8; 4])`：每个分量除以 255。
-- `to_rgba8()`：每个分量先 clamp 到 0..=1，再乘 255、加 0.5 后截断为 `u8`，即四舍五入量化。
+- Fields `r`, `g`, `b`, `a` are all public and can be read and written directly.
+- Constants: `BLACK` (0,0,0,1), `WHITE` (1,1,1,1), `TRANSPARENT` (0,0,0,0).
+- `rgb(r, g, b)`: alpha is fixed at 1; `rgba(r, g, b, a)`: stores the four components as given. Both are `const fn` and do no range checking.
+- `from_rgba8([u8; 4])`: divides each component by 255.
+- `to_rgba8()`: clamps each component to 0..=1, multiplies by 255, adds 0.5 and truncates to `u8`, i.e. rounds to the nearest value.
 
-## 行为规则与边界情况
+## Behavior rules and edge cases
 
-- 构造函数不 clamp：超出 0..=1 的值会被保存下来，只在 `to_rgba8` 时才被截到 0 或 255。
-- `from_rgba8` 后再 `to_rgba8` 对任意 8 位输入都能精确还原。
-- `NaN` 分量经 `clamp` 后仍为 `NaN`，按 Rust 浮点转整数的饱和规则变为 0。
-- `Color` 实现 `PartialEq`，按浮点逐分量比较。
+- Constructors do not clamp: values outside 0..=1 are kept and are only cut to 0 or 255 in `to_rgba8`.
+- `from_rgba8` followed by `to_rgba8` restores any 8-bit input exactly.
+- A `NaN` component is still `NaN` after `clamp`, and becomes 0 under Rust's saturating float-to-integer conversion rules.
+- `Color` implements `PartialEq`, comparing floats component by component.
 
-## 与其它模块的关系
+## Relationship to other modules
 
-- `Document::new_with_background` 与 `Document::resize_canvas` 用 `to_rgba8` 把颜色写入像素。
-- `op-color` 在它之上实现 HSB 与十六进制转换。
-- `op-ui` 用它保存前景色/背景色等。
+- `Document::new_with_background` and `Document::resize_canvas` use `to_rgba8` to write colors into pixels.
+- `op-color` builds HSB and hexadecimal conversion on top of it.
+- `op-ui` uses it to store the foreground/background colors and so on.
 
-## 已知限制
+## Known limitations
 
-- 只表示 RGB 颜色，不携带颜色空间或 ICC 信息。
+- Represents RGB colors only; carries no color space or ICC information.
 
-## 测试覆盖
+## Test coverage
 
-本文件没有单元测试；量化规则间接由 `document.rs` 与 `op-color` 的测试覆盖。
+This file has no unit tests; the quantization rules are covered indirectly by the tests in `document.rs` and `op-color`.

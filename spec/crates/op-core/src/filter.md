@@ -1,71 +1,71 @@
-# filter.rs：滤镜
+# filter.rs: Filters
 
-## 职责
+## Responsibilities
 
-实现 Filter 菜单中的滤镜，作用于活动图层、限于选区。不记录历史（由 `op-ui` 按滤镜名称记录）。
+Implements the filters in the Filter menu, acting on the active layer and limited to the selection. Records no history (`op-ui` records it under the filter's name).
 
-## 对外接口
+## Public interface
 
-- `Filter`（括号内为参数）：
-  - `GaussianBlur { radius }`：按 Photoshop 2026 实测：半径（Photoshop 以 0.1 为单位）≤ 2 时用 Photoshop 自己的 8 位整数核（`SMALL_KERNELS`，中心与一侧的权重，总和 256；小半径的核明显比 σ = r 的高斯宽）；2.1–2.9 用实测的浮点核（`MID_KERNELS`，2.2–2.4、2.5–2.6 共用同一个）；≥ 3 时用五个方差各为 r²/5 的扩展方框（Gwosdek 等人的 extended box，整数半径 l 加两端小数权重 α）卷积成一个核，一次行列分离卷积、边缘重复。与 Photoshop 相差不超过 1 级（探测图 0.3、1、2.5、10 四个半径）。
-  - `BoxBlur { radius }`：(2r + 1)² 方框内的平均，行列分离。
-  - `Average`：选区（没有选区时整个图层）内所有像素的平均颜色（按选择程度加权）填满选区。
-  - `UnsharpMask { amount, radius, threshold }`：以 `radius` 做上述高斯模糊，锐化量 `Δ = (原值 − 模糊值) × amount%`；阈值不是开关，而是从锐化量里减去：结果 = `原值 + sign(Δ) × max(0, |Δ| − threshold)`（Photoshop 实测，相差不超过 2 级）。只处理颜色通道。
-  - `AddNoise { amount, gaussian, monochromatic }`：每个通道加 `n × amount% × 127.5`，`n` 为 −1–1 的均匀分布，或单位方差的近似正态分布（4 个均匀随机数之和）。单色时三个通道使用同一个随机数。随机数由像素坐标和通道决定，同样的参数总是得到同样的结果，预览与最终结果一致。
-  - `Median { radius }`：每个通道取 (2r + 1)² 方框内的中位数（与 Photoshop 一致）。
-  - `Minimum { radius, round }`、`Maximum { radius, round }`：Preserve 为 Squareness 时取半径四舍五入后的方框内的最小/最大值（与 Photoshop 一致，2.5 即 7 × 7）；Roundness 时用圆形窗口，边缘像素按覆盖率 `clamp(1 − (距离 − 半径), 0, 1)` 参与（结果为 `原值 + (邻值 − 原值) × 覆盖率` 的最小/最大），是近似，个别像素与 Photoshop 相差较大。
-  - `HighPass { radius }`：`原值 − 高斯模糊值 + 128`。
-  - `Offset { dx, dy, fill }`：图层整体右移 `dx`、下移 `dy`。空出的区域按 `OffsetFill`：`Background`（普通图层为透明，背景图层为背景色）、`RepeatEdges`（重复边缘像素）、`Wrap`（从另一侧绕回）。
-  - `Mosaic { cell }`：从左上角起把图层划成 `cell` × `cell` 的格子，每格填其平均颜色（右、下边缘的格子可能不完整）。
-  - `Solarize`：每个颜色通道大于 127 的值取反（`255 − v`）。
-  - `Blur`：3 × 3 核 [[0,1,0],[1,4,1],[0,1,0]] / 8；`BlurMore`：[[1,2,1],[2,2,2],[1,2,1]] / 14；`Sharpen`：中心 2、上下左右 −¼；`SharpenMore`：中心 3、八邻 −¼。均由脉冲实测，与 Photoshop 逐级相同。
-  - `FindEdges`：每个通道 `255 − √(gx² + gy²)`，gx、gy 为不归一化的 Sobel 核（与 Photoshop 相差不超过 1 级）。
-  - `MotionBlur { angle, distance }`：沿角度方向每隔 1 像素取 `distance + 1` 个点（从 `−ceil(distance/2)` 起），各以双线性分摊，平均后作为卷积核（脉冲响应即这些点，读取方向相反）。水平时与 Photoshop 逐级相同；斜向是近似（内部相差约 12 级，图像边缘处 Photoshop 的边界处理不同，差得更多）。
-  - `Emboss { angle, height, amount }`（高度 1–100 像素）：每个通道 `128 + (I(p + s) − I(p − s)) × amount%`，`s = (height/2)·(cos a, −sin a)`，双线性取样。水平、竖直时与 Photoshop 一致；斜向时 Photoshop 的取样更集中，存在误差（探测图平均 0.2–0.4 级，最大 31 级）。
-  - `Fragment`：四个分别向四个对角方向偏移 4 像素的副本取平均（与 Photoshop 相差不超过 1 级）。
-  - `Custom { kernel, scale, offset }`：5 × 5 卷积核（从上到下逐行，−999–999），加权和除以 `scale`（为 0 时按 1）再加 `offset`，四舍五入后限制在 0–255。只处理颜色通道（与 Photoshop 相差不超过 1 级）。
-  - `SurfaceBlur { radius, threshold }`（半径 1–100，阈值 2–255）：每个通道取 (2r + 1)² 方框内的加权平均，邻点权重 `max(0, 1 − |邻值 − 原值| / (2.5 × threshold))`，所以与原值相差超过 2.5 倍阈值的邻点不参与，边缘得以保留（与 Photoshop 相差不超过 1 级）。
-  - `DustAndScratches { radius, threshold }`（半径 1–500，阈值 0–255）：先求每个通道 (2r + 1)² 方框内的中位数；任一通道与中位数相差超过阈值的像素整体换成中位数，其余保持原样（与 Photoshop 相差不超过 1 级）。
-  - `Despeckle`：每个通道在原值与 Blur More（上述 3 × 3 核 / 14）之间混合，Blur More 的比例为 `1 − e`，`e = clamp((|g| − 64) / 192, 0, 1)`，`|g|` 为该通道不归一化 Sobel 梯度的长度——平坦处完全模糊，梯度 ≥ 256 的边缘保持原样（由孤立点、阶跃边与斜坡实测，与 Photoshop 相差不超过 1 级）。
-  - `SharpenEdges`：同样的 `e`，在原值与 Sharpen（先截到 0–255）之间按 `e` 混合——只锐化边缘，与 Despeckle 互补（与 Photoshop 相差不超过 1 级）。
-  - `TraceContour { level, upper }`：每个通道独立，结果只有 0 与 255：Upper 时值 ≤ level 且上下左右有邻点 > level 的像素为 0，Lower 时值 ≥ level 且有邻点 < level 的像素为 0，其余为 255。与 Photoshop 一致（Upper 的探测图中仅一个通道值不同：一个 255 的孤立点四周恰好等于 level 时 Photoshop 也会描出它）。
-  - `Wind { method, from_left }`：Photoshop 的 Wind 是随机的（同样参数两次结果不同），无法逐像素对照；这里按实测的统计行为还原，并用像素坐标决定随机数，同样参数总是同样结果（预览与应用一致）。沿风向（`from_left` 时向右）逐行扫描，在变暗超过一定幅度（加权亮度 3R+6G+B 差 > 40）处一半概率起一道尾迹，长度 8–31 像素：
-    - `WindMethod::Wind`：尾迹首像素为前后两像素的平均，此后每像素向所经过的像素按随机比例（0.08–0.28）衰减；
-    - `Blast`：原样延伸前一像素的颜色；
-    - `Stagger`：把该像素沿风向带走更远（24–93 像素）再放下，原处由后一像素填补。
-    - Wind 与 Blast 只会让像素变亮（取各通道较大值），平坦区域不变。
-  - 扭曲（Distort）滤镜都是「逆映射 + 双线性取样」：每个像素取它从哪里映射来的位置的颜色（`distort_source`），映射在 Photoshop 2026 上用坐标图（R、G 编码 x、y）测得。Twirl、Pinch、Spherize 只作用于贴着图像四边的椭圆内，距离 `t` 以椭圆半径为 1：
-    - `Twirl { angle }`：转角 `angle × (1 − t)²`（中心最大，边缘为 0）。
-    - `Pinch { amount }`：取样距离 `t + amount% × h(t)`，`h` 为实测的 21 点表（`PINCH_SHIFT`，与数量成正比，正值向内收）。
-    - `Spherize { amount, mode }`：正值取样距离 `t + a × ((2/π)·asin t − t)`，负值 `t + |a| × (sin(πt/2) − t)`；Horizontal only / Vertical only 只沿一个方向。
-    - `PolarCoordinates { to_polar }`：Rectangular to Polar 把绕中心的角度（从正上方逆时针）映射到 x、到中心的距离映射到 y；Polar to Rectangular 反之（角度取 `(x + 1)/w` 一圈）。
-    - 与 Photoshop 的平均差：Twirl 0.5 级、Pinch 0.2 级、Spherize 1.2–1.7 级、Polar 0.03–0.7 级；孤立的单像素亮点在亚像素坐标差异下会差得较多。
-- `Filter::name()`：菜单与历史名称（「Gaussian Blur」「Box Blur」「Average」「Unsharp Mask」「Add Noise」「Median」「Minimum」「Maximum」「High Pass」「Offset」「Mosaic」「Solarize」「Blur」「Blur More」「Sharpen」「Sharpen More」「Find Edges」「Motion Blur」「Emboss」「Twirl」「Pinch」「Spherize」「Polar Coordinates」「Fragment」「Custom」「Surface Blur」「Dust & Scratches」「Despeckle」「Sharpen Edges」「Trace Contour」「Wind」）。
-- `distortion_source(filter, x, y, w, h)`：扭曲滤镜在 `w` × `h` 图像中为像素 (x, y) 取色的源位置（其它滤镜返回原位置），供对话框画示意图。
-- `apply(doc, filter, background)`：先做与调整相同的检查（`adjust::check`：没有图层、图层隐藏、像素锁定时返回 `FillError`），再应用。`background` 是 Offset 在背景图层上使用的背景色。
+- `Filter` (parameters in braces):
+  - `GaussianBlur { radius }`: as measured in Photoshop 2026: for radius (Photoshop uses steps of 0.1) ≤ 2, Photoshop's own 8-bit integer kernels (`SMALL_KERNELS`, center and one-side weights summing to 256; the kernels for small radii are noticeably wider than a Gaussian with σ = r); for 2.1–2.9, measured floating-point kernels (`MID_KERNELS`; 2.2–2.4 and 2.5–2.6 share one each); for ≥ 3, five extended boxes each with variance r²/5 (the extended box of Gwosdek et al., integer radius l plus fractional end weights α) convolved into one kernel, applied as one separable row/column convolution with edge repeat. Within 1 level of Photoshop (probe images at radii 0.3, 1, 2.5 and 10).
+  - `BoxBlur { radius }`: the average over a (2r + 1)² box, separable by rows and columns.
+  - `Average`: fills the selection with the average color (weighted by selection degree) of all pixels in the selection (the whole layer when there is no selection).
+  - `UnsharpMask { amount, radius, threshold }`: applies the Gaussian blur above with `radius`; the sharpening amount is `Δ = (original − blurred) × amount%`; the threshold is not a switch but is subtracted from the sharpening amount: result = `original + sign(Δ) × max(0, |Δ| − threshold)` (measured in Photoshop, within 2 levels). Only processes color channels.
+  - `AddNoise { amount, gaussian, monochromatic }`: adds `n × amount% × 127.5` to each channel, where `n` is uniformly distributed in −1–1, or approximately normally distributed with unit variance (the sum of 4 uniform random numbers). When monochromatic, the three channels use the same random number. Random numbers are determined by pixel coordinates and channel, so the same parameters always give the same result, and the preview matches the final result.
+  - `Median { radius }`: each channel takes the median within a (2r + 1)² box (matches Photoshop).
+  - `Minimum { radius, round }`, `Maximum { radius, round }`: with Preserve set to Squareness, takes the minimum/maximum within a box whose radius is rounded (matches Photoshop; 2.5 means 7 × 7); with Roundness, uses a circular window where edge pixels take part with coverage `clamp(1 − (distance − radius), 0, 1)` (the result is the min/max of `original + (neighbor − original) × coverage`); this is an approximation, and individual pixels can differ significantly from Photoshop.
+  - `HighPass { radius }`: `original − Gaussian-blurred + 128`.
+  - `Offset { dx, dy, fill }`: moves the whole layer right by `dx` and down by `dy`. The vacated area follows `OffsetFill`: `Background` (transparent for regular layers, the background color for the background layer), `RepeatEdges` (repeats edge pixels), `Wrap` (wraps around from the other side).
+  - `Mosaic { cell }`: divides the layer from the top-left corner into `cell` × `cell` cells and fills each cell with its average color (cells on the right and bottom edges may be incomplete).
+  - `Solarize`: inverts (`255 − v`) each color channel value greater than 127.
+  - `Blur`: 3 × 3 kernel [[0,1,0],[1,4,1],[0,1,0]] / 8; `BlurMore`: [[1,2,1],[2,2,2],[1,2,1]] / 14; `Sharpen`: center 2, up/down/left/right −¼; `SharpenMore`: center 3, all eight neighbors −¼. All measured with impulses and identical to Photoshop level for level.
+  - `FindEdges`: each channel is `255 − √(gx² + gy²)`, where gx and gy are unnormalized Sobel kernels (within 1 level of Photoshop).
+  - `MotionBlur { angle, distance }`: takes `distance + 1` points at 1-pixel intervals along the angle direction (starting at `−ceil(distance/2)`), each spread bilinearly, and averages them as the convolution kernel (the impulse response is these points, read in the opposite direction). Identical to Photoshop level for level when horizontal; diagonal is an approximation (about 12 levels of difference in the interior; at image edges Photoshop's border handling differs, so the difference is larger).
+  - `Emboss { angle, height, amount }` (height 1–100 pixels): each channel is `128 + (I(p + s) − I(p − s)) × amount%`, with `s = (height/2)·(cos a, −sin a)`, sampled bilinearly. Matches Photoshop when horizontal or vertical; when diagonal, Photoshop's sampling is more concentrated and there is error (on probe images, 0.2–0.4 levels on average, at most 31 levels).
+  - `Fragment`: averages four copies offset by 4 pixels in each of the four diagonal directions (within 1 level of Photoshop).
+  - `Custom { kernel, scale, offset }`: a 5 × 5 convolution kernel (row by row from top to bottom, −999–999); the weighted sum is divided by `scale` (treated as 1 when 0), `offset` is added, and the result is rounded and clamped to 0–255. Only processes color channels (within 1 level of Photoshop).
+  - `SurfaceBlur { radius, threshold }` (radius 1–100, threshold 2–255): each channel takes a weighted average within a (2r + 1)² box with neighbor weight `max(0, 1 − |neighbor − original| / (2.5 × threshold))`, so neighbors differing from the original by more than 2.5 times the threshold do not take part, and edges are preserved (within 1 level of Photoshop).
+  - `DustAndScratches { radius, threshold }` (radius 1–500, threshold 0–255): first computes the median of each channel within a (2r + 1)² box; pixels where any channel differs from the median by more than the threshold are replaced entirely by the median, and the rest stay as they are (within 1 level of Photoshop).
+  - `Despeckle`: each channel mixes between the original and Blur More (the 3 × 3 kernel / 14 above), with Blur More's share being `1 − e`, `e = clamp((|g| − 64) / 192, 0, 1)`, where `|g|` is the length of the channel's unnormalized Sobel gradient: flat areas are fully blurred, and edges with gradient ≥ 256 stay as they are (measured with isolated points, step edges and ramps; within 1 level of Photoshop).
+  - `SharpenEdges`: with the same `e`, mixes by `e` between the original and Sharpen (clamped to 0–255 first): sharpens only edges, complementary to Despeckle (within 1 level of Photoshop).
+  - `TraceContour { level, upper }`: each channel independently; results are only 0 and 255: with Upper, pixels whose value is ≤ level and that have an up/down/left/right neighbor > level are 0; with Lower, pixels whose value is ≥ level and that have a neighbor < level are 0; all others are 255. Matches Photoshop (on the Upper probe image only one channel value differs: Photoshop also traces an isolated 255 point whose surroundings exactly equal the level).
+  - `Wind { method, from_left }`: Photoshop's Wind is random (two runs with the same parameters give different results), so it cannot be compared pixel by pixel; it is reproduced here from the measured statistical behavior, with random numbers determined by pixel coordinates, so the same parameters always give the same result (preview and apply match). Scans each row along the wind direction (rightward with `from_left`); where it darkens by more than a certain amount (weighted luminance 3R+6G+B difference > 40), a streak starts with probability one half, 8–31 pixels long:
+    - `WindMethod::Wind`: the first pixel of the streak is the average of the pixels before and after; after that, each pixel decays toward the pixel it passes over by a random proportion (0.08–0.28);
+    - `Blast`: extends the color of the previous pixel unchanged;
+    - `Stagger`: carries the pixel further along the wind direction (24–93 pixels) before setting it down, and the pixel after it fills the original spot.
+    - Wind and Blast only make pixels lighter (taking the larger value per channel); flat areas are unchanged.
+  - The Distort filters all use "inverse mapping + bilinear sampling": each pixel takes the color at the position it maps from (`distort_source`); the mappings were measured in Photoshop 2026 with coordinate maps (R and G encode x and y). Twirl, Pinch and Spherize only act inside the ellipse touching the four sides of the image, with distance `t` measured so the ellipse radius is 1:
+    - `Twirl { angle }`: rotation `angle × (1 − t)²` (largest at the center, 0 at the edge).
+    - `Pinch { amount }`: sample distance `t + amount% × h(t)`, where `h` is a measured 21-point table (`PINCH_SHIFT`, proportional to the amount; positive values pull inward).
+    - `Spherize { amount, mode }`: for positive values, sample distance `t + a × ((2/π)·asin t − t)`; for negative, `t + |a| × (sin(πt/2) − t)`; Horizontal only / Vertical only act along one direction only.
+    - `PolarCoordinates { to_polar }`: Rectangular to Polar maps the angle around the center (counterclockwise from straight up) to x and the distance to the center to y; Polar to Rectangular is the reverse (the angle takes `(x + 1)/w` of a full turn).
+    - Average difference from Photoshop: Twirl 0.5 levels, Pinch 0.2 levels, Spherize 1.2–1.7 levels, Polar 0.03–0.7 levels; isolated single-pixel bright points can differ more because of subpixel coordinate differences.
+- `Filter::name()`: menu and history name ("Gaussian Blur", "Box Blur", "Average", "Unsharp Mask", "Add Noise", "Median", "Minimum", "Maximum", "High Pass", "Offset", "Mosaic", "Solarize", "Blur", "Blur More", "Sharpen", "Sharpen More", "Find Edges", "Motion Blur", "Emboss", "Twirl", "Pinch", "Spherize", "Polar Coordinates", "Fragment", "Custom", "Surface Blur", "Dust & Scratches", "Despeckle", "Sharpen Edges", "Trace Contour", "Wind").
+- `distortion_source(filter, x, y, w, h)`: the source position from which a distort filter takes the color for pixel (x, y) in a `w` × `h` image (other filters return the original position), used by dialogs to draw the preview diagram.
+- `apply(doc, filter, background)`: first performs the same checks as adjustments (`adjust::check`: returns `FillError` when there is no layer, the layer is hidden, or pixels are locked), then applies the filter. `background` is the background color Offset uses on the background layer.
 
-## 行为规则
+## Behavior rules
 
-- 滤镜读取整个图层计算（选区边缘的模糊会用到选区外的像素），只写入选中的像素；部分选中的像素按选择程度在原值与新值之间混合（包括 alpha）。
-- 模糊、排序类滤镜在预乘 alpha 下计算，透明像素的颜色不会渗入相邻像素；结果再转回直通 alpha。
-- 图层边界外按最近的边缘像素延伸（clamp）。
-- 背景图层和锁定透明像素的图层保持原 alpha。
+- Filters read the whole layer for computation (blurring at selection edges uses pixels outside the selection) and only write selected pixels; partially selected pixels mix between the original and new values by selection degree (including alpha).
+- Blur and rank filters compute in premultiplied alpha, so the color of transparent pixels does not bleed into neighboring pixels; the result is converted back to straight alpha.
+- Outside the layer bounds, the nearest edge pixel is extended (clamp).
+- The background layer and layers with locked transparent pixels keep their original alpha.
 
-## 已知限制
+## Known limitations
 
-- 全部在 CPU 上单线程计算，大图大半径时较慢。
-- Wind 的随机分布（起尾迹的概率、长度、衰减）是按探测图估计的，与 Photoshop 只在统计上相似；Stagger 的行为观察得最少。
-- Add Noise 的强度、Mosaic 以外的 Pixelate 滤镜等尚未与 Photoshop 核对。
+- Everything is computed single-threaded on the CPU, which is slow for large images and large radii.
+- Wind's random distribution (streak start probability, length, decay) is estimated from probe images and only statistically similar to Photoshop; Stagger's behavior was observed the least.
+- Add Noise's strength and the Pixelate filters other than Mosaic have not yet been checked against Photoshop.
 
-## 测试覆盖
+## Test coverage
 
-- `blurs_spread_the_dark_pixel`：5×1 白底中间一个黑点，Box Blur 半径 1 得到 `[255, 170, 170, 170, 255]`；Gaussian Blur 对称且由中心向外变亮；Average 得到平均值 204。
-- `rank_filters`：Median 去掉孤立黑点，Minimum 扩大黑点，Maximum 去掉黑点。
-- `sharpen_high_pass_and_solarize`：Unsharp Mask 保持边缘的黑白；High Pass 中心低于 128、边缘高于 128；Solarize 把白变黑。
-- `offset_wraps_or_fills_with_the_background`：绕回与用背景色填充。
-- `mosaic_and_noise`：Mosaic 一格取平均；Add Noise 重复执行结果相同，单色噪点保持灰色。
-- `transparent_pixels_do_not_bleed_color`：透明图层上的红点模糊后仍是红色，alpha 变为 85。
-- `photoshop::filters_match_photoshop`：36 组滤镜对照 Photoshop 的输出（含 Fragment、Custom 两组、Surface Blur 两组、Dust & Scratches 两组、Despeckle、Sharpen Edges、Trace Contour Lower）（`fixtures/filter`），每组限定最大误差。
-- `distortions_match_photoshop`：Twirl、Pinch、Spherize（含负值与 Vertical only）、Polar Coordinates 两个方向对照 Photoshop，按平均差断言。
-- `trace_contour_upper_matches_photoshop`：Trace Contour Level 128 Upper 对照 Photoshop，至多一个通道值不同。
-- `wind_streaks_downwind`：Wind、Blast 两个方向：结果可重复，亮点保留，尾迹只在下风侧、只变亮，32 行中有一部分起了尾迹；平坦图像三种方法都不变。
+- `blurs_spread_the_dark_pixel`: a black dot in the middle of a 5×1 white strip; Box Blur radius 1 gives `[255, 170, 170, 170, 255]`; Gaussian Blur is symmetric and gets lighter from the center outward; Average gives the average value 204.
+- `rank_filters`: Median removes an isolated black dot, Minimum enlarges a black dot, Maximum removes a black dot.
+- `sharpen_high_pass_and_solarize`: Unsharp Mask keeps the black and white of an edge; High Pass is below 128 at the center and above 128 at the edge; Solarize turns white black.
+- `offset_wraps_or_fills_with_the_background`: wrapping around and filling with the background color.
+- `mosaic_and_noise`: Mosaic averages a cell; repeated Add Noise gives the same result, and monochromatic noise stays gray.
+- `transparent_pixels_do_not_bleed_color`: a red dot on a transparent layer stays red after blurring, with alpha 85.
+- `photoshop::filters_match_photoshop`: 36 filter cases compared against Photoshop output (including Fragment, two Custom cases, two Surface Blur cases, two Dust & Scratches cases, Despeckle, Sharpen Edges, Trace Contour Lower) (`fixtures/filter`), each with a maximum error bound.
+- `distortions_match_photoshop`: Twirl, Pinch, Spherize (including negative values and Vertical only), and Polar Coordinates in both directions compared against Photoshop, asserting on the average difference.
+- `trace_contour_upper_matches_photoshop`: Trace Contour Level 128 Upper compared against Photoshop, with at most one channel value different.
+- `wind_streaks_downwind`: Wind and Blast in both directions: results are repeatable, bright points are kept, streaks appear only on the downwind side and only lighten, and some of the 32 rows start a streak; on a flat image all three methods change nothing.

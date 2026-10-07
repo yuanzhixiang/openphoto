@@ -1,24 +1,24 @@
-# align.rs：对齐与分布
+# align.rs: Align and Distribute
 
-## 职责
+## Responsibilities
 
-Layer › Align、Layer › Distribute 以及移动工具选项栏的对齐/分布按钮：按选中图层的像素范围移动它们，使其对齐或均匀分布，规则与 Photoshop 2026 一致（结果在 Photoshop 中实测核对过）。
+Layer › Align, Layer › Distribute, and the align/distribute buttons in the Move tool options bar: moves the selected layers by their pixel extents so that they are aligned or evenly distributed, following the same rules as Photoshop 2026 (results verified by testing in Photoshop).
 
-## 对外接口
+## Public interface
 
-- `Align`：`Top`、`VerticalCenter`、`Bottom`、`Left`、`HorizontalCenter`、`Right`；`ALL` 为菜单顺序，`label()` 为菜单文字（「Top Edges」等），`name()` 为历史名称（「Align Left Edges」等，与 Photoshop 记录的一致）。
-- `Distribute`：上面六种加 `Horizontally`、`Vertically`（等间距）；同样有 `ALL`、`label()`、`name()`（「Distribute Vertical Centers」等）。
-- `movable_count(doc)`：会被移动的选中图层数（需要扫描各图层像素外框；`op-ui` 按修订号缓存它）。`can_align_count(doc, n)` 是给定该数目时的 `can_align`。
-- `can_align(doc)` / `align(doc, how)`：有像素选区时，选中的图层对齐到选区的外框（一个图层就可以）；没有选区时需要至少两个图层，对齐到它们的总外框。中心对齐的位移四舍五入到整像素。
-- `can_distribute(doc)` / `distribute(doc, how)`：需要至少三个图层。按所选的边或中心排序，最外侧的两个不动，中间的按所选的边或中心等距排列；`Horizontally`/`Vertically` 则让相邻图层之间的空隙相等。
+- `Align`: `Top`, `VerticalCenter`, `Bottom`, `Left`, `HorizontalCenter`, `Right`; `ALL` is the menu order, `label()` is the menu text ("Top Edges" etc.), `name()` is the history name ("Align Left Edges" etc., matching what Photoshop records).
+- `Distribute`: the six above plus `Horizontally`, `Vertically` (equal spacing); likewise has `ALL`, `label()`, `name()` ("Distribute Vertical Centers" etc.).
+- `movable_count(doc)`: the number of selected layers that would be moved (requires scanning each layer's pixel bounds; `op-ui` caches it by revision number). `can_align_count(doc, n)` is `can_align` given that count.
+- `can_align(doc)` / `align(doc, how)`: with a pixel selection, the selected layers align to the selection's bounding box (one layer is enough); with no selection, at least two layers are required, and they align to their combined bounding box. Center alignment offsets are rounded to whole pixels.
+- `can_distribute(doc)` / `distribute(doc, how)`: requires at least three layers. Layers are sorted by the chosen edge or center; the two outermost stay put and the ones in between are spaced evenly by the chosen edge or center; `Horizontally`/`Vertically` instead make the gaps between adjacent layers equal.
 
-参与的图层：选中的、不是背景、没有锁定位置或像素、有不透明像素的图层；像素范围用 `TiledImage::content_bounds`（包括画布外的像素），移动用 `with_canvas` 平移，画布外的像素保留。
+Participating layers: those that are selected, not the background, have neither position nor pixels locked, and have opaque pixels. Pixel extents use `TiledImage::content_bounds` (including pixels outside the canvas); moving uses a `with_canvas` translation, and pixels outside the canvas are preserved.
 
-## 图层组
+## Layer groups
 
-选中的组算作一个整体：范围是组里所有像素图层的并集，移动时组里的所有像素图层一起移动。
+A selected group counts as a single unit: its extent is the union of all pixel layers in the group, and when moved, all pixel layers in the group move together.
 
-## 测试覆盖
+## Test coverage
 
-- `matches_photoshop`：三个方块依次左对齐、垂直居中对齐、底对齐、按垂直中心分布，结果与 Photoshop 2026 中同样操作后的图层范围完全一致。
-- `equal_gaps_and_selection_alignment`：等间距分布后中间一条两侧空隙相等；有像素选区时单个图层右对齐到选区。
+- `matches_photoshop`: three squares are successively left-aligned, vertically center-aligned, bottom-aligned and distributed by vertical centers; the results match exactly the layer extents after the same operations in Photoshop 2026.
+- `equal_gaps_and_selection_alignment`: after equal-spacing distribution, the gaps on both sides of the middle strip are equal; with a pixel selection, a single layer right-aligns to the selection.

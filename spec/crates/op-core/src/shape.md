@@ -1,23 +1,23 @@
-# shape.rs：形状工具
+# shape.rs: Shape tools
 
-## 职责
+## Responsibility
 
-矩形、椭圆、三角形、多边形、直线工具：生成形状的覆盖范围，并作为一个新图层（用颜色填充）加入文档。不记录历史。
+The Rectangle, Ellipse, Triangle, Polygon, and Line tools: generates a shape's coverage and adds it to the document as a new layer (filled with a color). Records no history.
 
-## 对外接口
+## Public interface
 
-- `ShapeKind`：`Rectangle`、`Ellipse`、`Triangle`、`Polygon(边数)`、`Line`。`layer_name()` 为新图层名的前缀（「Rectangle」「Ellipse」「Triangle」「Polygon」「Line」）。
-- `coverage(kind, w, h, a, b, weight)`：形状在画布上的覆盖范围（`Selection`，全部消除锯齿）。
-  - 矩形、椭圆、三角形、多边形填满 `a`、`b` 两点构成的矩形：矩形即该矩形；椭圆为内切椭圆；三角形顶点在上边中点、底边两角；多边形为内接于矩形的正多边形（少于 3 边按 3 边），第一个顶点在正上方。
-  - 直线：从 `a` 到 `b`、宽 `weight` 像素的长方形；两点重合时为空。
-- `add_shape_layer(doc, kind, a, b, weight, color)`：用覆盖值作为 alpha、`color` 作为颜色，生成一个新图层插在当前图层之上并选中它，返回其 ID。图层名为前缀加编号，编号为同名前缀已有最大编号 + 1（如「Rectangle 1」「Rectangle 2」）。覆盖为空时不添加图层，返回 `None`。
+- `ShapeKind`: `Rectangle`, `Ellipse`, `Triangle`, `Polygon(sides)`, `Line`. `layer_name()` is the prefix of the new layer's name ("Rectangle", "Ellipse", "Triangle", "Polygon", "Line").
+- `coverage(kind, w, h, a, b, weight)`: the shape's coverage on the canvas (a `Selection`, fully anti-aliased).
+  - Rectangle, Ellipse, Triangle, and Polygon fill the rectangle formed by points `a` and `b`: the rectangle is that rectangle; the ellipse is the inscribed ellipse; the triangle has its vertices at the midpoint of the top edge and the two bottom corners; the polygon is the regular polygon inscribed in the rectangle (fewer than 3 sides is treated as 3), with the first vertex straight up.
+  - Line: a rectangle from `a` to `b`, `weight` pixels wide; empty when the two points coincide.
+- `add_shape_layer(doc, kind, a, b, weight, color)`: using the coverage as alpha and `color` as the color, creates a new layer inserted above the current layer, selects it, and returns its ID. The layer name is the prefix plus a number, where the number is the highest existing number for that prefix + 1 (e.g. "Rectangle 1", "Rectangle 2"). When the coverage is empty, no layer is added and `None` is returned.
 
-## 已知限制
+## Known limitations
 
-- 形状是栅格图层，不是 Photoshop 的矢量形状图层：没有路径、实时形状属性、圆角、描边，也不能再编辑形状。
-- 没有自定形状工具和路径/像素模式。
+- Shapes are raster layers, not Photoshop's vector shape layers: no paths, live shape properties, rounded corners, or strokes, and the shape cannot be edited afterwards.
+- No Custom Shape tool and no path/pixel modes.
 
-## 测试覆盖
+## Test coverage
 
-- `shapes_cover_their_box`：矩形范围、椭圆中心与角、三角形、正六边形、2 像素粗的水平直线。
-- `shape_layers_are_numbered`：连续两个矩形得到「Rectangle 1」「Rectangle 2」，像素为对应颜色；零尺寸形状不加图层。
+- `shapes_cover_their_box`: rectangle extent, ellipse center and corners, triangle, regular hexagon, a 2-pixel-thick horizontal line.
+- `shape_layers_are_numbered`: two consecutive rectangles produce "Rectangle 1" and "Rectangle 2", with pixels in the corresponding colors; a zero-size shape adds no layer.

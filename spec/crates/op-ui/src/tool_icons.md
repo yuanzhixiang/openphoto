@@ -1,28 +1,28 @@
-# tool_icons.rs：工具栏的工具图标
+# tool_icons.rs: Toolbar Tool Icons
 
-## 组件职责
+## Component Responsibilities
 
-按 Photoshop 2026 工具栏图标的样式自己绘制的矢量图标（不是 Adobe 的图标资源）：1 pt（2 设备像素）的线条与实心剪影，位置、大小与外形按 Photoshop 工具栏的 2x 截图逐个测量。工具栏（`toolbar.rs`）的每个工具按钮和右键弹出的工具列表都用它。Remove Tool 在 Photoshop 里没有可切换到它的脚本 ID，它的图标（修复画笔的创可贴加左上角两颗四角星，星的周围挖空）是从 Photoshop 修复工具组的右键弹出列表（0.93 倍）里量的，`nudge` 为 (2, 2)。
+Vector icons drawn in-house in the style of Photoshop 2026's toolbar icons (not Adobe's icon assets): 1 pt (2 device pixel) lines and solid silhouettes, with position, size and shape measured one by one from 2x screenshots of Photoshop's toolbar. Every tool button in the toolbar (`toolbar.rs`) and the right-click tool flyout use it. The Remove Tool has no script ID in Photoshop that switches to it; its icon (the healing brush's bandage plus two four-pointed stars at the top left, knocked out around the stars) was measured from the right-click flyout of Photoshop's healing tool group (at 0.93×), and its `nudge` is (2, 2).
 
-## 坐标与位置
+## Coordinates and Position
 
-- 每个图标画在 56 × 52 设备像素（2x）的格子里，`x` 向右、`y` 向下；坐标直接来自对 Photoshop 图标的测量。
-- `paint(painter, center, tool, color, bg)`：格子左边在按钮中心左侧 29 px，顶边在按钮中心上方 25 px（向下取整）；按钮中心恰好落在整像素上的行（工具栏 25.9 pt 的行距每 5 行重复一次，即第 1、6、11、16、21 个按钮）再下移 1 px。这条取整规则是对 Photoshop 全部 22 个按钮逐个比对得出的。
-- `nudge(tool)`：个别图标测量时坐标差了 1–2 px，绘制时整体挪动的量。
-- 图标中心由工具栏按 Photoshop 的行距计算（第一个按钮中心在工具栏顶下 43 pt，之后每个 25.9 pt），不取按钮矩形（避免按钮高度取整带来的漂移）。
-- `paint_scaled(…, scale)`：按比例缩小绘制，用于弹出列表（Photoshop 列表里的移动工具图标宽 14 pt，工具栏里 15 pt，比例 0.93）。
+- Each icon is drawn in a 56 × 52 device pixel (2x) cell, `x` to the right and `y` downward; coordinates come directly from measurements of Photoshop's icons.
+- `paint(painter, center, tool, color, bg)`: the cell's left edge is 29 px left of the button center and its top edge 25 px above the button center (rounded down); for rows where the button center falls exactly on a whole pixel (the toolbar's 25.9 pt pitch repeats every 5 rows, i.e. the 1st, 6th, 11th, 16th and 21st buttons), it moves down another 1 px. This rounding rule was derived by comparing all 22 of Photoshop's buttons one by one.
+- `nudge(tool)`: for a few icons whose measured coordinates were off by 1–2 px, the amount to shift the whole icon when drawing.
+- Icon centers are computed by the toolbar from Photoshop's row pitch (the first button's center 43 pt below the top of the toolbar, then every 25.9 pt), not taken from the button rectangle (avoiding drift from rounding button heights).
+- `paint_scaled(…, scale)`: draws scaled down, used for the flyout (in Photoshop's list the Move tool icon is 14 pt wide, 15 pt in the toolbar, a ratio of 0.93).
 
-## 视觉
+## Visuals
 
-- 图标色 `#dddddd`（`COLOR`，Photoshop 实测）；形状工具（矩形、椭圆、三角形、多边形、自定形状）与铅笔内部为 `#6f6f6f`，修补工具内部为 144 灰，选择画笔的底为 `#757575`，渐变图标内部从 47 到 202 灰的横向渐变，路径选择工具的箭头内部为黑色。
-- 需要「挖空」的部分（创可贴的四个孔、海绵的孔、红眼的高光、涂抹与加深工具手指间的缝）用按钮背景色 `bg` 画出：选中时为 `TOOL_ACTIVE`，悬停时为 `HOVER`，否则为面板底色；弹出列表里悬停行为强调色。
-- 凹形的实心形状用一张三角网格（`fan`）一次填满，避免逐个三角形抗锯齿留下的接缝，外缘再描一条细线抗锯齿。
+- Icon color `#dddddd` (`COLOR`, Photoshop measurement); the interiors of the shape tools (rectangle, ellipse, triangle, polygon, custom shape) and the pencil are `#6f6f6f`, the patch tool's interior is 144 gray, the selection brush's base is `#757575`, the gradient icon's interior is a horizontal gradient from 47 to 202 gray, and the path selection tool's arrow interior is black.
+- Parts that need to be "knocked out" (the bandage's four holes, the sponge's holes, the red eye's highlight, the gaps between the fingers of the smudge and burn tools) are drawn in the button background color `bg`: `TOOL_ACTIVE` when selected, `HOVER` when hovered, otherwise the panel background; in the flyout, the hovered row uses the accent color.
+- Concave solid shapes are filled in one go with a triangle mesh (`fan`), avoiding seams left by anti-aliasing each triangle separately, and a thin line is then stroked along the outer edge for anti-aliasing.
 
-## 已知差异
+## Known Differences
 
-- 外形是按截图重画的近似：线条类图标（套索、铅笔、吸管、自定形状等）与 Photoshop 的亮像素重合度约 0.5–0.7，块状图标（移动、选框、裁剪、文字、修补、矩形等）0.9–1.0。磁性套索的磁铁、选择画笔的底色深浅、切片刀的刀身与 Photoshop 差别最大。
+- The shapes are approximations redrawn from screenshots: line-style icons (lasso, pencil, eyedropper, custom shape, etc.) overlap Photoshop's bright pixels by about 0.5–0.7, and block-style icons (move, marquee, crop, type, patch, rectangle, etc.) by 0.9–1.0. The magnetic lasso's magnet, the shade of the selection brush's base, and the slice tool's blade differ most from Photoshop.
 
-## 测试覆盖
+## Test Coverage
 
-- `ui_tests.rs` 的 `tool_icons_match_photoshops_extents`：渲染全部 69 个工具的图标，每个的亮像素外框与 Photoshop 测得的外框（`PS_ICON_EXTENTS`，只存数值）相差不超过 2 px。
-- `compare_tool_icons_with_photoshop`（`#[ignore]`，需要环境变量 `PS_ICONS` 指向从 Photoshop 工具栏截下的图标目录，可用 `ICONS` 只比对部分工具）：打印每个图标与 Photoshop 的亮像素重合度和最佳平移，输出上下对照图 `target/ui-shots/icon_compare.png`。Photoshop 的截图只在本地使用，不放进仓库。
+- `tool_icons_match_photoshops_extents` in `ui_tests.rs`: renders the icons of all 69 tools; each one's bright-pixel bounding box differs by at most 2 px from the bounding box measured in Photoshop (`PS_ICON_EXTENTS`, which stores only numbers).
+- `compare_tool_icons_with_photoshop` (`#[ignore]`; requires the environment variable `PS_ICONS` to point at a directory of icons captured from Photoshop's toolbar; `ICONS` can be used to compare only some tools): prints each icon's bright-pixel overlap with Photoshop and the best offset, and outputs a top/bottom comparison image `target/ui-shots/icon_compare.png`. Photoshop screenshots are used only locally and are not committed to the repository.
