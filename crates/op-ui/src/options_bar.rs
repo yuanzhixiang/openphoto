@@ -1194,7 +1194,7 @@ fn transform_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
         for gx in -1i8..=1 {
             let c = Pos2::new(at(146.0 + 7.0 * gx as f32), cy + pt(0.75 + 7.0 * gy as f32));
             let cell = Rect::from_center_size(c, Vec2::splat(pt(5.5)));
-            let chosen = t.reference == (gx, gy);
+            let chosen = t.reference_custom.is_none() && t.reference == (gx, gy);
             if chosen {
                 painter.rect_filled(cell, 0, grid_tint);
             } else {
@@ -1215,6 +1215,7 @@ fn transform_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
                     .clicked()
             {
                 t.reference = (gx, gy);
+                t.reference_custom = None;
             }
         }
     }
@@ -1465,18 +1466,45 @@ fn warp_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
     );
     separator(&painter, bar, 161.5);
     label(171.5, "Split:", color::TEXT);
-    let stroke = egui::Stroke::new(pt(1.0), dim);
-    for (x, kind) in [(208.5, 0), (234.0, 1), (260.0, 2)] {
+    let Some(state) = app.active() else {
+        return;
+    };
+    let Some(t) = state.free_transform.as_mut() else {
+        return;
+    };
+    use crate::state::WarpSplit;
+    use op_core::transform::{StyleWarp, WarpStyle};
+    let styled = t.warp.as_ref().and_then(|m| m.style);
+    // Split Crosswise, Vertically, Horizontally: the next click on the
+    // mesh splits it there (not while a preset style is on)
+    for (x, kind, tip) in [
+        (208.5, WarpSplit::Crosswise, "Split warp crosswise"),
+        (234.0, WarpSplit::Vertical, "Split warp vertically"),
+        (260.0, WarpSplit::Horizontal, "Split warp horizontally"),
+    ] {
+        let hit = Rect::from_center_size(Pos2::new(at(x), cy), Vec2::splat(pt(24.0)));
+        let enabled = styled.is_none();
+        let response = ui.interact(hit, ui.id().with(("warp-split", x as i32)), Sense::click());
+        if enabled && t.warp_split == Some(kind) {
+            painter.rect_filled(hit, pt(3.0), color::TOOL_ACTIVE);
+        } else if enabled && response.hovered() {
+            painter.rect_filled(hit, pt(3.0), color::HOVER);
+        }
+        if enabled && response.on_hover_text(tip).clicked() {
+            t.warp_split = (t.warp_split != Some(kind)).then_some(kind);
+        }
+        let ink = if enabled { color::OPTIONS_ICON } else { dim };
+        let stroke = egui::Stroke::new(pt(1.0), ink);
         let r = Rect::from_center_size(Pos2::new(at(x), cy), Vec2::splat(pt(11.0)));
         painter.rect_stroke(r, 0, stroke, egui::StrokeKind::Inside);
         let c = r.center();
-        if kind != 2 {
+        if kind != WarpSplit::Horizontal {
             painter.line_segment(
                 [Pos2::new(c.x, r.top()), Pos2::new(c.x, r.bottom())],
                 stroke,
             );
         }
-        if kind != 1 {
+        if kind != WarpSplit::Vertical {
             painter.line_segment(
                 [Pos2::new(r.left(), c.y), Pos2::new(r.right(), c.y)],
                 stroke,
@@ -1485,36 +1513,78 @@ fn warp_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
     }
     separator(&painter, bar, 282.0);
     label(290.5, "Grid:", color::TEXT);
+    // Default is one patch; the others are that many patches each way
+    let grids = [(1, "Default"), (3, "3 x 3"), (4, "4 x 4"), (5, "5 x 5")];
+    let (cols, rows) = t.warp.as_ref().map_or((1, 1), |m| (m.cols, m.rows));
+    let grid_label = grids
+        .iter()
+        .find(|(n, _)| (*n, *n) == (cols, rows))
+        .map_or("Custom".to_owned(), |(_, l)| (*l).to_owned());
+    let grid_entries: Vec<_> = grids
+        .iter()
+        .map(|(n, l)| crate::native_popup::Entry::item(*l, (*n, *n) == (cols, rows)))
+        .collect();
+    let mut grid_pick = None;
     ui.scope_builder(egui::UiBuilder::new().max_rect(span(319.5, 378.5)), |ui| {
-        widgets::dropdown_with(ui, "warp-grid", pt(59.0), "Default", false, |_| {});
+        grid_pick = widgets::dropdown_entries(
+            ui,
+            "warp-grid",
+            pt(59.0),
+            &grid_label,
+            styled.is_none(),
+            &grid_entries,
+        );
     });
+    if let (Some(k), Some(mesh)) = (grid_pick, t.warp.as_mut()) {
+        let n = grids[k].0;
+        *mesh = mesh.regrid(n, n);
+    }
     separator(&painter, bar, 386.5);
     label(395.0, "Warp:", color::TEXT);
+    let mut style_entries = vec![
+        crate::native_popup::Entry::item("Custom", styled.is_none()),
+        crate::native_popup::Entry::Separator,
+    ];
+    style_entries.extend(
+        WarpStyle::ALL.iter().map(|s| {
+            crate::native_popup::Entry::item(s.label(), styled.map(|w| w.style) == Some(*s))
+        }),
+    );
+    let style_label = styled.map_or("Custom", |w| w.style.label());
+    let mut style_pick = None;
     ui.scope_builder(egui::UiBuilder::new().max_rect(span(428.5, 518.5)), |ui| {
-        widgets::dropdown_with(ui, "warp-style", pt(90.0), "Custom", true, |ui| {
-            let _ = ui.selectable_label(true, "Custom");
-            ui.separator();
-            for style in [
-                "Arc",
-                "Arc Lower",
-                "Arc Upper",
-                "Arch",
-                "Bulge",
-                "Shell Lower",
-                "Shell Upper",
-                "Flag",
-                "Wave",
-                "Fish",
-                "Rise",
-                "Fisheye",
-                "Inflate",
-                "Squeeze",
-                "Twist",
-            ] {
-                ui.add_enabled(false, egui::Button::new(style));
-            }
-        });
+        style_pick = widgets::dropdown_entries(
+            ui,
+            "warp-style",
+            pt(90.0),
+            style_label,
+            true,
+            &style_entries,
+        );
     });
+    let (map, bounds) = (t.mapping(), t.bounds);
+    if let (Some(k), Some(mesh)) = (style_pick, t.warp.as_mut()) {
+        if k == 0 {
+            // Custom: the shape becomes editable points
+            mesh.freeze_style();
+        } else if k >= 2 {
+            let style = WarpStyle::ALL[k - 2];
+            // Photoshop starts a preset at 50% Bend
+            let base = mesh.style.unwrap_or(StyleWarp {
+                style,
+                rect: bounds,
+                bend: 0.5,
+                horizontal: 0.0,
+                vertical: 0.0,
+                vertical_orientation: false,
+                then: map,
+            });
+            *mesh = op_core::transform::WarpMesh::flat(bounds);
+            mesh.style = Some(StyleWarp { style, ..base });
+            t.warp_split = None;
+        }
+    }
+    let styled = t.warp.as_ref().and_then(|m| m.style);
     crate::ps_icons::paint(
         &painter,
         Pos2::new(at(540.0), cy),
@@ -1522,30 +1592,62 @@ fn warp_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
         dim,
         color::OPTIONS_BAR,
     );
+    // The orientation switch (a preset's bend turns sideways)
+    let orient = Rect::from_center_size(Pos2::new(at(575.0), cy), Vec2::splat(pt(24.0)));
+    let orient_response = ui.interact(orient, ui.id().with("warp-orient"), Sense::click());
+    if let Some(w) = styled
+        && orient_response
+            .on_hover_text("Change the warp orientation")
+            .clicked()
+        && let Some(m) = t.warp.as_mut()
+    {
+        m.style = Some(StyleWarp {
+            vertical_orientation: !w.vertical_orientation,
+            ..w
+        });
+    }
     crate::ps_icons::paint(
         &painter,
-        Pos2::new(at(575.0), cy),
+        orient.center(),
         Icon::WarpToggle,
-        dim,
+        if styled.is_some() {
+            color::OPTIONS_ICON
+        } else {
+            dim
+        },
         color::OPTIONS_BAR,
     );
     let dim_text = Color32::from_gray(0x87);
-    for (lx, text, x0, x1, px) in [
+    let ink = if styled.is_some() {
+        color::TEXT
+    } else {
+        dim_text
+    };
+    for (k, (lx, text, x0, x1, px)) in [
         (600.5, "Bend:", 631.0, 678.0, 685.0),
         (700.0, "H:", 713.0, 760.0, 763.0),
         (779.0, "V:", 793.0, 840.0, 843.0),
-    ] {
-        label(lx, text, dim_text);
-        let mut zero = "0.0".to_string();
-        widgets::text_box(ui, span(x0, x1), &mut zero, ("warp-num", text), false);
-        label(px, "%", dim_text);
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        label(lx, text, ink);
+        let value = styled.map_or(0.0, |w| [w.bend, w.horizontal, w.vertical][k]);
+        let shown = format!("{:.1}", value * 100.0);
+        if let Some(typed) = value_box(ui, span(x0, x1), text, shown, styled.is_some())
+            && let Some(v) = typed_number(&typed)
+            && let Some(m) = t.warp.as_mut()
+            && let Some(w) = m.style.as_mut()
+        {
+            let v = (v / 100.0).clamp(-1.0, 1.0);
+            match k {
+                0 => w.bend = v,
+                1 => w.horizontal = v,
+                _ => w.vertical = v,
+            }
+        }
+        label(px, "%", ink);
     }
-    let Some(state) = app.active() else {
-        return;
-    };
-    let Some(t) = state.free_transform.as_mut() else {
-        return;
-    };
     // The Warp switch, on
     let toggle = Rect::from_min_max(
         Pos2::new(at(907.0), bar.top() + pt(4.0)),

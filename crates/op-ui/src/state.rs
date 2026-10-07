@@ -853,10 +853,12 @@ pub enum TransformHandle {
     /// A scale handle: −1, 0 or 1 along each axis of the box (0 for the
     /// middle of a side).
     Scale(i8, i8),
+    /// The reference point, shown and dragged elsewhere.
+    Reference,
 }
 
 /// A Free Transform drag: the handle and the box as it was at mouse-down.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct TransformDrag {
     pub handle: TransformHandle,
     pub start: egui::Pos2,
@@ -875,6 +877,19 @@ pub struct TransformDrag {
 pub enum WarpGrab {
     Point(usize),
     Surface(f32, f32),
+    /// A preset style's Bend handle, with the bend at mouse-down.
+    Bend(f32),
+}
+
+/// Warp's Split buttons: what the next click on the mesh adds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WarpSplit {
+    /// A column and a row of patches.
+    Crosswise,
+    /// A column.
+    Vertical,
+    /// A row.
+    Horizontal,
 }
 
 /// Edit > Transform's modes: what dragging a handle does.
@@ -911,6 +926,11 @@ pub struct FreeTransform {
     pub skew: (f32, f32),
     /// The reference point: −1, 0 or 1 along each axis of the box.
     pub reference: (i8, i8),
+    /// A reference point dragged elsewhere (a point of the original box),
+    /// instead of one of the nine.
+    pub reference_custom: Option<(f32, f32)>,
+    /// Warp's Split mode, until the next click on the mesh.
+    pub warp_split: Option<WarpSplit>,
     /// The options bar's reference point checkbox (Photoshop 2026: off).
     pub show_reference: bool,
     /// X and Y relative to where the reference point started.
@@ -942,6 +962,8 @@ impl FreeTransform {
             mode: TransformMode::Free,
             skew: (0.0, 0.0),
             reference: (0, 0),
+            reference_custom: None,
+            warp_split: None,
             show_reference: false,
             relative: false,
             linked: true,
@@ -982,6 +1004,9 @@ impl FreeTransform {
 
     /// The reference point on the original box.
     pub fn reference_point(&self) -> (f32, f32) {
+        if let Some(p) = self.reference_custom {
+            return p;
+        }
         let (x0, y0, x1, y1) = self.bounds;
         let pick = |k: i8, a: f32, b: f32| match k {
             -1 => a,

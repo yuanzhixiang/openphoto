@@ -666,12 +666,21 @@ pub fn transform_selection<M: Mapping>(doc: &mut Document, m: M) -> bool {
     true
 }
 
-/// Edit > Transform > Warp's surface: a bicubic Bézier patch over the
-/// box, 4 × 4 control points row by row from the top left (in document
-/// pixels). Undistorted, they sit at thirds of the box.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// Edit > Transform > Warp's surface: `cols` × `rows` bicubic Bézier
+/// patches over the box, sharing their edges. The control points form a
+/// (3·cols + 1) × (3·rows + 1) grid, row by row from the top left (in
+/// document pixels); undistorted they sit at thirds of each patch. With a
+/// `style` (Warp's Arc, Flag...) the surface is that shape instead.
+#[derive(Clone, Debug, PartialEq)]
 pub struct WarpMesh {
-    pub points: [(f32, f32); 16],
+    pub cols: usize,
+    pub rows: usize,
+    pub points: Vec<(f32, f32)>,
+    /// Where each column and row of patches starts and ends on the box
+    /// (0 to 1): splitting adds one, keeping the surface's parameters.
+    pub us: Vec<f32>,
+    pub vs: Vec<f32>,
+    pub style: Option<StyleWarp>,
 }
 
 fn bernstein(t: f32) -> [f32; 4] {
@@ -679,42 +688,378 @@ fn bernstein(t: f32) -> [f32; 4] {
     [s * s * s, 3.0 * s * s * t, 3.0 * s * t * t, t * t * t]
 }
 
+/// A cubic's four points.
+type Cubic = [(f32, f32); 4];
+
+/// Splits the cubic `p` at `t` (de Casteljau): the two halves' points.
+fn split_cubic(p: Cubic, t: f32) -> (Cubic, Cubic) {
+    let lerp = |a: (f32, f32), b: (f32, f32)| (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t);
+    let (a, b, c) = (lerp(p[0], p[1]), lerp(p[1], p[2]), lerp(p[2], p[3]));
+    let (d, e) = (lerp(a, b), lerp(b, c));
+    let f = lerp(d, e);
+    ([p[0], a, d, f], [f, e, c, p[3]])
+}
+
 impl WarpMesh {
-    /// The flat mesh over (x0, y0, x1, y1).
-    pub fn flat((x0, y0, x1, y1): (f32, f32, f32, f32)) -> Self {
-        let points = std::array::from_fn(|k| {
-            let (i, j) = ((k % 4) as f32, (k / 4) as f32);
-            (x0 + (x1 - x0) * i / 3.0, y0 + (y1 - y0) * j / 3.0)
-        });
-        Self { points }
+    /// The flat single patch over (x0, y0, x1, y1) (Grid: Default).
+    pub fn flat(rect: (f32, f32, f32, f32)) -> Self {
+        Self::grid(rect, 1, 1)
+    }
+
+    /// The flat mesh of `cols` × `rows` patches over the box (Grid: 3 x 3...).
+    pub fn grid((x0, y0, x1, y1): (f32, f32, f32, f32), cols: usize, rows: usize) -> Self {
+        let (cols, rows) = (cols.max(1), rows.max(1));
+        let (nx, ny) = (3 * cols + 1, 3 * rows + 1);
+        let points = (0..nx * ny)
+            .map(|k| {
+                let (i, j) = ((k % nx) as f32, (k / nx) as f32);
+                (
+                    x0 + (x1 - x0) * i / (nx - 1) as f32,
+                    y0 + (y1 - y0) * j / (ny - 1) as f32,
+                )
+            })
+            .collect();
+        Self {
+            cols,
+            rows,
+            points,
+            us: (0..=cols).map(|i| i as f32 / cols as f32).collect(),
+            vs: (0..=rows).map(|j| j as f32 / rows as f32).collect(),
+            style: None,
+        }
+    }
+
+    /// Control points per row.
+    pub fn stride(&self) -> usize {
+        3 * self.cols + 1
+    }
+
+    /// The patch holding (u, v) and the coordinates in it.
+    fn patch(&self, u: f32, v: f32) -> (usize, usize, f32, f32) {
+        let find = |knots: &[f32], t: f32| {
+            let t = t.clamp(0.0, 1.0);
+            let k = knots[1..knots.len() - 1]
+                .iter()
+                .filter(|&&b| b <= t)
+                .count();
+            let (a, b) = (knots[k], knots[k + 1]);
+            (k, ((t - a) / (b - a).max(1e-9)).clamp(0.0, 1.0))
+        };
+        let (pi, s) = find(&self.us, u);
+        let (pj, t) = find(&self.vs, v);
+        (pi, pj, s, t)
     }
 
     /// The surface point at (u, v) in 0..1.
     pub fn at(&self, u: f32, v: f32) -> (f32, f32) {
-        let (bu, bv) = (bernstein(u), bernstein(v));
+        if let Some(style) = &self.style {
+            return style.at(u, v);
+        }
+        let (pi, pj, s, t) = self.patch(u, v);
+        let (bu, bv) = (bernstein(s), bernstein(t));
+        let stride = self.stride();
         let mut p = (0.0, 0.0);
-        for (k, c) in self.points.iter().enumerate() {
-            let w = bu[k % 4] * bv[k / 4];
-            p.0 += c.0 * w;
-            p.1 += c.1 * w;
+        for (b, wv) in bv.iter().enumerate() {
+            for (a, wu) in bu.iter().enumerate() {
+                let c = self.points[(3 * pj + b) * stride + 3 * pi + a];
+                p.0 += c.0 * wu * wv;
+                p.1 += c.1 * wu * wv;
+            }
         }
         p
     }
 
-    /// Drags the surface point at (u, v) by `d`: the control points move
-    /// by their share of it, so that point follows exactly (Photoshop's
-    /// way of warping by dragging inside the mesh).
+    /// Drags the surface point at (u, v) by `d`: its patch's control
+    /// points move by their share of it, so that point follows exactly
+    /// (Photoshop's way of warping by dragging inside the mesh).
     pub fn pull(&mut self, (u, v): (f32, f32), d: (f32, f32)) {
-        let (bu, bv) = (bernstein(u), bernstein(v));
-        let weights: [f32; 16] = std::array::from_fn(|k| bu[k % 4] * bv[k / 4]);
-        let norm: f32 = weights.iter().map(|w| w * w).sum();
+        let (pi, pj, s, t) = self.patch(u, v);
+        let (bu, bv) = (bernstein(s), bernstein(t));
+        let norm: f32 = (0..16).map(|k| (bu[k % 4] * bv[k / 4]).powi(2)).sum();
         if norm <= 0.0 {
             return;
         }
-        for (p, w) in self.points.iter_mut().zip(weights) {
-            p.0 += d.0 * w / norm;
-            p.1 += d.1 * w / norm;
+        let stride = self.stride();
+        for (b, wv) in bv.iter().enumerate() {
+            for (a, wu) in bu.iter().enumerate() {
+                let w = wu * wv;
+                let p = &mut self.points[(3 * pj + b) * stride + 3 * pi + a];
+                p.0 += d.0 * w / norm;
+                p.1 += d.1 * w / norm;
+            }
         }
+    }
+
+    /// Whether control point `k` is drawn and can be grabbed: those on the
+    /// patches' edges (anchors and the handles along the edges).
+    pub fn shows_point(&self, k: usize) -> bool {
+        let stride = self.stride();
+        (k % stride).is_multiple_of(3) || (k / stride).is_multiple_of(3)
+    }
+
+    /// Split Vertically at `u`: a new column of patches starts there, the
+    /// surface unchanged (each row of the patch's points is cut in two).
+    pub fn split_u(&mut self, u: f32) {
+        let (pi, _, s, _) = self.patch(u, 0.0);
+        if !(0.01..=0.99).contains(&s) {
+            return;
+        }
+        let stride = self.stride();
+        let ny = 3 * self.rows + 1;
+        let mut points = Vec::with_capacity((stride + 3) * ny);
+        for j in 0..ny {
+            let row = &self.points[j * stride..(j + 1) * stride];
+            let seg = [
+                row[3 * pi],
+                row[3 * pi + 1],
+                row[3 * pi + 2],
+                row[3 * pi + 3],
+            ];
+            let (left, right) = split_cubic(seg, s);
+            points.extend_from_slice(&row[..3 * pi]);
+            points.extend_from_slice(&left);
+            points.extend_from_slice(&right[1..]);
+            points.extend_from_slice(&row[3 * pi + 4..]);
+        }
+        self.points = points;
+        self.cols += 1;
+        self.us.insert(pi + 1, u);
+    }
+
+    /// Split Horizontally at `v`: a new row of patches starts there.
+    pub fn split_v(&mut self, v: f32) {
+        let (_, pj, _, t) = self.patch(0.0, v);
+        if !(0.01..=0.99).contains(&t) {
+            return;
+        }
+        let stride = self.stride();
+        let ny = 3 * self.rows + 1;
+        let mut columns: Vec<Vec<(f32, f32)>> = (0..stride)
+            .map(|i| (0..ny).map(|j| self.points[j * stride + i]).collect())
+            .collect();
+        for col in &mut columns {
+            let seg = [
+                col[3 * pj],
+                col[3 * pj + 1],
+                col[3 * pj + 2],
+                col[3 * pj + 3],
+            ];
+            let (top, bottom) = split_cubic(seg, t);
+            let mut out = col[..3 * pj].to_vec();
+            out.extend_from_slice(&top);
+            out.extend_from_slice(&bottom[1..]);
+            out.extend_from_slice(&col[3 * pj + 4..]);
+            *col = out;
+        }
+        self.rows += 1;
+        self.vs.insert(pj + 1, v);
+        let ny = 3 * self.rows + 1;
+        self.points = (0..ny * stride)
+            .map(|k| columns[k % stride][k / stride])
+            .collect();
+    }
+
+    /// The style's shape as free points (choosing Custom after a style):
+    /// each control point takes the surface point at its place.
+    pub fn freeze_style(&mut self) {
+        let Some(style) = self.style.take() else {
+            return;
+        };
+        self.refit(&|u, v| style.at(u, v));
+    }
+
+    /// Puts every control point on `surface` at its place in the box
+    /// (the anchors exactly, the rest approximately).
+    fn refit(&mut self, surface: &dyn Fn(f32, f32) -> (f32, f32)) {
+        let (nx, ny) = (self.stride(), 3 * self.rows + 1);
+        let place = |knots: &[f32], i: usize| {
+            let (k, f) = (i / 3, (i % 3) as f32 / 3.0);
+            if k + 1 >= knots.len() {
+                return 1.0;
+            }
+            knots[k] + (knots[k + 1] - knots[k]) * f
+        };
+        for k in 0..nx * ny {
+            let (i, j) = (k % nx, k / nx);
+            self.points[k] = surface(place(&self.us, i), place(&self.vs, j));
+        }
+    }
+
+    /// The same surface on a `cols` × `rows` grid (Warp's Grid menu): the
+    /// new control points are put on the current surface.
+    pub fn regrid(&self, cols: usize, rows: usize) -> Self {
+        let (x0, y0) = self.points[0];
+        let mut out = Self::grid((x0, y0, x0 + 1.0, y0 + 1.0), cols, rows);
+        out.refit(&|u, v| self.at(u, v));
+        out
+    }
+}
+
+/// Warp's preset shapes (Photoshop's Warp menu, in its order).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WarpStyle {
+    Arc,
+    ArcLower,
+    ArcUpper,
+    Arch,
+    Bulge,
+    ShellLower,
+    ShellUpper,
+    Flag,
+    Wave,
+    Fish,
+    Rise,
+    Fisheye,
+    Inflate,
+    Squeeze,
+    Twist,
+}
+
+impl WarpStyle {
+    pub const ALL: [Self; 15] = [
+        Self::Arc,
+        Self::ArcLower,
+        Self::ArcUpper,
+        Self::Arch,
+        Self::Bulge,
+        Self::ShellLower,
+        Self::ShellUpper,
+        Self::Flag,
+        Self::Wave,
+        Self::Fish,
+        Self::Rise,
+        Self::Fisheye,
+        Self::Inflate,
+        Self::Squeeze,
+        Self::Twist,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Arc => "Arc",
+            Self::ArcLower => "Arc Lower",
+            Self::ArcUpper => "Arc Upper",
+            Self::Arch => "Arch",
+            Self::Bulge => "Bulge",
+            Self::ShellLower => "Shell Lower",
+            Self::ShellUpper => "Shell Upper",
+            Self::Flag => "Flag",
+            Self::Wave => "Wave",
+            Self::Fish => "Fish",
+            Self::Rise => "Rise",
+            Self::Fisheye => "Fisheye",
+            Self::Inflate => "Inflate",
+            Self::Squeeze => "Squeeze",
+            Self::Twist => "Twist",
+        }
+    }
+}
+
+/// A preset warp over a box: the style, Bend and the horizontal and
+/// vertical distortion (−1..1, the options bar's percentages), and the
+/// orientation. The shapes follow Photoshop's pictures of them; the exact
+/// curves are Adobe's own.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StyleWarp {
+    pub style: WarpStyle,
+    pub rect: (f32, f32, f32, f32),
+    pub bend: f32,
+    pub horizontal: f32,
+    pub vertical: f32,
+    /// Vertical orientation: the shape turned a quarter (bending sideways).
+    pub vertical_orientation: bool,
+    /// The box's transform before the warp (scaling, rotating...), applied
+    /// after the shape.
+    pub then: Projective,
+}
+
+impl StyleWarp {
+    /// The surface point at (u, v).
+    pub fn at(&self, u: f32, v: f32) -> (f32, f32) {
+        let (x0, y0, x1, y1) = self.rect;
+        let (w, h) = (x1 - x0, y1 - y0);
+        // Worked out for the horizontal orientation in a unit box: (a, b)
+        // across and down, the bend making the shape
+        let (a, b) = if self.vertical_orientation {
+            (v, u)
+        } else {
+            (u, v)
+        };
+        let (s, du, dv) = (self.bend, 2.0 * a - 1.0, 2.0 * b - 1.0);
+        let (mut x, mut y) = (a, b);
+        let pi = std::f32::consts::PI;
+        match self.style {
+            WarpStyle::Arc => {
+                // Bent along circles about a center below (above for a
+                // negative bend): the middle row keeps its length
+                // (worked out in widths, so the rows keep their spacing)
+                if s.abs() > 1e-3 {
+                    let k = if self.vertical_orientation {
+                        w / h
+                    } else {
+                        h / w
+                    }
+                    .max(1e-3);
+                    let span = s.abs() * pi / 2.0;
+                    let r = 1.0 / span;
+                    let row = if s > 0.0 { b } else { 1.0 - b };
+                    let rr = r + (0.5 - row) * k;
+                    let angle = du * span / 2.0;
+                    x = 0.5 + rr * angle.sin();
+                    let yy = 0.5 + (r - rr * angle.cos()) / k;
+                    y = if s > 0.0 { yy } else { 1.0 - yy };
+                }
+            }
+            _ => {
+                let bow = 1.0 - du * du;
+                match self.style {
+                    WarpStyle::ArcLower => y += s * 0.5 * bow * b,
+                    WarpStyle::ArcUpper => y -= s * 0.5 * bow * (1.0 - b),
+                    WarpStyle::Arch => y -= s * 0.5 * bow,
+                    WarpStyle::Bulge => y += s * 0.5 * bow * dv,
+                    WarpStyle::ShellLower => y -= s * 0.5 * du * du * b,
+                    WarpStyle::ShellUpper => y += s * 0.5 * du * du * (1.0 - b),
+                    WarpStyle::Flag => y -= s * 0.25 * (2.0 * pi * a).sin(),
+                    WarpStyle::Wave => {
+                        y -= s * 0.25 * (2.0 * pi * a).sin() * (0.5 + 0.5 * dv.abs())
+                    }
+                    WarpStyle::Fish => y += s * 0.5 * (pi * a).sin() * dv * (1.0 - a * 0.6),
+                    WarpStyle::Rise => y -= s * 0.5 * (pi * (a - 0.5)).sin(),
+                    WarpStyle::Fisheye | WarpStyle::Inflate => {
+                        let r2 = (du * du + dv * dv).min(2.0);
+                        let k = if self.style == WarpStyle::Fisheye {
+                            s * 0.5 * (1.0 - r2 / 2.0).max(0.0)
+                        } else {
+                            s * 0.25 * bow * (1.0 - dv * dv)
+                        };
+                        x += du * 0.5 * k;
+                        y += dv * 0.5 * k;
+                    }
+                    WarpStyle::Squeeze => {
+                        x -= s * 0.25 * du * (1.0 - dv * dv);
+                        y += s * 0.25 * dv * bow;
+                    }
+                    WarpStyle::Twist => {
+                        let r = ((du * du + dv * dv).sqrt() / 2f32.sqrt()).min(1.0);
+                        let turn = s * pi / 2.0 * (1.0 - r);
+                        let (sn, cs) = turn.sin_cos();
+                        x = 0.5 + 0.5 * (du * cs - dv * sn);
+                        y = 0.5 + 0.5 * (du * sn + dv * cs);
+                    }
+                    WarpStyle::Arc => unreachable!("above"),
+                }
+            }
+        }
+        // Horizontal and vertical distortion: perspective-like taper
+        let (cx, cy) = (x - 0.5, y - 0.5);
+        let x = 0.5 + cx * (1.0 + self.vertical * (2.0 * b - 1.0));
+        let y = 0.5 + cy * (1.0 + self.horizontal * (2.0 * a - 1.0));
+        let (x, y) = if self.vertical_orientation {
+            (y, x)
+        } else {
+            (x, y)
+        };
+        self.then.apply((x0 + w * x, y0 + h * y))
     }
 }
 
@@ -758,7 +1103,7 @@ pub fn warp(
     }
     // Each target pixel takes its color from the triangle it falls in
     let map = WarpMap::new(triangles);
-    let landing: Vec<(f32, f32)> = mesh.points.to_vec();
+    let landing: Vec<(f32, f32)> = grid.iter().flatten().map(|(_, d)| *d).collect();
     resample_targets(doc, &landing, &|p| map.back(p), background, how)
 }
 
@@ -1014,6 +1359,77 @@ mod tests {
         );
         // The corners move much less
         assert!((m.at(0.0, 0.0).0).abs() < 1.0);
+    }
+
+    #[test]
+    fn warp_grids_splits_and_styles() {
+        let close =
+            |a: (f32, f32), b: (f32, f32)| (a.0 - b.0).abs() < 1e-3 && (a.1 - b.1).abs() < 1e-3;
+        // A 3 × 3 grid is flat too, with 10 × 10 points
+        let g = WarpMesh::grid((0.0, 0.0, 90.0, 60.0), 3, 3);
+        assert_eq!(g.points.len(), 100);
+        assert!(close(g.at(0.4, 0.7), (36.0, 42.0)));
+        // Pulling a point moves only its own patch
+        let mut p = g.clone();
+        p.pull((0.5, 0.5), (3.0, 0.0));
+        assert!(close(p.at(0.5, 0.5), (48.0, 30.0)));
+        assert!(close(p.at(0.1, 0.1), g.at(0.1, 0.1)));
+        // Splitting keeps the surface and adds a column or row of patches
+        let mut m = WarpMesh::flat((0.0, 0.0, 30.0, 60.0));
+        m.pull((0.3, 0.6), (5.0, -4.0));
+        let mut split = m.clone();
+        split.split_u(0.4);
+        split.split_v(0.25);
+        assert_eq!((split.cols, split.rows, split.points.len()), (2, 2, 49));
+        // The same surface
+        assert!(close(split.at(0.0, 0.0), m.at(0.0, 0.0)));
+        assert!(close(split.at(1.0, 1.0), m.at(1.0, 1.0)));
+        for (u, v) in [(0.2, 0.1), (0.4, 0.25), (0.7, 0.6), (0.95, 0.9)] {
+            assert!(close(split.at(u, v), m.at(u, v)), "{u} {v}");
+        }
+        assert_eq!(split.us, vec![0.0, 0.4, 1.0]);
+        // A new grid keeps the shape at its anchors
+        let r = split.regrid(3, 3);
+        assert!(close(
+            r.at(1.0 / 3.0, 2.0 / 3.0),
+            m.at(1.0 / 3.0, 2.0 / 3.0)
+        ));
+        // Only anchors and edge handles show
+        assert!(split.shows_point(0) && split.shows_point(3) && !split.shows_point(8));
+        // A style with no bend is flat; a bend changes the shape
+        for style in WarpStyle::ALL {
+            let mut w = StyleWarp {
+                style,
+                rect: (0.0, 0.0, 100.0, 50.0),
+                bend: 0.0,
+                horizontal: 0.0,
+                vertical: 0.0,
+                vertical_orientation: false,
+                then: Projective::IDENTITY,
+            };
+            assert!(close(w.at(0.25, 0.75), (25.0, 37.5)), "{style:?}");
+            w.bend = 0.5;
+            let moved = (0..=4)
+                .flat_map(|j| (0..=4).map(move |i| (i as f32 / 4.0, j as f32 / 4.0)))
+                .any(|(u, v)| !close(w.at(u, v), (100.0 * u, 50.0 * v)));
+            assert!(moved, "{style:?} bends");
+        }
+        // Arc keeps the middle of the top edge raised for a positive bend
+        let arc = StyleWarp {
+            style: WarpStyle::Arc,
+            rect: (0.0, 0.0, 100.0, 50.0),
+            bend: 0.5,
+            horizontal: 0.0,
+            vertical: 0.0,
+            vertical_orientation: false,
+            then: Projective::IDENTITY,
+        };
+        assert!(arc.at(0.5, 0.0).1 < arc.at(0.0, 0.0).1);
+        // Freezing a style turns it into points on the surface
+        let mut f = WarpMesh::flat((0.0, 0.0, 100.0, 50.0));
+        f.style = Some(arc);
+        f.freeze_style();
+        assert!(f.style.is_none() && close(f.points[0], arc.at(0.0, 0.0)));
     }
 
     #[test]

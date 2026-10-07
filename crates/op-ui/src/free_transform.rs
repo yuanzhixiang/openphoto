@@ -76,16 +76,39 @@ pub fn set_mode(t: &mut FreeTransform, mode: TransformMode) {
     }
 }
 
+/// A preset style's Bend handle: the middle of its top edge (left edge
+/// in the vertical orientation), as Photoshop places it.
+fn bend_handle(mesh: &WarpMesh) -> (f32, f32) {
+    match &mesh.style {
+        Some(s) if s.vertical_orientation => mesh.at(0.0, 0.5),
+        _ => mesh.at(0.5, 0.0),
+    }
+}
+
 /// Where a press at document point `p` grabs the warp mesh: a boundary
 /// control point within reach, else the nearest surface point if the
 /// press is on the surface.
 fn warp_grab(state: &DocState, mesh: &WarpMesh, p: Pos2, ppp: f32) -> Option<WarpGrab> {
     let screen = to_screen(state, p, ppp);
+    // A preset style has only its Bend handle
+    if let Some(style) = &mesh.style {
+        let (x, y) = bend_handle(mesh);
+        return (to_screen(state, Pos2::new(x, y), ppp).distance(screen) <= GRAB)
+            .then_some(WarpGrab::Bend(style.bend));
+    }
     for (k, c) in mesh.points.iter().enumerate() {
-        if to_screen(state, Pos2::new(c.0, c.1), ppp).distance(screen) <= GRAB {
+        if mesh.shows_point(k)
+            && to_screen(state, Pos2::new(c.0, c.1), ppp).distance(screen) <= GRAB
+        {
             return Some(WarpGrab::Point(k));
         }
     }
+    surface_at(mesh, p).map(|(u, v)| WarpGrab::Surface(u, v))
+}
+
+/// The surface point (u, v) nearest document point `p`, if `p` is on the
+/// surface.
+fn surface_at(mesh: &WarpMesh, p: Pos2) -> Option<(f32, f32)> {
     // The nearest of a fine grid of surface points, if close enough
     let mut best = (f32::MAX, 0.0, 0.0);
     for j in 0..=32 {
@@ -102,7 +125,7 @@ fn warp_grab(state: &DocState, mesh: &WarpMesh, p: Pos2, ppp: f32) -> Option<War
         let (a, b) = (mesh.at(0.0, 0.0), mesh.at(1.0, 1.0));
         ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt() / 32.0
     };
-    (best.0.sqrt() <= spacing.max(1.0) * 1.5).then_some(WarpGrab::Surface(best.1, best.2))
+    (best.0.sqrt() <= spacing.max(1.0) * 1.5).then_some((best.1, best.2))
 }
 
 /// The box's corners in document pixels, clockwise from the top left.
@@ -155,8 +178,15 @@ fn inside(q: &[Pos2; 4], p: Pos2) -> bool {
     true
 }
 
-/// The handle under the screen point `p`.
+/// The handle under the screen point `p`: the reference point first
+/// (when shown), then a scale handle, inside (move) or outside (rotate).
 fn hit(state: &DocState, t: &FreeTransform, p: Pos2, ppp: f32) -> TransformHandle {
+    if t.show_reference && t.quad.is_none() && t.mode != TransformMode::Warp {
+        let (x, y) = t.reference_now();
+        if to_screen(state, Pos2::new(x, y), ppp).distance(p) <= GRAB {
+            return TransformHandle::Reference;
+        }
+    }
     for (h, hx, hy) in handles(t) {
         if to_screen(state, h, ppp).distance(p) <= GRAB {
             return TransformHandle::Scale(hx, hy);
@@ -278,6 +308,22 @@ fn drag_to(t: &mut FreeTransform, drag: TransformDrag, p: Pos2, mods: Modifiers)
         t.quad = Some(reshape(start, (hx, hy), p - drag.start, mode));
         return;
     }
+    if drag.handle == TransformHandle::Reference {
+        // Anywhere: the point of the box under the pointer
+        if let Some(back) = t.mapping().inverse() {
+            t.reference_custom = Some(back.apply((p.x, p.y)));
+        }
+        return;
+    }
+    // Where the reference point was at mouse-down: rotating, and scaling
+    // with Alt, pivot on it (Photoshop's way)
+    let pivot = {
+        let now = (t.offset, t.scale, t.angle);
+        (t.offset, t.scale, t.angle) = (drag.offset, drag.scale, drag.angle);
+        let p = t.reference_now();
+        (t.offset, t.scale, t.angle) = now;
+        Pos2::new(p.0, p.1)
+    };
     let center0 = t.center();
     let (x0, y0, x1, y1) = t.bounds;
     let (ow, oh) = ((x1 - x0) / 2.0, (y1 - y0) / 2.0);
@@ -286,19 +332,45 @@ fn drag_to(t: &mut FreeTransform, drag: TransformDrag, p: Pos2, mods: Modifiers)
     let to_world = |v: Vec2| Vec2::new(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
     let c = Pos2::new(center0.0 + drag.offset.0, center0.1 + drag.offset.1);
     match drag.handle {
+        // Handled above
+        TransformHandle::Reference => {}
         TransformHandle::Move => {
             let d = p - drag.start;
             t.offset = (drag.offset.0 + d.x, drag.offset.1 + d.y);
         }
         TransformHandle::Rotate => {
-            let a0 = (drag.start - c).angle();
-            let a1 = (p - c).angle();
+            let a0 = (drag.start - pivot).angle();
+            let a1 = (p - pivot).angle();
             let mut angle = drag.angle + (a1 - a0);
             if mods.shift {
                 let step = 15f32.to_radians();
                 angle = (angle / step).round() * step;
             }
             t.angle = angle;
+            t.offset = drag.offset;
+            keep_reference(t, pivot);
+        }
+        TransformHandle::Scale(hx, hy) if mods.alt => {
+            // Around the reference point: the handle's distance to it
+            // scales along the box's axes
+            let (cw, ch) = (ow * drag.scale.0, oh * drag.scale.1);
+            let handle0 = c + to_world(Vec2::new(hx as f32 * cw, hy as f32 * ch));
+            let a = to_local(handle0 - pivot);
+            let b = to_local(p - pivot);
+            let ratio = |n: f32, d: f32| if d.abs() < 1e-3 { 1.0 } else { n / d };
+            let (mut fx, mut fy) = (
+                if hx != 0 { ratio(b.x, a.x) } else { 1.0 },
+                if hy != 0 { ratio(b.y, a.y) } else { 1.0 },
+            );
+            if hx != 0 && hy != 0 && !mods.shift {
+                let f = b.dot(a) / a.length_sq().max(1e-6);
+                (fx, fy) = (f, f);
+            }
+            let min = 1.0 / ow.max(oh).max(1.0);
+            let clamp = |s: f32| if s.abs() < min { min.copysign(s) } else { s };
+            t.scale = (clamp(drag.scale.0 * fx), clamp(drag.scale.1 * fy));
+            t.offset = drag.offset;
+            keep_reference(t, pivot);
         }
         TransformHandle::Scale(hx, hy) => {
             let (hx, hy) = (hx as f32, hy as f32);
@@ -356,6 +428,13 @@ fn drag_to(t: &mut FreeTransform, drag: TransformDrag, p: Pos2, mods: Modifiers)
     }
 }
 
+/// Moves the box so its reference point is at `pivot` again.
+fn keep_reference(t: &mut FreeTransform, pivot: Pos2) {
+    let now = t.reference_now();
+    t.offset.0 += pivot.x - now.0;
+    t.offset.1 += pivot.y - now.1;
+}
+
 /// Handles input on the canvas while transforming. Returns how the session
 /// ended, if it did.
 pub fn input(
@@ -386,13 +465,35 @@ pub fn input(
         return commit(state);
     }
 
+    // Warp's Split: a click on the mesh adds a column, a row or both there
+    if t.mode == TransformMode::Warp
+        && let Some(kind) = t.warp_split
+        && response.clicked()
+        && let Some(p) = response.interact_pointer_pos()
+    {
+        let at = to_doc(state, p, ppp);
+        let t = state.free_transform.as_mut()?;
+        if let Some(mesh) = t.warp.as_mut()
+            && let Some((u, v)) = surface_at(mesh, at)
+        {
+            if kind != crate::state::WarpSplit::Horizontal {
+                mesh.split_u(u);
+            }
+            if kind != crate::state::WarpSplit::Vertical {
+                mesh.split_v(v);
+            }
+        }
+        t.warp_split = None;
+        preview(state, background);
+        return None;
+    }
     if response.drag_started_by(egui::PointerButton::Primary)
         && let Some(p) = ui.input(|i| i.pointer.press_origin())
     {
         let handle = hit(state, t, p, ppp);
         let start = to_doc(state, p, ppp);
         let quad = t.quad;
-        let mesh = t.warp;
+        let mesh = t.warp.clone();
         let warp_grab = match (&t.warp, t.mode) {
             (Some(m), TransformMode::Warp) => warp_grab(state, m, start, ppp),
             _ => None,
@@ -413,7 +514,7 @@ pub fn input(
         .input(|i| i.pointer.interact_pos())
         .map(|p| to_doc(state, p, ppp));
     let t = state.free_transform.as_mut()?;
-    if let Some(drag) = t.drag {
+    if let Some(drag) = t.drag.clone() {
         if let Some(p) = pointer {
             if t.mode == TransformMode::Warp {
                 // Warp: a control point or the surface follows the pointer
@@ -425,6 +526,19 @@ pub fn input(
                             mesh.points[k].1 += d.1;
                         }
                         WarpGrab::Surface(u, v) => mesh.pull((u, v), d),
+                        // Up (left, sideways) bends more, across the box's
+                        // height (width)
+                        WarpGrab::Bend(start) => {
+                            let (x0, y0, x1, y1) = t.bounds;
+                            if let Some(style) = mesh.style.as_mut() {
+                                let k = if style.vertical_orientation {
+                                    -d.0 / (x1 - x0).max(1.0)
+                                } else {
+                                    -d.1 / (y1 - y0).max(1.0)
+                                };
+                                style.bend = (start + 2.0 * k).clamp(-1.0, 1.0);
+                            }
+                        }
                     }
                     t.warp = Some(mesh);
                 }
@@ -447,8 +561,8 @@ pub fn preview(state: &mut DocState, background: [u8; 3]) {
     };
     let m = t.mapping();
     let how = t.interpolation;
-    if let Some(mesh) = t.warp {
-        if Some(mesh) == t.applied_warp && how == t.applied_interpolation {
+    if let Some(mesh) = t.warp.clone() {
+        if Some(&mesh) == t.applied_warp.as_ref() && how == t.applied_interpolation {
             return;
         }
         let bounds = t.bounds;
@@ -476,13 +590,24 @@ pub fn preview(state: &mut DocState, background: [u8; 3]) {
     }
 }
 
+/// Whether the warp moves anything: its surface differs from the box.
+fn bends(mesh: &WarpMesh, (x0, y0, x1, y1): (f32, f32, f32, f32)) -> bool {
+    (0..=8).any(|j| {
+        (0..=8).any(|i| {
+            let (u, v) = (i as f32 / 8.0, j as f32 / 8.0);
+            let (x, y) = mesh.at(u, v);
+            (x - (x0 + (x1 - x0) * u)).abs() > 0.01 || (y - (y0 + (y1 - y0) * v)).abs() > 0.01
+        })
+    })
+}
+
 /// Ends the session keeping the result ("Free Transform" in the history).
 pub fn commit(state: &mut DocState) -> Option<Outcome> {
     let t = state.free_transform.take()?;
-    if let Some(mesh) = t.applied_warp {
+    if let Some(mesh) = &t.applied_warp {
         // Photoshop records a warp as "Warp" (it isn't repeated by
         // Transform Again here); an untouched mesh changes nothing
-        if mesh != WarpMesh::flat(t.bounds) {
+        if bends(mesh, t.bounds) {
             state.record("Warp");
         } else {
             state.doc.restore(&t.before);
@@ -592,10 +717,14 @@ pub fn cursor(state: &DocState, p: Pos2, ppp: f32) -> CursorIcon {
     let Some(t) = &state.free_transform else {
         return CursorIcon::Default;
     };
-    let handle = t.drag.map_or_else(|| hit(state, t, p, ppp), |d| d.handle);
+    let handle = t
+        .drag
+        .as_ref()
+        .map_or_else(|| hit(state, t, p, ppp), |d| d.handle);
     match handle {
         TransformHandle::Move => CursorIcon::Move,
         TransformHandle::Rotate => CursorIcon::Alias,
+        TransformHandle::Reference => CursorIcon::Crosshair,
         TransformHandle::Scale(hx, hy) => {
             // The handle's direction on screen, rotated with the box
             let dir = Vec2::new(hx as f32, hy as f32).normalized();
@@ -675,37 +804,59 @@ fn draw_box(painter: &egui::Painter, quad: [Pos2; 4], handles: [Pos2; 8]) {
     }
 }
 
-/// Warp's mesh as Photoshop 2026 draws it: blue outline and thirds lines
-/// on the surface, the boundary's control points as blue dots (bigger at
-/// the corners).
+/// Warp's mesh as Photoshop 2026 draws it: blue outline and the patches'
+/// lines (thirds of a single patch) on the surface, the control points on
+/// them as blue dots (bigger at the anchors); a preset style shows its
+/// surface's thirds and only its Bend handle, a small square.
 fn draw_warp(painter: &egui::Painter, state: &DocState, mesh: &WarpMesh, ppp: f32) {
     let blue = Color32::from_rgb(0x5b, 0x8b, 0xe6);
     let at = |u: f32, v: f32| {
         let (x, y) = mesh.at(u, v);
         to_screen(state, Pos2::new(x, y), ppp)
     };
-    let curve = |f: &dyn Fn(f32) -> Pos2| (0..=24).map(|k| f(k as f32 / 24.0)).collect::<Vec<_>>();
-    for k in 0..=3 {
-        let t = k as f32 / 3.0;
-        let width = if k == 0 || k == 3 { pt(1.5) } else { pt(0.75) };
-        painter.add(egui::Shape::line(
-            curve(&|s| at(t, s)),
-            Stroke::new(width, blue),
-        ));
-        painter.add(egui::Shape::line(
-            curve(&|s| at(s, t)),
-            Stroke::new(width, blue),
-        ));
+    let curve = |f: &dyn Fn(f32) -> Pos2| (0..=48).map(|k| f(k as f32 / 48.0)).collect::<Vec<_>>();
+    // The lines across: thirds for one patch (or a style), else the
+    // patches' edges
+    let single = mesh.style.is_some() || (mesh.cols == 1 && mesh.rows == 1);
+    let lines = |knots: &[f32]| -> Vec<f32> {
+        if single {
+            vec![0.0, 1.0 / 3.0, 2.0 / 3.0, 1.0]
+        } else {
+            knots.to_vec()
+        }
+    };
+    for (ts, across) in [(lines(&mesh.us), true), (lines(&mesh.vs), false)] {
+        for &t in &ts {
+            let edge = t == 0.0 || t == 1.0;
+            let width = if edge { pt(1.5) } else { pt(0.75) };
+            let points = if across {
+                curve(&|s| at(t, s))
+            } else {
+                curve(&|s| at(s, t))
+            };
+            painter.add(egui::Shape::line(points, Stroke::new(width, blue)));
+        }
     }
+    if mesh.style.is_some() {
+        let (x, y) = bend_handle(mesh);
+        let c = to_screen(state, Pos2::new(x, y), ppp);
+        painter.rect(
+            Rect::from_center_size(c, Vec2::splat(pt(7.0))),
+            0,
+            Color32::WHITE,
+            Stroke::new(pt(1.0), blue),
+            egui::StrokeKind::Inside,
+        );
+        return;
+    }
+    let stride = mesh.stride();
     for (k, p) in mesh.points.iter().enumerate() {
-        let (i, j) = (k % 4, k / 4);
-        let boundary = i == 0 || i == 3 || j == 0 || j == 3;
-        if !boundary {
+        if !mesh.shows_point(k) {
             continue;
         }
-        let corner = (i == 0 || i == 3) && (j == 0 || j == 3);
+        let anchor = (k % stride).is_multiple_of(3) && (k / stride).is_multiple_of(3);
         let c = to_screen(state, Pos2::new(p.0, p.1), ppp);
-        painter.circle_filled(c, if corner { pt(5.0) } else { pt(3.5) }, blue);
+        painter.circle_filled(c, if anchor { pt(5.0) } else { pt(3.5) }, blue);
     }
 }
 
@@ -761,7 +912,7 @@ mod tests {
             scale: t.scale,
             angle: t.angle,
             quad: t.quad,
-            mesh: t.warp,
+            mesh: t.warp.clone(),
             warp_grab: None,
         }
     }
@@ -780,6 +931,39 @@ mod tests {
         let d = drag(&t, TransformHandle::Scale(1, 1), Pos2::new(4.0, 2.0));
         drag_to(&mut t, d, Pos2::new(8.0, 2.0), Modifiers::SHIFT);
         assert!((t.scale.0 - 2.0).abs() < 1e-4 && (t.scale.1 - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn rotating_and_alt_scaling_pivot_on_the_reference_point() {
+        // Reference at the top left: a quarter turn keeps that corner
+        let mut t = session();
+        t.reference = (-1, -1);
+        let d = drag(&t, TransformHandle::Rotate, Pos2::new(6.0, 0.0));
+        drag_to(&mut t, d, Pos2::new(0.0, 6.0), Modifiers::NONE);
+        assert!((t.angle - std::f32::consts::FRAC_PI_2).abs() < 1e-4);
+        let tl = t.affine().apply((0.0, 0.0));
+        assert!(tl.0.abs() < 1e-3 && tl.1.abs() < 1e-3, "{tl:?}");
+        // Alt-dragging the bottom-right corner scales about it too
+        let mut t = session();
+        t.reference = (-1, -1);
+        let d = drag(&t, TransformHandle::Scale(1, 1), Pos2::new(4.0, 2.0));
+        drag_to(&mut t, d, Pos2::new(8.0, 4.0), Modifiers::ALT);
+        assert!((t.scale.0 - 2.0).abs() < 1e-4 && (t.scale.1 - 2.0).abs() < 1e-4);
+        let tl = t.affine().apply((0.0, 0.0));
+        assert!(tl.0.abs() < 1e-3 && tl.1.abs() < 1e-3, "{tl:?}");
+        // The reference point dragged elsewhere: rotating pivots there
+        let mut t = session();
+        t.show_reference = true;
+        let d = drag(&t, TransformHandle::Reference, Pos2::new(2.0, 1.0));
+        drag_to(&mut t, d, Pos2::new(4.0, 2.0), Modifiers::NONE);
+        assert_eq!(t.reference_custom, Some((4.0, 2.0)));
+        let d = drag(&t, TransformHandle::Rotate, Pos2::new(8.0, 2.0));
+        drag_to(&mut t, d, Pos2::new(4.0, 6.0), Modifiers::NONE);
+        let br = t.affine().apply((4.0, 2.0));
+        assert!(
+            (br.0 - 4.0).abs() < 1e-3 && (br.1 - 2.0).abs() < 1e-3,
+            "{br:?}"
+        );
     }
 
     #[test]

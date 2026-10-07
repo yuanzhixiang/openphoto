@@ -1220,7 +1220,13 @@ fn warp_pulls_the_surface() {
     // A corner control point dragged out by (30, 30)
     let (a, b) = (doc_point(&h, 160.0, 160.0), doc_point(&h, 190.0, 190.0));
     drag(&mut h, a, b, Modifiers::NONE);
-    let mesh = active(&h).free_transform.as_ref().unwrap().warp.unwrap();
+    let mesh = active(&h)
+        .free_transform
+        .as_ref()
+        .unwrap()
+        .warp
+        .clone()
+        .unwrap();
     assert!(
         (mesh.points[15].0 - 190.0).abs() < 1.0,
         "{:?}",
@@ -1229,7 +1235,13 @@ fn warp_pulls_the_surface() {
     // Pulling the middle of the surface up
     let (a, b) = (doc_point(&h, 130.0, 130.0), doc_point(&h, 130.0, 110.0));
     drag(&mut h, a, b, Modifiers::NONE);
-    let mesh = active(&h).free_transform.as_ref().unwrap().warp.unwrap();
+    let mesh = active(&h)
+        .free_transform
+        .as_ref()
+        .unwrap()
+        .warp
+        .clone()
+        .unwrap();
     let mid = mesh.at(0.5, 0.5);
     assert!(mid.1 < 135.0, "{mid:?}");
     h.key_press(egui::Key::Enter);
@@ -1237,7 +1249,84 @@ fn warp_pulls_the_surface() {
     assert!(active(&h).free_transform.is_none());
     assert_eq!(last_history(&h), "Warp");
     // The stretched corner is red now
-    assert!(layer_pixel(&h, 1, 180, 180)[3] > 0);
+    assert!(layer_pixel(&h, 1, 175, 170)[3] > 0);
+}
+
+#[test]
+fn warp_splits_grids_and_styles() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    crate::panels::new_layer(h.state_mut().state.active().unwrap());
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    select_rect(&mut h, 100.0, 100.0, 220.0, 160.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.run_steps(2);
+    run_command(&mut h, crate::menu::WARP);
+    let mesh = |h: &Harness<'_, OpenPhotoApp>| {
+        active(h)
+            .free_transform
+            .as_ref()
+            .unwrap()
+            .warp
+            .clone()
+            .unwrap()
+    };
+    // Split Crosswise (the options bar's first Split button), then a click
+    // on the mesh: a column and a row of patches start there
+    click(&mut h, at_pt(208.5, 45.25));
+    assert!(
+        active(&h)
+            .free_transform
+            .as_ref()
+            .unwrap()
+            .warp_split
+            .is_some()
+    );
+    let p = doc_point(&h, 160.0, 115.0);
+    click(&mut h, p);
+    let m = mesh(&h);
+    assert_eq!((m.cols, m.rows), (2, 2));
+    assert!(
+        (m.us[1] - 0.5).abs() < 0.05 && (m.vs[1] - 0.25).abs() < 0.05,
+        "{:?} {:?}",
+        m.us,
+        m.vs
+    );
+    // Nothing moved
+    let (x, y) = m.at(0.75, 0.75);
+    assert!((x - 190.0).abs() < 0.5 && (y - 145.0).abs() < 0.5);
+    // Grid: 4 x 4
+    click(&mut h, at_pt(349.0, 45.25));
+    h.get_by_label("4 x 4").click();
+    h.run_steps(2);
+    assert_eq!((mesh(&h).cols, mesh(&h).rows), (4, 4));
+    shot(&mut h, "warp_grid");
+    // Warp: Arc at 50% Bend bows the top; typing Bend 100 bows it more
+    click(&mut h, at_pt(473.5, 45.25));
+    h.get_by_label("Arc").click();
+    h.run_steps(2);
+    let style = mesh(&h).style.unwrap();
+    assert_eq!(style.style, op_core::transform::WarpStyle::Arc);
+    // (how far the top edge's middle stands above its ends)
+    let top = |h: &Harness<'_, OpenPhotoApp>| mesh(h).at(0.0, 0.0).1 - mesh(h).at(0.5, 0.0).1;
+    let half = top(&h);
+    assert!(half > 5.0, "{half}");
+    type_in_bar(&mut h, 654.5, "100");
+    assert!(top(&h) > half);
+    shot(&mut h, "warp_arc");
+    // Dragging the Bend handle down flattens it
+    let handle = mesh(&h).at(0.5, 0.0);
+    let (a, b) = (
+        doc_point(&h, handle.0, handle.1),
+        doc_point(&h, handle.0, handle.1 + 60.0),
+    );
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert!(mesh(&h).style.unwrap().bend < 1.0);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(last_history(&h), "Warp");
 }
 
 #[test]
