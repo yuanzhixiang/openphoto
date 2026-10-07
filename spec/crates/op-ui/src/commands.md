@@ -146,6 +146,7 @@ Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's men
 | PrintSize | View › Print Size | None |
 | ActualSize | View › Actual Size | None |
 | Fade | Edit › Fade <edit>... (opens the Fade dialog) | ⇧⌘F |
+| OpenRecent(i), ClearRecent | File › Open Recent's items and Clear Recent File List (see `recent.md`) | — |
 | ToggleExtras | View › Extras | ⌘H |
 | ToggleGrid | View › Show › Grid | ⌘' |
 | ToggleGuides | View › Show › Guides | ⌘; |

@@ -23,6 +23,7 @@ mod options_kit;
 mod options_tools;
 mod panels;
 mod ps_icons;
+mod recent;
 mod rulers;
 mod selection_brush;
 mod snap;
@@ -61,6 +62,19 @@ impl OpenPhotoApp {
     pub fn new(cc: &eframe::CreationContext<'_>, files: Vec<PathBuf>) -> Self {
         let mut app = Self::new_headless(cc, files);
         app.state.clipboard = clipboard::Clipboard::new(true);
+        if let Some(store) = recent::RecentFiles::default_store() {
+            app.state.recent = recent::RecentFiles::load(store);
+            // The files opened from the command line, before the list was read
+            let opened: Vec<PathBuf> = app
+                .state
+                .doc_order
+                .iter()
+                .filter_map(|id| app.state.docs.get(id)?.path.clone())
+                .collect();
+            for path in opened {
+                app.state.recent.add(&path);
+            }
+        }
         #[cfg(target_os = "macos")]
         {
             let mut menu = menu::NativeMenu::install(&cc.egui_ctx);

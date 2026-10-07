@@ -225,6 +225,10 @@ pub enum Command {
     PrintSize,
     /// View > Actual Size.
     ActualSize,
+    /// File > Open Recent's items (by place in the list) and Clear Recent
+    /// File List.
+    OpenRecent(u8),
+    ClearRecent,
     /// Edit > Fade (opens the dialog for the last fadeable edit).
     Fade,
     /// View > Rulers.
@@ -474,7 +478,9 @@ impl Command {
             | Self::SnapToNone
             | Self::ScreenMode(_)
             | Self::StatusInfo(_)
-            | Self::RulerUnits(_) => return None,
+            | Self::RulerUnits(_)
+            | Self::OpenRecent(_)
+            | Self::ClearRecent => return None,
             Self::ToggleRulers => cmd(Key::R),
             Self::ToggleExtras => cmd(Key::H),
             Self::ToggleGuides => cmd(Key::Semicolon),
@@ -934,6 +940,8 @@ impl Command {
             | Self::NewGuide
             | Self::QuickMask => doc.is_some(),
             Self::Fade => doc.is_some_and(|d| d.can_fade()),
+            Self::OpenRecent(i) => (i as usize) < app.recent.files().len(),
+            Self::ClearRecent => !app.recent.files().is_empty(),
         }
     }
 }
@@ -1491,6 +1499,27 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::LockGuides => app.view.lock_guides = !app.view.lock_guides,
         Command::ToggleSnap => app.view.snap = !app.view.snap,
         Command::ScreenMode(mode) => app.set_screen_mode(mode),
+        Command::OpenRecent(i) => {
+            if let Some(path) = app.recent.files().get(i as usize).cloned() {
+                // Already open: just bring it forward
+                let open = app
+                    .docs
+                    .iter()
+                    .find(|(_, d)| d.path.as_ref().is_some_and(|p| same_file(p, &path)))
+                    .map(|(&id, _)| id);
+                match open {
+                    Some(id) => app.active_doc = Some(id),
+                    None if !path.exists() => {
+                        app.alert = Some(format!(
+                            "Could not open “{}” because the file was not found.",
+                            path.display()
+                        ));
+                    }
+                    None => crate::actions::open_paths(app, vec![path]),
+                }
+            }
+        }
+        Command::ClearRecent => app.recent.clear(),
         Command::Fade => {
             if let Some(source) = app.active().and_then(|d| d.fade_source()) {
                 app.fade_dialog = Some(crate::state::FadeState {
@@ -1839,5 +1868,13 @@ fn with_cloud_colors(filter: op_core::filter::Filter, app: &AppState) -> op_core
             seed,
         },
         other => other,
+    }
+}
+
+/// Whether two paths name the same file.
+fn same_file(a: &std::path::Path, b: &std::path::Path) -> bool {
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a == b,
     }
 }

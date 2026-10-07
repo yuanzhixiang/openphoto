@@ -6247,3 +6247,59 @@ fn crystallize_pointillize_and_diffuse_apply() {
         assert!(changed, "{name}");
     }
 }
+
+#[test]
+fn open_recent_reopens_files() {
+    use crate::commands::Command;
+    let dir = std::env::temp_dir().join(format!("openphoto-open-recent-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let (a, b) = (dir.join("a.png"), dir.join("b.png"));
+    for p in [&a, &b] {
+        let doc = op_core::Document::from_rgba8("x", 8, 8, &[200; 8 * 8 * 4]);
+        op_io::save(&doc, p).unwrap();
+    }
+    let mut h = harness(Vec::new());
+    crate::actions::open_paths(&mut h.state_mut().state, vec![a.clone()]);
+    crate::actions::open_paths(&mut h.state_mut().state, vec![b.clone()]);
+    h.run_steps(2);
+    let names = |h: &Harness<'_, OpenPhotoApp>| -> Vec<String> {
+        h.state()
+            .state
+            .recent
+            .files()
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect()
+    };
+    // Newest first
+    assert_eq!(names(&h), ["b.png", "a.png"]);
+    // Opening one that is already open brings it forward instead
+    let docs = h.state().state.docs.len();
+    run_command(&mut h, Command::OpenRecent(1));
+    assert_eq!(h.state().state.docs.len(), docs);
+    assert_eq!(active(&h).doc.title, "a.png");
+    // Closed, it opens again
+    crate::actions::close_all(&mut h.state_mut().state);
+    h.run_steps(2);
+    run_command(&mut h, Command::OpenRecent(1));
+    assert_eq!(active(&h).doc.title, "a.png");
+    assert_eq!(names(&h), ["a.png", "b.png"]);
+    // Gone from disk: Photoshop's not-found alert
+    std::fs::remove_file(&b).unwrap();
+    run_command(&mut h, Command::OpenRecent(1));
+    assert!(
+        h.state()
+            .state
+            .alert
+            .as_deref()
+            .unwrap()
+            .contains("was not found")
+    );
+    h.state_mut().state.alert = None;
+    // Items past the list are disabled; Clear empties it
+    assert!(!Command::OpenRecent(5).enabled(&h.state().state));
+    run_command(&mut h, Command::ClearRecent);
+    assert!(names(&h).is_empty());
+    assert!(!Command::ClearRecent.enabled(&h.state().state));
+    let _ = std::fs::remove_dir_all(dir);
+}

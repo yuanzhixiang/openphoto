@@ -17,6 +17,8 @@ Defines `OpenPhotoApp` (implements `eframe::App`), which:
 5. Connects to the system clipboard (`clipboard::Clipboard::new(true)`). `new_headless` skips this step, so tests do not change the user's clipboard.
 6. If there are command-line files, opens them one by one; otherwise creates a new 1920×1080 "Untitled-1" document with a white background.
 
+- The real app (`new`, not the headless tests) also loads File › Open Recent's list from its store and adds the files it was started with (see `recent.md`).
+
 ## Per-frame flow
 
 1. Files dropped into the window are opened one by one.

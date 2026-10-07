@@ -10,6 +10,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `tool`: the current tool, defaulting to the Rectangular Marquee (matching the default of a fresh Photoshop install).
 - `tool_slots`: the tool currently shown in each toolbar slot (the most recently used one in that group), initially the first in each group. `select_tool(t)` sets both the current tool and the tool shown in its slot.
 - `foreground` / `background`: the foreground color defaults to `#14a5dc`, the background color to white.
+- `recent` (`recent::RecentFiles`): File › Open Recent's list.
 - `ruler_units` (`rulers::RulerUnit`) and `ruler_menu` (a ruler was right-clicked; its menu opens after the frame).
 - `status_info` (what the status bar shows, `status_info.md`), `status_menu` (its arrow was clicked; the menu opens after the frame), `last_timing` (seconds the last document-changing command took, for Timing).
 - `screen_mode` (`ScreenMode`: Standard, FullWithMenus, Full; `cycle` gives the next or previous for F / Shift+F), `hide_tools`, `hide_panels` (Tab, Shift+Tab), `full_screen_prompt` / `skip_full_screen_prompt` (Full Screen Mode's warning, `FULL_SCREEN_WARNING`, Photoshop's `$$$/FullScreenModeWarningWithShortcut` text with F). `set_screen_mode` asks first when entering Full Screen Mode; `enter_screen_mode` switches without asking: entering Full Screen Mode hides the tools and panels, leaving it shows them; `toggle_hidden` is Tab's rule (see `actions.md`).

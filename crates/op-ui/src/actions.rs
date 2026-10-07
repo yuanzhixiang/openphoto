@@ -14,6 +14,7 @@ pub fn open_paths(app: &mut AppState, paths: Vec<PathBuf>) {
             Ok(doc) => {
                 let id = doc.id;
                 app.add_document(doc, "Open");
+                app.recent.add(&path);
                 if let Some(state) = app.docs.get_mut(&id) {
                     state.path = Some(path);
                 }
@@ -220,6 +221,7 @@ pub fn save(app: &mut AppState, id: DocId) -> bool {
     match op_io::save(&state.doc, &path) {
         Ok(()) => {
             state.mark_saved();
+            app.recent.add(&path);
             true
         }
         Err(e) => {
@@ -260,6 +262,10 @@ pub fn save_to(app: &mut AppState, id: DocId, path: PathBuf, copy: bool) -> bool
         app.alert = Some(format!("Could not save “{}”: {e}", path.display()));
         return false;
     }
+    app.recent.add(&path);
+    let Some(state) = app.docs.get_mut(&id) else {
+        return true;
+    };
     let previous = state.path.replace(path.clone());
     if copy || !saves_in_place(state) {
         state.path = previous;

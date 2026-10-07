@@ -1263,6 +1263,8 @@ pub struct AppState {
     /// The rulers' unit, and a right-click on a ruler asking for its menu.
     pub ruler_units: crate::rulers::RulerUnit,
     pub ruler_menu: bool,
+    /// File › Open Recent's list.
+    pub recent: crate::recent::RecentFiles,
     /// What the status bar shows beside the zoom box.
     pub status_info: crate::status_info::StatusInfo,
     /// The status bar's arrow was clicked: its menu opens after the frame.
@@ -1419,6 +1421,7 @@ impl Default for AppState {
             new_layer_dialog: None,
             ruler_units: Default::default(),
             ruler_menu: false,
+            recent: Default::default(),
             status_info: Default::default(),
             status_menu: false,
             last_timing: 0.0,

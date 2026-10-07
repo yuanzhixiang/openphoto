@@ -9,7 +9,7 @@ Opening, creating, saving, reverting, exporting, and closing documents (includin
 - After a successful open, the document's file path is recorded (`DocState::path`).
 
 - `open_dialog`: the system file dialog, multi-select, filtered to the formats listed in `op_io::OPEN_EXTENSIONS` (PNG, JPEG, WebP, TIFF, BMP, GIF).
-- `open_paths`: opens each in turn; each success is added as a new document and becomes the current document, with "Open" as the first history entry. On failure, a log entry is written and `alert` shows "Could not open “path”: reason".
+- `open_paths`: opens each in turn; each success is added as a new document and becomes the current document, with "Open" as the first history entry, and goes to the top of File › Open Recent (`recent.md`; saving does too). On failure, a log entry is written and `alert` shows "Could not open “path”: reason".
 - When an ordinary bitmap is opened, the whole image is one layer, matching Photoshop: a fully opaque image is a locked "Background" layer, and an image with transparency is a normal "Layer 0" layer.
 
 ## New

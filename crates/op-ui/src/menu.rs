@@ -173,6 +173,27 @@ const ALL_COMMANDS: &[Command] = &[
     Command::PrintSize,
     Command::ActualSize,
     Command::Fade,
+    Command::ClearRecent,
+    Command::OpenRecent(0),
+    Command::OpenRecent(1),
+    Command::OpenRecent(2),
+    Command::OpenRecent(3),
+    Command::OpenRecent(4),
+    Command::OpenRecent(5),
+    Command::OpenRecent(6),
+    Command::OpenRecent(7),
+    Command::OpenRecent(8),
+    Command::OpenRecent(9),
+    Command::OpenRecent(10),
+    Command::OpenRecent(11),
+    Command::OpenRecent(12),
+    Command::OpenRecent(13),
+    Command::OpenRecent(14),
+    Command::OpenRecent(15),
+    Command::OpenRecent(16),
+    Command::OpenRecent(17),
+    Command::OpenRecent(18),
+    Command::OpenRecent(19),
     Command::ToggleRulers,
     Command::ToggleExtras,
     Command::ToggleGuides,
@@ -280,6 +301,10 @@ pub struct NativeMenu {
     applied: Vec<(bool, Option<String>)>,
     /// The window's NSView, for menus that pop up in it.
     view: Option<usize>,
+    /// File › Open Recent, rebuilt when the list changes (the revision it
+    /// shows).
+    open_recent: Submenu,
+    recent_shown: u64,
 }
 
 impl NativeMenu {
@@ -347,6 +372,7 @@ impl NativeMenu {
             ],
         );
 
+        let open_recent = Submenu::new("Open Recent", true);
         let file = Submenu::with_items(
             "File",
             true,
@@ -355,7 +381,7 @@ impl NativeMenu {
                 &item("Open...", Command::Open),
                 &todo("Browse in Bridge...", Some("CmdOrCtrl+Alt+O")),
                 &todo("Open as Smart Object...", None),
-                &todo_sub("Open Recent"),
+                &open_recent,
                 &sep(),
                 &item("Close", Command::Close),
                 &item("Close All", Command::CloseAll),
@@ -1149,7 +1175,36 @@ impl NativeMenu {
             events,
             applied,
             view: None,
+            open_recent,
+            recent_shown: 0,
         }
+    }
+
+    /// Rebuilds File › Open Recent from the list: the files' names newest
+    /// first, a separator and Clear Recent File List (disabled when empty),
+    /// as in Photoshop.
+    fn sync_open_recent(&mut self, app: &AppState) {
+        if self.recent_shown == app.recent.revision() {
+            return;
+        }
+        self.recent_shown = app.recent.revision();
+        while self.open_recent.remove_at(0).is_some() {}
+        for (i, path) in app.recent.files().iter().enumerate() {
+            let name = path.file_name().map_or_else(
+                || path.display().to_string(),
+                |n| n.to_string_lossy().into_owned(),
+            );
+            let item = MenuItem::with_id(id(Command::OpenRecent(i as u8)), name, true, None);
+            let _ = self.open_recent.append(&item);
+        }
+        let _ = self.open_recent.append(&PredefinedMenuItem::separator());
+        let clear = MenuItem::with_id(
+            id(Command::ClearRecent),
+            "Clear Recent File List",
+            !app.recent.files().is_empty(),
+            None,
+        );
+        let _ = self.open_recent.append(&clear);
     }
 
     /// The window's NSView (from its raw window handle), where pop-up menus
@@ -1207,6 +1262,7 @@ impl NativeMenu {
 
     /// Syncs enabled states and dynamic labels ("Undo Canvas Size") with the app.
     pub fn update(&mut self, app: &AppState) {
+        self.sync_open_recent(app);
         for (command, item) in &self.checks {
             let enabled = command.enabled(app);
             if item.is_enabled() != enabled {
