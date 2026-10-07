@@ -6,7 +6,7 @@ Lets AI agents edit images through MCP (Model Context Protocol). `op-mcp` is a s
 
 All edits call the same `op-core` / `op-io` functions the application itself uses (adjustments, filters, layers, selection, canvas, fill, history) rather than reimplementing them, so the results match operating in OpenPhoto.
 
-Startup: `cargo run -p op-mcp`. For a client configuration example, see the "MCP server" section of the repository's `README.md`.
+Startup: the macOS release ships the binary inside the app as `OpenPhoto.app/Contents/MacOS/op-mcp` (see `spec/scripts/package-macos.md`), so MCP clients run it from the installed app with no Rust toolchain; from a source checkout, `cargo run -p op-mcp`. For client configuration examples, see the "MCP server" section of the repository's `README.md`.
 
 ## Public interface: only two MCP tools
 

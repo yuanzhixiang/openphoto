@@ -125,7 +125,28 @@ OpenPhoto 是一个 Cargo workspace。文档模型与界面完全分离，所有
 | [`op-color`](crates/op-color) | 颜色模型与转换 |
 | [`op-tools`](crates/op-tools) | 工具定义与快捷键 |
 | [`op-ui`](crates/op-ui) | egui 界面：菜单、选项栏、工具栏、面板、对话框与工具交互 |
+| [`op-mcp`](crates/op-mcp) | MCP 服务：通过关键词搜索调用全部编辑操作，走 stdio |
 | [`app`](app) | 可执行程序 |
+
+## MCP 服务
+
+AI agent 可以通过 [`op-mcp`](crates/op-mcp) 编辑图像。它是一个通过 stdio 收发 JSON-RPC 2.0 的 MCP 服务，调用的是与界面相同的 `op-core` / `op-io` 函数，所以结果与在应用里操作完全一致。
+
+MCP 服务随应用一起安装：把 `OpenPhoto.app` 放进「应用程序」后，让 MCP 客户端运行 `/Applications/OpenPhoto.app/Contents/MacOS/op-mcp` 即可。以 Claude Code 为例：
+
+```bash
+claude mcp add openphoto /Applications/OpenPhoto.app/Contents/MacOS/op-mcp
+```
+
+其它客户端（Claude 桌面版、Cursor 等）在配置里填同一个路径：
+
+```json
+{ "mcpServers": { "openphoto": { "command": "/Applications/OpenPhoto.app/Contents/MacOS/op-mcp" } } }
+```
+
+从源码运行时改用 `cargo run --quiet -p op-mcp`。
+
+它只暴露两个工具：`search_tools` 按关键词搜索约 100 种操作（调整、滤镜、图层、选区、画布、绘画、历史记录），返回名称与完整的参数定义；`call_tool` 按名称执行其中一个。用法是先搜后调：`search_tools` 传 `{"query": "gaussian blur"}` 得到 `filter_gaussian_blur`，再用 `call_tool` 传 `{"name": "filter_gaussian_blur", "arguments": {"radius": 2.0}}` 执行。文档在两次调用之间保留在服务进程里：先 `open_image` 或 `new_document`，编辑后用 `export_composite` 或 `save_image` 保存（`.psd` 保留图层）。
 
 ## 测试
 

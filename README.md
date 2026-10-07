@@ -132,9 +132,19 @@ OpenPhoto is a Cargo workspace. The document model knows nothing about the inter
 
 Agents can edit images through [`op-mcp`](crates/op-mcp), an MCP server speaking JSON-RPC 2.0 over stdio. It calls the same `op-core` / `op-io` functions as the interface, so results match the application exactly.
 
+The server ships inside the app: once `OpenPhoto.app` is in Applications, point your MCP client at `/Applications/OpenPhoto.app/Contents/MacOS/op-mcp`. With Claude Code:
+
 ```bash
-cargo run -p op-mcp
+claude mcp add openphoto /Applications/OpenPhoto.app/Contents/MacOS/op-mcp
 ```
+
+Other clients (Claude Desktop, Cursor and the like) take the same path in their configuration:
+
+```json
+{ "mcpServers": { "openphoto": { "command": "/Applications/OpenPhoto.app/Contents/MacOS/op-mcp" } } }
+```
+
+From a source checkout, run it with `cargo run --quiet -p op-mcp` instead.
 
 Instead of exposing every operation as its own tool, the server exposes exactly two:
 
@@ -144,10 +154,6 @@ Instead of exposing every operation as its own tool, the server exposes exactly 
 | `call_tool` | Run one operation by name with arguments |
 
 The workflow is discover-then-run: `search_tools` with `{"query": "gaussian blur"}` returns `filter_gaussian_blur` with its schema, and `call_tool` with `{"name": "filter_gaussian_blur", "arguments": {"radius": 2.0}}` applies it. Documents stay open in the server between calls: `open_image` or `new_document` first, then edit, then `export_composite` or `save_image` (`.psd` keeps the layers). `cargo test -p op-mcp` covers search scoring and an edit round-trip through the protocol.
-
-```json
-{ "mcpServers": { "openphoto": { "command": "cargo", "args": ["run", "--quiet", "-p", "op-mcp"] } } }
-```
 
 ## Testing
 

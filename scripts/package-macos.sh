@@ -1,6 +1,8 @@
 #!/bin/bash
 # Builds OpenPhoto.app as a universal (Apple Silicon + Intel) binary and
 # zips it for a GitHub release: dist/OpenPhoto-<version>-macos-universal.zip
+# The MCP server ships inside it as Contents/MacOS/op-mcp, so MCP clients
+# can run it from the installed app.
 #
 # SIGN_IDENTITY   a Developer ID Application identity to sign with
 #                 (hardened runtime, timestamped); ad hoc without it
@@ -17,24 +19,29 @@ export MACOSX_DEPLOYMENT_TARGET=11.0
 
 rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
 for target in aarch64-apple-darwin x86_64-apple-darwin; do
-  cargo build --release --target "$target"
+  cargo build --release --target "$target" -p openphoto -p op-mcp
 done
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-lipo -create -output "$APP/Contents/MacOS/openphoto" \
-  target/aarch64-apple-darwin/release/openphoto \
-  target/x86_64-apple-darwin/release/openphoto
-strip -x "$APP/Contents/MacOS/openphoto"
+for bin in openphoto op-mcp; do
+  lipo -create -output "$APP/Contents/MacOS/$bin" \
+    "target/aarch64-apple-darwin/release/$bin" \
+    "target/x86_64-apple-darwin/release/$bin"
+  strip -x "$APP/Contents/MacOS/$bin"
+done
 sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$APP/Contents/Info.plist"
 cp packaging/macos/OpenPhoto.icns "$APP/Contents/Resources/"
 
+# Sign the helper first, then the bundle around it
 if [ -n "${SIGN_IDENTITY:-}" ]; then
-  codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+  sign=(codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY")
 else
   # Ad-hoc signature: enough to run on Apple Silicon, not to pass Gatekeeper
-  codesign --force --sign - "$APP"
+  sign=(codesign --force --sign -)
 fi
+"${sign[@]}" "$APP/Contents/MacOS/op-mcp"
+"${sign[@]}" "$APP"
 codesign --verify --deep --strict "$APP"
 
 ZIP="$DIST/OpenPhoto-$VERSION-macos-universal.zip"
