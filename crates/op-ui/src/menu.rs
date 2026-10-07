@@ -319,11 +319,10 @@ impl NativeMenu {
                 &Submenu::with_items("Export", true, &[&item("Export As...", Command::ExportAs)])
                     .expect("static menu definition is valid"),
                 &sep(),
-                &todo("Search Adobe Stock...", None),
-                &todo("Search Adobe Express Templates...", None),
+                // Photoshop's Adobe Stock and Adobe Express items are left
+                // out: the app shows no Adobe brand or service
                 &todo("Place Embedded...", None),
                 &todo("Place Linked...", None),
-                &todo("Place Free Adobe Stock Images...", None),
                 &todo("Package...", None),
                 &sep(),
                 &todo_sub("Automate"),
@@ -710,9 +709,9 @@ impl NativeMenu {
             "Type",
             true,
             &[
-                &todo("More from Adobe Fonts...", None) as &dyn IsMenuItem,
-                &sep(),
-                &todo_sub("Panels"),
+                // Photoshop's first item, More from Adobe Fonts..., and its
+                // separator are left out: the app shows no Adobe brand
+                &todo_sub("Panels") as &dyn IsMenuItem,
                 &sep(),
                 &todo_sub("Anti-Alias"),
                 &sep(),
@@ -1168,6 +1167,25 @@ impl NativeMenu {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn menus_show_no_adobe_brand() {
+        // Photoshop's items for Adobe services (Stock, Express, Fonts) are
+        // left out; no menu label may name Adobe
+        let source = include_str!("menu.rs");
+        let labels: Vec<&str> = source
+            .lines()
+            .filter(|l| {
+                ["todo(\"", "item(\"", "todo_sub(\"", "with_items(\""]
+                    .iter()
+                    .any(|k| l.contains(k))
+            })
+            .collect();
+        assert!(labels.len() > 100, "found {} labels", labels.len());
+        for label in labels {
+            assert!(!label.contains("Adobe"), "{}", label.trim());
+        }
+    }
 
     /// Every shortcut shows in the native menu: a key muda can't parse
     /// would silently drop the key equivalent.
