@@ -44,6 +44,9 @@ impl Floating {
                 )
             }
             Self::Navigator => Vec2::new(pt(250.0), pt(230.0)),
+            Self::Histogram if app.histogram_expanded => {
+                Vec2::new(pt(250.0), super::histogram::EXPANDED)
+            }
             Self::Histogram => Vec2::new(pt(250.0), pt(150.0)),
             Self::CloneSource => Vec2::new(pt(250.0), pt(250.0)),
         }

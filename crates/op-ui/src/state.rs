@@ -117,9 +117,8 @@ pub struct DocState {
     /// Where the pointer is over the document (document pixels), for the
     /// Info panel.
     pub pointer: Option<egui::Pos2>,
-    /// The merged image's luminosity histogram and thumbnail texture, per
-    /// revision (Histogram and Navigator panels).
-    histogram: Option<(u64, [u64; 256])>,
+    /// The merged image's thumbnail texture, per revision (Navigator,
+    /// Layers panel).
     composite_tex: Option<(u64, egui::TextureHandle)>,
     /// The Clone Stamp's source point (set with Alt-click), and the offset
     /// from it to the strokes once painting has started (Aligned).
@@ -142,6 +141,7 @@ pub struct DocState {
     /// The Channels panel's thumbnails (composite, red, green, blue) and
     /// the revision they show.
     channel_thumbs: Option<(u64, [egui::TextureHandle; 4])>,
+    channel_histograms: Option<(u64, [[u64; 256]; 5])>,
     /// The Crop tool's box, while the Crop tool is in use.
     pub crop: Option<CropBox>,
     /// The Perspective Crop tool's box, while it is in use.
@@ -267,7 +267,6 @@ impl DocState {
             perspective_crop: None,
             guide_drag: None,
             pointer: None,
-            histogram: None,
             composite_tex: None,
             clone_source: None,
             clone_offset: None,
@@ -279,6 +278,7 @@ impl DocState {
             channels_shown: [true; 3],
             channels_targeted: [true; 3],
             channel_thumbs: None,
+            channel_histograms: None,
             gradient_drag: None,
             shape_drag: None,
             text_edit: None,
@@ -653,23 +653,29 @@ impl DocState {
         Some(Color::from_rgba8(img.pixels[i..i + 4].try_into().ok()?))
     }
 
-    /// Luminosity histogram of the merged image, cached per revision.
-    pub fn composite_histogram(&mut self) -> [u64; 256] {
+    /// The merged image's histograms for the Histogram panel's channels:
+    /// luminosity, red, green, blue, and the three together (Colors / RGB),
+    /// cached by revision.
+    pub fn channel_histograms(&mut self) -> [[u64; 256]; 5] {
         let rev = self.doc.revision();
-        if let Some((r, h)) = &self.histogram
+        if let Some((r, h)) = &self.channel_histograms
             && *r == rev
         {
             return *h;
         }
         let img = self.canvas_image();
-        let mut hist = [0u64; 256];
+        let mut hist = [[0u64; 256]; 5];
         for px in img.pixels.chunks(4) {
-            if px[3] > 0 {
-                let l = op_core::adjust::luminosity([px[0], px[1], px[2], 255]);
-                hist[l as usize] += 1;
+            if px[3] == 0 {
+                continue;
+            }
+            hist[0][op_core::adjust::luminosity([px[0], px[1], px[2], 255]) as usize] += 1;
+            for c in 0..3 {
+                hist[c + 1][px[c] as usize] += 1;
+                hist[4][px[c] as usize] += 1;
             }
         }
-        self.histogram = Some((rev, hist));
+        self.channel_histograms = Some((rev, hist));
         hist
     }
 
@@ -1581,6 +1587,10 @@ pub struct AppState {
     /// come to the window's right (left) side.
     pub reveal_panels: bool,
     pub reveal_tools: bool,
+    /// The Histogram panel: Expanded View, and the channel it shows (0
+    /// luminosity, 1–3 red, green, blue, 4 RGB, 5 Colors).
+    pub histogram_expanded: bool,
+    pub histogram_channel: usize,
     /// Entering Full Screen Mode: Photoshop's warning, while asked.
     pub full_screen_prompt: Option<crate::dialogs::alert::Alert>,
     /// "Don't show again" was ticked in that warning.
@@ -1769,6 +1779,8 @@ impl Default for AppState {
             hide_panels: false,
             reveal_panels: false,
             reveal_tools: false,
+            histogram_expanded: false,
+            histogram_channel: 0,
             full_screen_prompt: None,
             skip_full_screen_prompt: false,
             seed_override: None,

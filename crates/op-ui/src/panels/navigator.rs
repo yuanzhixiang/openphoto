@@ -3,13 +3,13 @@
 //! the zoom percentage and a zoom slider between the zoom-out and zoom-in
 //! buttons.
 
-use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
+use egui::{Color32, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 
 use super::floating::small;
 use crate::document_view;
 use crate::icons;
 use crate::state::AppState;
-use crate::theme::{self, color, pt};
+use crate::theme::{self, pt};
 
 /// Photoshop draws the view box in red.
 const VIEW_BOX: Color32 = Color32::from_rgb(0xff, 0x00, 0x00);
@@ -51,27 +51,57 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         document_view::center_on(state, Pos2::new(doc.x, doc.y), ppp);
     }
 
-    // Zoom percentage, zoom out, slider, zoom in
+    // Zoom percentage (typed: Enter zooms there), zoom out, slider, zoom in
     let row = Rect::from_min_max(Pos2::new(rect.left(), rect.bottom() - pt(24.0)), rect.max);
-    ui.painter().text(
-        row.left_center(),
-        Align2::LEFT_CENTER,
-        document_view::zoom_label(state.view.zoom),
-        small(),
-        color::TEXT,
+    let field = Rect::from_min_size(
+        Pos2::new(row.left(), row.center().y - pt(9.0)),
+        Vec2::new(pt(54.0), pt(18.0)),
     );
+    let id = ui.id().with("navigator-zoom");
+    let mut text = ui
+        .data(|d| d.get_temp::<String>(id))
+        .unwrap_or_else(|| document_view::zoom_label(state.view.zoom));
+    let editor = ui.put(
+        field,
+        egui::TextEdit::singleline(&mut text)
+            .id(id)
+            .font(small())
+            .desired_width(field.width()),
+    );
+    if editor.has_focus() {
+        ui.data_mut(|d| d.insert_temp(id, text.clone()));
+    } else {
+        ui.data_mut(|d| d.remove::<String>(id));
+    }
+    if editor.lost_focus()
+        && ui.input(|i| i.key_pressed(egui::Key::Enter))
+        && let Some(v) = crate::options_bar::typed_number(&text)
+        && v > 0.0
+    {
+        document_view::zoom_to(state, (v / 100.0).clamp(0.01, 128.0), ppp);
+    }
     let mut row_ui = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_max(
         Pos2::new(row.left() + pt(60.0), row.top()),
         row.max,
     )));
     row_ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(icons::MOUNTAINS).font(theme::icon(pt(10.0))));
+        let small_mountains =
+            egui::Button::new(egui::RichText::new(icons::MOUNTAINS).font(theme::icon(pt(10.0))))
+                .frame(false);
+        if ui.add(small_mountains).on_hover_text("Zoom Out").clicked() {
+            document_view::zoom_step(state, false, ppp);
+        }
         // Logarithmic slider over Photoshop's zoom range
         let mut log = state.view.zoom.ln();
         let slider = egui::Slider::new(&mut log, 0.01f32.ln()..=128f32.ln()).show_value(false);
         if ui.add_sized([pt(120.0), pt(18.0)], slider).changed() {
             document_view::zoom_to(state, log.exp(), ppp);
         }
-        ui.label(egui::RichText::new(icons::MOUNTAINS).font(theme::icon(pt(15.0))));
+        let big_mountains =
+            egui::Button::new(egui::RichText::new(icons::MOUNTAINS).font(theme::icon(pt(15.0))))
+                .frame(false);
+        if ui.add(big_mountains).on_hover_text("Zoom In").clicked() {
+            document_view::zoom_step(state, true, ppp);
+        }
     });
 }

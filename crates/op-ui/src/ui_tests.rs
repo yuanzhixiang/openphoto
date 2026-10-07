@@ -6796,6 +6796,29 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn histogram_expands_and_navigator_zooms() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, Command::ToggleHistogram);
+    run_command(&mut h, Command::ToggleNavigator);
+    h.run_steps(2);
+    // Expanded View: the statistics of the gray image (one level)
+    h.state_mut().state.histogram_expanded = true;
+    h.state_mut().state.histogram_channel = 1;
+    h.run_steps(2);
+    shot(&mut h, "histogram_expanded");
+    let hists = h.state_mut().state.active().unwrap().channel_histograms();
+    let (mean, dev, _, pixels) = crate::panels::histogram::statistics(&hists[1]);
+    assert_eq!(pixels, 734 * 811);
+    assert!(dev < 1.0, "{mean} {dev}");
+    // The Navigator's zoom out button steps the zoom down
+    let before = active(&h).view.zoom;
+    crate::document_view::zoom_step(h.state_mut().state.active().unwrap(), false, 2.0);
+    assert!(active(&h).view.zoom < before);
+}
+
+#[test]
 fn channels_panel_targets_shows_and_loads() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);

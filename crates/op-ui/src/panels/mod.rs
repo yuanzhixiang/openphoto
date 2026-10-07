@@ -8,7 +8,7 @@ pub(crate) mod channels;
 pub(crate) mod clone_source;
 mod color_panel;
 pub mod floating;
-mod histogram;
+pub(crate) mod histogram;
 pub(crate) mod info;
 mod navigator;
 mod presets;
