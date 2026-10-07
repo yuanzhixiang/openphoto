@@ -46,11 +46,35 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
             // Photoshop's tool icons are about 15 pt across
             let r = widgets::icon_button_font(
                 ui,
-                icons::tool(shown),
+                "",
                 Vec2::new(button_w, pitch - 1.0),
                 theme::tool_icon(crate::theme::pt(17.5)),
                 selected,
             );
+            // Photoshop-style drawings, else the icon font
+            // The icon's center by Photoshop's pitch, free of the buttons'
+            // rounding
+            let icon_center = Pos2::new(
+                r.rect.center().x,
+                full.top() + crate::theme::pt(43.0) + pitch * slot as f32,
+            );
+            let bg = if selected || r.is_pointer_button_down_on() {
+                color::TOOL_ACTIVE
+            } else if r.hovered() {
+                color::HOVER
+            } else {
+                color::PANEL
+            };
+            let tint = crate::tool_icons::COLOR;
+            if !crate::tool_icons::paint(ui.painter(), icon_center, shown, tint, bg) {
+                ui.painter().text(
+                    r.rect.center(),
+                    Align2::CENTER_CENTER,
+                    icons::tool(shown),
+                    theme::tool_icon(crate::theme::pt(17.5)),
+                    color::ICON,
+                );
+            }
             // The selected tool's box has a faint light outline
             if selected {
                 ui.painter().rect_stroke(
@@ -346,6 +370,9 @@ pub mod flyout_metrics {
     /// 65.7.
     pub const TEXT: f32 = 11.5;
     pub const ICON: f32 = 16.3;
+    /// The drawn icons at the flyout's size: Photoshop's Move icon is 14 pt
+    /// across there, 15 in the toolbar.
+    pub const ICON_SCALE: f32 = 0.93;
 }
 
 /// The flyout's text font (the panels' font).
@@ -419,13 +446,22 @@ fn flyout(button: &egui::Response, group: &[Tool], shown: Tool, app: &mut AppSta
                     );
                     painter.rect_filled(mark, 0, color::TEXT);
                 }
-                painter.text(
-                    Pos2::new(x(ICON_X), rect.center().y),
-                    Align2::CENTER_CENTER,
-                    icons::tool(tool),
-                    theme::tool_icon(pt(ICON)),
-                    color::ICON,
-                );
+                let icon_at = Pos2::new(x(ICON_X), rect.center().y);
+                let bg = if response.hovered() {
+                    color::ACCENT
+                } else {
+                    color::PANEL
+                };
+                let tint = crate::tool_icons::COLOR;
+                if !crate::tool_icons::paint_scaled(painter, icon_at, tool, tint, bg, ICON_SCALE) {
+                    painter.text(
+                        icon_at,
+                        Align2::CENTER_CENTER,
+                        icons::tool(tool),
+                        theme::tool_icon(pt(ICON)),
+                        color::ICON,
+                    );
+                }
                 let galley = flyout_galley(painter, tool.name());
                 let name_pos = Pos2::new(x(NAME_X), rect.center().y - galley.size().y / 2.0);
                 painter.galley(name_pos, galley, color::TEXT);

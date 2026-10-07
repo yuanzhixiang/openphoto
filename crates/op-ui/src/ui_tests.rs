@@ -3651,3 +3651,207 @@ fn tool_flyout_matches_photoshop_and_switches_tools() {
     let image = h.render().expect("render frame");
     assert!(flyout_frame(&image).0.is_empty(), "the flyout closes");
 }
+
+/// Each tool's toolbar icon against Photoshop's, cropped from its toolbar
+/// at 2x into `$PS_ICONS/<Tool>.png`: prints the overlap of the bright
+/// pixels and writes a sheet (ours over Photoshop's) to
+/// `target/ui-shots/icon_compare.png`.
+#[test]
+#[ignore]
+fn compare_tool_icons_with_photoshop() {
+    let Ok(dir) = std::env::var("PS_ICONS") else {
+        return;
+    };
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let only = std::env::var("ICONS").ok();
+    let mut tiles = Vec::new();
+    let mut scores = Vec::new();
+    for slot in op_tools::TOOLBAR {
+        for &tool in *slot {
+            let name = format!("{tool:?}");
+            if only
+                .as_ref()
+                .is_some_and(|o| !o.split(',').any(|n| n == name))
+            {
+                continue;
+            }
+            let Ok(ps) = image::open(format!("{dir}/{name}.png")) else {
+                continue;
+            };
+            let ps = ps.to_rgba8();
+            h.state_mut().state.select_tool(tool);
+            h.run_steps(2);
+            let image = h.render().expect("render frame");
+            let cy = (211.0 + 51.8 * tool.slot() as f32) as u32;
+            let ours = image::imageops::crop_imm(&image, 10, cy - 26, 56, 52).to_image();
+            let bright = |img: &image::RgbaImage, x: u32, y: u32| {
+                let p = img.get_pixel(x, y).0;
+                (p[0] as u32 + p[1] as u32 + p[2] as u32) / 3 > 140
+            };
+            let (mut both, mut either) = (0, 0);
+            for y in 3..46 {
+                for x in 0..46 {
+                    let (a, b) = (bright(&ours, x, y), bright(&ps, x, y));
+                    both += (a && b) as u32;
+                    either += (a || b) as u32;
+                }
+            }
+            let iou = both as f32 / either.max(1) as f32;
+            // The shift of ours that would overlap best
+            let mut best = (0.0f32, 0i32, 0i32);
+            for dy in -4i32..=4 {
+                for dx in -4i32..=4 {
+                    let (mut b2, mut e2) = (0, 0);
+                    for y in 6..42i32 {
+                        for x in 4..42i32 {
+                            let a = bright(&ours, (x + dx) as u32, (y + dy) as u32);
+                            let b = bright(&ps, x as u32, y as u32);
+                            b2 += (a && b) as u32;
+                            e2 += (a || b) as u32;
+                        }
+                    }
+                    let v = b2 as f32 / e2.max(1) as f32;
+                    if v > best.0 {
+                        best = (v, dx, dy);
+                    }
+                }
+            }
+            eprintln!(
+                "{name}: best {:.2} at ours shifted by ({}, {})",
+                best.0, best.1, best.2
+            );
+            scores.push((iou, name.clone()));
+            tiles.push((name, ours, ps));
+        }
+    }
+    scores.sort_by(|a, b| a.0.total_cmp(&b.0));
+    for (iou, name) in &scores {
+        eprintln!("{iou:.2} {name}");
+    }
+    let rows = tiles.len().div_ceil(10) as u32;
+    let mut sheet =
+        image::RgbaImage::from_pixel(10 * 60 * 3, rows * 110 * 3, image::Rgba([255, 0, 255, 255]));
+    for (i, (_, ours, ps)) in tiles.iter().enumerate() {
+        let (x, y) = ((i % 10) as u32 * 60 * 3, (i / 10) as u32 * 110 * 3);
+        let big = |img: &image::RgbaImage| {
+            image::imageops::resize(img, 56 * 3, 52 * 3, image::imageops::FilterType::Nearest)
+        };
+        image::imageops::overlay(&mut sheet, &big(ours), x as i64, y as i64);
+        image::imageops::overlay(&mut sheet, &big(ps), x as i64, (y + 54 * 3) as i64);
+    }
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/ui-shots");
+    std::fs::create_dir_all(&dir).unwrap();
+    sheet.save(dir.join("icon_compare.png")).unwrap();
+}
+
+/// The bright pixels' box of each tool icon in a toolbar cell (56 x 52
+/// device pixels around the button, as `compare_tool_icons_with_photoshop`
+/// crops it), measured on Photoshop 2026's toolbar: x0, y0, x1, y1.
+const PS_ICON_EXTENTS: &[(&str, [u32; 4])] = &[
+    ("AddAnchorPoint", [10, 11, 43, 42]),
+    ("AdjustmentBrush", [12, 10, 44, 41]),
+    ("ArtHistoryBrush", [12, 7, 45, 40]),
+    ("Artboard", [8, 5, 41, 36]),
+    ("BackgroundEraser", [10, 8, 43, 39]),
+    ("Blur", [18, 10, 37, 39]),
+    ("Brush", [12, 11, 41, 40]),
+    ("Burn", [12, 14, 43, 36]),
+    ("CloneStamp", [16, 11, 41, 40]),
+    ("ColorReplacement", [6, 7, 41, 40]),
+    ("ColorSampler", [6, 7, 44, 40]),
+    ("ContentAwareMove", [11, 13, 44, 38]),
+    ("ConvertPoint", [22, 13, 40, 38]),
+    ("Count", [11, 10, 45, 38]),
+    ("Crop", [8, 6, 45, 39]),
+    ("CurvaturePen", [10, 11, 45, 40]),
+    ("CustomShape", [10, 11, 45, 40]),
+    ("DeleteAnchorPoint", [10, 13, 43, 42]),
+    ("DirectSelection", [18, 11, 37, 43]),
+    ("Dodge", [12, 12, 41, 41]),
+    ("Ellipse", [12, 13, 41, 38]),
+    ("EllipticalMarquee", [12, 10, 43, 37]),
+    ("Eraser", [12, 13, 41, 39]),
+    ("Eyedropper", [12, 10, 42, 40]),
+    ("Frame", [12, 10, 45, 37]),
+    ("FreeformPen", [6, 11, 45, 40]),
+    ("Gradient", [12, 12, 43, 37]),
+    ("Hand", [12, 11, 43, 43]),
+    ("HealingBrush", [13, 10, 42, 39]),
+    ("HistoryBrush", [10, 11, 43, 40]),
+    ("HorizontalType", [18, 13, 41, 40]),
+    ("HorizontalTypeMask", [16, 13, 43, 40]),
+    ("Lasso", [14, 10, 45, 41]),
+    ("Line", [14, 13, 41, 40]),
+    ("MagicEraser", [7, 9, 43, 39]),
+    ("MagicWand", [13, 7, 45, 40]),
+    ("MagneticLasso", [13, 8, 43, 41]),
+    ("MixerBrush", [6, 11, 43, 40]),
+    ("Move", [13, 10, 40, 37]),
+    ("Note", [16, 11, 41, 38]),
+    ("ObjectSelection", [14, 8, 44, 41]),
+    ("PaintBucket", [12, 9, 45, 41]),
+    ("Patch", [12, 10, 43, 39]),
+    ("PathSelection", [20, 12, 39, 43]),
+    ("PatternStamp", [6, 11, 41, 40]),
+    ("Pen", [14, 13, 43, 42]),
+    ("Pencil", [12, 9, 43, 40]),
+    ("PerspectiveCrop", [16, 6, 41, 39]),
+    ("Polygon", [14, 13, 43, 38]),
+    ("PolygonalLasso", [12, 8, 43, 41]),
+    ("QuickSelection", [10, 11, 45, 37]),
+    ("Rectangle", [12, 13, 43, 38]),
+    ("RectangularMarquee", [12, 10, 43, 35]),
+    ("RedEye", [10, 7, 45, 39]),
+    ("RotateView", [12, 9, 45, 42]),
+    ("Ruler", [12, 17, 45, 30]),
+    ("SelectionBrush", [12, 6, 43, 40]),
+    ("Sharpen", [16, 11, 41, 39]),
+    ("SingleColumnMarquee", [24, 8, 29, 37]),
+    ("SingleRowMarquee", [12, 22, 43, 27]),
+    ("Slice", [13, 14, 45, 36]),
+    ("SliceSelect", [10, 10, 45, 36]),
+    ("Smudge", [16, 12, 41, 41]),
+    ("Sponge", [12, 12, 43, 39]),
+    ("SpotHealingBrush", [10, 7, 42, 39]),
+    ("Triangle", [13, 12, 42, 38]),
+    ("VerticalType", [7, 13, 41, 40]),
+    ("VerticalTypeMask", [7, 13, 43, 40]),
+    ("Zoom", [12, 12, 43, 43]),
+];
+
+#[test]
+fn tool_icons_match_photoshops_extents() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let mut off = Vec::new();
+    for slot in op_tools::TOOLBAR {
+        for &tool in *slot {
+            let name = format!("{tool:?}");
+            let Some((_, want)) = PS_ICON_EXTENTS.iter().find(|(n, _)| *n == name) else {
+                continue;
+            };
+            h.state_mut().state.select_tool(tool);
+            h.run_steps(2);
+            let image = h.render().expect("render frame");
+            let cy = (211.0 + 51.8 * tool.slot() as f32) as u32;
+            let cell = image::imageops::crop_imm(&image, 10, cy - 26, 56, 52).to_image();
+            let (mut x0, mut y0, mut x1, mut y1) = (u32::MAX, u32::MAX, 0, 0);
+            for y in 3..46 {
+                for x in 0..46 {
+                    let p = cell.get_pixel(x, y).0;
+                    if (p[0] as u32 + p[1] as u32 + p[2] as u32) / 3 > 140 {
+                        (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+                    }
+                }
+            }
+            let got = [x0, y0, x1, y1];
+            if got.iter().zip(want).any(|(g, w)| g.abs_diff(*w) > 2) {
+                off.push(format!("{name}: {got:?}, Photoshop {want:?}"));
+            }
+        }
+    }
+    assert!(off.is_empty(), "{}", off.join("\n"));
+    // Every tool has a drawing but Remove (its Photoshop icon is unmeasured)
+    assert_eq!(PS_ICON_EXTENTS.len(), 69);
+}

@@ -25,6 +25,7 @@ mod rulers;
 mod state;
 mod theme;
 mod titlebar;
+mod tool_icons;
 mod toolbar;
 mod type_tool;
 mod widgets;
