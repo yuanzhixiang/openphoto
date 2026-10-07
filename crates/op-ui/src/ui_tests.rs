@@ -8759,3 +8759,38 @@ fn screenshot_plain_filter_dialogs() {
         shot_dialog(&mut h, name, w, ht);
     }
 }
+
+#[test]
+fn reduce_noise_dialog_advanced_per_channel() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::ReduceNoise);
+    h.run_steps(4);
+    shot_dialog(&mut h, "reduce_noise", 807.0, 658.0);
+    let (x, y) = dialog_origin(&mut h);
+    let pt = crate::theme::pt;
+    let at = |px: f32, py: f32| egui::pos2(pt(x + px), pt(y + py));
+    // Advanced, then the Per Channel tab
+    click(&mut h, at(646.0, 155.0));
+    h.run_steps(2);
+    shot_dialog(&mut h, "reduce_noise_advanced", 807.0, 658.0);
+    click(&mut h, at(586.0, 221.5));
+    h.run_steps(3);
+    assert!(h.state().state.adjust_dialog.as_ref().unwrap().extra.rn_per_channel);
+    shot_dialog(&mut h, "reduce_noise_channel", 807.0, 658.0);
+    // Green's Strength reaches the filter
+    let dialog = h.state_mut().state.adjust_dialog.as_mut().unwrap();
+    dialog.test_set_value(6, "1");
+    dialog.test_set_value(9, "4");
+    h.run_steps(2);
+    match h.state().state.adjust_dialog.as_ref().unwrap().effect() {
+        Some(crate::dialogs::Effect::Filter(op_core::filter::Filter::ReduceNoise(o))) => {
+            assert_eq!(o.channels[1], (4.0, 60.0));
+            assert_eq!(o.channels[0].0, 0.0);
+        }
+        other => panic!("{other:?}"),
+    }
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Reduce Noise");
+}

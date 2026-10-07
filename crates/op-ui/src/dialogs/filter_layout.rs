@@ -547,55 +547,6 @@ pub const SHAPE_BLUR: &Layout = &Layout {
     ],
 };
 
-pub const REDUCE_NOISE: &Layout = &Layout {
-    size: (324.0, 513.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: true,
-    rows: &[
-        number(
-            "Strength:",
-            135.0,
-            [140.0, 287.0, 200.5, 306.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 313.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Preserve Details:",
-            135.0,
-            [140.0, 336.0, 200.5, 355.0],
-            "%",
-            205.5,
-            Some((21.0, 303.0, 362.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Reduce Color Noise:",
-            135.0,
-            [140.0, 385.0, 200.5, 404.0],
-            "%",
-            205.5,
-            Some((21.0, 303.0, 411.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Sharpen Details:",
-            135.0,
-            [140.0, 434.0, 200.5, 453.0],
-            "%",
-            205.5,
-            Some((21.0, 303.0, 460.0)),
-            Scale::Linear,
-        ),
-        Row::Check {
-            label: "Remove JPEG Artifact",
-            min: (10.0, 483.0),
-        },
-    ],
-};
-
 pub const SMART_SHARPEN: &Layout = &Layout {
     size: (324.0, 519.0),
     button_width: 59.5,

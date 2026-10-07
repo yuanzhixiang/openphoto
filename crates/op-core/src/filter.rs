@@ -378,12 +378,7 @@ pub enum Filter {
         shape: crate::more_filters::BlurShape,
     },
     LensBlur(crate::more_filters::LensBlur),
-    ReduceNoise {
-        strength: f32,
-        preserve: f32,
-        color: f32,
-        sharpen: f32,
-    },
+    ReduceNoise(crate::more_filters::ReduceNoise),
     SmartSharpen {
         amount: f32,
         radius: f32,
@@ -434,7 +429,7 @@ impl Filter {
             Self::SmartBlur { .. } => "Smart Blur",
             Self::ShapeBlur { .. } => "Shape Blur",
             Self::LensBlur(_) => "Lens Blur",
-            Self::ReduceNoise { .. } => "Reduce Noise",
+            Self::ReduceNoise(_) => "Reduce Noise",
             Self::SmartSharpen { .. } => "Smart Sharpen",
             Self::Fibers { .. } => "Fibers",
             Self::LensFlare { .. } => "Lens Flare",
@@ -2013,7 +2008,7 @@ fn filtered(
         | Filter::SmartBlur { .. }
         | Filter::ShapeBlur { .. }
         | Filter::LensBlur(_)
-        | Filter::ReduceNoise { .. }
+        | Filter::ReduceNoise(_)
         | Filter::SmartSharpen { .. }
         | Filter::Fibers { .. }
         | Filter::LensFlare { .. }
@@ -2128,12 +2123,7 @@ fn more(px: &[[u8; 4]], w: usize, h: usize, filter: Filter, depth: Option<&[u8]>
         } => m::smart_blur(px, w, h, radius, threshold, quality, mode),
         Filter::ShapeBlur { radius, shape } => m::shape_blur(px, w, h, radius, shape),
         Filter::LensBlur(o) => m::lens_blur(px, w, h, &o, depth),
-        Filter::ReduceNoise {
-            strength,
-            preserve,
-            color,
-            sharpen,
-        } => m::reduce_noise(px, w, h, strength, preserve, color, sharpen),
+        Filter::ReduceNoise(o) => m::reduce_noise(px, w, h, &o),
         Filter::SmartSharpen {
             amount,
             radius,

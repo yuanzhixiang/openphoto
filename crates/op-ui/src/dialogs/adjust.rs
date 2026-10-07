@@ -277,12 +277,21 @@ const LENS_BLUR: &[Param] = &[
     check("Monochromatic", false),
 ];
 
+/// In the dialog's order (`reduce_noise`'s indexes).
 const REDUCE_NOISE: &[Param] = &[
+    choice("Mode", &["Basic", "Advanced"], 0),
     param("Strength:", 0.0, 10.0, 6.0, 0),
     param("Preserve Details:", 0.0, 100.0, 60.0, 0),
     param("Reduce Color Noise:", 0.0, 100.0, 45.0, 0),
     param("Sharpen Details:", 0.0, 100.0, 25.0, 0),
     check("Remove JPEG Artifact", false),
+    choice("Channel:", &["Red", "Green", "Blue"], 0),
+    param("Red Strength:", 0.0, 10.0, 0.0, 0),
+    param("Red Preserve Details:", 0.0, 100.0, 60.0, 0),
+    param("Green Strength:", 0.0, 10.0, 0.0, 0),
+    param("Green Preserve Details:", 0.0, 100.0, 60.0, 0),
+    param("Blue Strength:", 0.0, 10.0, 0.0, 0),
+    param("Blue Preserve Details:", 0.0, 100.0, 60.0, 0),
 ];
 
 const SMART_SHARPEN: &[Param] = &[
@@ -632,7 +641,6 @@ impl Kind {
             Self::TraceContour => l::TRACE_CONTOUR,
             Self::Diffuse => l::DIFFUSE,
             Self::ShapeBlur => l::SHAPE_BLUR,
-            Self::ReduceNoise => l::REDUCE_NOISE,
             Self::SmartSharpen => l::SMART_SHARPEN,
             Self::OilPaint => l::OIL_PAINT,
             Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
@@ -882,6 +890,11 @@ pub struct Extra {
     /// Lens Flare's center, 0–1 across and down the image (the middle at
     /// first; a click in the preview moves it).
     pub flare_center: (f32, f32),
+    /// Reduce Noise: the Per Channel tab is showing, the saved setting
+    /// chosen, and the layer's red, green and blue as gray thumbnails.
+    pub rn_per_channel: bool,
+    pub rn_setting: Option<String>,
+    pub rn_thumbs: [Option<egui::TextureHandle>; 3],
     /// The document's size in pixels (Lens Flare's center needs it).
     pub doc_size: (f32, f32),
 }
@@ -1324,6 +1337,7 @@ impl AdjustDialog {
             || self.kind == Kind::Shear
             || self.kind == Kind::LensBlur
             || self.kind == Kind::Wave
+            || legacy::preview_rect(self.kind).is_some()
             || self.kind.distort().is_some()
             || self.layout().is_some_and(|l| l.pane)
     }
@@ -1451,12 +1465,26 @@ impl AdjustDialog {
                 focal: v[lens_blur::FOCAL] as u8,
                 invert: v[lens_blur::INVERT] == 1.0,
             }),
-            Kind::ReduceNoise => Filter::ReduceNoise {
-                strength: v[0],
-                preserve: v[1],
-                color: v[2],
-                sharpen: v[3],
-            },
+            Kind::ReduceNoise => {
+                // Per Channel counts only in Advanced
+                let advanced = v[reduce_noise::MODE] == 1.0;
+                let c = reduce_noise::CHANNELS;
+                let channel = |k: usize| {
+                    if advanced {
+                        (v[c + k * 2], v[c + k * 2 + 1])
+                    } else {
+                        (0.0, 60.0)
+                    }
+                };
+                Filter::ReduceNoise(mf::ReduceNoise {
+                    strength: v[1],
+                    preserve: v[2],
+                    color: v[3],
+                    sharpen: v[4],
+                    jpeg: v[reduce_noise::JPEG] == 1.0,
+                    channels: [channel(0), channel(1), channel(2)],
+                })
+            }
             Kind::SmartSharpen => Filter::SmartSharpen {
                 amount: v[0],
                 radius: v[1],
@@ -1733,6 +1761,7 @@ impl AdjustDialog {
                     Some(Custom::Kernel(_)) => custom_filter::SIZE,
                     None if self.kind == Kind::LensBlur => lens_blur::size(ctx.content_rect()),
                     None if self.kind == Kind::Wave => wave::SIZE,
+                    None if self.kind == Kind::ReduceNoise => reduce_noise::SIZE,
                     None => self
                         .layout()
                         .map_or_else(|| self.kind.size(), |l| vec2(pt(l.size.0), pt(l.size.1))),
@@ -1745,6 +1774,8 @@ impl AdjustDialog {
                     self.lens_ui(ui, rect)
                 } else if self.kind == Kind::Wave {
                     self.wave_ui(ui, rect)
+                } else if self.kind == Kind::ReduceNoise {
+                    self.reduce_noise_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
                     self.classic_ui(ui, rect, layout)
                 } else if let Some(layout) = self.kind.plain() {
@@ -2541,7 +2572,9 @@ impl AdjustDialog {
     /// The preview's size in pixels (the classic pane's 196 pt square,
     /// the plug-in style dialogs' 256 pt one, at two pixels a point).
     pub fn pane_px(&self) -> (usize, usize) {
-        if self.kind == Kind::Shear {
+        if let Some([x0, y0, x1, y1]) = legacy::preview_rect(self.kind) {
+            (((x1 - x0) * 2.0) as usize, ((y1 - y0) * 2.0) as usize)
+        } else if self.kind == Kind::Shear {
             (600, 300)
         } else if self.kind == Kind::Wave {
             let [x0, y0, x1, y1] = wave::PREVIEW;
@@ -2980,7 +3013,9 @@ fn auto_brightness_contrast(histogram: &[u64; 256]) -> (i32, i32) {
     best.1
 }
 
+mod legacy;
 mod lens_blur;
+mod reduce_noise;
 
 /// A flat 13 pt button as the plug-in dialogs' Randomize (`#454545`,
 /// `#666666` edge, `#5a5a5a` while pressed). Returns whether it was

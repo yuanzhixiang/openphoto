@@ -605,19 +605,110 @@ pub fn lens_blur(px: &[Px], w: usize, h: usize, o: &LensBlur, depth: Option<&[u8
 
 // ------------------------------------------------------ Reduce Noise
 
-/// Noise › Reduce Noise: Strength (0–10) smooths each channel within
-/// what Preserve Details (0–100 %) lets through as edges; Reduce Color
-/// Noise (0–100 %) smooths the chroma more; Sharpen Details (0–100 %)
-/// puts edge contrast back.
-pub fn reduce_noise(
-    px: &[Px],
-    w: usize,
-    h: usize,
-    strength: f32,
-    preserve: f32,
-    color: f32,
-    sharpen: f32,
-) -> Vec<Px> {
+/// Reduce Noise's settings, as its dialog has them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ReduceNoise {
+    /// Strength 0–10, Preserve Details, Reduce Color Noise and Sharpen
+    /// Details 0–100 %.
+    pub strength: f32,
+    pub preserve: f32,
+    pub color: f32,
+    pub sharpen: f32,
+    /// Remove JPEG Artifact.
+    pub jpeg: bool,
+    /// Advanced › Per Channel: each of red, green and blue's own Strength
+    /// (0–10) and Preserve Details (0–100 %).
+    pub channels: [(f32, f32); 3],
+}
+
+impl Default for ReduceNoise {
+    /// Photoshop's Default setting.
+    fn default() -> Self {
+        Self {
+            strength: 6.0,
+            preserve: 60.0,
+            color: 45.0,
+            sharpen: 25.0,
+            jpeg: false,
+            channels: [(0.0, 60.0); 3],
+        }
+    }
+}
+
+/// Remove JPEG Artifact: across each edge of the 8 × 8 blocks JPEG
+/// compresses in, the two pixels on either side move halfway toward each
+/// other where they differ by less than 24 levels (a block's step, not a
+/// real edge).
+fn deblock(px: &[Px], w: usize, h: usize) -> Vec<Px> {
+    let mut out = px.to_vec();
+    let mut smooth = |a: usize, b: usize| {
+        let (p, q) = (px[a], px[b]);
+        if (0..3).all(|c| (p[c] as i32 - q[c] as i32).abs() < 24) {
+            for c in 0..3 {
+                let m = (p[c] as f32 + q[c] as f32) / 2.0;
+                out[a][c] = ((p[c] as f32 + m) / 2.0).round() as u8;
+                out[b][c] = ((q[c] as f32 + m) / 2.0).round() as u8;
+            }
+        }
+    };
+    for y in 0..h {
+        for x in (8..w).step_by(8) {
+            smooth(y * w + x - 1, y * w + x);
+        }
+    }
+    for y in (8..h).step_by(8) {
+        for x in 0..w {
+            smooth((y - 1) * w + x, y * w + x);
+        }
+    }
+    out
+}
+
+/// One channel smoothed by its own Strength and Preserve Details (as the
+/// overall smoothing, on that channel alone).
+fn smooth_channel(px: &mut [Px], w: usize, h: usize, c: usize, strength: f32, preserve: f32) {
+    if strength <= 0.0 {
+        return;
+    }
+    let src = px.to_vec();
+    let at = |x: i64, y: i64| {
+        src[y.clamp(0, h as i64 - 1) as usize * w + x.clamp(0, w as i64 - 1) as usize][c]
+    };
+    let edge = 12.0 + (100.0 - preserve.clamp(0.0, 100.0)) / 100.0 * 40.0;
+    let k = strength / 10.0;
+    for i in 0..w * h {
+        let (x, y) = ((i % w) as i64, (i / w) as i64);
+        let p = src[i][c] as f32;
+        let (mut acc, mut n) = (0.0, 0.0);
+        for dy in -2..=2 {
+            for dx in -2..=2 {
+                let q = at(x + dx, y + dy) as f32;
+                let wgt = (1.0 - (q - p).abs() / edge).max(0.0);
+                acc += q * wgt;
+                n += wgt;
+            }
+        }
+        let v = p + (acc / f32::max(n, 1e-3) - p) * k;
+        px[i][c] = v.round().clamp(0.0, 255.0) as u8;
+    }
+}
+
+/// Noise › Reduce Noise: Remove JPEG Artifact first (`deblock`), then
+/// each channel's own smoothing (Per Channel); then Strength (0–10)
+/// smooths each channel within what Preserve Details (0–100 %) lets
+/// through as edges; Reduce Color Noise (0–100 %) smooths the chroma
+/// more; Sharpen Details (0–100 %) puts edge contrast back.
+pub fn reduce_noise(px: &[Px], w: usize, h: usize, o: &ReduceNoise) -> Vec<Px> {
+    let mut first = if o.jpeg {
+        deblock(px, w, h)
+    } else {
+        px.to_vec()
+    };
+    for (c, &(s, p)) in o.channels.iter().enumerate() {
+        smooth_channel(&mut first, w, h, c, s, p);
+    }
+    let px = &first[..];
+    let (strength, preserve, color, sharpen) = (o.strength, o.preserve, o.color, o.sharpen);
     let at = |x: i64, y: i64| {
         px[y.clamp(0, h as i64 - 1) as usize * w + x.clamp(0, w as i64 - 1) as usize]
     };
@@ -1193,6 +1284,46 @@ mod tests {
     }
 
     #[test]
+    fn reduce_noise_jpeg_and_channels() {
+        // 8 × 8 blocks alternating 100 and 110: Remove JPEG Artifact softens
+        // the step across the blocks' edges
+        let blocks: Vec<Px> = (0..16 * 16)
+            .map(|i| {
+                let v = if ((i % 16) / 8 + (i / 16) / 8) % 2 == 0 { 100 } else { 110 };
+                [v, v, v, 255]
+            })
+            .collect();
+        let off = ReduceNoise {
+            strength: 0.0,
+            color: 0.0,
+            sharpen: 0.0,
+            ..Default::default()
+        };
+        assert_eq!(reduce_noise(&blocks, 16, 16, &off), blocks);
+        let jpeg = reduce_noise(&blocks, 16, 16, &ReduceNoise { jpeg: true, ..off });
+        let step = |p: &[Px]| (p[8][0] as i32 - p[7][0] as i32).abs();
+        assert!(step(&jpeg) < step(&blocks));
+        // Per Channel: red's own Strength smooths red alone
+        let noisy: Vec<Px> = (0..16 * 16)
+            .map(|i| {
+                let n = (hash((i % 16) as i64, (i / 16) as i64, 2, 3) * 20.0) as u8;
+                [100 + n, 100 + n, 100 + n, 255]
+            })
+            .collect();
+        let red = reduce_noise(
+            &noisy,
+            16,
+            16,
+            &ReduceNoise {
+                channels: [(10.0, 0.0), (0.0, 60.0), (0.0, 60.0)],
+                ..off
+            },
+        );
+        assert!(red.iter().zip(&noisy).any(|(a, b)| a[0] != b[0]));
+        assert!(red.iter().zip(&noisy).all(|(a, b)| a[1] == b[1] && a[2] == b[2]));
+    }
+
+    #[test]
     fn lens_blur_iris_and_depth() {
         let hexagon = LensBlur::default();
         // A hexagon's flat side is inside the circle; full curvature rounds it
@@ -1290,7 +1421,18 @@ mod tests {
                 [v, v, v, 255]
             })
             .collect();
-        let quiet = reduce_noise(&noisy, 32, 32, 10.0, 0.0, 0.0, 0.0);
+        let quiet = reduce_noise(
+            &noisy,
+            32,
+            32,
+            &ReduceNoise {
+                strength: 10.0,
+                preserve: 0.0,
+                color: 0.0,
+                sharpen: 0.0,
+                ..Default::default()
+            },
+        );
         let spread = |p: &[Px]| {
             let n = p.len() as f32;
             let mean = p.iter().map(|q| q[0] as f32).sum::<f32>() / n;

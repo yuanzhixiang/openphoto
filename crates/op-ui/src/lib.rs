@@ -382,6 +382,24 @@ impl OpenPhotoApp {
                     }
                     dialog.pane = None;
                 }
+                // Reduce Noise's Per Channel thumbnails: the layer's red,
+                // green and blue as grays, made once
+                if dialog.kind == dialogs::AdjustKind::ReduceNoise
+                    && dialog.extra.rn_thumbs[0].is_none()
+                    && let Some((w, h, px)) = dialogs::adjust_thumbnail(&state.doc, (240, 220))
+                {
+                    for c in 0..3 {
+                        let gray: Vec<egui::Color32> = px
+                            .iter()
+                            .map(|p| egui::Color32::from_gray(p[c]))
+                            .collect();
+                        dialog.extra.rn_thumbs[c] = Some(ctx.load_texture(
+                            format!("reduce-noise-channel-{c}"),
+                            egui::ColorImage::new([w, h], gray),
+                            egui::TextureOptions::NEAREST,
+                        ));
+                    }
+                }
                 if dialog.wants_pane() && dialog.pane.is_none() {
                     let (texture, center) = pane_texture(
                         ctx,
