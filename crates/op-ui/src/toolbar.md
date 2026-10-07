@@ -47,4 +47,4 @@ Quick Mask 按钮（「Edit in Quick Mask Mode (Q)」）点击进入/退出当�
 
 ## 工具图标
 
-按钮里的图标由 `tool_icons.rs` 按 Photoshop 的样式绘制（见 `tool_icons.md`），图标中心按 Photoshop 的行距计算；没有绘制的工具（Remove Tool）退回 Phosphor 字体图标。
+按钮里的图标由 `tool_icons.rs` 按 Photoshop 的样式绘制（见 `tool_icons.md`），图标中心按 Photoshop 的行距计算；`paint` 返回 false 的工具（目前没有）退回 Phosphor 字体图标。

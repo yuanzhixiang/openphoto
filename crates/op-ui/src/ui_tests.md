@@ -77,7 +77,7 @@
 - `distort_filters_from_the_menu`：四个扭曲滤镜的对话框以默认值应用并成为 Last Filter。
 - `dragging_on_a_large_document_keeps_up`：在 3000 × 1080 的文档上用移动工具、画笔、橡皮擦拖动 20 帧，平均每帧 UI 更新须少于 40 ms（目前约 10 ms，修复前移动工具约 56 ms），防止合成、图层外框扫描或缩略图再次变慢。
 - `layers_panel_footer_and_lock_buttons` 另外检查：Lock all 打开时只有锁按钮有按下底色，其余按钮没有；此时拖动 Opacity、Fill 不起作用，关掉后拖动 Opacity 生效。
-- `tool_flyout_matches_photoshop_and_switches_tools`：右键移动工具，弹出列表的外框在 (36, 92)，130 × 40（误差 1 pt）；点第二行切到 Artboard Tool 并关闭列表。`screenshot_tool_flyout`（`#[ignore]`）用于与 Photoshop 截图比对。
+- `tool_flyout_matches_photoshop_and_switches_tools`：右键移动工具，弹出列表的外框在 (36, 92)，130 × 40（误差 1 pt）；点第二行切到 Artboard Tool 并关闭列表。`screenshot_tool_flyout`（同时截出修复工具组的弹出列表 `heal_flyout.png`，用于与 Photoshop 比对 Remove Tool 图标）（`#[ignore]`）用于与 Photoshop 截图比对。
 - `align_buttons_line_up_selected_layers` 另外检查：⌘/ 锁定选中的图层后，Align 与 Distribute 变为不可用（缓存的可用状态随之更新）。
 - `tool_icons_match_photoshops_extents`：69 个工具图标的亮像素外框与 Photoshop 测得的外框相差不超过 2 px（见 `tool_icons.md`）。`compare_tool_icons_with_photoshop`（`#[ignore]`）逐个与本地的 Photoshop 截图比对。
 - `options_bars_match_photoshops_layout`：按实测布局的选项栏，分隔线与各种框的边缘与 Photoshop 的数值（`PS_BAR_MARKS`）逐一对应，误差 1 pt。`screenshot_options_bars`（`#[ignore]`）截出每个工具的选项栏用于比对。
