@@ -4756,3 +4756,42 @@ fn properties_sections_toggle_views_and_run_quick_actions() {
     click(&mut h, p(55.0, 129.0 + 74.5));
     assert!(h.state().state.trim_dialog.is_some());
 }
+
+#[test]
+#[ignore]
+fn screenshot_layer_drag_and_rename() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::J);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::J);
+    h.run_steps(3);
+    // Hold "Layer 1" (the middle row) over the top row's upper half
+    let (from, to) = (at_pt(1130.0, 695.0), at_pt(1130.0, 640.0));
+    h.hover_at(from);
+    h.event(egui::Event::PointerButton {
+        pos: from,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    for i in 1..=4 {
+        h.event(egui::Event::PointerMoved(
+            from + (to - from) * (i as f32 / 4.0),
+        ));
+        h.step();
+    }
+    shot(&mut h, "layer_drag");
+    h.event(egui::Event::PointerMoved(from));
+    h.step();
+    h.event(egui::Event::PointerButton {
+        pos: from,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(3);
+    double_click(&mut h, at_pt(1130.0, 695.0));
+    h.run_steps(2);
+    shot(&mut h, "layer_rename");
+}

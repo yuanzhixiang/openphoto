@@ -6,7 +6,7 @@ use op_core::{BlendMode, Layer, LayerId, TiledImage};
 use crate::icons;
 use crate::ps_icons::Icon;
 use crate::state::{AppState, DocState};
-use crate::theme::{self, color, pt, size};
+use crate::theme::{self, color, pt};
 use crate::widgets;
 
 /// Photoshop 2026's Layers panel, measured (points from the panel body's
@@ -18,6 +18,13 @@ const FOOTER: f32 = pt(25.0);
 /// always there, with a 10 pt `#696969` pill thumb 3 pt from its sides and
 /// 2 pt from its ends when the rows overflow (Photoshop 2026).
 const GUTTER: f32 = pt(16.0);
+/// A row while it's dragged, and the line showing where it would go
+/// (Photoshop 2026, measured).
+const DRAGGED_ROW: egui::Color32 = egui::Color32::from_rgb(0x51, 0x62, 0x91);
+const DROP_LINE: egui::Color32 = egui::Color32::from_rgb(0x60, 0xa4, 0xf8);
+/// The rename field: `#454545`, no border, the selection `#4374b3`.
+const RENAME_FIELD: egui::Color32 = egui::Color32::from_gray(0x45);
+const RENAME_SELECTION: egui::Color32 = egui::Color32::from_rgb(0x43, 0x74, 0xb3);
 /// A lock a layer gets from its group (Photoshop 2026).
 const INHERITED_LOCK: egui::Color32 = egui::Color32::from_gray(0xa6);
 const SCROLL_TRACK: egui::Color32 = egui::Color32::from_gray(0x4a);
@@ -739,7 +746,9 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
             Pos2::new(eye_rect.right() + pt(1.0), lit.top()),
             Pos2::new(row_rect.right(), lit.bottom()),
         );
-        if selected {
+        if response.dragged() {
+            painter.rect_filled(body, 0, DRAGGED_ROW);
+        } else if selected {
             painter.rect_filled(body, 0, color::ROW_SELECTED);
         } else if response.hovered() {
             painter.rect_filled(body, 0, color::HOVER);
@@ -878,7 +887,9 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
             font,
             color::TEXT_BRIGHT,
         );
-        let bg = if selected {
+        let bg = if response.dragged() {
+            DRAGGED_ROW
+        } else if selected {
             color::ROW_SELECTED
         } else {
             color::PANEL
@@ -919,23 +930,40 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
     (from_background, None)
 }
 
-/// The inline text field for renaming a layer: Enter or clicking elsewhere
-/// commits, Escape cancels.
+/// The inline text field for renaming a layer, as in Photoshop 2026: a
+/// borderless `#454545` box from 2 pt before the name to 5 pt after it
+/// (growing as it's typed), 14.5 pt tall, centered on the row. Enter or
+/// clicking elsewhere commits, Escape cancels.
 fn rename_field(ui: &mut Ui, state: &mut DocState, id: LayerId, pos: Pos2, row: Rect) {
     let Some((_, text)) = &mut state.renaming else {
         return;
     };
+    let width = ui
+        .painter()
+        .layout_no_wrap(text.clone(), theme::body(), color::TEXT_BRIGHT)
+        .size()
+        .x;
     let field = Rect::from_min_max(
-        Pos2::new(pos.x - 4.0, row.center().y - size::FIELD_HEIGHT / 2.0),
+        Pos2::new(pos.x - pt(2.0), pos.y - pt(7.25)),
         Pos2::new(
-            row.right() - 50.0,
-            row.center().y + size::FIELD_HEIGHT / 2.0,
+            (pos.x + width + pt(5.0)).min(row.right() - GUTTER),
+            pos.y + pt(7.25),
         ),
     );
-    let edit = egui::TextEdit::singleline(text)
-        .font(theme::body())
-        .margin(Vec2::new(4.0, 2.0));
-    let r = ui.put(field, edit);
+    ui.painter().rect_filled(field, 0, RENAME_FIELD);
+    // A child that doesn't take room from the list's rows
+    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(field));
+    child.visuals_mut().selection.bg_fill = RENAME_SELECTION;
+    let r = child.add_sized(
+        field.size(),
+        egui::TextEdit::singleline(text)
+            .id_salt(("rename-layer", id.0))
+            .font(theme::body())
+            .text_color(color::TEXT_BRIGHT)
+            .frame(egui::Frame::NONE)
+            .margin(Vec2::new(pt(2.0), 0.0))
+            .vertical_align(egui::Align::Center),
+    );
     if !r.has_focus() && !r.lost_focus() {
         // First frame: focus the field with the whole name selected
         r.request_focus();
@@ -1010,12 +1038,18 @@ fn drop_layer(
         }
         return;
     }
+    // Two bands just under the boundary, across the rows (not the
+    // scrollbar's track): 1 pt, a half point gap, 1.5 pt
     let y = edges[gap];
     let clip = ui.clip_rect();
-    ui.painter().line_segment(
-        [Pos2::new(clip.left(), y), Pos2::new(clip.right(), y)],
-        Stroke::new(2.0, color::ACCENT),
-    );
+    let (left, right) = (clip.left(), clip.right() - GUTTER);
+    for (y0, y1) in [(0.5, 1.5), (2.0, 3.5)] {
+        ui.painter().rect_filled(
+            Rect::from_min_max(Pos2::new(left, y + pt(y0)), Pos2::new(right, y + pt(y1))),
+            0,
+            DROP_LINE,
+        );
+    }
 }
 
 /// The rows of the list, top to bottom, with their depth in groups:
