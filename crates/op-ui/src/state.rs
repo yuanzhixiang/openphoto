@@ -86,6 +86,10 @@ pub struct DocState {
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
     /// What the drag in progress snaps to (View › Snap).
     pub snap: Option<crate::snap::Targets>,
+    /// The History Brush's source: a history state's id, or `None` for the
+    /// snapshot of the document as opened (Photoshop's default). A state
+    /// that is no longer kept falls back to the snapshot.
+    pub history_source: Option<u64>,
     /// The last fadeable edit: the history state it made and its name.
     pub fade: Option<(u64, String)>,
     /// A Selection Brush stroke under way, and the overlay texture showing
@@ -223,6 +227,7 @@ impl DocState {
             quick: None,
             object_drag: None,
             snap: None,
+            history_source: None,
             fade: None,
             selection_stroke: None,
             overlay: None,
@@ -264,6 +269,16 @@ impl DocState {
     pub fn record(&mut self, name: &str) {
         self.history.record(&self.doc, name);
         self.pending_edit = false;
+    }
+
+    /// The document as the History Brush paints from it: its source state,
+    /// or the first state (the snapshot of the document as opened).
+    pub fn history_brush_snapshot(&self) -> Option<&op_core::document::Snapshot> {
+        let index = self
+            .history_source
+            .and_then(|id| self.history.index_of(id))
+            .unwrap_or(0);
+        self.history.snapshot(index)
     }
 
     /// Records an edit Edit › Fade can blend back (a filter, adjustment,

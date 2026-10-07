@@ -188,6 +188,7 @@ fn history_list(ui: &mut Ui, list: Rect, app: &mut AppState) {
     };
     let thumb = state.snapshot_thumbnail(ui.ctx());
     let mut jump = None;
+    let mut new_source = None;
 
     // egui draws the track only as wide as the handle, so the wider track is
     // painted here whenever the list overflows.
@@ -229,38 +230,63 @@ fn history_list(ui: &mut Ui, list: Rect, app: &mut AppState) {
             ui.spacing_mut().item_spacing.y = 0.0;
             let current = state.history.current();
             let title = state.doc.title.clone();
+            // The source shown is the one the History Brush would use
+            let source = state
+                .history_source
+                .filter(|&id| state.history.index_of(id).is_some());
 
-            if snapshot_row(ui, &title, thumb.as_ref()).clicked() {
+            let (row, pick) = snapshot_row(ui, &title, thumb.as_ref(), source.is_none());
+            if pick {
+                new_source = Some(None);
+            } else if row.clicked() {
                 jump = Some(0);
             }
             for (i, h) in state.history.states().iter().enumerate() {
                 // States after the current one have been undone and are drawn dimmed
-                if state_row(ui, icons::FILE_TEXT, &h.name, i == current, i > current).clicked() {
+                let (row, pick) = state_row(
+                    ui,
+                    icons::FILE_TEXT,
+                    &h.name,
+                    (i == current, i > current),
+                    source == Some(h.id),
+                );
+                if pick {
+                    new_source = Some(Some(h.id));
+                } else if row.clicked() {
                     jump = Some(i);
                 }
             }
         });
+    if let Some(source) = new_source {
+        state.history_source = source;
+    }
     if let Some(i) = jump {
         state.jump_to_state(i);
     }
 }
 
 /// The snapshot of the document as opened, shown above the states. Its left
-/// column carries the history-brush source marker.
-fn snapshot_row(ui: &mut Ui, title: &str, thumb: Option<&egui::TextureHandle>) -> egui::Response {
+/// column carries the history-brush source marker when it is the source
+/// (an empty box otherwise); the second value is a click on that column,
+/// which makes it the source.
+fn snapshot_row(
+    ui: &mut Ui,
+    title: &str,
+    thumb: Option<&egui::TextureHandle>,
+    is_source: bool,
+) -> (egui::Response, bool) {
     let (rect, response) =
         ui.allocate_exact_size(vec2(ui.available_width(), SNAPSHOT_ROW), Sense::click());
+    let pick = source_column(ui, rect, SNAPSHOT_SOURCE_X, is_source, "snapshot");
     let painter = ui.painter();
     if response.hovered() {
         painter.rect_filled(rect, 0, color::HOVER);
     }
     let cy = rect.center().y;
-    painter.text(
+    source_marker(
+        painter,
         pos2(rect.left() + SNAPSHOT_SOURCE_X, cy),
-        Align2::CENTER_CENTER,
-        icons::PAINT_BRUSH_BROAD,
-        theme::icon(pt(13.0)),
-        color::ICON,
+        is_source,
     );
 
     let thumb_box = Rect::from_min_size(
@@ -308,11 +334,54 @@ fn snapshot_row(ui: &mut Ui, title: &str, thumb: Option<&egui::TextureHandle>) -
         rect.right_bottom(),
     );
     painter.rect_filled(line, 0, GRIP_LINE);
-    response
+    (response, pick)
 }
 
-fn state_row(ui: &mut Ui, icon: &str, label: &str, selected: bool, undone: bool) -> egui::Response {
+/// The left column of a row: clicking it makes the row the History Brush's
+/// source.
+fn source_column(ui: &Ui, row: Rect, center_x: f32, is_source: bool, id: &str) -> bool {
+    let column = Rect::from_min_max(row.min, pos2(row.left() + center_x * 2.0, row.bottom()));
+    let response = ui.interact(column, ui.id().with(("history-source", id)), Sense::click());
+    response.clicked() && !is_source
+}
+
+/// The source marker: the history brush, or an empty box on rows that
+/// aren't the source.
+fn source_marker(painter: &egui::Painter, center: Pos2, is_source: bool) {
+    if is_source {
+        painter.text(
+            center,
+            Align2::CENTER_CENTER,
+            icons::PAINT_BRUSH_BROAD,
+            theme::icon(pt(13.0)),
+            color::ICON,
+        );
+    } else {
+        painter.rect(
+            Rect::from_center_size(center, Vec2::splat(CHECKBOX)),
+            1,
+            Color32::from_black_alpha(25),
+            Stroke::new(1.0, Color32::from_gray(0x44)),
+            StrokeKind::Inside,
+        );
+    }
+}
+
+fn state_row(
+    ui: &mut Ui,
+    icon: &str,
+    label: &str,
+    (selected, undone): (bool, bool),
+    is_source: bool,
+) -> (egui::Response, bool) {
     let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), ROW), Sense::click());
+    let pick = source_column(
+        ui,
+        rect,
+        CHECKBOX_X + CHECKBOX / 2.0,
+        is_source,
+        &format!("{}", rect.top()),
+    );
     let painter = ui.painter();
     if selected {
         painter.rect_filled(rect, 0, color::ROW_SELECTED);
@@ -328,17 +397,11 @@ fn state_row(ui: &mut Ui, icon: &str, label: &str, selected: bool, undone: bool)
     );
 
     let cy = rect.center().y;
-    // History-brush source checkbox (the brush itself isn't implemented yet)
-    let checkbox = Rect::from_min_size(
-        pos2(rect.left() + CHECKBOX_X, cy - CHECKBOX / 2.0),
-        Vec2::splat(CHECKBOX),
-    );
-    painter.rect(
-        checkbox,
-        1,
-        Color32::from_black_alpha(25),
-        Stroke::new(1.0, Color32::from_gray(0x44)),
-        StrokeKind::Inside,
+    // The History Brush's source box
+    source_marker(
+        painter,
+        pos2(rect.left() + CHECKBOX_X + CHECKBOX / 2.0, cy),
+        is_source,
     );
 
     let tint = if undone { UNDONE } else { color::TEXT };
@@ -356,7 +419,7 @@ fn state_row(ui: &mut Ui, icon: &str, label: &str, selected: bool, undone: bool)
         egui::FontId::proportional(FONT),
         tint,
     );
-    response
+    (response, pick)
 }
 
 fn bottom_bar(ui: &mut Ui, rect: Rect, app: &mut AppState) {

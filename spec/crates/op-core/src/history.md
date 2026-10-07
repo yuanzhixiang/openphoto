@@ -11,7 +11,7 @@ Implements an undo history modeled on Photoshop's History panel: a chronological
 - `current_id()`: the `id` of the current state. The UI layer remembers `current_id()` at save time; whenever it differs afterwards, there are unsaved changes (undoing back to the saved state counts as no changes).
 - `History::new(doc, name)`: takes the document's current contents as the first state (usually named `"Open"` or `"New"`).
 - `record(doc, name)`: called after an edit; records the document's current contents as a new state.
-- `states()`, `current()`: all states and the current state's index.
+- `states()`, `current()`: all states and the current state's index. `index_of(id)`: where the state with that id is now, `None` once it is no longer kept (the History Brush's source relies on it).
 - `can_undo()` / `can_redo()`, `undo_name()` / `redo_name()`.
 - `undo(doc)` / `redo(doc)`: step back / forward one step.
 - `jump(index, doc)`: jump to any state (clicking a row in the History panel).

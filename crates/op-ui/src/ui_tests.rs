@@ -6100,3 +6100,45 @@ fn screenshot_fade_dialog() {
     h.run_steps(3);
     shot_dialog(&mut h, "fade", 291.0, 144.0);
 }
+
+#[test]
+fn history_brush_source_can_be_any_state() {
+    use crate::commands::Command;
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // #141414, then filled white ("Fill"), then black ("Fill")
+    h.state_mut().state.foreground = Color::from_rgba8([255, 255, 255, 255]);
+    run_command(&mut h, Command::FillForeground);
+    h.state_mut().state.foreground = Color::from_rgba8([0, 0, 0, 255]);
+    run_command(&mut h, Command::FillForeground);
+    h.state_mut().state.history_open = true;
+    h.run_steps(3);
+    let k = 2.0 * UI_SCALE;
+    let at_px = |x: f32, y: f32| Pos2::new(x / k, y / k);
+    // The first "Fill" row's source box (its row is not jumped to)
+    click(&mut h, at_px(1522.0, 331.0));
+    let fill_white = active(&h).history.states()[1].id;
+    assert_eq!(active(&h).history_source, Some(fill_white));
+    assert_eq!(active(&h).history.current(), 2);
+    // The snapshot row's column makes the opened document the source again,
+    // and back
+    click(&mut h, at_px(1522.0, 228.0));
+    assert_eq!(active(&h).history_source, None);
+    click(&mut h, at_px(1522.0, 331.0));
+    assert_eq!(active(&h).history_source, Some(fill_white));
+    // The History Brush paints from that state: white, not black
+    h.state_mut().state.history_open = false;
+    h.state_mut().state.select_tool(Tool::HistoryBrush);
+    h.state_mut().state.history_brush.size = 30.0;
+    h.run_steps(2);
+    let (a, b) = (doc_point(&h, 100.0, 300.0), doc_point(&h, 200.0, 300.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    // (the brush's soft edge leaves it a little short of full)
+    assert!(layer_pixel(&h, 0, 150, 300)[0] >= 250);
+    // From the snapshot: the document as opened
+    h.state_mut().state.active().unwrap().history_source = None;
+    let (a, b) = (doc_point(&h, 100.0, 400.0), doc_point(&h, 200.0, 400.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert!((0x12..=0x14).contains(&layer_pixel(&h, 0, 150, 400)[0]));
+}

@@ -1525,10 +1525,10 @@ fn stroke_kind(
             }
         }
         Tool::HistoryBrush => {
-            // Paints from the document as it was opened (the History
-            // Brush's default source)
+            // Paints from its source in the History panel (by default the
+            // document as it was opened)
             let id = state.doc.active_layer.ok_or("")?;
-            let snapshot = state.history.snapshot(0).ok_or("")?;
+            let snapshot = state.history_brush_snapshot().ok_or("")?;
             let layer = op_core::Document::snapshot_layer(snapshot, id).ok_or_else(|| {
                 "Could not use the history brush because the history state does not contain \
                  a corresponding layer."

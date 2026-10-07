@@ -83,6 +83,11 @@ impl History {
         self.current
     }
 
+    /// Where the state with `id` is now, if it is still kept.
+    pub fn index_of(&self, id: u64) -> Option<usize> {
+        self.states.iter().position(|s| s.id == id)
+    }
+
     pub fn can_undo(&self) -> bool {
         self.current > 0
     }
