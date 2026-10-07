@@ -5427,6 +5427,55 @@ fn brush_presets_pressure_and_smoothing() {
 }
 
 #[test]
+fn define_pattern_and_the_pattern_stamp() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A red square, selected, becomes "Pattern 1"
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    select_rect(&mut h, 0.0, 0.0, 10.0, 10.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.run_steps(2);
+    run_command(&mut h, crate::commands::Command::DefinePattern);
+    h.run_steps(2);
+    assert!(h.state().state.define_pattern.is_some());
+    shot(&mut h, "pattern_name");
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(h.state().state.patterns.len(), 2);
+    assert_eq!(h.state().state.patterns[1].name, "Pattern 1");
+    assert_eq!(h.state().state.pattern, 1);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    // The Pattern Stamp paints it
+    h.state_mut()
+        .state
+        .select_tool(op_tools::Tool::PatternStamp);
+    h.run_steps(2);
+    let (a, b) = (doc_point(&h, 100.0, 300.0), doc_point(&h, 200.0, 300.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(composite_pixel(&mut h, 150, 300), [255, 0, 0, 255]);
+    // The picker lists both; the default comes back
+    click(&mut h, at_pt(712.5, 45.25));
+    h.get_by_label("Default Pattern").click();
+    h.run_steps(2);
+    assert_eq!(h.state().state.pattern, 0);
+    // A feathered (non-rectangular) selection is refused
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let (w, hh) = (doc.width, doc.height);
+        let r = op_core::selection::Rect {
+            x0: 0.0,
+            y0: 0.0,
+            x1: 50.0,
+            y1: 50.0,
+        };
+        doc.set_selection(Some(op_core::selection::Selection::ellipse(w, hh, r, true)));
+    }
+    run_command(&mut h, crate::commands::Command::DefinePattern);
+    assert!(h.state().state.alert.is_some());
+}
+
+#[test]
 fn airbrush_builds_up_while_held() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);

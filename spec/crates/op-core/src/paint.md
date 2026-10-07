@@ -46,7 +46,7 @@ The Mode of the Brush and Pencil, set with `Stroke::with_mode` (default Normal):
 
 ## Smudge, pattern, Background Eraser and Color Replacement
 
-- `Pattern(image)` (Pattern Stamp): the target pixel takes the pattern's color at (x mod width, y mod height), i.e. tiled from the document origin (Aligned); mixed in by coverage, opacity and flow.
+- `Pattern(image)` (Pattern Stamp): the target pixel takes the pattern's color at (x mod width, y mod height), i.e. tiled from the document origin (Aligned); mixed in by coverage, opacity and flow. With Impressionist (`with_impressionist`) the pattern is read at the dab's center, moved by −1, 0 or 1 quarter of the tip in each direction by the pixel's 3 × 3 block, so each dab lays daubs of a few colors instead of the pattern's detail.
 - `Smudge(strength)` (Smudge): does not use coverage but changes the current pixels directly: each dab pulls the pixels at the previous dab's position to the current position by "strength × tip coverage × selection" (reading everything before writing); the first dab only picks up color and changes nothing.
 - `BackgroundErase(ColorMatch)` (Background Eraser) and `ReplaceColor { color, mode, matching }` (Color Replacement; `mode` is the Hue / Saturation / Color / Luminosity blend formula) only change "matching" pixels:
   - Sample color (`Sampling`): `Continuous` takes the center of each dab (pixels before the stroke started), `Once` takes the center of the first dab, `Swatch(c)` uses the given color (the background color).
@@ -100,6 +100,7 @@ The options (`Stroke::with_retouch(Retouch { protect_tones, vibrance, protect_de
 
 ## Test coverage (brush shape and dynamics)
 
+- `impressionist_pattern_daubs`: a one-pixel stripe pattern comes through as stripes, and with Impressionist in blocks of one color.
 - `retouching_builds_up_and_its_options`: a second Burn pass darkens further, `build_up` darkens in place, Protect Tones keeps a 2:1 red/green ratio that plain Dodge changes, Vibrance saturates a strong red less, Protect Detail sharpens an edge less.
 - `elliptical_tips_and_spacing`: a 30% round tip is wide at 0° and tall at 90°; 100% spacing places dabs a diameter apart.
 - `pressure_controls_size_and_opacity`: at 20% pressure a size-controlled line is thin; at 50% an opacity-controlled stroke stays at half coverage over four passes.

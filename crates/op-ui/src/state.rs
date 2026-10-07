@@ -1340,6 +1340,16 @@ pub struct AppState {
     /// The pen's last pressure (0–1) while a tablet is used; None with a
     /// mouse, which paints at full pressure.
     pub pen_pressure: Option<f32>,
+    /// The patterns (the default, then those made with Edit › Define
+    /// Pattern...) and the one the Pattern Stamp paints.
+    pub patterns: Vec<Pattern>,
+    pub pattern: usize,
+    /// Edit › Define Pattern...'s Pattern Name dialog and the pixels it
+    /// names.
+    pub define_pattern: Option<(
+        crate::dialogs::new_preset::NewPresetDialog,
+        op_core::TiledImage,
+    )>,
     pub save_options: Option<crate::actions::PendingSave>,
     pub export_options: op_io::ExportOptions,
     pub gradient_editor: Option<(
@@ -1516,6 +1526,12 @@ impl Default for AppState {
             auto_saved: None,
             save_options: None,
             pen_pressure: None,
+            patterns: vec![Pattern {
+                name: "Default Pattern".into(),
+                image: default_pattern(),
+            }],
+            pattern: 0,
+            define_pattern: None,
             export_options: op_io::ExportOptions::default(),
             gradient_editor: None,
             new_crop_preset: None,
@@ -1695,6 +1711,7 @@ impl AppState {
             || self.equalize_dialog.is_some()
             || self.image_size_dialog.is_some()
             || self.new_crop_preset.is_some()
+            || self.define_pattern.is_some()
             || self.gradient_editor.is_some()
             || self.auto_options_dialog.is_some()
             || self.save_options.is_some()
@@ -1824,6 +1841,13 @@ impl AppState {
             self.foreground = c;
         }
     }
+}
+
+/// A pattern: its name and pixels.
+#[derive(Clone)]
+pub struct Pattern {
+    pub name: String,
+    pub image: op_core::TiledImage,
 }
 
 /// The Pattern Stamp's pattern: Photoshop's default, dots of green on dark

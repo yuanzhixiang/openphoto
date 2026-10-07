@@ -6,7 +6,7 @@ The small dialog asking for a preset's name, used by the Crop tool's New Crop Pr
 
 ## Layout (measured in Photoshop 2026's New Crop Preset dialog, 448 × 110 pt)
 
-- Centered on the window, with the shared frame and title (`common::frame`, 13 pt bold): "New Crop Preset".
+- Centered on the window, with the shared frame and title (`common::frame`, 13 pt bold) given by its user: "New Crop Preset" (Crop tool), "Pattern Name" (Edit › Define Pattern..., `commands.md`; Photoshop's also shows the pattern's thumbnail, which this one doesn't).
 - "Name:" (AppKit 12 pt text) right-aligned to x 55.5 at y 47.5; the field (60, 38)–(362.5, 57), `#454545` with a `#5e5e5e` border, focused with the suggested name selected on opening.
 - OK (377.5, 38.5)–(438.5, 64.5), the default button (grayed out while the name is empty); Cancel (377.5, 73.5)–(438.5, 99.5).
 

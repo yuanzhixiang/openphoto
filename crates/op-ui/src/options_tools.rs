@@ -2118,15 +2118,26 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
             MenuButton(x0, x1, label) => {
                 b.menu_button(x0, x1, label);
             }
-            Swatch(x0, x1, x2, white) => {
-                let fill = if white {
-                    egui::Color32::WHITE
-                } else {
-                    egui::Color32::from_rgb(0x16, 0x34, 0x18)
-                };
-                // The pattern's chevron sits in a box after it
-                let chevron_box = (!white).then_some((x1 - 1.0, x2));
-                b.swatch(x0, x1, fill, chevron_box);
+            Swatch(x0, x1, _, true) => b.swatch(x0, x1, egui::Color32::WHITE, None),
+            // The Pattern Stamp's pattern, its chevron the pattern picker
+            Swatch(x0, x1, x2, false) => {
+                let k = app.pattern.min(app.patterns.len().saturating_sub(1));
+                let image = app.patterns[k].image.clone();
+                let chevron = b.pattern_swatch(x0, x1, (x1 - 1.0, x2), &image);
+                let entries: Vec<_> = app
+                    .patterns
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| crate::native_popup::Entry::item(p.name.clone(), i == k))
+                    .collect();
+                if let Some(i) = crate::native_popup::dropdown(
+                    b.ui,
+                    &chevron,
+                    b.ui.id().with("patterns"),
+                    &entries,
+                ) {
+                    app.pattern = i;
+                }
             }
         }
     }

@@ -154,6 +154,14 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let tool = app.tool;
     let paint = app.paint_options(tool).copied();
     let dynamics = paint_dynamics(app, tool);
+    // The Pattern Stamp's pattern and Impressionist
+    let pattern = (tool == Tool::PatternStamp).then(|| {
+        let k = app.pattern.min(app.patterns.len().saturating_sub(1));
+        (
+            app.patterns[k].image.clone(),
+            app.flag("pattern.impressionist", false),
+        )
+    });
     let (foreground, background) = (app.foreground, app.background);
     let bucket = app.bucket;
     let view_options = app.view;
@@ -626,6 +634,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         replace_mode,
                         heal,
                         dynamics,
+                        pattern: pattern.clone(),
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
                 }
@@ -1643,7 +1652,7 @@ fn stroke_kind(
 
 /// Everything a stroke needs besides the document: the tool's brush, the
 /// foreground and background colors, and the retouching options.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct StrokeSettings {
     opts: crate::state::PaintOptions,
     colors: (op_core::Color, op_core::Color),
@@ -1658,6 +1667,8 @@ struct StrokeSettings {
     replace_mode: op_core::BlendMode,
     heal: crate::options_tools::HealOptions,
     dynamics: Dynamics,
+    /// The Pattern Stamp's pattern and Impressionist.
+    pattern: Option<(op_core::TiledImage, bool)>,
 }
 
 /// The pen and the smoothing a stroke uses.
@@ -1764,6 +1775,7 @@ fn paint_input(
         replace_mode,
         heal,
         dynamics,
+        pattern,
     } = settings;
     // The pen's pressure at this point (a mouse paints at full pressure)
     let pen = dynamics.pen.unwrap_or(1.0);
@@ -1806,6 +1818,12 @@ fn paint_input(
             (matching, replace_mode, opts.opacity),
             heal,
         ) {
+            Ok(op_core::paint::StrokeKind::Pattern(_)) if pattern.is_some() => Ok(
+                op_core::paint::StrokeKind::Pattern(pattern.clone().expect("checked").0),
+            ),
+            other => other,
+        };
+        let kind = match kind {
             Ok(kind) => kind,
             Err(message) => {
                 // Only once per press, and never an empty message
@@ -1833,6 +1851,9 @@ fn paint_input(
                     stroke = stroke.with_pressure(dynamics.pressure);
                 }
                 stroke = stroke.with_retouch(dynamics.retouch);
+                if let Some((_, impressionist)) = &pattern {
+                    stroke = stroke.with_impressionist(*impressionist);
+                }
                 let start = ui
                     .input(|i| i.pointer.press_origin())
                     .map(|p| to_doc(state, p, ppp));

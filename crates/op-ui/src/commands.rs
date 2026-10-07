@@ -261,6 +261,8 @@ pub enum Command {
     ClearRecent,
     /// Edit > Fade (opens the dialog for the last fadeable edit).
     Fade,
+    /// Edit > Define Pattern...
+    DefinePattern,
     /// View > Rulers.
     ToggleRulers,
     /// View > Extras.
@@ -518,7 +520,8 @@ impl Command {
             | Self::RulerUnits(_)
             | Self::OpenRecent(_)
             | Self::ClearRecent
-            | Self::QuickExportPng => return None,
+            | Self::QuickExportPng
+            | Self::DefinePattern => return None,
             Self::ToggleRulers => cmd(Key::R),
             Self::ToggleExtras => cmd(Key::H),
             Self::ToggleGuides => cmd(Key::Semicolon),
@@ -923,6 +926,7 @@ impl Command {
             | Self::CloseAll
             | Self::ExportAs
             | Self::QuickExportPng
+            | Self::DefinePattern
             | Self::LayerQuickExportPng
             | Self::LayerExportAs
             | Self::CanvasSize
@@ -1721,6 +1725,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
             }
         }
         Command::ClearRecent => app.recent.clear(),
+        Command::DefinePattern => define_pattern(app),
         Command::Fade => {
             if let Some(source) = app.active().and_then(|d| d.fade_source()) {
                 app.fade_dialog = Some(crate::state::FadeState {
@@ -2078,4 +2083,47 @@ fn same_file(a: &std::path::Path, b: &std::path::Path) -> bool {
         (Ok(a), Ok(b)) => a == b,
         _ => a == b,
     }
+}
+
+/// Edit › Define Pattern...: the merged pixels of the rectangular
+/// selection (the whole canvas without one) are named in the Pattern Name
+/// dialog. A selection that isn't a plain rectangle is refused, as
+/// Photoshop only offers the command for one.
+fn define_pattern(app: &mut AppState) {
+    let Some(state) = app.active() else {
+        return;
+    };
+    let doc = &state.doc;
+    let (x0, y0, x1, y1) = match doc.selection() {
+        None => (0, 0, doc.width, doc.height),
+        Some(sel) => {
+            let Some((x0, y0, x1, y1)) = sel.bounds() else {
+                return;
+            };
+            let full = (y0..y1).all(|y| (x0..x1).all(|x| sel.get(x, y) == 255));
+            if !full {
+                app.alert = Some(
+                    "Could not complete the Define Pattern command because the selected area \
+                     must be rectangular and not feathered."
+                        .into(),
+                );
+                return;
+            }
+            (x0, y0, x1, y1)
+        }
+    };
+    let all = doc.composite_rgba8();
+    let w = doc.width as usize;
+    let mut image = op_core::TiledImage::new(x1 - x0, y1 - y0);
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let i = (y as usize * w + x as usize) * 4;
+            image.set_pixel(x - x0, y - y0, [all[i], all[i + 1], all[i + 2], all[i + 3]]);
+        }
+    }
+    let name = format!("Pattern {}", app.patterns.len());
+    app.define_pattern = Some((
+        crate::dialogs::new_preset::NewPresetDialog::new("Pattern Name", name),
+        image,
+    ));
 }

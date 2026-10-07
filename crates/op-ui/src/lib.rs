@@ -566,6 +566,18 @@ impl OpenPhotoApp {
                 }
             }
         }
+        // Edit › Define Pattern...'s Pattern Name: OK adds the pattern and
+        // makes it the Pattern Stamp's
+        if let Some((mut dialog, image)) = self.state.define_pattern.take() {
+            match dialog.show(ctx) {
+                Outcome::Open => self.state.define_pattern = Some((dialog, image)),
+                Outcome::Cancel => {}
+                Outcome::Ok(name) => {
+                    self.state.patterns.push(state::Pattern { name, image });
+                    self.state.pattern = self.state.patterns.len() - 1;
+                }
+            }
+        }
         if let Some(mut dialog) = self.state.delete_crop_preset.take() {
             match dialog.show(ctx, None) {
                 DeleteOutcome::Open => self.state.delete_crop_preset = Some(dialog),

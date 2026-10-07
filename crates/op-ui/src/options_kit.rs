@@ -626,6 +626,64 @@ impl<'a> Bar<'a> {
         );
     }
 
+    /// The Pattern Stamp's pattern: `image` tiled from `x0` to `x1`, a
+    /// pixel a point, and its chevron in a box from `b0` to `b1`. Returns
+    /// the chevron box's response (the pattern picker).
+    pub fn pattern_swatch(
+        &mut self,
+        x0: f32,
+        x1: f32,
+        (b0, b1): (f32, f32),
+        image: &op_core::TiledImage,
+    ) -> egui::Response {
+        let rect = self.rect(x0, (5.0, 30.0), x1);
+        let painter = self.ui.painter_at(rect);
+        let (pw, ph) = (image.width().max(1), image.height().max(1));
+        let cols = (rect.width() / pt(1.0)).ceil() as u32;
+        let rows = (rect.height() / pt(1.0)).ceil() as u32;
+        for y in 0..rows {
+            for x in 0..cols {
+                let [r, g, b, a] = image.pixel(x % pw, y % ph);
+                let cell = Rect::from_min_size(
+                    rect.min + egui::vec2(x as f32 * pt(1.0), y as f32 * pt(1.0)),
+                    egui::vec2(pt(1.0), pt(1.0)),
+                );
+                painter.rect_filled(cell, 0, Color32::from_rgba_unmultiplied(r, g, b, a));
+            }
+        }
+        self.ui.painter().rect_stroke(
+            rect,
+            0,
+            Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+            StrokeKind::Inside,
+        );
+        let chevron = self.rect(b0, (5.0, 30.0), b1);
+        let response = self.ui.interact(
+            chevron,
+            self.ui.id().with("pattern-chevron"),
+            Sense::click(),
+        );
+        self.ui.painter().rect(
+            chevron,
+            CornerRadius::same(pt(2.0) as u8),
+            if response.hovered() {
+                Color32::from_gray(0x4f)
+            } else {
+                color::FIELD
+            },
+            Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+            StrokeKind::Inside,
+        );
+        crate::ps_icons::paint(
+            self.ui.painter(),
+            self.at((b0 + b1) / 2.0, 18.0),
+            Icon::Caret,
+            color::OPTIONS_ICON,
+            color::OPTIONS_BAR,
+        );
+        response
+    }
+
     /// Segmented buttons: one box split at `edges` (its left edge first and
     /// its right edge last) with a label per segment, the `chosen` one
     /// pressed. Returns the segment clicked.

@@ -279,6 +279,9 @@ pub struct Stroke {
     /// Distance travelled since the last dab.
     since_dab: f32,
     retouch: Retouch,
+    /// The Pattern Stamp's Impressionist, and the dab being placed.
+    impressionist: bool,
+    dab_center: (f32, f32),
 }
 
 impl Stroke {
@@ -349,7 +352,16 @@ impl Stroke {
             last_pressure: 1.0,
             dab_pressure: 1.0,
             retouch: Retouch::default(),
+            impressionist: false,
+            dab_center: (0.0, 0.0),
         })
+    }
+
+    /// The Pattern Stamp's Impressionist: each dab paints the pattern's
+    /// color near its center, in daubs.
+    pub fn with_impressionist(mut self, on: bool) -> Self {
+        self.impressionist = on;
+        self
     }
 
     /// The retouching tools' options.
@@ -441,6 +453,7 @@ impl Stroke {
             return;
         }
         let (w, h) = (doc.width, doc.height);
+        self.dab_center = (cx, cy);
         let tip = BrushTip {
             diameter: self.diameter(),
             ..self.tip
@@ -607,6 +620,17 @@ impl Stroke {
             }
             StrokeKind::Pattern(image) => {
                 let (pw, ph) = (image.width().max(1), image.height().max(1));
+                // Impressionist: the color at the dab's center, a little off
+                // by the pixel's quarter of the tip, so dabs read as daubs
+                let (x, y) = if self.impressionist {
+                    let (cx, cy) = self.dab_center;
+                    let r = (self.tip.diameter / 4.0).max(1.0);
+                    let jx = ((x / 3) % 3) as f32 - 1.0;
+                    let jy = ((y / 3) % 3) as f32 - 1.0;
+                    ((cx + jx * r).max(0.0) as u32, (cy + jy * r).max(0.0) as u32)
+                } else {
+                    (x, y)
+                };
                 let p = image.pixel(x % pw, y % ph);
                 [p[0], p[1], p[2], base[3].max(p[3])]
             }
@@ -1318,6 +1342,27 @@ mod tests {
             edge,
         );
         assert!(soft[0] > 200 && soft[0] < hard[0], "{soft:?} {hard:?}");
+    }
+
+    #[test]
+    fn impressionist_pattern_daubs() {
+        // A pattern of vertical stripes, one pixel each
+        let mut pattern = TiledImage::new(2, 1);
+        pattern.set_pixel(0, 0, [255, 0, 0, 255]);
+        pattern.set_pixel(1, 0, [0, 0, 255, 255]);
+        let (mut doc, id) = doc_with_layer();
+        let mut s =
+            Stroke::begin(&doc, HARD, StrokeKind::Pattern(pattern.clone()), 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 20.0, 20.0);
+        // Aligned: the stripes come through
+        assert_ne!(pixel(&doc, id, 19, 20), pixel(&doc, id, 20, 20));
+        // Impressionist: blocks of one color
+        let (mut doc, id) = doc_with_layer();
+        let mut s = Stroke::begin(&doc, HARD, StrokeKind::Pattern(pattern), 1.0, 1.0)
+            .unwrap()
+            .with_impressionist(true);
+        s.add_point(&mut doc, 20.0, 20.0);
+        assert_eq!(pixel(&doc, id, 18, 19), pixel(&doc, id, 19, 19));
     }
 
     #[test]
