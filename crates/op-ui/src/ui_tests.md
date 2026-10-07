@@ -82,3 +82,4 @@
 - `tool_icons_match_photoshops_extents`：69 个工具图标的亮像素外框与 Photoshop 测得的外框相差不超过 2 px（见 `tool_icons.md`）。`compare_tool_icons_with_photoshop`（`#[ignore]`）逐个与本地的 Photoshop 截图比对。
 - `options_bars_match_photoshops_layout`：按实测布局的选项栏，分隔线与各种框的边缘与 Photoshop 的数值（`PS_BAR_MARKS`）逐一对应，误差 1 pt。`screenshot_options_bars`（`#[ignore]`）截出每个工具的选项栏用于比对。
 - `selection_options_bars_edit_their_settings`：在选框栏的 Feather 输入 5 并回车生效、点第二个运算按钮切到 Add；魔棒 Tolerance 改为 60、Contiguous 取消勾选；磁性套索的 Frequency 改为 80 后保存在 `tool_settings`。
+- `brush_options_bars_edit_their_settings`：见 `options_tools.md`。

@@ -29,6 +29,7 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
   - **魔棒**：运算按钮 (110)；分隔线 222；「Sample Size:」(231.5) 与下拉 (298–413.5，Point Sample 到 101 by 101 Average)；「Tolerance:」(422.5) 与输入框 (476.5–524.5，0–255)；Anti-alias (532.5)、Contiguous (606.5)、Sample All Layers (690)；分隔线 803.5；Select Subject (815–906，不可用) 与其菜单按钮 (907–926)；「Select and Mask...」(945–1055)。
   - **对象选择**：运算按钮 (104 起)；分隔线 212；「Select people」菜单按钮 (217.5–305.5，右下角小三角)；刷新 (中心 323)、显示全部对象开关 (353)、齿轮 (383)；分隔线 400；模式下拉 (405–483，Rectangle / Lasso)；分隔线 487；Sample All Layers (492)、Hard Edge (602，默认勾选)；分隔线 677；反馈 (696)；分隔线 712；Select Subject (717.5–808.5) 与菜单按钮 (813.5–832.5)；「Select and Mask...」(837.5–947.5)。
   - **快速选择**：三个模式按钮（新选区 / 添加 / 减去，中心 129、157、185）；分隔线 202；笔刷选择器 (中心 221.5，大小 30)；分隔线 253；角度图标 (266) 与输入框 (277–318.5，0°)；分隔线 322.5；Sample All Layers (327.5)、Enhance Edge (437)；分隔线 530；Select Subject (543.5–634.5) 与菜单按钮；「Select and Mask...」(669.5–779.5)。
+  - **画笔类工具**（`options_tools.rs` 里的控件表，见 `options_tools.md`）：画笔、铅笔、颜色替换、混合器画笔、橡皮擦、背景橡皮擦、魔术橡皮擦、仿制图章、图案图章、历史记录画笔、历史记录艺术画笔、模糊、锐化、涂抹、减淡、加深、海绵，各控件的坐标见该文件。
   - 选区运算、Feather、Anti-alias（`AppState::marquee`，选框与套索共用；对象选择也用它的运算方式）与魔棒的 Tolerance、Anti-alias、Contiguous、Sample All Layers（`AppState::wand`）生效；其余设置（选框的固定宽高、磁性套索的参数与压感、魔棒的 Sample Size、对象选择与快速选择的各项）保存在 `AppState::tool_settings`，可以修改并保留，但还没有效果。Select Subject 不可用；Select and Mask 有选区时可点但还没有效果。
 - **吸管**：
   - 「Sample Size:」下拉：Point Sample、3 by 3 Average、5 by 5 Average、11 by 11 Average、31 by 31 Average、51 by 51 Average、101 by 101 Average，默认 Point Sample。
