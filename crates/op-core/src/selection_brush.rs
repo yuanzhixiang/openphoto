@@ -126,6 +126,9 @@ mod tests {
             hardness: 1.0,
             aliased: false,
             square: false,
+            angle: 0.0,
+            roundness: 1.0,
+            spacing: 0.25,
         }
     }
 

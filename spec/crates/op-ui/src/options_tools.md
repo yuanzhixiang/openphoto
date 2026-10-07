@@ -39,13 +39,13 @@ Each control carries a key:
 
 ## Brush picker
 
-Clicking it pops up Size (1–5000 px, logarithmic scale) and Hardness (not on the Pencil) sliders, which change the current tool's brush.
+Clicking it pops up the brush picker popup (`brush_presets.md`): Size, Hardness (not on the Pencil), the tip's angle and roundness, and the General Brushes presets. The options bar's "Always use pressure for opacity / size" toggles and Smoothing take effect (`document_view.md`).
 
 ## Known differences
 
 - Initial values of brush size, opacity, etc. are this program's defaults; the Photoshop screenshots show the state at the time (e.g. a 13 px brush).
 - The Mixer's smoothing icon, symmetry (butterfly), airbrush, angle gradient and similar icons are approximate redrawings from the screenshots; the Ruler's readout is currently fixed at 0.
-- The various panel toggles (Brush Settings, Clone Source) and buttons such as symmetry, smoothing options and ignore adjustment layers have no effect yet.
+- The various panel toggles (Brush Settings, Clone Source) and buttons such as symmetry, smoothing options (the gear) and ignore adjustment layers have no effect yet.
 - The Pen, Path Selection, Artboard, Perspective Crop, Slice, Slice Select and Frame tools themselves are not implemented yet; their options are only stored in `tool_settings`. Icons such as path operations/alignment/arrangement, gear, Warp Text and panel toggles are appearance only.
 - The Remove Tool and Adjustment Brush themselves are not implemented yet; their options are only stored in `tool_settings`. The Remove Tool's feedback icon and the Adjustment Brush's Select Subject icon are approximate drawings. The Move tool's bar is laid out separately by `options_bar.rs` (its separators and edges also match Photoshop).
 

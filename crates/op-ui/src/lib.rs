@@ -6,6 +6,7 @@
 mod actions;
 #[cfg(target_os = "macos")]
 mod app_kit;
+mod brush_presets;
 mod clipboard;
 #[cfg(target_os = "macos")]
 mod color_management;
@@ -967,6 +968,14 @@ impl OpenPhotoApp {
 impl eframe::App for OpenPhotoApp {
     fn raw_input_hook(&mut self, _ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         raw_input.events.append(&mut self.state.forward_events);
+        // The pen's pressure, from the event that brought this frame (the
+        // real app only: tests set it themselves)
+        #[cfg(target_os = "macos")]
+        if self.menu.is_some()
+            && let Some(pen) = app_kit::pen_pressure()
+        {
+            self.state.pen_pressure = pen;
+        }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {

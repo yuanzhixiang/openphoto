@@ -72,6 +72,9 @@ pub struct DocState {
     pub stroke: Option<(op_core::paint::Stroke, Tool)>,
     /// Where the last stroke ended; Shift-click draws a line from here.
     pub last_paint_point: Option<(f32, f32)>,
+    /// Smoothing: where the stroke being painted has got to (document
+    /// pixels), trailing the pointer.
+    pub paint_smooth: Option<(f32, f32)>,
     /// A lasso outline being drawn.
     pub lasso: Option<LassoPath>,
     /// The Patch or Content-Aware Move tool dragging the selection: where
@@ -224,6 +227,7 @@ impl DocState {
             movable: Default::default(),
             stroke: None,
             last_paint_point: None,
+            paint_smooth: None,
             renaming: None,
             lasso: None,
             patch_drag: None,
@@ -1204,6 +1208,15 @@ pub struct PaintOptions {
     pub opacity: f32,
     /// 0..=1; not used by the Pencil.
     pub flow: f32,
+    /// The tip's angle (degrees) and roundness (0.01–1), and its spacing
+    /// (a fraction of the diameter, Photoshop's 25%).
+    pub angle: f32,
+    pub roundness: f32,
+    pub spacing: f32,
+    /// What the pen's pressure controls (the brush preset's dynamics).
+    pub pressure: op_core::paint::Pressure,
+    /// The brush preset last picked (`brush_presets::GENERAL`).
+    pub preset: Option<usize>,
 }
 
 impl PaintOptions {
@@ -1216,6 +1229,15 @@ impl PaintOptions {
             hardness: 0.0,
             opacity: 1.0,
             flow: 1.0,
+            angle: 0.0,
+            roundness: 1.0,
+            spacing: 0.25,
+            pressure: op_core::paint::Pressure {
+                size: false,
+                opacity: false,
+                flow: false,
+            },
+            preset: None,
         }
     }
 
@@ -1223,8 +1245,7 @@ impl PaintOptions {
         Self {
             size: 1.0,
             hardness: 1.0,
-            opacity: 1.0,
-            flow: 1.0,
+            ..Self::brush()
         }
     }
 
@@ -1235,7 +1256,7 @@ impl PaintOptions {
             size: 13.0,
             hardness: 1.0,
             opacity,
-            flow: 1.0,
+            ..Self::brush()
         }
     }
 
@@ -1316,6 +1337,9 @@ pub struct AppState {
     pub auto_saved: Option<op_core::auto::Options>,
     /// A JPEG or PNG save waiting for its options, and the options last
     /// used (the next save starts from them).
+    /// The pen's last pressure (0–1) while a tablet is used; None with a
+    /// mouse, which paints at full pressure.
+    pub pen_pressure: Option<f32>,
     pub save_options: Option<crate::actions::PendingSave>,
     pub export_options: op_io::ExportOptions,
     pub gradient_editor: Option<(
@@ -1491,6 +1515,7 @@ impl Default for AppState {
             auto_options_dialog: None,
             auto_saved: None,
             save_options: None,
+            pen_pressure: None,
             export_options: op_io::ExportOptions::default(),
             gradient_editor: None,
             new_crop_preset: None,

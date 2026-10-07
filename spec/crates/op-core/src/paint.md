@@ -14,7 +14,7 @@ Matches Photoshop: within one stroke, "flow" keeps accumulating but never exceed
 
 ## Public interface
 
-- `BrushTip`: diameter (pixels), hardness (0 soft – 1 hard), `aliased` (Pencil: no anti-aliasing), `square` (the Eraser's Block: a square with side length equal to the diameter, fully covered inside and 0 outside). Dab alpha: 1 from the center out to `radius × hardness`, then falls off smoothly to 0 at 0.5 pixels outside the radius; even at hardness 1 a 1-pixel anti-aliased edge is kept. For the Pencil, a pixel whose center is within the radius is 1, otherwise 0 (the diameter counts as at least 1 pixel).
+- `BrushTip`: diameter (pixels), hardness (0 soft – 1 hard), `aliased` (Pencil: no anti-aliasing), `square` (the Eraser's Block: a square with side length equal to the diameter, fully covered inside and 0 outside), and the Brush Tip Shape: `angle` (degrees, counterclockwise on screen), `roundness` (0.01–1: the tip's height over its width) and `spacing` (the distance between dabs as a fraction of the diameter; Photoshop's default 0.25). An elliptical tip measures each pixel's offset in the tip's own frame (turned by the angle, its short axis stretched by 1 / roundness) before the falloff below. Dab alpha: 1 from the center out to `radius × hardness`, then falls off smoothly to 0 at 0.5 pixels outside the radius; even at hardness 1 a 1-pixel anti-aliased edge is kept. For the Pencil, a pixel whose center is within the radius is 1, otherwise 0 (the diameter counts as at least 1 pixel).
 - `StrokeKind`:
   - `Paint(rgb)`: paints color (Brush, Pencil). `Erase { background }`: Eraser.
   - `Dodge(range)`, `Burn(range)`: Dodge, Burn. `ToneRange` is Shadows / Midtones (default) / Highlights; `label()` is the menu text.
@@ -23,7 +23,12 @@ Matches Photoshop: within one stroke, "flow" keeps accumulating but never exceed
   - `Source { image, dx, dy }`: paints pixels from another image; target (x, y) takes (x − dx, y − dy) of `image`. Used by both the Clone Stamp (another spot on the same layer) and the History Brush (an earlier state of the layer, offset 0).
   `StrokeKind` can be cloned but is no longer `Copy` (`Source` carries an image).
 - `Stroke::begin(doc, tip, kind, opacity, flow)`: starts a stroke on the current layer and records the current selection.
-- `Stroke::add_point(doc, x, y)`: extends the stroke to (`x`, `y`). The first point places one dab; after that, dabs are placed along a straight line every 25% of the diameter (Photoshop's default spacing, at least 1 pixel), with spacing kept continuous across calls.
+- `Stroke::add_point(doc, x, y)`: extends the stroke to (`x`, `y`) at full pressure. The first point places one dab. After that, dabs are placed along a straight line every `spacing` × the current diameter (at least 1 pixel), and the spacing stays continuous across calls.
+- `Stroke::add_point_with_pressure(doc, x, y, pressure)`: the same with the pen's pressure there (0–1). Each dab's pressure is interpolated from the previous point's.
+- `Stroke::with_pressure(Pressure { size, opacity, flow })`: chooses what pressure controls. By default it controls nothing.
+  - **Size:** the dab's diameter is the tip's × pressure (at least 1 pixel), and spacing follows it.
+  - **Opacity:** a pixel's coverage moves toward the dab's pressure instead of toward 1, and never goes down. Light pressure therefore can't build up past its own level, however often it passes.
+  - **Flow:** the dab's flow is multiplied by the pressure.
 - `last_point()`: where the stroke ended; the UI uses it for Shift+click straight lines.
 - `StrokeError`: the reason a stroke cannot start; `message(tool)` gives Photoshop's message text:
   - No layer: "Could not use the {tool} because there is no layer to paint on."
@@ -78,10 +83,16 @@ The retouching tools first compute the "full strength" target value of the pre-s
 
 ## Known limitations
 
-- Only round brush tips; no brush presets, angle, roundness or spacing settings, and no pressure, Smoothing or airbrush.
-- No Smudge tool; the retouching tools' Protect Tones, Vibrance, Sample All Layers and Protect Detail options are not implemented.
+- Brush tips are computed (round or elliptical); there are no sampled tips. There is no airbrush build-up, and no scattering, texture, dual brush or color dynamics.
+- Pressure only reaches the dabs of the coverage-based strokes (painting, erasing, retouching). Smudge, healing and the color-matching strokes use the tip's own size.
+- The retouching tools' Protect Tones, Vibrance, Sample All Layers and Protect Detail options are not implemented.
 - The only brush mode is Normal; the Eraser only has Brush mode (no Pencil or Block mode).
 - Every dab triggers a full recomposite and upload of the document, so painting on large documents is slow.
+
+## Test coverage (brush shape and dynamics)
+
+- `elliptical_tips_and_spacing`: a 30% round tip is wide at 0° and tall at 90°; 100% spacing places dabs a diameter apart.
+- `pressure_controls_size_and_opacity`: at 20% pressure a size-controlled line is thin; at 50% an opacity-controlled stroke stays at half coverage over four passes.
 
 ## Layer groups
 

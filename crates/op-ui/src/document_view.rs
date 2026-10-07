@@ -153,6 +153,7 @@ pub fn fit_layers(state: &mut DocState, ppp: f32) {
 pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let tool = app.tool;
     let paint = app.paint_options(tool).copied();
+    let dynamics = paint_dynamics(app, tool);
     let (foreground, background) = (app.foreground, app.background);
     let bucket = app.bucket;
     let view_options = app.view;
@@ -624,6 +625,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         matching,
                         replace_mode,
                         heal,
+                        dynamics,
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
                 }
@@ -799,7 +801,13 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     crate::perspective_crop::draw(ui, state, &perspective_options, canvas_rect, ppp);
     let transforming = state.free_transform.is_some();
     if let (Some(opts), Some(p), false) = (paint, response.hover_pos(), transforming) {
-        brush_cursor(ui, canvas_rect, p, opts.size * state.view.zoom / ppp);
+        brush_cursor(
+            ui,
+            canvas_rect,
+            p,
+            opts.size * state.view.zoom / ppp,
+            (opts.angle, opts.roundness),
+        );
     }
     if status_bar(ui, state, status_rect, (status_info, &status_text), ppp) {
         app.status_menu = true;
@@ -1649,6 +1657,65 @@ struct StrokeSettings {
     /// The Color Replacement's Mode.
     replace_mode: op_core::BlendMode,
     heal: crate::options_tools::HealOptions,
+    dynamics: Dynamics,
+}
+
+/// The pen and the smoothing a stroke uses.
+#[derive(Clone, Copy, Default)]
+struct Dynamics {
+    /// The pen's pressure, if a tablet is in use.
+    pen: Option<f32>,
+    /// What pressure controls: the brush preset's, and Size or Opacity when
+    /// the options bar's "Always use pressure" buttons are on.
+    pressure: op_core::paint::Pressure,
+    /// Smoothing, 0–1.
+    smoothing: f32,
+}
+
+/// The current tool's pen dynamics and smoothing.
+fn paint_dynamics(app: &mut crate::state::AppState, tool: Tool) -> Dynamics {
+    let keys = match tool {
+        Tool::Brush => Some((
+            "brush.size_pressure",
+            "brush.opacity_pressure",
+            "brush.smoothing",
+            "10%",
+        )),
+        Tool::Pencil => Some((
+            "pencil.size_pressure",
+            "pencil.opacity_pressure",
+            "pencil.smoothing",
+            "10%",
+        )),
+        Tool::Eraser => Some((
+            "eraser.size_pressure",
+            "eraser.opacity_pressure",
+            "eraser.smoothing",
+            "0%",
+        )),
+        _ => None,
+    };
+    let mut pressure = app
+        .paint_options(tool)
+        .map(|o| o.pressure)
+        .unwrap_or_default();
+    let mut smoothing = 0.0;
+    if let Some((size, opacity, smooth, default)) = keys {
+        pressure.size |= app.flag(size, false);
+        pressure.opacity |= app.flag(opacity, false);
+        smoothing = app
+            .setting(smooth, default)
+            .trim()
+            .trim_end_matches('%')
+            .trim()
+            .parse::<f32>()
+            .map_or(0.0, |v| (v / 100.0).clamp(0.0, 1.0));
+    }
+    Dynamics {
+        pen: app.pen_pressure,
+        pressure,
+        smoothing,
+    }
 }
 
 fn paint_input(
@@ -1669,7 +1736,10 @@ fn paint_input(
         matching,
         replace_mode,
         heal,
+        dynamics,
     } = settings;
+    // The pen's pressure at this point (a mouse paints at full pressure)
+    let pen = dynamics.pen.unwrap_or(1.0);
     use crate::options_tools::EraserMode;
     let eraser = (tool == Tool::Eraser).then_some(eraser_mode);
     use op_core::paint::{BrushTip, Stroke};
@@ -1690,6 +1760,9 @@ fn paint_input(
             hardness: opts.hardness,
             aliased: tool == Tool::Pencil || eraser == Some(EraserMode::Pencil),
             square: block,
+            angle: opts.angle,
+            roundness: opts.roundness,
+            spacing: opts.spacing,
         };
         let just_pressed = ui.input(|i| i.pointer.primary_pressed());
         let start = ui
@@ -1728,6 +1801,10 @@ fn paint_input(
                 } else {
                     stroke
                 };
+                // Pressure only matters with a pen
+                if dynamics.pen.is_some() {
+                    stroke = stroke.with_pressure(dynamics.pressure);
+                }
                 let start = ui
                     .input(|i| i.pointer.press_origin())
                     .map(|p| to_doc(state, p, ppp));
@@ -1736,7 +1813,8 @@ fn paint_input(
                     stroke.add_point(&mut state.doc, x, y);
                 }
                 if let Some(p) = start.or(pointer) {
-                    stroke.add_point(&mut state.doc, p.x, p.y);
+                    stroke.add_point_with_pressure(&mut state.doc, p.x, p.y, pen);
+                    state.paint_smooth = Some((p.x, p.y));
                 }
                 state.stroke = Some((stroke, tool));
             }
@@ -1752,10 +1830,27 @@ fn paint_input(
     }
 
     if let Some((stroke, stroke_tool)) = &mut state.stroke {
+        let released = !ui.input(|i| i.pointer.primary_down());
         if let Some(p) = pointer {
-            stroke.add_point(&mut state.doc, p.x, p.y);
+            // Smoothing: the stroke trails the pointer on a string as long
+            // as 50 screen points at full smoothing, catching up a little
+            // each frame and all the way when the button is let go
+            let (x, y) = match state.paint_smooth {
+                Some((sx, sy)) if dynamics.smoothing > 0.0 && !released => {
+                    let string = dynamics.smoothing * 50.0 / state.view.zoom.max(0.01);
+                    let (dx, dy) = (p.x - sx, p.y - sy);
+                    let d = (dx * dx + dy * dy).sqrt();
+                    let pull = if d > string { 1.0 - string / d } else { 0.0 };
+                    let (sx, sy) = (sx + dx * pull, sy + dy * pull);
+                    let catch = 0.1;
+                    (sx + (p.x - sx) * catch, sy + (p.y - sy) * catch)
+                }
+                _ => (p.x, p.y),
+            };
+            state.paint_smooth = Some((x, y));
+            stroke.add_point_with_pressure(&mut state.doc, x, y, pen);
         }
-        if !ui.input(|i| i.pointer.primary_down()) {
+        if released {
             let (_, name) = stroke_names(*stroke_tool);
             state.last_paint_point = stroke.last_point();
             state.stroke = None;
@@ -1769,18 +1864,44 @@ fn paint_input(
 
 /// Photoshop's "normal brush tip" cursor: the brush outline, drawn in white
 /// over black so it shows on any background.
-fn brush_cursor(ui: &Ui, canvas: Rect, center: Pos2, diameter: f32) {
+fn brush_cursor(
+    ui: &Ui,
+    canvas: Rect,
+    center: Pos2,
+    diameter: f32,
+    (angle, roundness): (f32, f32),
+) {
     if diameter < 4.0 {
         return;
     }
     let painter = ui.painter_at(canvas);
     let r = diameter / 2.0;
-    painter.circle_stroke(
-        center,
-        r,
+    if roundness >= 1.0 {
+        painter.circle_stroke(
+            center,
+            r,
+            egui::Stroke::new(1.5, Color32::from_black_alpha(160)),
+        );
+        painter.circle_stroke(center, r, egui::Stroke::new(0.75, Color32::WHITE));
+        return;
+    }
+    // An elliptical tip: its outline, turned by the angle
+    let (s, c) = angle.to_radians().sin_cos();
+    let points: Vec<Pos2> = (0..=64)
+        .map(|k| {
+            let t = k as f32 / 64.0 * std::f32::consts::TAU;
+            let (u, v) = (t.cos() * r, t.sin() * r * roundness);
+            center + egui::vec2(u * c + v * s, -u * s + v * c)
+        })
+        .collect();
+    painter.add(egui::Shape::line(
+        points.clone(),
         egui::Stroke::new(1.5, Color32::from_black_alpha(160)),
-    );
-    painter.circle_stroke(center, r, egui::Stroke::new(0.75, Color32::WHITE));
+    ));
+    painter.add(egui::Shape::line(
+        points,
+        egui::Stroke::new(0.75, Color32::WHITE),
+    ));
 }
 
 /// Marching ants around the selection and the marquee being dragged.

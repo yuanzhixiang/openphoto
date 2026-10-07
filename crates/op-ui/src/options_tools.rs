@@ -2203,41 +2203,25 @@ fn picker(b: &mut Bar, app: &mut AppState, x: f32) {
         }
     };
     let response = b.brush_picker(x, &format!("{size:.0}"), size, hardness);
-    let mut size = size;
-    let mut hardness = hardness;
+    // The tools with paint options get the whole picker (Size, Hardness,
+    // the tip's angle and roundness, the presets); the others a size
+    let mut options = app
+        .paint_options(tool)
+        .copied()
+        .unwrap_or(crate::state::PaintOptions {
+            size,
+            hardness,
+            ..app.brush
+        });
     egui::Popup::from_response(&response)
         .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-        .show(|ui| {
-            ui.set_min_width(240.0);
-            ui.label("Size:");
-            ui.add(
-                egui::Slider::new(&mut size, 1.0..=crate::state::PaintOptions::MAX_SIZE)
-                    .logarithmic(true)
-                    .max_decimals(0)
-                    .suffix(" px"),
-            );
-            if tool != Tool::Pencil {
-                ui.label("Hardness:");
-                let mut pct = hardness * 100.0;
-                if ui
-                    .add(
-                        egui::Slider::new(&mut pct, 0.0..=100.0)
-                            .max_decimals(0)
-                            .suffix("%"),
-                    )
-                    .changed()
-                {
-                    hardness = pct / 100.0;
-                }
-            }
-        });
+        .show(|ui| crate::brush_presets::picker_ui(ui, &mut options, tool != Tool::Pencil));
     match app.paint_options(tool) {
-        Some(o) => {
-            o.size = size;
-            o.hardness = hardness;
+        Some(o) => *o = options,
+        None => {
+            *app.setting(picker_key(tool), picker_default(tool)) = format!("{:.0}", options.size)
         }
-        None => *app.setting(picker_key(tool), picker_default(tool)) = format!("{size:.0}"),
     }
 }
 

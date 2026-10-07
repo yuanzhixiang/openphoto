@@ -45,7 +45,7 @@ When started with the environment variable `OPENPHOTO_FRAME_LOG` set (any value)
 
 ## Input injection
 
-Before egui processes each frame's input, `raw_input_hook` appends the events in `AppState::forward_events` to the raw input and clears it. This is used when the menu's Cut/Copy/Paste is forwarded to an input field (see "Clipboard" in `commands.md`).
+Before egui processes each frame's input, `raw_input_hook` appends the events in `AppState::forward_events` to the raw input and clears it. This is used when the menu's Cut/Copy/Paste is forwarded to an input field (see "Clipboard" in `commands.md`). In the real app (with a native menu) it also reads the pen from the event that brought the frame (`app_kit::pen_pressure`) into `AppState::pen_pressure`: a tablet's pressure, or None after a mouse press or drag.
 
 ## Document tabs
 

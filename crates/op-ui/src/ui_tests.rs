@@ -5392,6 +5392,41 @@ fn selection_options_bars_edit_their_settings() {
 }
 
 #[test]
+fn brush_presets_pressure_and_smoothing() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    h.state_mut().state.select_tool(op_tools::Tool::Brush);
+    h.run_steps(2);
+    // The picker's General Brushes: Hard Round Pressure Size
+    click(&mut h, at_pt(124.0, 45.25));
+    h.get_by_label("Hard Round Pressure Size").click();
+    h.run_steps(2);
+    let brush = h.state().state.brush;
+    assert!(brush.pressure.size && brush.hardness == 1.0 && brush.size == 30.0);
+    h.key_press(egui::Key::Escape);
+    h.run_steps(1);
+    // A pen at 20% pressure paints a line a fifth as thick
+    *h.state_mut().state.setting("brush.smoothing", "10%") = "0%".into();
+    h.state_mut().state.pen_pressure = Some(0.2);
+    let (a, b) = (doc_point(&h, 100.0, 300.0), doc_point(&h, 300.0, 300.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(composite_pixel(&mut h, 200, 300)[0], 255);
+    assert_ne!(composite_pixel(&mut h, 200, 306)[0], 255);
+    // With a mouse the same preset paints at full size
+    h.state_mut().state.pen_pressure = None;
+    let (a, b) = (doc_point(&h, 100.0, 500.0), doc_point(&h, 300.0, 500.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(composite_pixel(&mut h, 200, 512)[0], 255);
+    // Full smoothing still ends the stroke where the pointer was let go
+    *h.state_mut().state.setting("brush.smoothing", "10%") = "100%".into();
+    let (a, b) = (doc_point(&h, 100.0, 700.0), doc_point(&h, 600.0, 700.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(composite_pixel(&mut h, 598, 700)[0], 255);
+}
+
+#[test]
 fn brush_options_bars_edit_their_settings() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);

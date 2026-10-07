@@ -26,6 +26,22 @@ pub struct BrushTip {
     pub aliased: bool,
     /// A square tip (the Eraser's Block mode) instead of a round one.
     pub square: bool,
+    /// Brush Tip Shape: the tip's angle (degrees, counterclockwise) and
+    /// roundness (its height over its width, 0.01–1), and the spacing
+    /// between dabs as a fraction of the diameter.
+    pub angle: f32,
+    pub roundness: f32,
+    pub spacing: f32,
+}
+
+/// Which of a stroke's settings follow the pen's pressure (Shape
+/// Dynamics' Size Jitter control and Transfer's Opacity and Flow Jitter
+/// controls set to Pen Pressure).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Pressure {
+    pub size: bool,
+    pub opacity: bool,
+    pub flow: bool,
 }
 
 impl BrushTip {
@@ -39,6 +55,17 @@ impl BrushTip {
                 0.0
             };
         }
+        // An elliptical tip: turn the offset into the tip's frame and
+        // stretch its short axis
+        let (dx, dy) = if self.angle != 0.0 || self.roundness < 1.0 {
+            let (s, c) = self.angle.to_radians().sin_cos();
+            // (screen y points down; the angle turns counterclockwise)
+            let u = dx * c - dy * s;
+            let v = dx * s + dy * c;
+            (u, v / self.roundness.clamp(0.01, 1.0))
+        } else {
+            (dx, dy)
+        };
         self.alpha((dx * dx + dy * dy).sqrt())
     }
 
@@ -235,6 +262,11 @@ pub struct Stroke {
     /// Where the previous dab was (Smudge).
     last_dab: Option<(f32, f32)>,
     last: Option<(f32, f32)>,
+    /// What the pen's pressure controls, and the pressure at the last
+    /// point and at the dab being placed.
+    pressure: Pressure,
+    last_pressure: f32,
+    dab_pressure: f32,
     /// Distance travelled since the last dab.
     since_dab: f32,
 }
@@ -303,7 +335,16 @@ impl Stroke {
             last_dab: None,
             last: None,
             since_dab: 0.0,
+            pressure: Pressure::default(),
+            last_pressure: 1.0,
+            dab_pressure: 1.0,
         })
+    }
+
+    /// Lets the pen's pressure control size, opacity and flow.
+    pub fn with_pressure(mut self, pressure: Pressure) -> Self {
+        self.pressure = pressure;
+        self
     }
 
     /// Paints in `mode` (the Brush's and Pencil's Mode).
@@ -312,30 +353,57 @@ impl Stroke {
         self
     }
 
-    /// Distance between dabs: 25% of the diameter, Photoshop's default spacing.
+    /// The tip's diameter at the current dab's pressure (Size: at least
+    /// one pixel).
+    fn diameter(&self) -> f32 {
+        if self.pressure.size {
+            (self.tip.diameter * self.dab_pressure).max(1.0)
+        } else {
+            self.tip.diameter
+        }
+    }
+
+    /// Distance between dabs: the tip's spacing (Photoshop's default 25%)
+    /// of the diameter at that moment.
     fn spacing(&self) -> f32 {
-        (self.tip.diameter * 0.25).max(1.0)
+        (self.diameter() * self.tip.spacing.clamp(0.01, 10.0)).max(1.0)
     }
 
     /// Continues the stroke to (`x`, `y`) in document pixels, placing dabs
     /// along the way. The first point places a single dab.
     pub fn add_point(&mut self, doc: &mut Document, x: f32, y: f32) {
+        self.add_point_with_pressure(doc, x, y, 1.0);
+    }
+
+    /// [`Self::add_point`] with the pen's pressure there (0–1), interpolated
+    /// from the last point's along the way.
+    pub fn add_point_with_pressure(&mut self, doc: &mut Document, x: f32, y: f32, pressure: f32) {
+        let pressure = pressure.clamp(0.0, 1.0);
         let Some((lx, ly)) = self.last else {
+            self.dab_pressure = pressure;
             self.dab(doc, x, y);
             self.last = Some((x, y));
+            self.last_pressure = pressure;
             return;
         };
         let (dx, dy) = (x - lx, y - ly);
         let dist = (dx * dx + dy * dy).sqrt();
-        let spacing = self.spacing();
-        let mut t = spacing - self.since_dab;
+        let p0 = self.last_pressure;
+        let mut t = self.spacing() - self.since_dab;
+        let mut placed = None;
         while t <= dist {
             let f = t / dist;
+            self.dab_pressure = p0 + (pressure - p0) * f;
             self.dab(doc, lx + dx * f, ly + dy * f);
-            t += spacing;
+            placed = Some(t);
+            t += self.spacing();
         }
-        self.since_dab = dist - (t - spacing);
+        self.since_dab = match placed {
+            Some(at) => dist - at,
+            None => self.since_dab + dist,
+        };
         self.last = Some((x, y));
+        self.last_pressure = pressure;
     }
 
     fn dab(&mut self, doc: &mut Document, cx: f32, cy: f32) {
@@ -348,7 +416,23 @@ impl Stroke {
             return;
         }
         let (w, h) = (doc.width, doc.height);
-        let r = self.tip.diameter / 2.0 + 1.0;
+        let tip = BrushTip {
+            diameter: self.diameter(),
+            ..self.tip
+        };
+        // (an elliptical tip's long axis is the diameter)
+        let r = tip.diameter / 2.0 + 1.0;
+        // Pressure lowers this dab's flow, or the coverage it can reach
+        let flow = if self.pressure.flow {
+            self.flow * self.dab_pressure
+        } else {
+            self.flow
+        };
+        let cap = if self.pressure.opacity {
+            self.dab_pressure
+        } else {
+            1.0
+        };
         let x0 = (cx - r).floor().max(0.0) as u32;
         let y0 = (cy - r).floor().max(0.0) as u32;
         let x1 = ((cx + r).ceil().max(0.0) as u32).min(w);
@@ -379,7 +463,7 @@ impl Stroke {
         for y in y0..y1 {
             for x in x0..x1 {
                 let (px, py) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
-                let a = self.tip.coverage(px, py);
+                let a = tip.coverage(px, py);
                 if a <= 0.0 {
                     continue;
                 }
@@ -394,7 +478,9 @@ impl Stroke {
                 });
                 let i = ((y % TILE_SIZE) * TILE_SIZE + x % TILE_SIZE) as usize;
                 let c = &mut cov[i];
-                *c += (1.0 - *c) * a * self.flow;
+                if *c < cap {
+                    *c += (cap - *c) * a * flow;
+                }
                 let selected = self
                     .selection
                     .as_ref()
@@ -835,6 +921,9 @@ mod tests {
         hardness: 1.0,
         aliased: false,
         square: false,
+        angle: 0.0,
+        roundness: 1.0,
+        spacing: 0.25,
     };
 
     #[test]
@@ -928,6 +1017,9 @@ mod tests {
             hardness: 1.0,
             aliased: true,
             square: false,
+            angle: 0.0,
+            roundness: 1.0,
+            spacing: 0.25,
         };
         let mut s = Stroke::begin(&doc, tip, StrokeKind::Paint([0, 0, 0]), 1.0, 1.0).unwrap();
         s.add_point(&mut doc, 20.0, 20.0);
@@ -1093,6 +1185,72 @@ mod tests {
             .with_mode(PaintMode::Clear);
         s.add_point(&mut doc, 20.0, 20.0);
         assert_eq!(pixel(&doc, id, 20, 20)[3], 0);
+    }
+
+    #[test]
+    fn elliptical_tips_and_spacing() {
+        // A flat tip (roundness 30%) at 0°: wide, short
+        let tip = BrushTip {
+            diameter: 20.0,
+            roundness: 0.3,
+            ..HARD
+        };
+        assert!(tip.coverage(9.0, 0.0) > 0.9);
+        assert!(tip.coverage(0.0, 5.0) < 0.1);
+        // Turned 90°: tall, narrow
+        let tall = BrushTip { angle: 90.0, ..tip };
+        assert!(tall.coverage(0.0, 9.0) > 0.9);
+        assert!(tall.coverage(5.0, 0.0) < 0.1);
+        // Spacing 100%: dabs a diameter apart along a line
+        let (mut doc, id) = doc_with_layer();
+        let tip = BrushTip {
+            diameter: 4.0,
+            spacing: 1.0,
+            ..HARD
+        };
+        let mut s = Stroke::begin(&doc, tip, StrokeKind::Paint([0, 0, 0]), 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 4.0, 20.0);
+        s.add_point(&mut doc, 36.0, 20.0);
+        // (dabs at 4, 8, 12...: a gap between 4 and 8 halfway is covered by
+        // neither centre's core but the edges touch)
+        assert_eq!(pixel(&doc, id, 8, 20)[3], 255);
+        assert_eq!(pixel(&doc, id, 40, 20)[3], 0);
+    }
+
+    #[test]
+    fn pressure_controls_size_and_opacity() {
+        // Size: light pressure paints a thin line
+        let (mut doc, id) = doc_with_layer();
+        let tip = BrushTip {
+            diameter: 20.0,
+            ..HARD
+        };
+        let size = Pressure {
+            size: true,
+            ..Default::default()
+        };
+        let mut s = Stroke::begin(&doc, tip, StrokeKind::Paint([0, 0, 0]), 1.0, 1.0)
+            .unwrap()
+            .with_pressure(size);
+        s.add_point_with_pressure(&mut doc, 10.0, 20.0, 0.2);
+        s.add_point_with_pressure(&mut doc, 40.0, 20.0, 0.2);
+        assert_eq!(pixel(&doc, id, 25, 20)[3], 255);
+        assert_eq!(pixel(&doc, id, 25, 26)[3], 0);
+        // Opacity: half pressure reaches half coverage, however often
+        let (mut doc, id) = doc_with_layer();
+        let opacity = Pressure {
+            opacity: true,
+            ..Default::default()
+        };
+        let mut s = Stroke::begin(&doc, tip, StrokeKind::Paint([0, 0, 0]), 1.0, 1.0)
+            .unwrap()
+            .with_pressure(opacity);
+        for _ in 0..4 {
+            s.add_point_with_pressure(&mut doc, 10.0, 20.0, 0.5);
+            s.add_point_with_pressure(&mut doc, 40.0, 20.0, 0.5);
+        }
+        let a = pixel(&doc, id, 25, 20)[3];
+        assert!(a.abs_diff(128) <= 2, "{a}");
     }
 
     #[test]

@@ -73,6 +73,47 @@ pub fn screen_ppi() -> Option<f32> {
     }
 }
 
+/// What the event being handled says about the pen: `Some(Some(p))` for a
+/// tablet (a mouse press or drag whose subtype is a tablet point, or a
+/// tablet point itself) with its pressure 0–1, `Some(None)` for a mouse
+/// press or drag, `None` for any other event.
+pub fn pen_pressure() -> Option<Option<f32>> {
+    /// `NSEventTypeLeftMouseDown`, `NSEventTypeLeftMouseDragged`,
+    /// `NSEventTypeTabletPoint`
+    const DOWN: usize = 1;
+    const DRAGGED: usize = 6;
+    const TABLET_POINT: usize = 23;
+    /// `NSEventSubtypeTabletPoint`
+    const SUBTYPE_TABLET: i16 = 1;
+    let class = AnyClass::get(c"NSApplication")?;
+    // SAFETY: called on the main thread; `subtype` and `pressure` are only
+    // asked of mouse and tablet events, which have them
+    unsafe {
+        let app: *mut AnyObject = msg_send![class, sharedApplication];
+        if app.is_null() {
+            return None;
+        }
+        let event: *mut AnyObject = msg_send![app, currentEvent];
+        if event.is_null() {
+            return None;
+        }
+        let kind: usize = msg_send![event, type];
+        let tablet = match kind {
+            TABLET_POINT => true,
+            DOWN | DRAGGED => {
+                let subtype: i16 = msg_send![event, subtype];
+                subtype == SUBTYPE_TABLET
+            }
+            _ => return None,
+        };
+        if !tablet {
+            return Some(None);
+        }
+        let pressure: f32 = msg_send![event, pressure];
+        Some(Some(pressure.clamp(0.0, 1.0)))
+    }
+}
+
 /// Whether Option is held right now (`NSEvent.modifierFlags`), for menu
 /// commands that change with it.
 pub fn option_held() -> bool {

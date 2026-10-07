@@ -60,6 +60,9 @@ pub fn input(
             hardness: opts.hardness,
             aliased: false,
             square: false,
+            angle: 0.0,
+            roundness: 1.0,
+            spacing: 0.25,
         };
         let (w, h) = (state.doc.width, state.doc.height);
         let mut stroke = SelectionStroke::new(
