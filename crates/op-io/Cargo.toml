@@ -9,3 +9,4 @@ license.workspace = true
 op-core.workspace = true
 image.workspace = true
 thiserror.workspace = true
+flate2.workspace = true

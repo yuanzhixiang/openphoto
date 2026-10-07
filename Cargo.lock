@@ -2330,6 +2330,7 @@ dependencies = [
 name = "op-io"
 version = "0.2.2"
 dependencies = [
+ "flate2",
  "image",
  "op-core",
  "thiserror 2.0.21",

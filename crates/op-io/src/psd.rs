@@ -505,6 +505,11 @@ impl Reader<'_> {
     fn i32(&mut self) -> Result<i32, IoError> {
         Ok(i32::from_be_bytes(self.take()?))
     }
+    /// The bytes left after the current position.
+    fn remaining(&self) -> usize {
+        self.0.get_ref().len().saturating_sub(self.pos() as usize)
+    }
+
     fn pos(&self) -> u64 {
         self.0.position()
     }
@@ -540,10 +545,36 @@ fn read_channel(r: &mut Reader, len: usize, rows: usize, cols: usize) -> Result<
             }
             plane
         }
-        _ => return Err(invalid("ZIP-compressed layers are not supported")),
+        2 | 3 => {
+            let data = r.bytes(len.saturating_sub(2))?;
+            unzip(data, rows * cols, (compression == 3).then_some(cols))?
+        }
+        _ => return Err(invalid("unknown channel compression")),
     };
     r.seek(end);
     Ok(plane)
+}
+
+/// ZIP channel data: a zlib stream of `size` bytes; with prediction
+/// (`Some(cols)`) each row holds differences from the byte before.
+fn unzip(data: &[u8], size: usize, prediction: Option<usize>) -> Result<Vec<u8>, IoError> {
+    use std::io::Read;
+    let mut out = Vec::with_capacity(size);
+    flate2::read::ZlibDecoder::new(data)
+        .take(size as u64)
+        .read_to_end(&mut out)
+        .map_err(|_| invalid("damaged ZIP data"))?;
+    if out.len() < size {
+        return Err(invalid("damaged ZIP data"));
+    }
+    if let Some(cols) = prediction.filter(|&c| c > 0) {
+        for row in out.chunks_mut(cols) {
+            for i in 1..row.len() {
+                row[i] = row[i].wrapping_add(row[i - 1]);
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn lock_bits(layer: &Layer) -> u32 {
@@ -863,7 +894,19 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                     planes.push(plane);
                 }
             }
-            _ => return Err(invalid("ZIP-compressed image data is not supported")),
+            2 | 3 => {
+                // One stream for all the channels
+                let rest = r.bytes(r.remaining())?;
+                let all = unzip(
+                    rest,
+                    rows * cols * merged_channels,
+                    (compression == 3).then_some(cols),
+                )?;
+                for c in 0..channels {
+                    planes.push(all[c * rows * cols..(c + 1) * rows * cols].to_vec());
+                }
+            }
+            _ => return Err(invalid("unknown image data compression")),
         }
         let mut rgba = Vec::with_capacity(rows * cols * 4);
         for k in 0..rows * cols {
@@ -886,6 +929,38 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zip_channels_with_and_without_prediction() {
+        use std::io::Write;
+        let plane: Vec<u8> = (0..12).map(|i| (i * 20) as u8).collect();
+        let zip = |data: &[u8]| {
+            let mut e = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+            e.write_all(data).unwrap();
+            e.finish().unwrap()
+        };
+        // Compression 2: the plane itself
+        let mut bytes = 2u16.to_be_bytes().to_vec();
+        bytes.extend(zip(&plane));
+        let mut r = Reader(std::io::Cursor::new(&bytes[..]));
+        assert_eq!(read_channel(&mut r, bytes.len(), 3, 4).unwrap(), plane);
+        // Compression 3: each row's differences
+        let deltas: Vec<u8> = plane
+            .chunks(4)
+            .flat_map(|row| {
+                let mut d = vec![row[0]];
+                d.extend(row.windows(2).map(|w| w[1].wrapping_sub(w[0])));
+                d
+            })
+            .collect();
+        let mut bytes = 3u16.to_be_bytes().to_vec();
+        bytes.extend(zip(&deltas));
+        let mut r = Reader(std::io::Cursor::new(&bytes[..]));
+        assert_eq!(read_channel(&mut r, bytes.len(), 3, 4).unwrap(), plane);
+        // A damaged stream is an error, not a panic
+        let mut r = Reader(std::io::Cursor::new(&[0u8, 2, 1, 2, 3][..]));
+        assert!(read_channel(&mut r, 5, 3, 4).is_err());
+    }
 
     #[test]
     fn packbits_round_trip() {
