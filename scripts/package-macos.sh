@@ -1,6 +1,12 @@
 #!/bin/bash
 # Builds OpenPhoto.app as a universal (Apple Silicon + Intel) binary and
 # zips it for a GitHub release: dist/OpenPhoto-<version>-macos-universal.zip
+#
+# SIGN_IDENTITY   a Developer ID Application identity to sign with
+#                 (hardened runtime, timestamped); ad hoc without it
+# NOTARY_PROFILE  a notarytool keychain profile, created once with
+#                 `xcrun notarytool store-credentials <name>`; the app is
+#                 then notarized and the ticket stapled
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,10 +29,23 @@ strip -x "$APP/Contents/MacOS/openphoto"
 sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$APP/Contents/Info.plist"
 cp packaging/macos/OpenPhoto.icns "$APP/Contents/Resources/"
 
-# Ad-hoc signature: required to run on Apple Silicon; not notarized
-codesign --force --deep --sign - "$APP"
+if [ -n "${SIGN_IDENTITY:-}" ]; then
+  codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+else
+  # Ad-hoc signature: enough to run on Apple Silicon, not to pass Gatekeeper
+  codesign --force --sign - "$APP"
+fi
+codesign --verify --deep --strict "$APP"
 
 ZIP="$DIST/OpenPhoto-$VERSION-macos-universal.zip"
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
+
+if [ -n "${NOTARY_PROFILE:-}" ]; then
+  xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+  xcrun stapler staple "$APP"
+  spctl --assess --type execute --verbose "$APP"
+  rm -f "$ZIP"
+  ditto -c -k --keepParent "$APP" "$ZIP"
+fi
 shasum -a 256 "$ZIP"
