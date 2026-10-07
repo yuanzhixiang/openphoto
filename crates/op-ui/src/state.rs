@@ -1079,6 +1079,9 @@ pub struct AppState {
     pub last_transform: Option<op_core::transform::Projective>,
     /// The last filter applied, for Filter > Last Filter.
     pub last_filter: Option<op_core::filter::Filter>,
+    /// Options bar settings that nothing reads yet (Photoshop's options
+    /// the app doesn't implement), by key, so they keep what's typed.
+    pub tool_settings: std::collections::HashMap<&'static str, String>,
     /// Each filter dialog's last settings, to open with next time.
     pub filter_settings: std::collections::HashMap<crate::dialogs::AdjustKind, Vec<String>>,
     /// An adjustment or filter dialog, while open.
@@ -1182,6 +1185,7 @@ impl Default for AppState {
             adjust_dialog: None,
             last_filter: None,
             filter_settings: Default::default(),
+            tool_settings: Default::default(),
             last_transform: None,
             bucket: Default::default(),
             color_picker: None,
@@ -1221,6 +1225,22 @@ impl AppState {
     }
 
     /// Makes `tool` current and the tool shown in its toolbar slot.
+    /// An options bar setting nothing reads yet, starting at `default`.
+    pub fn setting(&mut self, key: &'static str, default: &str) -> &mut String {
+        self.tool_settings
+            .entry(key)
+            .or_insert_with(|| default.to_owned())
+    }
+
+    /// A checkbox setting nothing reads yet.
+    pub fn flag(&mut self, key: &'static str, default: bool) -> bool {
+        self.setting(key, if default { "1" } else { "0" }) == "1"
+    }
+
+    pub fn set_flag(&mut self, key: &'static str, on: bool) {
+        *self.setting(key, "0") = if on { "1" } else { "0" }.to_owned();
+    }
+
     pub fn select_tool(&mut self, tool: Tool) {
         self.tool = tool;
         self.tool_slots[tool.slot()] = tool;

@@ -19,6 +19,7 @@ mod icons;
 #[cfg(target_os = "macos")]
 mod menu;
 mod options_bar;
+mod options_kit;
 mod panels;
 mod ps_icons;
 mod rulers;

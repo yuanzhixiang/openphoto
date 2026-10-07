@@ -3855,3 +3855,219 @@ fn tool_icons_match_photoshops_extents() {
     // Every tool has a drawing but Remove (its Photoshop icon is unmeasured)
     assert_eq!(PS_ICON_EXTENTS.len(), 69);
 }
+
+/// Every tool's options bar, cropped as the Photoshop captures are (window
+/// rows 56–126 at 2x), into `target/ui-shots/bars/<Tool>.png`.
+#[test]
+#[ignore]
+fn screenshot_options_bars() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/ui-shots/bars");
+    std::fs::create_dir_all(&dir).unwrap();
+    for slot in op_tools::TOOLBAR {
+        for &tool in *slot {
+            h.state_mut().state.select_tool(tool);
+            h.run_steps(3);
+            let image = h.render().expect("render frame");
+            let bar = image::imageops::crop_imm(&image, 0, 56, image.width(), 70).to_image();
+            bar.save(dir.join(format!("{tool:?}.png"))).unwrap();
+        }
+    }
+}
+
+/// Separators and frame edges (fields, pop-ups, buttons, pressed boxes)
+/// along each tool's options bar, measured on Photoshop 2026 (bar points,
+/// from x 104): the bars laid out with `options_kit`.
+type BarMarks = (&'static str, &'static [f32], &'static [f32]);
+const PS_BAR_MARKS: &[BarMarks] = &[
+    (
+        "RectangularMarquee",
+        &[222.0, 412.0, 749.0],
+        &[
+            110.0, 135.0, 276.0, 329.0, 453.5, 530.5, 574.0, 614.5, 699.5, 740.0, 760.5, 869.5,
+        ],
+    ),
+    (
+        "EllipticalMarquee",
+        &[222.0, 412.0, 749.0],
+        &[
+            110.0, 135.0, 276.0, 329.0, 453.5, 530.5, 574.0, 614.5, 699.5, 740.0, 760.5, 869.5,
+        ],
+    ),
+    (
+        "SingleRowMarquee",
+        &[222.0, 410.0, 747.0],
+        &[
+            110.0, 135.0, 274.0, 327.0, 451.5, 528.5, 572.0, 612.5, 697.5, 738.0, 758.5, 867.5,
+        ],
+    ),
+    (
+        "SingleColumnMarquee",
+        &[222.0, 410.0, 747.0],
+        &[
+            110.0, 135.0, 274.0, 327.0, 451.5, 528.5, 572.0, 612.5, 697.5, 738.0, 758.5, 867.5,
+        ],
+    ),
+    (
+        "Lasso",
+        &[222.0, 412.0],
+        &[110.0, 135.0, 276.0, 329.0, 423.5, 532.5],
+    ),
+    (
+        "PolygonalLasso",
+        &[222.0, 412.0],
+        &[110.0, 135.0, 276.0, 329.0, 423.5, 532.5],
+    ),
+    (
+        "MagneticLasso",
+        &[222.0, 412.0, 701.0, 748.0],
+        &[
+            110.0, 135.0, 276.0, 329.0, 457.5, 498.5, 557.5, 598.5, 666.0, 692.0, 759.5, 868.5,
+        ],
+    ),
+    (
+        "MagicWand",
+        &[222.0, 803.5],
+        &[
+            110.0, 135.0, 298.0, 412.5, 476.5, 523.5, 815.0, 905.0, 907.0, 925.0, 945.0, 1054.0,
+        ],
+    ),
+    (
+        "ObjectSelection",
+        &[212.0, 400.0, 487.0, 677.0, 712.0],
+        &[
+            104.0, 129.0, 217.5, 304.5, 405.0, 482.0, 717.5, 807.5, 813.5, 831.5, 837.5, 946.5,
+        ],
+    ),
+    (
+        "QuickSelection",
+        &[202.0, 253.0, 322.5, 530.0],
+        &[
+            116.0, 141.0, 277.0, 317.5, 543.5, 633.5, 635.5, 653.5, 669.5, 778.5,
+        ],
+    ),
+];
+
+/// The x (bar points) of separators and of frame edges in an options bar
+/// cropped as `screenshot_options_bars` crops it (2x).
+fn bar_marks(bar: &image::RgbaImage) -> (Vec<f32>, Vec<f32>) {
+    let gray = |x: u32, y: u32| {
+        let p = bar.get_pixel(x, y).0;
+        (p[0] as i32 + p[1] as i32 + p[2] as i32) / 3
+    };
+    let width = bar.width().min(2200);
+    let runs = |hit: &dyn Fn(u32) -> bool| {
+        let mut out = Vec::new();
+        let mut inside = false;
+        for x in 208..width {
+            let h = hit(x);
+            if h && !inside {
+                out.push(x as f32 / 2.0);
+            }
+            inside = h;
+        }
+        out
+    };
+    let seps = runs(&|x| (14..54).all(|y| (gray(x, y) - 62).abs() <= 3));
+    let edges = runs(&|x| {
+        (20..46)
+            .filter(|&y| (91..=105).contains(&gray(x, y)))
+            .count()
+            >= 20
+    });
+    (seps, edges)
+}
+
+#[test]
+fn options_bars_match_photoshops_layout() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let mut off = Vec::new();
+    for &(name, seps, edges) in PS_BAR_MARKS {
+        let tool = op_tools::TOOLBAR
+            .iter()
+            .flat_map(|s| s.iter())
+            .find(|t| format!("{t:?}") == name)
+            .copied()
+            .unwrap();
+        h.state_mut().state.select_tool(tool);
+        h.run_steps(3);
+        let image = h.render().expect("render frame");
+        let bar = image::imageops::crop_imm(&image, 0, 56, image.width(), 70).to_image();
+        let (got_seps, got_edges) = bar_marks(&bar);
+        for (what, want, got) in [
+            ("separators", seps, &got_seps),
+            ("edges", edges, &got_edges),
+        ] {
+            let missing: Vec<_> = want
+                .iter()
+                .filter(|w| !got.iter().any(|g| (*g - **w).abs() <= 1.0))
+                .collect();
+            let extra: Vec<_> = got
+                .iter()
+                .filter(|g| !want.iter().any(|w| (**g - *w).abs() <= 1.0))
+                .collect();
+            if !missing.is_empty() || !extra.is_empty() {
+                off.push(format!(
+                    "{name} {what}: missing {missing:?}, extra {extra:?}"
+                ));
+            }
+        }
+    }
+    assert!(off.is_empty(), "{}", off.join("\n"));
+}
+
+#[test]
+fn selection_options_bars_edit_their_settings() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut()
+        .state
+        .select_tool(op_tools::Tool::RectangularMarquee);
+    h.run_steps(2);
+    // Feather: the field at 276–330 (bar points), the bar's middle at
+    // window y 45.25
+    click(&mut h, at_pt(300.0, 45.25));
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("5".into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(h.state().state.marquee.feather, 5.0);
+    // The second mode button: Add to selection
+    click(&mut h, at_pt(149.0, 45.25));
+    assert_eq!(
+        h.state().state.marquee.mode,
+        crate::state::SelectionMode::Add
+    );
+    // Magic Wand: Tolerance at 476.5–524.5
+    h.state_mut().state.select_tool(op_tools::Tool::MagicWand);
+    h.run_steps(2);
+    click(&mut h, at_pt(500.0, 45.25));
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("60".into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(h.state().state.wand.region.tolerance, 60);
+    // Contiguous (box at 606.5) toggles off
+    click(&mut h, at_pt(611.0, 45.25));
+    assert!(!h.state().state.wand.region.contiguous);
+    // Magnetic Lasso's Frequency keeps what's typed
+    h.state_mut()
+        .state
+        .select_tool(op_tools::Tool::MagneticLasso);
+    h.run_steps(2);
+    click(&mut h, at_pt(680.0, 45.25));
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("80".into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(
+        h.state()
+            .state
+            .tool_settings
+            .get("lasso.frequency")
+            .map(String::as_str),
+        Some("80")
+    );
+}

@@ -70,13 +70,28 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         if r.hovered() {
             painter.rect_filled(preset, 4, color::HOVER);
         }
-        painter.text(
-            preset.center(),
-            egui::Align2::CENTER_CENTER,
-            icons::tool(app.tool),
-            theme::tool_icon(pt(17.5)),
+        let bg = if r.hovered() {
+            color::HOVER
+        } else {
+            color::OPTIONS_BAR
+        };
+        let center = Pos2::new(at(68.0, 0.0).x, cy);
+        if !crate::tool_icons::paint_scaled(
+            &painter,
+            center,
+            app.tool,
             color::OPTIONS_ICON,
-        );
+            bg,
+            1.0,
+        ) {
+            painter.text(
+                preset.center(),
+                egui::Align2::CENTER_CENTER,
+                icons::tool(app.tool),
+                theme::tool_icon(pt(17.5)),
+                color::OPTIONS_ICON,
+            );
+        }
         r
     };
     response.on_hover_text("Tool Presets");
@@ -172,6 +187,10 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         ui.allocate_rect(bar, Sense::hover());
         return;
     }
+    if measured_bar(ui, app, bar) {
+        ui.allocate_rect(bar, Sense::hover());
+        return;
+    }
     let content = Rect::from_min_max(
         Pos2::new(bar.left() + CONTENT_LEFT, bar.top()),
         Pos2::new(right.left(), bar.bottom()),
@@ -186,6 +205,320 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         },
     );
     ui.allocate_rect(bar, Sense::hover());
+}
+
+/// The tools whose options are laid out at Photoshop 2026's measured
+/// places (`options_kit`); false for the others, laid out in a row.
+fn measured_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) -> bool {
+    use crate::options_kit::Bar;
+    let mut b = Bar::new(ui, bar);
+    match app.tool {
+        Tool::RectangularMarquee
+        | Tool::EllipticalMarquee
+        | Tool::SingleRowMarquee
+        | Tool::SingleColumnMarquee
+        | Tool::Lasso
+        | Tool::PolygonalLasso
+        | Tool::MagneticLasso => selection_bar(&mut b, app),
+        Tool::MagicWand => wand_bar(&mut b, app),
+        Tool::ObjectSelection => object_selection_bar(&mut b, app),
+        Tool::QuickSelection => quick_selection_bar(&mut b, app),
+        _ => return false,
+    }
+    true
+}
+
+/// A number with its unit, as the fields show it ("0 px", "10%").
+fn with_unit(v: f32, unit: &str) -> String {
+    let v = (v * 10.0).round() / 10.0;
+    if unit.is_empty() {
+        format!("{v}")
+    } else if unit == "%" {
+        format!("{v}%")
+    } else {
+        format!("{v} {unit}")
+    }
+}
+
+/// The marquee and lasso tools' options (measured on Photoshop 2026):
+/// the combine modes, Feather and Anti-alias; the marquees' Style with
+/// Width and Height; the Magnetic Lasso's Width, Contrast, Frequency and
+/// pen pressure; Select and Mask.
+fn selection_bar(b: &mut crate::options_kit::Bar, app: &mut AppState) {
+    let tool = app.tool;
+    let marquee = matches!(
+        tool,
+        Tool::RectangularMarquee
+            | Tool::EllipticalMarquee
+            | Tool::SingleRowMarquee
+            | Tool::SingleColumnMarquee
+    );
+    let single = matches!(tool, Tool::SingleRowMarquee | Tool::SingleColumnMarquee);
+    let has_selection = app.active().is_some_and(|d| d.doc.selection().is_some());
+    b.modes(110.0, &mut app.marquee.mode);
+    b.sep(222.0);
+    b.label(233.0, "Feather:", true);
+    // The single row and column marquees' fields sit 2 pt further left
+    let dx = if single { -2.0 } else { 0.0 };
+    let shown = with_unit(app.marquee.feather, "px");
+    if let Some(t) = b.value(276.0 + dx, 330.0 + dx, "feather", shown, true)
+        && let Some(v) = typed_number(&t)
+    {
+        app.marquee.feather = v.clamp(0.0, 1000.0);
+    }
+    // Anti-alias only applies to curved edges
+    let curved = !matches!(
+        tool,
+        Tool::RectangularMarquee | Tool::SingleRowMarquee | Tool::SingleColumnMarquee
+    );
+    // Photoshop shows it unchecked where it doesn't apply
+    let mut shown = app.marquee.anti_alias && curved;
+    b.check(338.0 + dx, "Anti-alias", &mut shown, curved);
+    if curved {
+        app.marquee.anti_alias = shown;
+    }
+    b.sep(412.0 + dx);
+    if marquee {
+        let fixed = !single && app.marquee.style != MarqueeStyle::Normal;
+        b.label(421.5 + dx, "Style:", !single);
+        let mut style = MarqueeStyle::ALL
+            .iter()
+            .position(|s| *s == app.marquee.style)
+            .unwrap_or(0);
+        b.choice(
+            453.5 + dx,
+            531.0 + dx,
+            "marquee-style",
+            &["Normal", "Fixed Ratio", "Fixed Size"],
+            &mut style,
+            !single,
+        );
+        app.marquee.style = MarqueeStyle::ALL[style];
+        b.label(541.0 + dx, "Width:", fixed);
+        let w = app.setting("marquee.width", "").clone();
+        if let Some(t) = b.value(574.0 + dx, 615.5 + dx, "marquee-width", w, fixed) {
+            *app.setting("marquee.width", "") = t;
+        }
+        b.icon(
+            638.5 + dx,
+            Icon::Swap,
+            "Swap height and width",
+            false,
+            fixed,
+        );
+        b.label(663.5 + dx, "Height:", fixed);
+        let h = app.setting("marquee.height", "").clone();
+        if let Some(t) = b.value(699.5 + dx, 741.0 + dx, "marquee-height", h, fixed) {
+            *app.setting("marquee.height", "") = t;
+        }
+        b.sep(749.0 + dx);
+        b.button(760.5 + dx, 870.5 + dx, "Select and Mask...", has_selection);
+    } else if tool == Tool::MagneticLasso {
+        for (x, label, x0, x1, key, default) in [
+            (422.5, "Width:", 457.5, 500.5, "lasso.width", "10 px"),
+            (509.0, "Contrast:", 557.5, 600.5, "lasso.contrast", "10%"),
+            (609.5, "Frequency:", 666.0, 693.0, "lasso.frequency", "57"),
+        ] {
+            b.label(x, label, true);
+            let shown = app.setting(key, default).clone();
+            if let Some(t) = b.value(x0, x1, key, shown, true) {
+                *app.setting(key, default) = t;
+            }
+        }
+        b.sep(701.0);
+        let on = app.flag("lasso.pressure", false);
+        if b.icon(
+            725.0,
+            Icon::PenPressure,
+            "Use tablet pressure to change pen width",
+            on,
+            true,
+        )
+        .clicked()
+        {
+            app.set_flag("lasso.pressure", !on);
+        }
+        b.sep(748.0);
+        b.button(759.5, 869.5, "Select and Mask...", has_selection);
+    } else {
+        b.button(423.5, 533.5, "Select and Mask...", has_selection);
+    }
+}
+
+/// Select Subject (with its menu) from `x` and Select and Mask from
+/// `mask_x`, at the bar's end.
+fn subject_and_mask(b: &mut crate::options_kit::Bar, x: f32, mask_x: f32, has_selection: bool) {
+    b.button(x, x + 91.0, "Select Subject", false);
+    b.chevron_button(x + 92.0, x + 111.0, "select-subject-menu", true);
+    b.button(mask_x, mask_x + 110.0, "Select and Mask...", has_selection);
+}
+
+/// A field of a setting nothing reads yet.
+fn setting_field(
+    b: &mut crate::options_kit::Bar,
+    app: &mut AppState,
+    (x0, x1): (f32, f32),
+    key: &'static str,
+    default: &str,
+    enabled: bool,
+) {
+    let shown = app.setting(key, default).clone();
+    if let Some(t) = b.value(x0, x1, key, shown, enabled) {
+        *app.setting(key, default) = t;
+    }
+}
+
+/// A checkbox of a setting nothing reads yet.
+fn setting_check(
+    b: &mut crate::options_kit::Bar,
+    app: &mut AppState,
+    x: f32,
+    label: &str,
+    key: &'static str,
+    default: bool,
+) {
+    let mut on = app.flag(key, default);
+    if b.check(x, label, &mut on, true).changed() {
+        app.set_flag(key, on);
+    }
+}
+
+/// A pop-up menu of a setting nothing reads yet.
+fn setting_choice(
+    b: &mut crate::options_kit::Bar,
+    app: &mut AppState,
+    (x0, x1): (f32, f32),
+    key: &'static str,
+    options: &[&str],
+    enabled: bool,
+) {
+    let mut i: usize = app.setting(key, "0").parse().unwrap_or(0);
+    b.choice(x0, x1, key, options, &mut i, enabled);
+    *app.setting(key, "0") = i.to_string();
+}
+
+/// Magic Wand: the modes, Sample Size, Tolerance, Anti-alias, Contiguous,
+/// Sample All Layers, Select Subject, Select and Mask.
+fn wand_bar(b: &mut crate::options_kit::Bar, app: &mut AppState) {
+    let has_selection = app.active().is_some_and(|d| d.doc.selection().is_some());
+    b.modes(110.0, &mut app.wand.mode);
+    b.sep(222.0);
+    b.label(231.5, "Sample Size:", true);
+    setting_choice(
+        b,
+        app,
+        (298.0, 413.5),
+        "wand.sample_size",
+        &[
+            "Point Sample",
+            "3 by 3 Average",
+            "5 by 5 Average",
+            "11 by 11 Average",
+            "31 by 31 Average",
+            "51 by 51 Average",
+            "101 by 101 Average",
+        ],
+        true,
+    );
+    b.label(422.5, "Tolerance:", true);
+    let region = &mut app.wand.region;
+    if let Some(t) = b.value(
+        476.5,
+        524.5,
+        "wand-tolerance",
+        region.tolerance.to_string(),
+        true,
+    ) && let Some(v) = typed_number(&t)
+    {
+        region.tolerance = v.clamp(0.0, 255.0) as u8;
+    }
+    b.check(532.5, "Anti-alias", &mut region.anti_alias, true);
+    b.check(606.5, "Contiguous", &mut region.contiguous, true);
+    b.check(690.0, "Sample All Layers", &mut region.all_layers, true);
+    b.sep(803.5);
+    subject_and_mask(b, 815.0, 945.0, has_selection);
+}
+
+/// Object Selection: the modes, Select people (its menu), refresh, show all
+/// objects, settings, Mode (Rectangle / Lasso), Sample All Layers, Hard
+/// Edge, feedback, Select Subject, Select and Mask.
+fn object_selection_bar(b: &mut crate::options_kit::Bar, app: &mut AppState) {
+    let has_selection = app.active().is_some_and(|d| d.doc.selection().is_some());
+    b.modes(104.0, &mut app.marquee.mode);
+    b.sep(212.0);
+    b.menu_button(217.5, 305.5, "Select people");
+    b.icon(323.0, Icon::Refresh, "Refresh object finder", false, true);
+    let on = app.flag("object.finder", false);
+    if b.icon(353.0, Icon::ObjectFinder, "Show all objects", on, true)
+        .clicked()
+    {
+        app.set_flag("object.finder", !on);
+    }
+    b.icon(383.0, Icon::Gear, "Set additional options", false, true);
+    b.sep(400.0);
+    setting_choice(
+        b,
+        app,
+        (405.0, 483.0),
+        "object.mode",
+        &["Rectangle", "Lasso"],
+        true,
+    );
+    b.sep(487.0);
+    setting_check(
+        b,
+        app,
+        492.0,
+        "Sample All Layers",
+        "object.all_layers",
+        false,
+    );
+    setting_check(b, app, 602.0, "Hard Edge", "object.hard_edge", true);
+    b.sep(677.0);
+    b.icon(696.0, Icon::Feedback, "Send feedback", false, true);
+    b.sep(712.0);
+    b.button(717.5, 808.5, "Select Subject", false);
+    b.chevron_button(813.5, 832.5, "select-subject-menu", true);
+    b.button(837.5, 947.5, "Select and Mask...", has_selection);
+}
+
+/// Quick Selection: its three modes, the brush, the angle, Sample All
+/// Layers, Enhance Edge, Select Subject, Select and Mask.
+fn quick_selection_bar(b: &mut crate::options_kit::Bar, app: &mut AppState) {
+    let has_selection = app.active().is_some_and(|d| d.doc.selection().is_some());
+    let mode: usize = app.setting("quick.mode", "0").parse().unwrap_or(0);
+    for (k, (icon, tip)) in [
+        (Icon::QuickNew, "New selection"),
+        (Icon::QuickAdd, "Add to selection"),
+        (Icon::QuickSubtract, "Subtract from selection"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if b.icon(129.0 + 28.0 * k as f32, icon, tip, mode == k, true)
+            .clicked()
+        {
+            *app.setting("quick.mode", "0") = k.to_string();
+        }
+    }
+    b.sep(202.0);
+    let size = app.setting("quick.size", "30").clone();
+    b.brush_picker(221.5, &size, 1.0);
+    b.sep(253.0);
+    b.icon(266.0, Icon::Angle, "Set the brush angle", false, true);
+    setting_field(b, app, (277.0, 318.5), "quick.angle", "0°", true);
+    b.sep(322.5);
+    setting_check(
+        b,
+        app,
+        327.5,
+        "Sample All Layers",
+        "quick.all_layers",
+        false,
+    );
+    setting_check(b, app, 437.0, "Enhance Edge", "quick.enhance_edge", false);
+    b.sep(530.0);
+    subject_and_mask(b, 543.5, 669.5, has_selection);
 }
 
 /// A 1 pt separator at `x` points from the bar's left, as in Photoshop.

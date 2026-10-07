@@ -70,6 +70,21 @@ pub enum Icon {
     LockPosition,
     LockArtboards,
     LockAll,
+    /// "Use tablet pressure" (the Magnetic Lasso's width, the brushes'
+    /// size): rings around a pen.
+    PenPressure,
+    /// Object Selection: refresh the object finder.
+    Refresh,
+    /// Object Selection: show all objects (a frame round three blocks).
+    ObjectFinder,
+    /// Object Selection: send feedback (a dotted frame and a speech bubble).
+    Feedback,
+    /// Quick Selection's modes: a dotted circle and a brush, plus or minus.
+    QuickNew,
+    QuickAdd,
+    QuickSubtract,
+    /// Brush angle.
+    Angle,
     Eye,
     /// A partly locked layer's lock (and the background's): hollow.
     LayerLock,
@@ -168,6 +183,19 @@ impl Pen<'_> {
             self.w(r),
             Stroke::new(self.w(width), self.color),
         );
+    }
+
+    /// An arc of radius `r` around (x, y) from `a0` to `a1` (radians,
+    /// clockwise from 3 o'clock).
+    fn arc(&self, x: f32, y: f32, r: f32, (a0, a1): (f32, f32), width: f32) {
+        let n = ((a1 - a0).abs() * r / 2.0).ceil().max(4.0) as usize;
+        let points: Vec<(f32, f32)> = (0..=n)
+            .map(|i| {
+                let a = a0 + (a1 - a0) * i as f32 / n as f32;
+                (x + r * a.cos(), y + r * a.sin())
+            })
+            .collect();
+        self.line(&points, width);
     }
 
     fn dot(&self, x: f32, y: f32, r: f32) {
@@ -823,6 +851,86 @@ pub fn paint_scaled(
                 pen.rect(-12.0, y - 1.25, 10.0, y + 1.25);
             }
             pen.poly(&[(19.5, 8.5), (19.5, 15.5), (12.0, 15.5)]);
+        }
+        Icon::PenPressure => {
+            pen.arc(-3.5, 0.5, 13.0, (-0.23, 4.62), 1.8);
+            pen.arc(-3.5, 0.5, 7.0, (0.35, 4.4), 1.8);
+            pen.round_line((11.0, -16.0), (-2.0, -2.5), 6.5);
+        }
+        Icon::Refresh => {
+            pen.arc(-1.0, 0.0, 10.5, (3.25, 5.45), 4.2);
+            pen.poly(&[(13.0, -12.5), (13.0, -2.0), (2.5, -2.0)]);
+            pen.arc(1.0, 0.0, 10.5, (0.1, 2.3), 4.2);
+            pen.poly(&[(-14.0, 2.5), (-3.5, 2.5), (-14.0, 12.5)]);
+        }
+        Icon::ObjectFinder => {
+            pen.line(
+                &[
+                    (-13.0, -12.5),
+                    (13.0, -12.5),
+                    (13.0, 12.5),
+                    (-13.0, 12.5),
+                    (-13.0, -12.5),
+                ],
+                2.0,
+            );
+            pen.rect(-10.0, -9.5, -2.5, -2.0);
+            pen.rect(2.0, -5.5, 9.5, 2.0);
+            pen.rect(-8.0, 2.5, -0.5, 10.0);
+        }
+        Icon::Feedback => {
+            for k in 0..7 {
+                pen.rect(-16.0 + 4.0 * k as f32, -15.5, -14.0 + 4.0 * k as f32, -13.5);
+            }
+            for k in 1..7 {
+                pen.rect(-16.0, -15.5 + 4.0 * k as f32, -14.0, -13.5 + 4.0 * k as f32);
+            }
+            for k in 1..3 {
+                pen.rect(8.0, -15.5 + 4.0 * k as f32, 10.0, -13.5 + 4.0 * k as f32);
+            }
+            pen.rect(-12.0, 8.5, -10.0, 10.5);
+            pen.rect(-6.0, -3.5, 16.0, 12.0);
+            pen.poly(&[(-2.0, 12.0), (4.0, 12.0), (-2.0, 17.5)]);
+            let hole = Pen {
+                color: background,
+                ..pen
+            };
+            for x in [-2.5, 4.5, 11.5] {
+                hole.dot(x, 4.5, 2.0);
+            }
+        }
+        Icon::QuickNew | Icon::QuickAdd | Icon::QuickSubtract => {
+            for k in 0..12 {
+                let a = k as f32 * std::f32::consts::TAU / 12.0;
+                let (x, y) = (-5.0 + 13.0 * a.cos(), 1.5 + 13.0 * a.sin());
+                if !(0.0..=1.4).contains(&a) {
+                    pen.rect(x - 1.0, y - 1.0, x + 1.0, y + 1.0);
+                }
+            }
+            pen.round_line((14.5, -12.5), (5.5, -1.0), 5.0);
+            pen.poly(&[
+                (2.0, -0.5),
+                (6.0, 0.5),
+                (7.5, 4.0),
+                (5.0, 8.5),
+                (-1.0, 11.0),
+                (-5.0, 11.5),
+                (-3.0, 8.0),
+                (-2.0, 3.0),
+            ]);
+            match icon {
+                Icon::QuickAdd => {
+                    pen.rect(5.0, -16.0, 7.0, -8.0);
+                    pen.rect(2.0, -13.0, 10.0, -11.0);
+                }
+                Icon::QuickSubtract => pen.rect(-1.0, -14.5, 8.0, -12.5),
+                _ => {}
+            }
+        }
+        Icon::Angle => {
+            pen.line(&[(-12.0, 7.0), (6.5, -9.5)], 2.6);
+            pen.rect(-12.5, 6.5, 13.5, 8.5);
+            pen.arc(-12.0, 7.5, 13.0, (-0.95, 0.0), 1.8);
         }
         Icon::Swap => {
             pen.rect(-7.5, -7.0, 4.0, -5.0);

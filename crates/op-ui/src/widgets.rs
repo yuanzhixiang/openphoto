@@ -323,6 +323,19 @@ pub fn text_box(
     id: impl egui::AsIdSalt,
     enabled: bool,
 ) -> Response {
+    text_box_inset(ui, rect, text, id, enabled, theme::pt(6.0))
+}
+
+/// [`text_box`] with the text `inset` from the box's left (the options
+/// bar's fields: 4.5 pt).
+pub fn text_box_inset(
+    ui: &mut Ui,
+    rect: egui::Rect,
+    text: &mut String,
+    id: impl egui::AsIdSalt,
+    enabled: bool,
+    inset: f32,
+) -> Response {
     use theme::pt;
     let (fill, border, value) = if enabled {
         (color::FIELD, Color32::from_gray(0x66), color::TEXT)
@@ -340,7 +353,10 @@ pub fn text_box(
         Stroke::new(pt(1.0), border),
         StrokeKind::Inside,
     );
-    let inner = rect.shrink2(Vec2::new(pt(6.0), pt(1.0)));
+    let inner = Rect::from_min_max(
+        egui::pos2(rect.left() + inset, rect.top() + pt(1.0)),
+        egui::pos2(rect.right() - pt(4.0), rect.bottom() - pt(1.0)),
+    );
     ui.scope_builder(egui::UiBuilder::new().max_rect(inner), |ui| {
         ui.add_enabled(
             enabled,

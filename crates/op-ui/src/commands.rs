@@ -599,7 +599,7 @@ impl Command {
     pub fn enabled(self, app: &AppState) -> bool {
         // With a text field focused, Cut/Copy/Paste edit its text (even in
         // a dialog)
-        if app.typing && self.is_clipboard() {
+        if app.typing && (self.is_clipboard() || self == Self::SelectAll) {
             return true;
         }
         // Menus are disabled while a modal dialog is open, as in Photoshop
@@ -943,7 +943,10 @@ pub fn from_shortcuts(ctx: &egui::Context, app: &AppState) -> Vec<Command> {
             // handle their own Cut/Copy/Paste
             if typing
                 && (command.is_clipboard()
-                    || matches!(command, Command::FillForeground | Command::FillBackground))
+                    || matches!(
+                        command,
+                        Command::FillForeground | Command::FillBackground | Command::SelectAll
+                    ))
             {
                 continue;
             }
@@ -987,6 +990,18 @@ pub fn run(command: Command, ctx: &egui::Context, app: &mut AppState) {
         return;
     }
     let ppp = ctx.pixels_per_point();
+    // With a text field focused, Select All selects its text (the native
+    // menu takes Cmd+A before the field sees it)
+    if command == Command::SelectAll && app.typing {
+        app.forward_events.push(egui::Event::Key {
+            key: Key::A,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::COMMAND,
+        });
+        return;
+    }
     match command {
         Command::New => actions::new_dialog(app),
         Command::Open => actions::open_dialog(app),
