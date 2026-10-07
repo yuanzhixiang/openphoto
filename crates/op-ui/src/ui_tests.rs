@@ -6201,6 +6201,8 @@ fn screenshot_pixelate_and_diffuse_dialogs() {
         (Command::Crystallize, "crystallize", 457.0, 367.0),
         (Command::Pointillize, "pointillize", 457.0, 367.0),
         (Command::Diffuse, "diffuse", 324.0, 430.0),
+        (Command::Ripple, "ripple", 405.0, 404.0),
+        (Command::Mezzotint, "mezzotint", 405.0, 354.0),
     ] {
         let mut h = harness(Vec::new());
         probe_document(&mut h);
@@ -6231,6 +6233,8 @@ fn crystallize_pointillize_and_diffuse_apply() {
         (Command::Crystallize, "Crystallize"),
         (Command::Pointillize, "Pointillize"),
         (Command::Diffuse, "Diffuse"),
+        (Command::Ripple, "Ripple"),
+        (Command::Mezzotint, "Mezzotint"),
     ] {
         let before = layer_pixel(&h, 0, 50, 50);
         run_command(&mut h, command);

@@ -39,6 +39,8 @@ pub enum Control {
     /// Radio buttons in group boxes, one group per setting (Polar
     /// Coordinates, Wind).
     Radios(&'static [RadioGroup]),
+    /// Nothing but the pop-up (Mezzotint).
+    None,
 }
 
 pub struct Layout {
@@ -46,8 +48,9 @@ pub struct Layout {
     /// OK and Cancel's left edge (89 pt wide).
     pub buttons_x: f32,
     pub control: Control,
-    /// Spherize's Mode pop-up (x0, y0, x1, y1).
-    pub mode: Option<[f32; 4]>,
+    /// A pop-up for the last setting (Spherize's Mode, Ripple's Size,
+    /// Mezzotint's Type): its rect (x0, y0, x1, y1) and its label's left.
+    pub mode: Option<([f32; 4], f32)>,
     /// The diagram's top-left corner.
     pub diagram: Option<(f32, f32)>,
 }
@@ -78,6 +81,29 @@ pub const CELL_SIZE: Layout = Layout {
     diagram: None,
 };
 
+/// Distort > Ripple: Amount over a slider like Spherize's, and the Size
+/// pop-up (405 × 404 pt).
+pub const RIPPLE: Layout = Layout {
+    size: (405.0, 404.0),
+    buttons_x: 298.5,
+    control: Control::Slider {
+        label_y: 327.0,
+        field_x: 218.0,
+        track_x1: 270.5,
+    },
+    mode: Some(([52.0, 368.0, 180.0, 386.0], 19.5)),
+    diagram: None,
+};
+
+/// Pixelate > Mezzotint: only the Type pop-up (405 × 354 pt).
+pub const MEZZOTINT: Layout = Layout {
+    size: (405.0, 354.0),
+    buttons_x: 298.5,
+    control: Control::None,
+    mode: Some(([55.0, 318.0, 253.0, 336.0], 21.0)),
+    diagram: None,
+};
+
 pub const PINCH: Layout = Layout {
     size: (468.0, 367.0),
     buttons_x: 347.5,
@@ -98,7 +124,7 @@ pub const SPHERIZE: Layout = Layout {
         field_x: 218.0,
         track_x1: 270.5,
     },
-    mode: Some([59.0, 368.0, 207.0, 386.0]),
+    mode: Some(([59.0, 368.0, 207.0, 386.0], 18.0)),
     diagram: Some((293.0, 264.0)),
 };
 

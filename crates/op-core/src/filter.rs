@@ -29,6 +29,55 @@ pub enum SpherizeMode {
     VerticalOnly,
 }
 
+/// Ripple's Size.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RippleSize {
+    Small,
+    Medium,
+    Large,
+}
+
+impl RippleSize {
+    /// The waves' length in pixels.
+    fn wavelength(self) -> f32 {
+        match self {
+            Self::Small => 6.0,
+            Self::Medium => 12.0,
+            Self::Large => 24.0,
+        }
+    }
+}
+
+/// Mezzotint's Type, in Photoshop's order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MezzotintType {
+    FineDots,
+    MediumDots,
+    GrainyDots,
+    CoarseDots,
+    ShortLines,
+    MediumLines,
+    LongLines,
+    ShortStrokes,
+    MediumStrokes,
+    LongStrokes,
+}
+
+impl MezzotintType {
+    pub const ALL: [Self; 10] = [
+        Self::FineDots,
+        Self::MediumDots,
+        Self::GrainyDots,
+        Self::CoarseDots,
+        Self::ShortLines,
+        Self::MediumLines,
+        Self::LongLines,
+        Self::ShortStrokes,
+        Self::MediumStrokes,
+        Self::LongStrokes,
+    ];
+}
+
 /// Diffuse's Mode.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DiffuseMode {
@@ -153,6 +202,12 @@ pub enum Filter {
     /// Pixelate > Pointillize: dots about `cell` pixels across in the
     /// colors under them (a little varied), on the background color.
     Pointillize { cell: u32 },
+    /// Distort > Ripple: waves along both axes, `amount` −999–999 percent,
+    /// their length set by `size`.
+    Ripple { amount: i32, size: RippleSize },
+    /// Pixelate > Mezzotint: each channel turned to full or nothing at
+    /// random, in dots, lines or strokes.
+    Mezzotint { kind: MezzotintType },
     /// Stylize > Diffuse: pixels swapped with random neighbors, in `mode`.
     Diffuse { mode: DiffuseMode },
     /// Render > Clouds: soft fractal noise between the foreground and
@@ -208,6 +263,8 @@ impl Filter {
             Self::Spherize { .. } => "Spherize",
             Self::PolarCoordinates { .. } => "Polar Coordinates",
             Self::Crystallize { .. } => "Crystallize",
+            Self::Ripple { .. } => "Ripple",
+            Self::Mezzotint { .. } => "Mezzotint",
             Self::Pointillize { .. } => "Pointillize",
             Self::Diffuse { .. } => "Diffuse",
             Self::Clouds { .. } => "Clouds",
@@ -625,6 +682,14 @@ fn distort_source(filter: Filter, x: f32, y: f32, cx: f32, cy: f32, w: f32, h: f
         t + a.abs() * (curve - t)
     };
     match filter {
+        // Waves: horizontal shifts that vary down the image and vertical
+        // ones that vary across it
+        Filter::Ripple { amount, size } => {
+            let len = size.wavelength();
+            let a = amount as f32 / 100.0 * len * 0.25;
+            let k = std::f32::consts::TAU / len;
+            (x + a * (y * k).sin(), y + a * (x * k + 1.0).sin())
+        }
         Filter::Twirl { angle } => {
             if t >= 1.0 {
                 return (x, y);
@@ -761,6 +826,57 @@ fn pointillize(src: &Buffer, cell: usize, paper: [u8; 3]) -> Vec<[u8; 4]> {
         }
     }
     out
+}
+
+/// Mezzotint: each channel becomes 255 or 0, at random with its value as
+/// the chance. Dots draw a fresh chance per pixel (Medium and Coarse per 2
+/// and 3 pixel blocks, Grainy with half the chances shared by a 2 pixel
+/// grain); Lines share a chance along horizontal runs of 4, 8 or 16 pixels,
+/// Strokes along diagonal runs of 4, 8 or 16.
+fn mezzotint(src: &Buffer, kind: MezzotintType) -> Vec<[u8; 4]> {
+    use MezzotintType::*;
+    let (w, h) = (src.w, src.h);
+    let chance = |x: usize, y: usize, c: usize| -> f32 {
+        match kind {
+            FineDots => noise(x, y, 50 + c),
+            MediumDots => noise(x / 2, y / 2, 50 + c),
+            CoarseDots => noise(x / 3, y / 3, 50 + c),
+            GrainyDots => (noise(x, y, 50 + c) + noise(x / 2, y / 2, 60 + c)) / 2.0,
+            ShortLines | MediumLines | LongLines => {
+                let run = match kind {
+                    ShortLines => 4,
+                    MediumLines => 8,
+                    _ => 16,
+                };
+                noise(x / run, y, 50 + c)
+            }
+            ShortStrokes | MediumStrokes | LongStrokes => {
+                let run = match kind {
+                    ShortStrokes => 4,
+                    MediumStrokes => 8,
+                    _ => 16,
+                };
+                // Along the diagonal: x − y is constant
+                let d = x + h - y;
+                noise(d, (x + y) / run, 50 + c)
+            }
+        }
+    };
+    (0..w * h)
+        .map(|i| {
+            let (x, y) = (i % w, i / w);
+            let p = Buffer::straight(src.px[i]);
+            let mut out = p;
+            for c in 0..3 {
+                out[c] = if chance(x, y, c) < p[c] as f32 / 255.0 {
+                    255
+                } else {
+                    0
+                };
+            }
+            out
+        })
+        .collect()
 }
 
 /// Diffuse: each pixel takes a randomly chosen pixel of its 3 × 3
@@ -1208,6 +1324,7 @@ fn filtered(
         Filter::Twirl { .. }
         | Filter::Pinch { .. }
         | Filter::Spherize { .. }
+        | Filter::Ripple { .. }
         | Filter::PolarCoordinates { .. } => {
             // Each pixel takes the color at the place the distortion maps
             // it from (measured from Photoshop 2026 on a coordinate image)
@@ -1306,6 +1423,7 @@ fn filtered(
         Filter::Crystallize { cell } => crystallize(&src, cell.max(3) as usize),
         Filter::Pointillize { cell } => pointillize(&src, cell.max(3) as usize, paper),
         Filter::Diffuse { mode } => diffuse(&src, mode),
+        Filter::Mezzotint { kind } => mezzotint(&src, kind),
         Filter::Clouds {
             foreground,
             background,
@@ -1837,5 +1955,39 @@ mod tests {
             let here = luma(Buffer::straight(src.px[i]));
             assert!(luma(dark[i]) <= here + 0.01 && luma(light[i]) >= here - 0.01);
         }
+    }
+
+    #[test]
+    fn mezzotint_leaves_only_full_or_empty_channels() {
+        for kind in MezzotintType::ALL {
+            let out = mezzotint(&ramp(), kind);
+            assert!(
+                out.iter()
+                    .all(|p| p[..3].iter().all(|&c| c == 0 || c == 255))
+            );
+            // Brighter columns get more full red
+            let red = |x: usize| (0..40).filter(|&y| out[y * 40 + x][0] == 255).count();
+            assert!(red(38) > red(2), "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn ripple_shifts_by_its_amount() {
+        let at = |amount| {
+            distortion_source(
+                Filter::Ripple {
+                    amount,
+                    size: RippleSize::Medium,
+                },
+                20.0,
+                3.0,
+                40.0,
+                40.0,
+            )
+        };
+        assert_eq!(at(0), (20.0, 3.0));
+        let (x, _) = at(100);
+        let (x2, _) = at(200);
+        assert!((x - 20.0).abs() > 1.0 && ((x2 - 20.0) / (x - 20.0) - 2.0).abs() < 1e-3);
     }
 }

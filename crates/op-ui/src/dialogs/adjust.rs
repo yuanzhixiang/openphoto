@@ -11,7 +11,9 @@
 
 use egui::{Align2, Color32, Key, Pos2, Rect, Sense, Stroke, Ui, vec2};
 use op_core::adjust::Adjustment;
-use op_core::filter::{DiffuseMode, Filter, OffsetFill, SpherizeMode, WindMethod};
+use op_core::filter::{
+    DiffuseMode, Filter, MezzotintType, OffsetFill, RippleSize, SpherizeMode, WindMethod,
+};
 
 use super::{
     appkit, black_white, brightness_contrast, channel_mixer, color_balance, common, curves,
@@ -126,6 +128,26 @@ const MOTION_BLUR: &[Param] = &[
 const TWIRL: &[Param] = &[param("Angle (°):", -999.0, 999.0, 50.0, 0)];
 const CRYSTALLIZE: &[Param] = &[param("Cell Size", 3.0, 300.0, 10.0, 0)];
 const POINTILLIZE: &[Param] = &[param("Cell Size", 3.0, 300.0, 5.0, 0)];
+const RIPPLE: &[Param] = &[
+    param("Amount (%):", -999.0, 999.0, 100.0, 0),
+    choice("Size", &["Small", "Medium", "Large"], 1),
+];
+const MEZZOTINT: &[Param] = &[choice(
+    "Type",
+    &[
+        "Fine Dots",
+        "Medium Dots",
+        "Grainy Dots",
+        "Coarse Dots",
+        "Short Lines",
+        "Medium Lines",
+        "Long Lines",
+        "Short Strokes",
+        "Medium Strokes",
+        "Long Strokes",
+    ],
+    0,
+)];
 const DIFFUSE: &[Param] = &[choice(
     "Mode",
     &["Normal", "Darken Only", "Lighten Only", "Anisotropic"],
@@ -206,6 +228,8 @@ pub enum Kind {
     Crystallize,
     Pointillize,
     Diffuse,
+    Ripple,
+    Mezzotint,
     Pinch,
     Spherize,
     PolarCoordinates,
@@ -250,6 +274,8 @@ impl Kind {
             Self::Crystallize => "Crystallize",
             Self::Pointillize => "Pointillize",
             Self::Diffuse => "Diffuse",
+            Self::Ripple => "Ripple",
+            Self::Mezzotint => "Mezzotint",
             Self::Pinch => "Pinch",
             Self::Spherize => "Spherize",
             Self::PolarCoordinates => "Polar Coordinates",
@@ -294,6 +320,8 @@ impl Kind {
             Self::Crystallize => CRYSTALLIZE,
             Self::Pointillize => POINTILLIZE,
             Self::Diffuse => DIFFUSE,
+            Self::Ripple => RIPPLE,
+            Self::Mezzotint => MEZZOTINT,
             Self::Pinch => PINCH,
             Self::Spherize => SPHERIZE,
             Self::PolarCoordinates => POLAR,
@@ -333,6 +361,8 @@ impl Kind {
         Some(match self {
             Self::Twirl => &distort::TWIRL,
             Self::Crystallize | Self::Pointillize => &distort::CELL_SIZE,
+            Self::Ripple => &distort::RIPPLE,
+            Self::Mezzotint => &distort::MEZZOTINT,
             Self::Pinch => &distort::PINCH,
             Self::Spherize => &distort::SPHERIZE,
             Self::PolarCoordinates => &distort::POLAR,
@@ -642,6 +672,13 @@ impl AdjustDialog {
             },
             Kind::Twirl => Filter::Twirl { angle: v[0] as i32 },
             Kind::Crystallize => Filter::Crystallize { cell: v[0] as u32 },
+            Kind::Ripple => Filter::Ripple {
+                amount: v[0] as i32,
+                size: [RippleSize::Small, RippleSize::Medium, RippleSize::Large][v[1] as usize],
+            },
+            Kind::Mezzotint => Filter::Mezzotint {
+                kind: MezzotintType::ALL[(v[0] as usize).min(9)],
+            },
             Kind::Pointillize => Filter::Pointillize { cell: v[0] as u32 },
             Kind::Diffuse => Filter::Diffuse {
                 mode: [
@@ -1006,6 +1043,7 @@ impl AdjustDialog {
                 let v = self.value(0).unwrap_or(p.default);
                 distort::slider(ui, at, track_x1, (v - p.min) / (p.max - p.min));
             }
+            distort::Control::None => {}
             distort::Control::Radios(groups) => {
                 for (i, group) in groups.iter().enumerate() {
                     distort::group(ui, at, group);
@@ -1020,17 +1058,19 @@ impl AdjustDialog {
                 }
             }
         }
-        if let (Some(rect), ParamKind::Choice(options)) = (
+        // The pop-up sets the last setting
+        let last = params.len().saturating_sub(1);
+        if let (Some((rect, label_x)), ParamKind::Choice(options)) = (
             layout.mode,
-            params.get(1).map(|p| p.kind).unwrap_or(ParamKind::Check),
+            params.get(last).map(|p| p.kind).unwrap_or(ParamKind::Check),
         ) {
             distort::label(
                 ui,
-                at(18.0, (rect[1] + rect[3]) / 2.0),
+                at(label_x, (rect[1] + rect[3]) / 2.0),
                 Align2::LEFT_CENTER,
-                "Mode",
+                params[last].label,
             );
-            let mut chosen = self.value(1).unwrap_or(0.0) as usize;
+            let mut chosen = self.value(last).unwrap_or(0.0) as usize;
             appkit::popup(
                 ui,
                 r(rect[0], rect[1], rect[2], rect[3]),
@@ -1042,7 +1082,7 @@ impl AdjustDialog {
                     }
                 },
             );
-            self.values[1] = chosen.to_string();
+            self.values[last] = chosen.to_string();
         }
         if let (Some((x, y)), Some(Effect::Filter(filter))) = (layout.diagram, self.effect()) {
             if self.diagram.as_ref().is_none_or(|(v, _)| *v != self.values) {
@@ -1272,6 +1312,8 @@ mod tests {
             Kind::Crystallize,
             Kind::Pointillize,
             Kind::Diffuse,
+            Kind::Ripple,
+            Kind::Mezzotint,
             Kind::Pinch,
             Kind::Spherize,
             Kind::PolarCoordinates,

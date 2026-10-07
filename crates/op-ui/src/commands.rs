@@ -98,6 +98,8 @@ pub enum Command {
     Crystallize,
     Pointillize,
     Diffuse,
+    Ripple,
+    Mezzotint,
     Pinch,
     Spherize,
     PolarCoordinates,
@@ -533,6 +535,8 @@ impl Command {
             | Self::Crystallize
             | Self::Pointillize
             | Self::Diffuse
+            | Self::Ripple
+            | Self::Mezzotint
             | Self::Pinch
             | Self::Spherize
             | Self::PolarCoordinates
@@ -900,6 +904,8 @@ impl Command {
             | Self::Crystallize
             | Self::Pointillize
             | Self::Diffuse
+            | Self::Ripple
+            | Self::Mezzotint
             | Self::Pinch
             | Self::Spherize
             | Self::PolarCoordinates
@@ -1301,6 +1307,8 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         | Command::Crystallize
         | Command::Pointillize
         | Command::Diffuse
+        | Command::Ripple
+        | Command::Mezzotint
         | Command::Pinch
         | Command::Spherize
         | Command::PolarCoordinates
@@ -1341,6 +1349,8 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 Command::Crystallize => (AdjustKind::Crystallize, "Crystallize"),
                 Command::Pointillize => (AdjustKind::Pointillize, "Pointillize"),
                 Command::Diffuse => (AdjustKind::Diffuse, "Diffuse"),
+                Command::Ripple => (AdjustKind::Ripple, "Ripple"),
+                Command::Mezzotint => (AdjustKind::Mezzotint, "Mezzotint"),
                 Command::Pinch => (AdjustKind::Pinch, "Pinch"),
                 Command::Spherize => (AdjustKind::Spherize, "Spherize"),
                 Command::PolarCoordinates => (AdjustKind::PolarCoordinates, "Polar Coordinates"),
