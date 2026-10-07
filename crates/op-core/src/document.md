@@ -81,6 +81,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
 
 - `descendants(id)`：组里（任意深度）的图层。`pixel_layers(ids)`：把其中的组换成组里的像素图层，按图层顺序、去重。
 - `is_shown(id)`：图层本身及它所在的每一层组都可见。移动、自由变换、Auto-Select（`layer_at`）都按它判断可见性。
+- 合成按 tile 行对齐的行带分到各个 CPU 线程（`std::thread::available_parallelism`）各自完成再拼接，结果与单线程相同：3000 × 1080 的文档拖动图层时每帧都要重新合成，单线程约 37 ms，并行后约 5 ms。Normal 模式的图层走直通 source-over 的快速路径（不经通用混合函数，结果与 `blend::composite` 的 Normal 相同）。
 - 合成（`composite_layers_rgba8`）按组递归：同一层级的图层按顺序处理；组为 Pass Through、不透明度（含填充）100% 且没有蒙版时，组里的图层直接合成到下方；否则先把组里的图层合成到一张透明缓冲，再按组的混合模式（Pass Through 当作 Normal）、不透明度和蒙版整体混合上去。隐藏的组不参与。只给出部分图层时（合并），父组不在其中的图层当作顶层。
 - `edit_target` 对组返回 `None`（组没有像素可编辑）。Canvas Size 等画布变换跳过组的像素（组没有），但会处理组的蒙版。
 

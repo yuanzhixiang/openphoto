@@ -39,7 +39,7 @@
 
 - `CanvasResources::slots` 是 `HashMap<u64, Slot>`，以 `CanvasImage::key` 为键，每个文档一个槽（`op-ui` 传入的 key 是文档 id）。
 - 每个槽持有：当前上传的 `revision`、mip 级数、该槽专属的 uniform buffer 和 bind group（纹理视图 + 共享采样器 + uniform）。
-- `prepare` 时，若槽不存在，或槽内 `revision` 与 `CanvasImage::revision` 不同，则调用 `create_slot` 整体重建：新建纹理、上传所有 mip 级、新建 uniform buffer 和 bind group，并替换掉旧槽（旧槽的 GPU 资源随之释放）。版本号相同时不做任何上传，只写 uniform。
+- `prepare` 时，若槽不存在，或槽内 `revision` 与 `CanvasImage::revision` 不同，先生成 mip 链：尺寸与级数都和槽里的纹理相同时直接把各级写进原纹理（拖动图层时每帧都会这样，重建纹理太慢）；否则调用 `create_slot` 整体重建：新建纹理、上传所有 mip 级、新建 uniform buffer 和 bind group，并替换掉旧槽（旧槽的 GPU 资源随之释放）。版本号相同时不做任何上传，只写 uniform。
 - 是否需要重新上传只看 `revision` 是否相等，不比较像素内容，也不比较尺寸；revision 的含义由调用方保证。
 
 ### 纹理格式
@@ -50,6 +50,7 @@
 ### 预乘与 mip 链（CPU）
 
 - 输入 `CanvasImage::pixels` 是紧密排列的**非预乘** RGBA8。`build_mips` 先在 CPU 上预乘：每个颜色通道 `c' = (c * a + 127) / 255`（四舍五入），alpha 不变。
+- 预乘与每一级缩小都按行带分到各 CPU 线程完成（行数少于 64 时单线程），结果与逐像素计算相同；3000 × 1080 的图约 1.7 ms（单线程约 12 ms）。
 - 然后从原尺寸开始，用 2×2 盒式滤波逐级缩小，直到 1×1：下一级尺寸为 `max(w/2, 1) × max(h/2, 1)`，每个输出像素是源中 `(2x, 2y)`、`(2x+1, 2y)`、`(2x, 2y+1)`、`(2x+1, 2y+1)` 四个像素（坐标越界时钳制到最后一行/列）逐通道求和后 `(sum + 2) / 4`。在预乘数据上平均，因此透明像素不会把颜色“渗”进来。
 - 每一级生成后，只有宽和高都不超过 `device.limits().max_texture_dimension_2d` 的级别才会被保留。超出限制的大级别被跳过，纹理的第 0 级就是第一个能放进 GPU 的级别。
 
@@ -95,7 +96,7 @@
 ## 已知限制
 
 - 合成在上游 CPU 上完成；本模块只显示最终合成图，不在 GPU 上做图层合成、混合模式或滤镜。
-- 任何内容变化（revision 改变）都会触发整张图的重新预乘、重新生成完整 mip 链并重新上传全部级别，没有脏区域的局部更新。
+- 任何内容变化（revision 改变）都会触发整张图的重新预乘、重新生成完整 mip 链并重新上传全部级别（尺寸不变时复用纹理），没有脏区域的局部更新。
 - 纹理槽在文档关闭后不会被释放：`slots` 只有插入和按 key 替换，没有删除路径，已关闭文档的纹理会一直占用显存直到程序退出。
 - 超过 GPU 纹理尺寸限制的级别仍然会在 CPU 上完整生成后才被丢弃，大图会产生对应的 CPU 时间和内存开销；同时显示分辨率被降低，没有分块（tiling）显示。
 - mip 选择只按 x 方向的缩放比计算，不做各向异性过滤。
@@ -108,3 +109,9 @@
 ## 图像转动（`rotation`）
 
 `CanvasView::rotation` 为 `Some((pivot, angle))` 时，屏幕点先按视图换算成「框空间」点 b，再绕 `pivot` 顺时针转 `angle` 得到要采样的图像点 d（`d = pivot + R(angle)(b − pivot)`），所以图像看上去转了 −angle。遮挡框在框空间里判断。裁剪工具转动图像时使用。
+
+## 测试覆盖
+
+- `mips_built_in_bands_match_the_reference`：多线程生成的 mip 链与按本文描述逐像素计算的参考实现逐字节相同（含奇数尺寸、1 像素宽/高）。
+- `levels_over_the_texture_limit_are_skipped`：超过纹理尺寸上限的级别被跳过。
+- 性能回归由 `op-ui` 的 `dragging_on_a_large_document_keeps_up` 覆盖。

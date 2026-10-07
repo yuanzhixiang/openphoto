@@ -75,3 +75,5 @@
 - `screenshot_filter_dialogs`（`#[ignore]`）：截取 Gaussian Blur、Add Noise、Offset、Unsharp Mask、Motion Blur、Minimum、Emboss、Surface Blur、Dust & Scratches、Mosaic、Box Blur、Custom、Trace Contour 的经典对话框，以及按 Photoshop 截图时的数值（120、−40、70）打开的 Twirl、Pinch、Spherize 与 Polar Coordinates、Wind 插件式对话框，用于与 Photoshop 并排比对。
 - `custom_filter_types_a_kernel_and_remembers_it`：Custom 对话框在左上角格子输入 2 后 Enter 应用，记录「Custom」，再次打开时保留该核。
 - `distort_filters_from_the_menu`：四个扭曲滤镜的对话框以默认值应用并成为 Last Filter。
+- `dragging_on_a_large_document_keeps_up`：在 3000 × 1080 的文档上用移动工具、画笔、橡皮擦拖动 20 帧，平均每帧 UI 更新须少于 40 ms（目前约 10 ms，修复前移动工具约 56 ms），防止合成、图层外框扫描或缩略图再次变慢。
+- `layers_panel_footer_and_lock_buttons` 另外检查：Lock all 打开时只有锁按钮有按下底色，其余按钮没有；此时拖动 Opacity、Fill 不起作用，关掉后拖动 Opacity 生效。

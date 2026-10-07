@@ -28,7 +28,7 @@ tile 边长，固定为 256 像素。每个 tile 占 256×256×4 = 262144 字节
 - `tile_at(tx, ty)` / `tile_at_mut(tx, ty)`：任意 tile（`i32` 坐标，可在画布外）。
 - `pixel(x, y)` / `set_pixel(x, y, rgba)`：画布内的像素；坐标在画布外时读出透明、写入被忽略。
 - `pixel_at(x, y)` / `set_pixel_at(x, y, rgba)`：任意位置（`i64`，可为负）的像素。向缺失的 tile 写透明像素不分配 tile。
-- `content_bounds()`：所有不透明像素（alpha > 0，包括画布外的）的外框 `(x0, y0, x1, y1)`，没有时为 `None`。扫描全部已分配 tile。
+- `content_bounds()`：所有不透明像素（alpha > 0，包括画布外的）的外框 `(x0, y0, x1, y1)`，没有时为 `None`。先处理 tile 网格边缘的 tile，之后完全落在已得外框内的 tile 直接跳过；每个 tile 内从上下向里找第一行、再在其间从左右向里找第一列，遇到像素即停。它每帧会被调用多次（移动工具的变换控件、对齐按钮的可用状态），所以不能逐像素扫描整个图层。
 - `has_pixels_outside()`：是否有像素在画布外。
 - `clipped()`：删掉画布外像素后的图像（背景图层、开启「删除裁剪的像素」的裁剪用它）。只保留画布范围内的 tile 并清掉边缘 tile 的画布外部分。
 - `with_canvas(width, height, dx, dy, fill)`：生成新画布尺寸的图像，所有像素（包括画布外的）平移 (`dx`, `dy`)，平移后落在新画布外的像素继续保留。`fill` 不透明时，新画布中原画布（平移后）没有覆盖的区域填 `fill`（背景图层的扩展色）；原画布内本来透明的像素保持透明。这是 Canvas Size、移动工具和 Reveal All 的底层实现。
@@ -78,3 +78,4 @@ tile 边长，固定为 256 像素。每个 tile 占 256×256×4 = 262144 字节
 - `clipped_drops_what_is_outside`：左边、右边（边缘 tile 内）和下方 tile 中的画布外像素都被删掉，只剩画布内的一个 tile。
 - `regions_reach_outside_the_canvas`：读出伸到画布左上外和右边很远处的区域，再用 `from_region` 写回，内容范围和像素都不变。
 - `opaque_fill_only_covers_new_canvas_area`：用不透明色扩展画布时只填新增区域，原画布内的透明像素保持透明，结果没有画布外像素。
+- `content_bounds_match_a_full_scan`：随机稀疏点（含画布外）与逐点计算一致；3000 × 1080 的大块内容外框准确，10 次调用少于 20 ms。

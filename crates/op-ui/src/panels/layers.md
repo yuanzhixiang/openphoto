@@ -54,6 +54,7 @@
 - 混合模式：切换后立即记录一条「Blending Change」历史。
 - 不透明度、Fill：拖动或输入期间不记录，结束时记录一条「Opacity Change」或「Fill Opacity Change」，避免一次拖动产生多条历史。
 - 五个锁定按钮：各自切换对应的标志，记录「Lock Layer」历史（Photoshop 2026 实测，开和关都叫这个名字）；背景图层上点击无效。「全部锁定」是独立的标志：关掉它，之前的单项锁定恢复原样。
+- 「全部锁定」打开时（Photoshop 2026 实测）：只有锁按钮显示按下，其余四个按钮显示为未按下并变暗，不能点击（各自的标志保留在下面）；混合模式、Opacity、Fill 与「Fill:」文字同样变暗，不能修改。
 - 「Add a mask」按钮：当前图层可以加蒙版时可用；有选区时按选区建蒙版（Reveal Selection），否则全白（Reveal All），记录「Add Layer Mask」，编辑目标切到蒙版。
 - 新建图层（底部按钮）：在当前图层上方插入一个透明图层（`Document::insert_above_active`），按 `Document::next_layer_name` 命名为「Layer N」（与 Photoshop 一致：打开带透明的图片得到「Layer 0」后，新建的是「Layer 1」），选中它，记录「New Layer」。也可以用 ⌥⇧⌘N。按住 ⌥ 单击这个按钮、按 ⇧⌘N 或 Layer › New › Layer... 则先弹出 New Layer 对话框（`dialogs/new_layer.md`），与 Photoshop 一致。
 - 删除图层：删除所有选中的图层（`layer_ops::delete_selected`），选中它下面的图层（没有则选中最底层），记录「Delete Layer」。只剩一个图层时按钮不可用。
