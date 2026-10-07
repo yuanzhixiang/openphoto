@@ -27,7 +27,7 @@ pub mod tile;
 pub mod transform;
 
 pub use color::Color;
-pub use document::{Anchor, DocId, Document, Guide, Snapshot};
+pub use document::{Anchor, DocId, Document, Guide, SampleScope, Snapshot};
 pub use history::History;
 pub use layer::{
     BlendMode, Layer, LayerColor, LayerId, LayerKind, LayerMask, Locks, neutral_color,

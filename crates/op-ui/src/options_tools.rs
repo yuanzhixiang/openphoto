@@ -1635,15 +1635,19 @@ fn choice(app: &mut AppState, key: &'static str) -> usize {
             .position(|(s, _)| *s == app.eyedropper.size)
             .unwrap_or(0),
         "eyedropper.sample" => {
-            let all = app.eyedropper.all_layers;
+            let scope = app.eyedropper.sample;
             let shown: usize = app.setting(key, "2").parse().unwrap_or(2);
             // The setting's own choice, as long as it agrees with the state
-            if (shown >= 2 && shown != 4) == all {
+            // (the "No Adjustments" ones sample like their plain versions:
+            // there are no adjustment layers)
+            if eyedropper_scope(shown) == scope {
                 shown
-            } else if all {
-                2
             } else {
-                0
+                match scope {
+                    op_core::SampleScope::Current => 0,
+                    op_core::SampleScope::CurrentAndBelow => 1,
+                    op_core::SampleScope::All => 2,
+                }
             }
         }
         _ => app.setting(key, default_choice(key)).parse().unwrap_or(0),
@@ -1680,7 +1684,7 @@ fn set_choice(app: &mut AppState, key: &'static str, i: usize) {
         }
         "eyedropper.size" => app.eyedropper.size = crate::state::EyedropperOptions::SIZES[i].0,
         "eyedropper.sample" => {
-            app.eyedropper.all_layers = i >= 2 && i != 4;
+            app.eyedropper.sample = eyedropper_scope(i);
             *app.setting(key, "2") = i.to_string();
         }
         _ => *app.setting(key, default_choice(key)) = i.to_string(),
@@ -2180,5 +2184,24 @@ pub fn paint_mode(app: &mut AppState, tool: Tool) -> op_core::paint::PaintMode {
             .flat_map(|g| g.iter())
             .find(|m| m.label() == label)
             .map_or(PaintMode::Normal, |m| PaintMode::Blend(*m)),
+    }
+}
+
+/// The Eyedropper's Sample choice (Current Layer, Current & Below, All
+/// Layers, All Layers No Adjustments, Current & Below No Adjustments).
+fn eyedropper_scope(i: usize) -> op_core::SampleScope {
+    match i {
+        0 => op_core::SampleScope::Current,
+        1 | 4 => op_core::SampleScope::CurrentAndBelow,
+        _ => op_core::SampleScope::All,
+    }
+}
+
+/// The Clone Stamp's Sample (Current Layer, Current & Below, All Layers).
+pub fn clone_scope(app: &mut AppState) -> op_core::SampleScope {
+    match choice(app, "clone.sample") {
+        1 => op_core::SampleScope::CurrentAndBelow,
+        2 => op_core::SampleScope::All,
+        _ => op_core::SampleScope::Current,
     }
 }

@@ -302,17 +302,29 @@ impl DocState {
     /// `all_layers`, of the active layer. Averaged with alpha weighting, and
     /// opaque; `None` outside the canvas or where everything sampled is
     /// transparent.
-    pub fn sample_average(&mut self, x: u32, y: u32, size: u32, all_layers: bool) -> Option<Color> {
+    pub fn sample_average(
+        &mut self,
+        x: u32,
+        y: u32,
+        size: u32,
+        scope: op_core::SampleScope,
+    ) -> Option<Color> {
+        use op_core::SampleScope;
         let (w, h) = (self.doc.width, self.doc.height);
         if x >= w || y >= h {
             return None;
         }
-        let merged = all_layers.then(|| self.canvas_image());
-        let layer = if all_layers {
-            None
-        } else {
-            let id = self.doc.active_layer?;
-            Some(self.doc.layer(id)?.image()?)
+        let below = (scope == SampleScope::CurrentAndBelow)
+            .then(|| self.doc.sample_source(scope))
+            .flatten();
+        let merged = (scope == SampleScope::All).then(|| self.canvas_image());
+        let layer = match scope {
+            SampleScope::Current => {
+                let id = self.doc.active_layer?;
+                Some(self.doc.layer(id)?.image()?)
+            }
+            SampleScope::CurrentAndBelow => Some(below.as_ref()?),
+            SampleScope::All => None,
         };
         let half = (size / 2) as i64;
         let mut sum = [0u64; 3];
@@ -856,8 +868,8 @@ pub struct LassoPath {
 pub struct EyedropperOptions {
     /// Side of the averaged square in pixels: 1 is "Point Sample".
     pub size: u32,
-    /// "Sample: All Layers" (the merged image) or "Current Layer".
-    pub all_layers: bool,
+    /// "Sample:": the current layer, the layers up to it, or all merged.
+    pub sample: op_core::SampleScope,
 }
 
 impl EyedropperOptions {
@@ -877,7 +889,7 @@ impl Default for EyedropperOptions {
     fn default() -> Self {
         Self {
             size: 1,
-            all_layers: true,
+            sample: op_core::SampleScope::All,
         }
     }
 }

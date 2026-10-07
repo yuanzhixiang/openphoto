@@ -5025,3 +5025,93 @@ fn lasso_with_alt_draws_straight_edges() {
     );
     assert_eq!(last_history(&h), "Lasso");
 }
+
+#[test]
+fn sampling_scopes_and_the_sampling_ring() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A red square on "Layer 1", an empty "Layer 2" on top (active)
+    {
+        let app = &mut h.state_mut().state;
+        let state = app.active().unwrap();
+        let doc = &mut state.doc;
+        let mut red = op_core::TiledImage::new(doc.width, doc.height);
+        for y in 50..150 {
+            for x in 50..150 {
+                red.set_pixel(x, y, [255, 0, 0, 255]);
+            }
+        }
+        let id = doc.new_layer_id();
+        doc.layers.push(op_core::Layer::raster(id, "Layer 1", red));
+        let top = doc.new_layer_id();
+        let (w, hgt) = (doc.width, doc.height);
+        doc.layers.push(op_core::Layer::raster(
+            top,
+            "Layer 2",
+            op_core::TiledImage::new(w, hgt),
+        ));
+        doc.select_layer(top);
+        doc.mark_dirty();
+    }
+    h.run_steps(2);
+    let red = Color::from_rgba8([255, 0, 0, 255]);
+    // Eyedropper: the empty current layer gives nothing; Current & Below
+    // finds the red under it
+    h.state_mut().state.select_tool(Tool::Eyedropper);
+    h.state_mut().state.foreground = Color::WHITE;
+    *h.state_mut().state.setting("eyedropper.ring", "1") = "0".into();
+    h.state_mut().state.eyedropper.sample = op_core::SampleScope::Current;
+    h.run_steps(1);
+    let p = doc_point(&h, 100.0, 100.0);
+    click(&mut h, p);
+    assert_eq!(h.state().state.foreground, Color::WHITE);
+    h.state_mut().state.eyedropper.sample = op_core::SampleScope::CurrentAndBelow;
+    click(&mut h, p);
+    assert_eq!(h.state().state.foreground, red);
+
+    // The sampling ring while held: the picked color above the pointer,
+    // the one it replaces below
+    h.state_mut().state.foreground = Color::from_rgba8([0, 0, 255, 255]);
+    *h.state_mut().state.setting("eyedropper.ring", "1") = "1".into();
+    h.hover_at(p);
+    h.event(egui::Event::PointerButton {
+        pos: p,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(2);
+    let image = h.render().unwrap();
+    let k = 2.0 * UI_SCALE;
+    let px = |q: Pos2| image.get_pixel((q.x * k) as u32, (q.y * k) as u32).0;
+    let ring = crate::theme::pt(48.0);
+    assert_eq!(px(p - egui::vec2(0.0, ring))[..3], [255, 0, 0]);
+    assert_eq!(px(p + egui::vec2(0.0, ring))[..3], [0, 0, 255]);
+    h.event(egui::Event::PointerButton {
+        pos: p,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(2);
+
+    // Clone Stamp sampling All Layers paints the red onto the empty layer
+    h.state_mut().state.select_tool(Tool::CloneStamp);
+    *h.state_mut().state.setting("clone.sample", "0") = "2".into();
+    h.run_steps(1);
+    alt_click(&mut h, p);
+    let q = doc_point(&h, 400.0, 400.0);
+    click(&mut h, q);
+    let top = active(&h).doc.active_layer.unwrap();
+    let pixel = active(&h)
+        .doc
+        .layer(top)
+        .unwrap()
+        .image()
+        .unwrap()
+        .pixel(400, 400);
+    // (the soft brush's center is just short of opaque)
+    assert_eq!(pixel[..3], [255, 0, 0]);
+    assert!(pixel[3] >= 250, "{pixel:?}");
+}

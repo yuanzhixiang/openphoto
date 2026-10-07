@@ -63,6 +63,15 @@ pub struct Snapshot {
     last_selection: Option<Selection>,
 }
 
+/// Which pixels a tool samples: its "Sample:" option.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum SampleScope {
+    #[default]
+    Current,
+    CurrentAndBelow,
+    All,
+}
+
 pub struct Document {
     pub id: DocId,
     pub title: String,
@@ -709,6 +718,26 @@ impl Document {
                 image.pixel(x, y)[3] > 0 && !masked
             })
             .map(|l| l.id)
+    }
+
+    /// The pixels a tool samples ("Sample:" in its bar): the active layer,
+    /// the layers up to and including it, or all of them merged. `None`
+    /// without an active pixel layer (for the current layer only).
+    pub fn sample_source(&self, scope: SampleScope) -> Option<TiledImage> {
+        let (w, h) = (self.width, self.height);
+        match scope {
+            SampleScope::Current => self.layer(self.active_layer?)?.image().cloned(),
+            SampleScope::CurrentAndBelow => {
+                let id = self.active_layer?;
+                let i = self.layers.iter().position(|l| l.id == id)?;
+                Some(TiledImage::from_rgba8(
+                    w,
+                    h,
+                    &self.composite_layers_rgba8(&self.layers[..=i]),
+                ))
+            }
+            SampleScope::All => Some(TiledImage::from_rgba8(w, h, &self.composite_rgba8())),
+        }
     }
 
     pub fn composite_rgba8(&self) -> Vec<u8> {

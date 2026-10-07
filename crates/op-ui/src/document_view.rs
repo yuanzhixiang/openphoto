@@ -150,6 +150,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     // The Brush's and Pencil's Mode, and the Eraser's (Brush, Pencil, Block)
     let paint_mode = crate::options_tools::paint_mode(app, tool);
     let eraser_mode = crate::options_tools::eraser_mode(app);
+    let clone_scope = crate::options_tools::clone_scope(app);
+    let sampling_ring = tool == Tool::Eyedropper && app.flag("eyedropper.ring", true);
     // The Zoom tool's Zoom Out button swaps what a click and Alt-click do
     let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
     let mut straightened = false;
@@ -329,18 +331,34 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             // Alt-click picks the background color
             Tool::Eyedropper if response.is_pointer_button_down_on() => {
                 if let Some(p) = response.interact_pointer_pos() {
+                    // The color being replaced, kept from the press for the ring
+                    let original_id = ui.id().with("eyedropper-original");
+                    if ui.input(|i| i.pointer.primary_pressed()) {
+                        let c = if alt { app.background } else { app.foreground };
+                        ui.data_mut(|d| d.insert_temp(original_id, c));
+                    }
                     let d = to_doc(state, p, ppp);
                     let o = app.eyedropper;
                     if d.x >= 0.0
                         && d.y >= 0.0
                         && let Some(c) =
-                            state.sample_average(d.x as u32, d.y as u32, o.size, o.all_layers)
+                            state.sample_average(d.x as u32, d.y as u32, o.size, o.sample)
                     {
                         if alt {
                             app.background = c;
                         } else {
                             app.foreground = c;
                         }
+                    }
+                    if sampling_ring {
+                        let new = if alt { app.background } else { app.foreground };
+                        let old = ui.data(|d| d.get_temp(original_id)).unwrap_or(new);
+                        // Over the canvas, which is painted after input
+                        let painter = ui.ctx().layer_painter(egui::LayerId::new(
+                            egui::Order::Foreground,
+                            ui.id().with("sampling-ring"),
+                        ));
+                        sampling_ring_shape(&painter, p, new, old);
                     }
                 }
             }
@@ -451,6 +469,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         retouch,
                         mode: paint_mode,
                         eraser_mode,
+                        clone_scope,
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
                 }
@@ -1087,7 +1106,7 @@ fn stroke_kind(
     state: &mut DocState,
     start: Pos2,
     (foreground, background): (op_core::Color, op_core::Color),
-    retouch: crate::state::RetouchOptions,
+    (retouch, clone_scope): (crate::state::RetouchOptions, op_core::SampleScope),
 ) -> Result<op_core::paint::StrokeKind, String> {
     use op_core::paint::StrokeKind;
     let rgb = |c: op_core::Color| {
@@ -1122,7 +1141,12 @@ fn stroke_kind(
                 _ => start - source,
             };
             state.clone_offset = Some(offset);
-            let image = active_image(state).ok_or("")?;
+            // Sample: the layer itself, the layers up to it, or all merged
+            let image = if clone_scope == op_core::SampleScope::Current {
+                active_image(state).ok_or("")?
+            } else {
+                state.doc.sample_source(clone_scope).ok_or("")?
+            };
             StrokeKind::Source {
                 image,
                 dx: offset.x.round() as i64,
@@ -1168,6 +1192,8 @@ struct StrokeSettings {
     retouch: crate::state::RetouchOptions,
     mode: op_core::paint::PaintMode,
     eraser_mode: crate::options_tools::EraserMode,
+    /// The Clone Stamp's Sample.
+    clone_scope: op_core::SampleScope,
 }
 
 fn paint_input(
@@ -1184,6 +1210,7 @@ fn paint_input(
         retouch,
         mode,
         eraser_mode,
+        clone_scope,
     } = settings;
     use crate::options_tools::EraserMode;
     let eraser = (tool == Tool::Eraser).then_some(eraser_mode);
@@ -1212,7 +1239,7 @@ fn paint_input(
             .map(|p| to_doc(state, p, ppp))
             .or(pointer)
             .unwrap_or_default();
-        let kind = match stroke_kind(tool, state, start, colors, retouch) {
+        let kind = match stroke_kind(tool, state, start, colors, (retouch, clone_scope)) {
             Ok(kind) => kind,
             Err(message) => {
                 // Only once per press, and never an empty message
@@ -1587,4 +1614,38 @@ fn status_bar(ui: &mut Ui, state: &mut DocState, rect: Rect, ppp: f32) {
         state.view.offset.x -= d * extent;
         clamp_offset(state, ppp);
     }
+}
+
+/// Photoshop's sampling ring around the Eyedropper while it's held: the
+/// color being picked on the top half, the one it replaces on the bottom
+/// half, inside a gray ring.
+fn sampling_ring_shape(painter: &egui::Painter, c: Pos2, new: op_core::Color, old: op_core::Color) {
+    use egui::{Color32, Mesh};
+    let to32 = |c: op_core::Color| {
+        let [r, g, b, _] = c.to_rgba8();
+        Color32::from_rgb(r, g, b)
+    };
+    let (inner, outer) = (crate::theme::pt(38.0), crate::theme::pt(58.0));
+    let half = |from: f32, color: Color32| {
+        let mut mesh = Mesh::default();
+        let n = 48;
+        for k in 0..=n {
+            let a = from + std::f32::consts::PI * k as f32 / n as f32;
+            let d = egui::vec2(a.cos(), a.sin());
+            mesh.colored_vertex(c + d * inner, color);
+            mesh.colored_vertex(c + d * outer, color);
+            if k > 0 {
+                let i = 2 * k as u32;
+                mesh.add_triangle(i - 2, i - 1, i);
+                mesh.add_triangle(i - 1, i, i + 1);
+            }
+        }
+        painter.add(egui::Shape::mesh(mesh));
+    };
+    // Top half (angles π..2π point up in screen space), then bottom
+    half(std::f32::consts::PI, to32(new));
+    half(0.0, to32(old));
+    let gray = egui::Stroke::new(crate::theme::pt(2.0), Color32::from_gray(0x80));
+    painter.circle_stroke(c, inner, gray);
+    painter.circle_stroke(c, outer, gray);
 }

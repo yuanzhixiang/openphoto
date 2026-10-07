@@ -26,7 +26,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
     };
     let pointer = state.pointer;
     let color = pointer.and_then(|p| {
-        (p.x >= 0.0 && p.y >= 0.0).then(|| state.sample_average(p.x as u32, p.y as u32, 1, true))?
+        (p.x >= 0.0 && p.y >= 0.0)
+            .then(|| state.sample_average(p.x as u32, p.y as u32, 1, op_core::SampleScope::All))?
     });
     let sel = state.doc.selection().and_then(|s| s.bounds());
     let (w, h) = (state.doc.width as f64, state.doc.height as f64);
