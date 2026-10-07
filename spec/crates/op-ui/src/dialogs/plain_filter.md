@@ -2,7 +2,7 @@
 
 ## Responsibilities
 
-The layouts of Photoshop 2026's small filter dialogs that have no preview: Stylize › Tiles... and Pixelate › Color Halftone.... They are drawn by `AdjustDialog::plain_ui` (`adjust.md`): the title bar, the items in order, and plug-in style OK and Cancel (89 × 26 pt, 13 pt labels, at y 41 and 77 from `buttons_x`). Measured on Photoshop 2026; labels, units and radio labels are 11 pt (`distort::label_font`), field values 12 pt; every label and field was checked within half a point.
+The layouts of Photoshop 2026's small filter dialogs that have no preview: Stylize › Tiles..., Pixelate › Color Halftone... and Other › HSB/HSL ("HSB/HSL Parameters"). They are drawn by `AdjustDialog::plain_ui` (`adjust.md`): the title bar, the items in order, and OK and Cancel at `buttons_x` with the layout's `buttons` (width, OK's and Cancel's tops, height, label size; the plug-in style ones are 89 × 26 pt at y 41 and 77 with 13 pt labels). Labels, units and radio labels are in the layout's `text_size` (11 pt in all three), field values 12 pt. Measured on Photoshop 2026: Tiles' and Color Halftone's labels and fields within half a point, HSB/HSL's within about a point (Source Sans 3 runs a little wider than Photoshop's font there).
 
 ## Items (`Item`)
 
@@ -16,6 +16,7 @@ The layouts of Photoshop 2026's small filter dialogs that have no preview: Styli
 | Dialog | Size | Buttons x | Items |
 | --- | --- | --- | --- |
 | Tiles (`TILES`) | 302 × 220 | 195.5 | "Number Of Tiles:" (x 17) field 117–146 × 44–65; "Maximum Offset:" field 118–147 × 81–102, "%" at 156; "Fill Empty Area With:" (23, 116.75); radios at x 21, y 134 / 154 / 174 / 194, labels 13 pt after |
+| HSB/HSL (`HSB_HSL`) | 270 × 163 | 172 (78 × 24 buttons at y 48 and 80, 11 pt) | "Input mode" (20, 60.5) over radios at x 26, y 83 / 107 / 131; "Row order" (101, 60.5) over radios at x 107; labels 15 pt after the centers |
 | Color Halftone (`COLOR_HALFTONE`) | 326 × 243 | 219.5 | "Max. Radius:" (x 9) field 87–150.5 × 36.5–56.5, "(Pixels)" at 160.5; "Screen Angles (Degrees):" (13, 76); "Channel 1:"–"Channel 4:" (x 17) fields 83.5–146.5 at y 95.5, 132.5, 169.5, 206.5 (20 tall) |
 
 ## Behavior

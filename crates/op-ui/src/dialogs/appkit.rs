@@ -302,7 +302,16 @@ pub fn radio_with(
         Pos2::new(center.x + pt(gap) + galley.size().x, center.y + pt(8.0)),
     );
     let clicked = ui
-        .interact(hit, ui.id().with(("appkit-radio", label)), Sense::click())
+        .interact(
+            hit,
+            ui.id().with((
+                "appkit-radio",
+                label,
+                center.x.to_bits(),
+                center.y.to_bits(),
+            )),
+            Sense::click(),
+        )
         .clicked();
     let painter = ui.painter();
     if chosen {

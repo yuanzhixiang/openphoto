@@ -12,8 +12,8 @@
 use egui::{Align2, Color32, Key, Pos2, Rect, Sense, Stroke, Ui, vec2};
 use op_core::adjust::Adjustment;
 use op_core::filter::{
-    DiffuseMode, Filter, MezzotintType, OffsetFill, RippleSize, SpherizeMode, TilesFill,
-    WindMethod, ZigZagStyle,
+    ColorModel, DiffuseMode, Filter, MezzotintType, OffsetFill, RippleSize, SpherizeMode,
+    TilesFill, WindMethod, ZigZagStyle,
 };
 
 use super::{
@@ -149,6 +149,10 @@ const MEZZOTINT: &[Param] = &[choice(
     ],
     0,
 )];
+const HSB_HSL: &[Param] = &[
+    choice("Input mode", &["RGB", "HSB", "HSL"], 0),
+    choice("Row order", &["RGB", "HSB", "HSL"], 1),
+];
 const ZIGZAG: &[Param] = &[
     param("Amount", -100.0, 100.0, 30.0, 0),
     param("Ridges", 0.0, 20.0, 4.0, 0),
@@ -264,6 +268,7 @@ pub enum Kind {
     Tiles,
     ColorHalftone,
     ZigZag,
+    HsbHsl,
     Pinch,
     Spherize,
     PolarCoordinates,
@@ -313,6 +318,7 @@ impl Kind {
             Self::Tiles => "Tiles",
             Self::ColorHalftone => "Color Halftone",
             Self::ZigZag => "ZigZag",
+            Self::HsbHsl => "HSB/HSL Parameters",
             Self::Pinch => "Pinch",
             Self::Spherize => "Spherize",
             Self::PolarCoordinates => "Polar Coordinates",
@@ -362,6 +368,7 @@ impl Kind {
             Self::Tiles => TILES,
             Self::ColorHalftone => COLOR_HALFTONE,
             Self::ZigZag => ZIGZAG,
+            Self::HsbHsl => HSB_HSL,
             Self::Pinch => PINCH,
             Self::Spherize => SPHERIZE,
             Self::PolarCoordinates => POLAR,
@@ -401,6 +408,7 @@ impl Kind {
         Some(match self {
             Self::Tiles => &plain_filter::TILES,
             Self::ColorHalftone => &plain_filter::COLOR_HALFTONE,
+            Self::HsbHsl => &plain_filter::HSB_HSL,
             _ => return None,
         })
     }
@@ -728,6 +736,14 @@ impl AdjustDialog {
                 amount: v[0] as i32,
                 size: [RippleSize::Small, RippleSize::Medium, RippleSize::Large][v[1] as usize],
             },
+            Kind::HsbHsl => {
+                let model =
+                    |i: f32| [ColorModel::Rgb, ColorModel::Hsb, ColorModel::Hsl][i as usize];
+                Filter::HsbHsl {
+                    input: model(v[0]),
+                    output: model(v[1]),
+                }
+            }
             Kind::ZigZag => Filter::ZigZag {
                 amount: v[0] as i32,
                 ridges: v[1] as u32,
@@ -1240,21 +1256,23 @@ impl AdjustDialog {
         let r = |b: [f32; 4]| Rect::from_min_max(at(b[0], b[1]), at(b[2], b[3]));
         common::frame(ui, frame, self.kind.title(), theme::dialog_bold(pt(13.0)));
         let params = self.kind.params();
+        let font = theme::dialog(pt(layout.text_size));
+        let label_at = |ui: &Ui, pos: Pos2, text: &str| {
+            let galley = theme::tracked_galley(ui.painter(), text, font.clone(), appkit::TEXT);
+            let rect = Align2::LEFT_CENTER.anchor_size(pos, galley.size());
+            ui.painter().galley(rect.min, galley, appkit::TEXT);
+        };
+        let label = |ui: &Ui, pos: Pos2, text: &str| label_at(ui, pos, text);
         let mut i = 0;
         for item in layout.items {
             match *item {
                 Item::Text { text, at: (x, y) } => {
-                    distort::label(ui, at(x, y), Align2::LEFT_CENTER, text);
+                    label(ui, at(x, y), text);
                 }
                 Item::Field { label, rect, unit } => {
                     let field = r(rect);
                     let cy = field.center().y;
-                    distort::label(
-                        ui,
-                        Pos2::new(at(label.1, 0.0).x, cy),
-                        Align2::LEFT_CENTER,
-                        label.0,
-                    );
+                    label_at(ui, Pos2::new(at(label.1, 0.0).x, cy), label.0);
                     let p = &params[i];
                     appkit::field(
                         ui,
@@ -1267,7 +1285,7 @@ impl AdjustDialog {
                         self.first_frame && i == 0,
                     );
                     if let Some((unit, x)) = unit {
-                        distort::label(ui, Pos2::new(at(x, 0.0).x, cy), Align2::LEFT_CENTER, unit);
+                        label_at(ui, Pos2::new(at(x, 0.0).x, cy), unit);
                     }
                     i += 1;
                 }
@@ -1275,7 +1293,7 @@ impl AdjustDialog {
                     if let ParamKind::Choice(options) = params[i].kind {
                         let chosen = self.value(i).unwrap_or(0.0) as usize;
                         for (k, (&(x, y), option)) in centers.iter().zip(options).enumerate() {
-                            let font = distort::label_font();
+                            let font = font.clone();
                             if appkit::radio_with(ui, at(x, y), option, chosen == k, (gap, font)) {
                                 self.values[i] = k.to_string();
                             }
@@ -1286,21 +1304,22 @@ impl AdjustDialog {
             }
         }
         let x0 = layout.buttons_x;
+        let (bw, ok_y, cancel_y, bh, size) = layout.buttons;
         let valid = self.effect().is_some();
         let ok = appkit::button_with(
             ui,
-            Rect::from_min_max(at(x0, 41.0), at(x0 + 89.0, 67.0)),
+            Rect::from_min_max(at(x0, ok_y), at(x0 + bw, ok_y + bh)),
             "OK",
             (true, valid),
-            13.0,
+            size,
             0.0,
         );
         let cancel = appkit::button_with(
             ui,
-            Rect::from_min_max(at(x0, 77.0), at(x0 + 89.0, 103.0)),
+            Rect::from_min_max(at(x0, cancel_y), at(x0 + bw, cancel_y + bh)),
             "Cancel",
             (false, true),
-            13.0,
+            size,
             0.0,
         );
         if cancel.clicked() {
@@ -1500,6 +1519,7 @@ mod tests {
             Kind::Tiles,
             Kind::ColorHalftone,
             Kind::ZigZag,
+            Kind::HsbHsl,
             Kind::Pinch,
             Kind::Spherize,
             Kind::PolarCoordinates,

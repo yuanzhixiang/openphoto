@@ -27,13 +27,22 @@ pub struct Layout {
     pub size: (f32, f32),
     /// OK's and Cancel's left edge.
     pub buttons_x: f32,
+    /// The buttons: width, OK's top, Cancel's top, height, label size.
+    pub buttons: (f32, f32, f32, f32, f32),
+    /// The labels' size (radio labels too).
+    pub text_size: f32,
     pub items: &'static [Item],
 }
+
+/// The plug-in style dialogs' buttons: 89 × 26 at y 41 and 77, 13 pt.
+const PLUGIN_BUTTONS: (f32, f32, f32, f32, f32) = (89.0, 41.0, 77.0, 26.0, 13.0);
 
 /// Stylize › Tiles (302 × 220 pt).
 pub const TILES: Layout = Layout {
     size: (302.0, 220.0),
     buttons_x: 195.5,
+    buttons: PLUGIN_BUTTONS,
+    text_size: 11.0,
     items: &[
         Item::Field {
             label: ("Number Of Tiles:", 17.0),
@@ -60,6 +69,8 @@ pub const TILES: Layout = Layout {
 pub const COLOR_HALFTONE: Layout = Layout {
     size: (326.0, 243.0),
     buttons_x: 219.5,
+    buttons: PLUGIN_BUTTONS,
+    text_size: 11.0,
     items: &[
         Item::Field {
             label: ("Max. Radius:", 9.0),
@@ -89,6 +100,33 @@ pub const COLOR_HALFTONE: Layout = Layout {
             label: ("Channel 4:", 17.0),
             rect: [83.5, 206.5, 146.5, 226.5],
             unit: None,
+        },
+    ],
+};
+
+/// Other › HSB/HSL ("HSB/HSL Parameters", 270 × 163 pt): Input mode and
+/// Row order radios side by side, 11 pt; 78 × 24 buttons with 11 pt labels.
+pub const HSB_HSL: Layout = Layout {
+    size: (270.0, 163.0),
+    buttons_x: 172.0,
+    buttons: (78.0, 48.0, 80.0, 24.0, 11.0),
+    text_size: 11.0,
+    items: &[
+        Item::Text {
+            text: "Input mode",
+            at: (20.0, 60.5),
+        },
+        Item::Radios {
+            centers: &[(26.0, 83.0), (26.0, 107.0), (26.0, 131.0)],
+            gap: 15.0,
+        },
+        Item::Text {
+            text: "Row order",
+            at: (101.0, 60.5),
+        },
+        Item::Radios {
+            centers: &[(107.0, 83.0), (107.0, 107.0), (107.0, 131.0)],
+            gap: 15.0,
         },
     ],
 };

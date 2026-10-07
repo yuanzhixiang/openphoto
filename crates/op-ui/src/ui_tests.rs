@@ -6209,6 +6209,7 @@ fn screenshot_pixelate_and_diffuse_dialogs() {
         (Command::Tiles, "tiles", 302.0, 220.0),
         (Command::ColorHalftone, "halftone", 326.0, 243.0),
         (Command::ZigZag, "zigzag", 433.0, 454.0),
+        (Command::HsbHsl, "hsb", 270.0, 163.0),
     ] {
         let mut h = harness(Vec::new());
         probe_document(&mut h);
@@ -6244,12 +6245,16 @@ fn crystallize_pointillize_and_diffuse_apply() {
         (Command::Tiles, "Tiles"),
         (Command::ColorHalftone, "Color Halftone"),
         (Command::ZigZag, "ZigZag"),
+        (Command::HsbHsl, "HSB/HSL"),
     ] {
         let before = layer_pixel(&h, 0, 50, 50);
         run_command(&mut h, command);
         assert!(h.state().state.adjust_dialog.is_some(), "{name}");
         // The dialogs without a preview leave the document alone meanwhile
-        if matches!(command, Command::Tiles | Command::ColorHalftone) {
+        if matches!(
+            command,
+            Command::Tiles | Command::ColorHalftone | Command::HsbHsl
+        ) {
             h.run_steps(2);
             assert_eq!(layer_pixel(&h, 0, 50, 50), before, "{name}");
         }

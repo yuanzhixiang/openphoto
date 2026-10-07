@@ -37,6 +37,7 @@ A dialog's result is an `Effect`: `Adjustment(Adjustment)` or `Filter(Filter)`. 
 | Diffuse | Mode (Normal / Darken Only / Lighten Only / Anisotropic, Normal) |
 | Ripple | Amount (%) (−999–999, 100), Size (Small / Medium / Large, Medium) |
 | ZigZag | Amount (−100–100, 30), Ridges (0–20, 4), Style (Around Center / Out From Center / Pond Ripples, Around Center) |
+| HSB/HSL | Input mode (RGB / HSB / HSL, RGB), Row order (RGB / HSB / HSL, HSB) |
 | Tiles | Number Of Tiles (1–99, 10), Maximum Offset (%) (1–99, 10), Fill Empty Area With (Background Color / Foreground Color / Inverse Image / Unaltered Image, Background Color) |
 | Color Halftone | Max. Radius (pixels) (4–127, 8), Channel 1–4 screen angles (−360–360; 108, 162, 90, 45) |
 | Mezzotint | Type (Fine Dots, Medium Dots, Grainy Dots, Coarse Dots, Short Lines, Medium Lines, Long Lines, Short Strokes, Medium Strokes, Long Strokes; Fine Dots) |
@@ -61,7 +62,7 @@ Gaussian Blur, Box Blur, Surface Blur, Motion Blur, Unsharp Mask, Add Noise, Dus
 
 Twirl, Pinch, Spherize, Polar Coordinates, Wind, Crystallize, Pointillize, Ripple, ZigZag and Mezzotint are rebuilt after Photoshop 2026's plugin-style dialogs (`distort_ui`), with layout and drawing in `distort.rs` (see `distort.md`): a large preview pane (with scroll troughs and a zoom bar at bottom left), OK / Cancel at top right (89 × 26, 13 pt text), settings below the preview pane (input box + pentagon slider, or the radio groups of Polar Coordinates and Wind), and a distortion diagram at bottom right. The settings still live in this module's parameter table, so remembering, validation and preview are the same as for classic dialogs.
 
-Tiles and Color Halftone have no preview: their layouts are in `plain_filter.rs` (`plain_ui`, see `plain_filter.md`), and they don't preview on the document. Tiles' Foreground Color fill takes the app's foreground color when applied (`lib.rs` fills it in).
+Tiles, Color Halftone and HSB/HSL have no preview: their layouts are in `plain_filter.rs` (`plain_ui`, see `plain_filter.md`), and they don't preview on the document. Tiles' Foreground Color fill takes the app's foreground color when applied (`lib.rs` fills it in).
 
 Every filter dialog has either a classic, a plugin-style or a plain layout (`Kind::size` panics when there is no layout, and `every_filter_dialog_has_an_effect` exposes omissions); the old generic layout has been removed.
 

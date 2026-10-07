@@ -105,6 +105,8 @@ pub enum Command {
     Tiles,
     ColorHalftone,
     ZigZag,
+    /// Filter > Other > HSB/HSL.
+    HsbHsl,
     Pinch,
     Spherize,
     PolarCoordinates,
@@ -554,6 +556,7 @@ impl Command {
             | Self::Tiles
             | Self::ColorHalftone
             | Self::ZigZag
+            | Self::HsbHsl
             | Self::Pinch
             | Self::Spherize
             | Self::PolarCoordinates
@@ -929,6 +932,7 @@ impl Command {
             | Self::Tiles
             | Self::ColorHalftone
             | Self::ZigZag
+            | Self::HsbHsl
             | Self::Pinch
             | Self::Spherize
             | Self::PolarCoordinates
@@ -1339,6 +1343,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         | Command::Tiles
         | Command::ColorHalftone
         | Command::ZigZag
+        | Command::HsbHsl
         | Command::Pinch
         | Command::Spherize
         | Command::PolarCoordinates
@@ -1383,6 +1388,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 Command::Mezzotint => (AdjustKind::Mezzotint, "Mezzotint"),
                 Command::Tiles => (AdjustKind::Tiles, "Tiles"),
                 Command::ZigZag => (AdjustKind::ZigZag, "ZigZag"),
+                Command::HsbHsl => (AdjustKind::HsbHsl, "HSB/HSL"),
                 Command::ColorHalftone => (AdjustKind::ColorHalftone, "Color Halftone"),
                 Command::Pinch => (AdjustKind::Pinch, "Pinch"),
                 Command::Spherize => (AdjustKind::Spherize, "Spherize"),

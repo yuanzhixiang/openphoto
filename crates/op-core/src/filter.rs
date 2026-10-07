@@ -29,6 +29,14 @@ pub enum SpherizeMode {
     VerticalOnly,
 }
 
+/// The channel models HSB/HSL converts between.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ColorModel {
+    Rgb,
+    Hsb,
+    Hsl,
+}
+
 /// ZigZag's Style.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ZigZagStyle {
@@ -247,6 +255,12 @@ pub enum Filter {
         ridges: u32,
         style: ZigZagStyle,
     },
+    /// Other > HSB/HSL: the channels read as `input` and written as
+    /// `output` (hue as 0–255 for 0–360°).
+    HsbHsl {
+        input: ColorModel,
+        output: ColorModel,
+    },
     /// Pixelate > Facet: similar neighboring colors clumped into flat
     /// patches.
     Facet,
@@ -309,6 +323,7 @@ impl Filter {
             Self::Tiles { .. } => "Tiles",
             Self::Facet => "Facet",
             Self::ZigZag { .. } => "ZigZag",
+            Self::HsbHsl { .. } => "HSB/HSL",
             Self::ColorHalftone { .. } => "Color Halftone",
             Self::Mezzotint { .. } => "Mezzotint",
             Self::Pointillize { .. } => "Pointillize",
@@ -1015,6 +1030,70 @@ fn facet(src: &Buffer) -> Vec<[u8; 4]> {
         .collect()
 }
 
+/// Three channels read in `model`, as RGB (hue 0–255 standing for
+/// 0–360°).
+fn to_rgb(model: ColorModel, c: [u8; 3]) -> [u8; 3] {
+    let (h, s, v) = (
+        c[0] as f32 / 255.0 * 6.0,
+        c[1] as f32 / 255.0,
+        c[2] as f32 / 255.0,
+    );
+    let hue = |h: f32, chroma: f32, m: f32| {
+        let x = chroma * (1.0 - ((h % 2.0) - 1.0).abs());
+        let (r, g, b) = match h as u32 {
+            0 => (chroma, x, 0.0),
+            1 => (x, chroma, 0.0),
+            2 => (0.0, chroma, x),
+            3 => (0.0, x, chroma),
+            4 => (x, 0.0, chroma),
+            _ => (chroma, 0.0, x),
+        };
+        [r + m, g + m, b + m].map(|v| (v * 255.0).round().clamp(0.0, 255.0) as u8)
+    };
+    let h = h.min(5.9999);
+    match model {
+        ColorModel::Rgb => c,
+        ColorModel::Hsb => {
+            let chroma = v * s;
+            hue(h, chroma, v - chroma)
+        }
+        ColorModel::Hsl => {
+            let chroma = (1.0 - (2.0 * v - 1.0).abs()) * s;
+            hue(h, chroma, v - chroma / 2.0)
+        }
+    }
+}
+
+/// RGB written as three channels in `model`.
+fn from_rgb(model: ColorModel, c: [u8; 3]) -> [u8; 3] {
+    let [r, g, b] = c.map(|v| v as f32 / 255.0);
+    let (max, min) = (r.max(g).max(b), r.min(g).min(b));
+    let d = max - min;
+    let h = if d == 0.0 {
+        0.0
+    } else if max == r {
+        ((g - b) / d).rem_euclid(6.0)
+    } else if max == g {
+        (b - r) / d + 2.0
+    } else {
+        (r - g) / d + 4.0
+    } / 6.0;
+    let q = |v: f32| (v * 255.0).round().clamp(0.0, 255.0) as u8;
+    match model {
+        ColorModel::Rgb => c,
+        ColorModel::Hsb => [q(h), q(if max == 0.0 { 0.0 } else { d / max }), q(max)],
+        ColorModel::Hsl => {
+            let l = (max + min) / 2.0;
+            let s = if d == 0.0 {
+                0.0
+            } else {
+                d / (1.0 - (2.0 * l - 1.0).abs())
+            };
+            [q(h), q(s), q(l)]
+        }
+    }
+}
+
 /// Mezzotint: each channel becomes 255 or 0, at random with its value as
 /// the chance. Dots draw a fresh chance per pixel (Medium and Coarse per 2
 /// and 3 pixel blocks, Grainy with half the chances shared by a 2 pixel
@@ -1613,6 +1692,11 @@ fn filtered(
         Filter::Diffuse { mode } => diffuse(&src, mode),
         Filter::Mezzotint { kind } => mezzotint(&src, kind),
         Filter::Facet => facet(&src),
+        Filter::HsbHsl { input, output } => per_pixel(&|_, _, p| {
+            let rgb = to_rgb(input, [p[0], p[1], p[2]]);
+            let out = from_rgb(output, rgb);
+            [out[0], out[1], out[2], p[3]]
+        }),
         Filter::Tiles {
             count,
             offset,
@@ -2273,5 +2357,23 @@ mod tests {
         assert!((((x - 50.0).powi(2) + (y - 50.0).powi(2)).sqrt() - 10.0).abs() < 0.01);
         let (_, y) = distortion_source(f(ZigZagStyle::OutFromCenter), 60.0, 50.0, 100.0, 100.0);
         assert!((y - 50.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn hsb_and_hsl_round_trip() {
+        // Pure red: hue 0, full saturation, full brightness / half lightness
+        assert_eq!(from_rgb(ColorModel::Hsb, [255, 0, 0]), [0, 255, 255]);
+        assert_eq!(from_rgb(ColorModel::Hsl, [255, 0, 0]), [0, 255, 128]);
+        // Blue's hue is 240° → 170
+        assert_eq!(from_rgb(ColorModel::Hsb, [0, 0, 255])[0], 170);
+        for c in [[200, 100, 50], [10, 220, 140], [128, 128, 128], [0, 0, 0]] {
+            for m in [ColorModel::Hsb, ColorModel::Hsl] {
+                let back = to_rgb(m, from_rgb(m, c));
+                assert!(
+                    (0..3).all(|k| back[k].abs_diff(c[k]) <= 3),
+                    "{m:?} {c:?} {back:?}"
+                );
+            }
+        }
     }
 }

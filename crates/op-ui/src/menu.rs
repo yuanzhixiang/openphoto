@@ -88,6 +88,7 @@ const ALL_COMMANDS: &[Command] = &[
     Command::Mezzotint,
     Command::Tiles,
     Command::ZigZag,
+    Command::HsbHsl,
     Command::ColorHalftone,
     Command::Pinch,
     Command::Spherize,
@@ -954,7 +955,7 @@ impl NativeMenu {
                     &[
                         ("Custom...", Some(Command::CustomFilter)),
                         ("High Pass...", Some(Command::HighPass)),
-                        ("HSB/HSL", None),
+                        ("HSB/HSL", Some(Command::HsbHsl)),
                         ("Maximum...", Some(Command::Maximum)),
                         ("Minimum...", Some(Command::Minimum)),
                         ("Offset...", Some(Command::Offset)),
