@@ -23,5 +23,4 @@ The document tab bar above the canvas, with one tab per open document. Dimension
 
 ## Known Limitations
 
-- Photoshop appends "*" to the title when the document has unsaved changes; this does not (and there is no save feature yet).
 - Tabs cannot be reordered by dragging or dragged out into floating windows; with too many tabs, they do not scroll or collapse.

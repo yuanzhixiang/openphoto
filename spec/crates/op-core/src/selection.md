@@ -36,7 +36,7 @@ Pixel selection. As in Photoshop, a selection is an 8-bit mask the same size as 
 ## Known limitations
 
 - The selection is stored densely, 1 byte per pixel, proportional to the document size.
-- There are none of Photoshop's Select › Modify (Expand, Contract, Smooth, Border), Grow, Similar, Color Range or similar operations.
+- There is no Color Range or Focus Area. (Select › Modify — Expand, Contract, Smooth, Border, Feather — and Grow / Similar are implemented; Grow and Similar live in `op_core::fill::grow`.)
 
 ## Test coverage
 

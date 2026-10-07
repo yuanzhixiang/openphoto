@@ -32,7 +32,7 @@ PackBits encoding: runs of 3 or more identical bytes are encoded as repeat segme
 
 ## Known Limitations
 
-- Not supported: layer groups (expanded on open, no groups on save), vector masks, adjustment layers, type layers, smart objects, layer styles, clipping masks, channels and paths, and 16/32-bit, grayscale, CMYK, and other modes.
+- Not supported: vector masks, adjustment layers, type layers, smart objects, layer styles, clipping masks, channels and paths, and 16/32-bit, grayscale, CMYK, and other modes.
 - ICC profiles and other image resources (guides, slices, thumbnails, etc.) are not read or written.
 - No thumbnail is written on save; PSD previews in Finder may rely on the system rendering the composite itself.
 - Verified: when Photoshop 2026 opens a PSD written by OpenPhoto, layer names, opacity, blend modes, visibility, and the background layer are all correct; when OpenPhoto reads a PSD saved by Photoshop, both the background layer and normal layers are correct. Layer masks have not yet been verified with Photoshop.

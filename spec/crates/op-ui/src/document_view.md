@@ -160,5 +160,4 @@ Applies to the Brush, Pencil, Eraser, and retouching tools (Dodge, Burn, Sponge,
 ## Known limitations
 
 - The marquee tool's "Fixed Ratio" and "Fixed Size" styles have no effect.
-- No rulers or guides.
 - Scrollbar thumb length does not exactly match Photoshop (Photoshop computes the scrollable range differently), and clicking the track does not page.

@@ -257,8 +257,6 @@ Cut, Copy, CopyMerged, Paste and PasteInPlace are executed by `actions::clipboar
 
 - On platforms without a native menu, ⌘V receives no event when the system clipboard holds only an image (see above); pasting is only possible through the menu.
 
-- Photoshop's Layer › New › Layer... shows the "New Layer" dialog; here the layer is created directly, so the menu item text has no ellipsis.
-- In Photoshop, Layer from Background and Duplicate Layer first show a dialog; here they execute directly; for Flatten Image with hidden layers, Photoshop asks whether to discard them, while here they are discarded directly.
 - Equalize: with a selection, it does not execute directly but first shows the Equalize prompt (`dialogs/equalize.md`).
 - Filter › Blur › Blur, Blur More, Sharpen › Sharpen, Sharpen More, Stylize › Find Edges: execute directly like Average and Solarize (checked the same as adjustments), recording history under the same name and becoming the Last Filter. Motion Blur... and Emboss... open filter dialogs (`dialogs/adjust.md`).
 - Filter › Distort › Twirl..., Pinch..., Spherize..., Polar Coordinates... open filter dialogs.

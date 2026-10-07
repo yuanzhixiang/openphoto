@@ -42,8 +42,6 @@ The fixed transforms of Edit › Transform: `Rotate180`, `Rotate90Clockwise`, `R
 
 ## Known limitations
 
-- Only bilinear interpolation; no Photoshop Bicubic family or Nearest Neighbor options.
-- No Skew, Distort, Perspective, or Warp.
 - Rotating 90° when the extent has an odd width or height produces a half-pixel offset (edges slightly blurred after resampling).
 
 ## Layer groups

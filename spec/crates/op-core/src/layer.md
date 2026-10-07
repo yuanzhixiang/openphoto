@@ -96,8 +96,8 @@ Effective locks (editing operations always use these methods instead of reading 
 
 ## Known limitations
 
-- Only raster layers; no layer groups, adjustment layers, type layers, shape layers or smart objects.
-- No layer masks, clipping masks or layer styles (so `fill` and `opacity` have the same effect).
+- Raster layers and layer groups only; no adjustment layers, type layers, shape layers or smart objects.
+- Layer masks are supported, but there are no clipping masks or layer styles (so `fill` and `opacity` have the same effect).
 - Prevent auto-nesting (`lock_nesting`) only stores state: there are no artboards or frames yet, so it does not affect any operation.
 
 ## Test coverage
