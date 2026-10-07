@@ -524,34 +524,6 @@ pub const OFFSET: &Layout = &Layout {
     ],
 };
 
-pub const RADIAL_BLUR: &Layout = &Layout {
-    size: (324.0, 528.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: true,
-    rows: &[
-        number(
-            "Amount:",
-            135.0,
-            [140.0, 287.0, 200.5, 306.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 313.0)),
-            Scale::Linear,
-        ),
-        Row::Radios {
-            title: "Blur Method",
-            group: [10.5, 336.0, 314.0, 405.0],
-            ys: &[361.0, 388.0],
-        },
-        Row::Radios {
-            title: "Quality",
-            group: [10.5, 417.0, 314.0, 513.0],
-            ys: &[442.0, 469.0, 496.0],
-        },
-    ],
-};
-
 pub const SMART_BLUR: &Layout = &Layout {
     size: (324.0, 454.0),
     button_width: 59.5,

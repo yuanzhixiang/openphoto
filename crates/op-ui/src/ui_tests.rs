@@ -8549,3 +8549,40 @@ fn info_panel_sections() {
     h.run_steps(2);
     shot(&mut h, "info_panel");
 }
+
+#[test]
+fn radial_blur_dialog_sets_its_center() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::RadialBlur);
+    h.run_steps(3);
+    shot_dialog(&mut h, "radial_blur", 274.0, 280.0);
+    // No preview on the document, as in Photoshop
+    let dialog = h.state().state.adjust_dialog.as_ref().unwrap();
+    assert!(!dialog.preview);
+    assert_eq!(dialog.extra.radial_center, (0.5, 0.5));
+    // A click in Blur Center's upper left quarter moves the center there
+    let (x, y) = dialog_origin(&mut h);
+    let pt = crate::theme::pt;
+    click(
+        &mut h,
+        egui::pos2(pt(x + 132.0 + 130.0 * 0.25), pt(y + 140.0 + 130.0 * 0.25)),
+    );
+    h.run_steps(2);
+    let center = h
+        .state()
+        .state
+        .adjust_dialog
+        .as_ref()
+        .unwrap()
+        .extra
+        .radial_center;
+    assert!(
+        (center.0 - 0.25).abs() < 0.02 && (center.1 - 0.25).abs() < 0.02,
+        "{center:?}"
+    );
+    shot_dialog(&mut h, "radial_blur_center", 274.0, 280.0);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Radial Blur");
+}

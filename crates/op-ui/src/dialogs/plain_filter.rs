@@ -1,5 +1,5 @@
 //! Photoshop 2026's small filter dialogs without a preview (Stylize ›
-//! Tiles..., Pixelate › Color Halftone...): plug-in style OK and Cancel
+//! Tiles..., Pixelate › Color Halftone..., Blur › Radial Blur...): OK and Cancel
 //! (89 pt wide) at the top right and the settings as text, fields, radio
 //! buttons and checkboxes, measured on Photoshop. Coordinates are
 //! Photoshop points from the dialog's top-left corner.
@@ -21,6 +21,21 @@ pub enum Item {
         centers: &'static [(f32, f32)],
         gap: f32,
     },
+    /// A slider for the field before it: a 3 pt track (x0, x1, top) with
+    /// the pin standing on it, its tip 3 pt above the track, its middle at
+    /// `pins.0` for the setting's minimum and `pins.1` for its maximum.
+    Track {
+        x0: f32,
+        x1: f32,
+        top: f32,
+        pins: (f32, f32),
+    },
+    /// A group box (x0, y0, x1, y1) with its title on the top edge, 19 pt
+    /// in; sets nothing.
+    Group { title: &'static str, rect: [f32; 4] },
+    /// Radial Blur's Blur Center: a white box drawing the blur's pattern
+    /// around the center, which a click or drag moves; sets nothing.
+    CenterBox { rect: [f32; 4] },
 }
 
 pub struct Layout {
@@ -127,6 +142,51 @@ pub const HSB_HSL: Layout = Layout {
         Item::Radios {
             centers: &[(107.0, 83.0), (107.0, 107.0), (107.0, 131.0)],
             gap: 15.0,
+        },
+    ],
+};
+
+/// Blur › Radial Blur (274 × 280 pt): Amount over a slider, the Blur
+/// Method and Quality groups, and the Blur Center box; 108.5 × 26 buttons.
+pub const RADIAL_BLUR: Layout = Layout {
+    size: (274.0, 280.0),
+    buttons_x: 148.0,
+    buttons: (108.5, 39.0, 75.0, 26.0, 13.0),
+    text_size: 11.0,
+    items: &[
+        Item::Field {
+            label: ("Amount", 19.5),
+            rect: [83.0, 48.5, 117.0, 67.0],
+            unit: None,
+        },
+        Item::Track {
+            x0: 14.5,
+            x1: 121.5,
+            top: 76.0,
+            pins: (17.75, 116.75),
+        },
+        Item::Group {
+            title: "Blur Method:",
+            rect: [12.0, 113.0, 117.5, 175.5],
+        },
+        Item::Radios {
+            centers: &[(26.0, 133.0), (26.0, 156.0)],
+            gap: 13.5,
+        },
+        Item::Group {
+            title: "Quality:",
+            rect: [12.0, 184.0, 117.5, 266.5],
+        },
+        Item::Radios {
+            centers: &[(26.0, 204.0), (26.0, 226.0), (26.0, 248.0)],
+            gap: 13.5,
+        },
+        Item::Text {
+            text: "Blur Center",
+            at: (133.0, 125.0),
+        },
+        Item::CenterBox {
+            rect: [132.0, 140.0, 262.0, 270.0],
         },
     ],
 };

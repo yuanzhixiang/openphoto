@@ -622,7 +622,6 @@ impl Kind {
             Self::Offset => l::OFFSET,
             Self::TraceContour => l::TRACE_CONTOUR,
             Self::Diffuse => l::DIFFUSE,
-            Self::RadialBlur => l::RADIAL_BLUR,
             Self::SmartBlur => l::SMART_BLUR,
             Self::ShapeBlur => l::SHAPE_BLUR,
             Self::LensBlur => l::LENS_BLUR,
@@ -650,6 +649,7 @@ impl Kind {
             Self::Tiles => &plain_filter::TILES,
             Self::ColorHalftone => &plain_filter::COLOR_HALFTONE,
             Self::HsbHsl => &plain_filter::HSB_HSL,
+            Self::RadialBlur => &plain_filter::RADIAL_BLUR,
             _ => return None,
         })
     }
@@ -860,6 +860,9 @@ pub struct Extra {
     /// reads "Set to Background").
     pub on_background: bool,
     pub preview_texture: Option<(PreviewKey, egui::TextureHandle)>,
+    /// Radial Blur's center, 0–1 across and down the image (the middle at
+    /// first; Blur Center sets it).
+    pub radial_center: (f32, f32),
 }
 
 /// The active layer made small for a preview box `max` pixels at most
@@ -1038,6 +1041,7 @@ impl AdjustDialog {
                 } else {
                     Vec::new()
                 },
+                radial_center: (0.5, 0.5),
                 ..Default::default()
             },
             custom: match kind {
@@ -1386,7 +1390,7 @@ impl AdjustDialog {
                 amount: v[0],
                 method: [mf::RadialMethod::Spin, mf::RadialMethod::Zoom][pick(v[1])],
                 quality: v[2] as u8,
-                center: (0.5, 0.5),
+                center: e.radial_center,
             },
             Kind::SmartBlur => Filter::SmartBlur {
                 radius: v[0],
@@ -2265,6 +2269,25 @@ impl AdjustDialog {
                     }
                     i += 1;
                 }
+                Item::Track { x0, x1, top, pins } => self.plain_track(
+                    ui,
+                    i - 1,
+                    (at(x0, top), at(x1, top).x),
+                    (at(pins.0, 0.0).x, at(pins.1, 0.0).x),
+                ),
+                Item::Group { title, rect } => {
+                    let g = r(rect);
+                    let title_x = at(rect[0] + 19.0, 0.0).x;
+                    let galley =
+                        theme::tracked_galley(ui.painter(), title, font.clone(), appkit::TEXT);
+                    appkit::group(
+                        ui.painter(),
+                        g,
+                        (title_x - pt(4.0), title_x + galley.size().x + pt(4.0)),
+                    );
+                    label(ui, Pos2::new(title_x, g.top() + pt(1.75)), title);
+                }
+                Item::CenterBox { rect } => self.center_box(ui, r(rect)),
                 Item::Radios { centers, gap } => {
                     if let ParamKind::Choice(options) = params[i].kind {
                         let chosen = self.value(i).unwrap_or(0.0) as usize;
@@ -2440,6 +2463,106 @@ impl AdjustDialog {
             Pos2::new(x, line.bottom() + pt(0.5)),
             appkit::Pin::White,
         );
+    }
+
+    /// A plain dialog's slider (`plain_filter::Item::Track`): the track
+    /// from `start` to `end_x`, the pin standing on it (tip 3 pt above),
+    /// its middle from `pins.0` (minimum) to `pins.1` (maximum), evenly.
+    fn plain_track(
+        &mut self,
+        ui: &mut Ui,
+        i: usize,
+        (start, end_x): (Pos2, f32),
+        pins: (f32, f32),
+    ) {
+        let p = &self.kind.params()[i];
+        let (min, max, decimals) = (p.min, p.max, p.decimals);
+        let line = Rect::from_min_max(start, Pos2::new(end_x, start.y + pt(3.0)));
+        ui.painter().rect_filled(line, 0, Color32::from_gray(0x75));
+        let hit = Rect::from_min_max(
+            Pos2::new(line.left() - pt(4.0), line.top() - pt(5.0)),
+            Pos2::new(line.right() + pt(4.0), line.bottom() + pt(7.0)),
+        );
+        let response = ui.interact(
+            hit,
+            ui.id().with(("plain-track", i)),
+            Sense::click_and_drag(),
+        );
+        if (response.dragged() || response.clicked())
+            && let Some(pointer) = response.interact_pointer_pos()
+        {
+            let t = ((pointer.x - pins.0) / (pins.1 - pins.0)).clamp(0.0, 1.0);
+            let round = 10f32.powi(decimals as i32);
+            self.set(i, ((min + (max - min) * t) * round).round() / round);
+        }
+        let v = self.value(i).unwrap_or(p.default);
+        let x = pins.0 + (pins.1 - pins.0) * ((v - min) / (max - min)).clamp(0.0, 1.0);
+        appkit::pin(
+            ui.painter(),
+            Pos2::new(x, line.top() - pt(3.0)),
+            appkit::Pin::White,
+        );
+    }
+
+    /// Radial Blur's Blur Center: white, with the blur's pattern drawn
+    /// from points along a grid around the center (Spin: arcs of the amount's
+    /// angle round the center; Zoom: strokes away from it, amount% of their
+    /// distance long). A click or drag puts the center there.
+    fn center_box(&mut self, ui: &mut Ui, rect: Rect) {
+        let response = ui.interact(rect, ui.id().with("blur-center"), Sense::click_and_drag());
+        if (response.clicked() || response.dragged())
+            && let Some(p) = response.interact_pointer_pos()
+        {
+            self.extra.radial_center = (
+                ((p.x - rect.left()) / rect.width()).clamp(0.0, 1.0),
+                ((p.y - rect.top()) / rect.height()).clamp(0.0, 1.0),
+            );
+        }
+        let painter = ui.painter_at(rect);
+        painter.rect_filled(rect, 0, Color32::WHITE);
+        let c = Pos2::new(
+            rect.left() + rect.width() * self.extra.radial_center.0,
+            rect.top() + rect.height() * self.extra.radial_center.1,
+        );
+        let amount = self.value(0).unwrap_or(10.0).clamp(1.0, 100.0);
+        let zoom = self.value(1) == Some(1.0);
+        let stroke = Stroke::new(pt(0.5), Color32::BLACK);
+        // Points 8 pt apart along grid lines a quarter of the box apart,
+        // through the center
+        let (step, spacing) = (pt(8.0), rect.width() / 4.0);
+        let lines = (rect.width().max(rect.height()) / spacing).ceil() as i32 + 1;
+        let dots = (rect.width().max(rect.height()) / step).ceil() as i32 + 1;
+        let mut points = Vec::new();
+        for k in -lines..=lines {
+            for j in -dots..=dots {
+                points.push(vec2(k as f32 * spacing, j as f32 * step));
+                points.push(vec2(j as f32 * step, k as f32 * spacing));
+            }
+        }
+        for d in points {
+            let p = c + d;
+            if !rect.expand(pt(4.0)).contains(p) {
+                continue;
+            }
+            let r = d.length();
+            if zoom {
+                let half = d * (amount / 200.0);
+                painter.line_segment([p - half, p + half], stroke);
+            } else if r < 0.5 {
+                painter.circle_filled(p, pt(0.5), Color32::BLACK);
+            } else {
+                let a0 = d.y.atan2(d.x);
+                let span = amount.to_radians();
+                let n = 6;
+                let arc: Vec<Pos2> = (0..=n)
+                    .map(|k| {
+                        let a = a0 + span * (k as f32 / n as f32 - 0.5);
+                        c + vec2(a.cos(), a.sin()) * r
+                    })
+                    .collect();
+                painter.add(egui::Shape::line(arc, stroke));
+            }
+        }
     }
 
     /// An angle dial: a circle with a line from its center at the angle
