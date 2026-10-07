@@ -91,3 +91,4 @@
 - `new_document_dialog_presets_recent_and_saved`：New Document 打开后点 Photo 页、选 Landscape, 6 x 4、点存储图标存为预设、Create：文档为 1800 × 1200、300 ppi；再打开时 Recent 第一个就是它，Saved 页列出存下的预设；Close 不新建文档。`screenshot_new_document_dialog`（`#[ignore]`）截出 Recent 与 Photo 页，`new_document_origin` 从标题栏颜色找出对话框位置。
 - `brush_modes_and_eraser_block`：画笔 Mode 设为 Multiply 后在 `#141414` 上画红色得到 `#140000`；橡皮擦 Block 在背景图层上擦出屏幕 16 像素见方的白色方块。
 - `holding_a_toolbar_button_opens_its_flyout`：短按不弹出；按住 0.5 秒弹出，松开后仍打开且没有切换工具；点第二行切到 Artboard 并关闭。
+- `lasso_with_alt_draws_straight_edges`：套索拖一段后按住 ⌥ 松开鼠标没有选区，⌥ 单击加一个角，松开 ⌥ 后闭合成选区，记录「Lasso」。
