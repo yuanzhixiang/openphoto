@@ -8,7 +8,7 @@ Creates a new guide from numeric values. On confirmation, `lib.rs` adds it to th
 
 Measured point by point from Photoshop 2026's "New guide" dialog (UXP style, 2x screenshot); the dialog is 390 × 188 pt, and coordinates are in pt from the dialog's top-left corner:
 
-- Title bar: `common::frame`, system bold 13 pt "New guide" (lowercase g, matching Photoshop 2026). Text is in the 12 pt panel font (`uxp::font`).
+- Title bar: `common::frame`, system bold 13 pt "New guide" (lowercase g, matching Photoshop 2026), or "Edit Guide" when it edits a selected guide (`NewGuideDialog::editing(guide, index)`, filled in with the guide's orientation and position; `editing` tells `lib.rs` to change that guide instead of adding one). Text is in the 12 pt panel font (`uxp::font`).
 - "Orientation" in bold, left edge 20, center y 57; two radio options side by side: Horizontal (circle center 26, 84) and Vertical (circle center 108, 84), `uxp::radio`.
 - "Position" right-aligned at 59.5, center y 120.5; input field (68–161, y 108–132), default "0 px", text indented 11.5 pt from the left.
 - "Color" right-aligned at 59.5, center y 156.5; dropdown (68–228, y 144–168): a 16 pt color square (`#a9a9a9` border) plus the color name; the options are Photoshop's guide colors Cyan (default), Light Blue, Light Red, Green, Medium Blue, Yellow, Magenta, Gray, Black. On the right (240–288) is the white swatch for a custom color.

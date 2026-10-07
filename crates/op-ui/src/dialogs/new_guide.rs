@@ -32,6 +32,8 @@ pub enum Outcome {
 pub struct NewGuideDialog {
     vertical: bool,
     position: String,
+    /// Edit Selected Guides...: the guide being edited (its index).
+    pub editing: Option<usize>,
     /// An index into [`COLORS`]; guides are drawn in one color for now.
     color: usize,
 }
@@ -42,12 +44,24 @@ impl Default for NewGuideDialog {
         Self {
             vertical: false,
             position: "0 px".into(),
+            editing: None,
             color: 0,
         }
     }
 }
 
 impl NewGuideDialog {
+    /// View › Guides › Edit Selected Guides...: the dialog filled in with
+    /// guide `index`, titled "Edit Guide"; its OK changes that guide.
+    pub fn editing(guide: Guide, index: usize) -> Self {
+        Self {
+            vertical: guide.vertical,
+            position: format!("{} px", (guide.position * 32.0).round() / 32.0),
+            editing: Some(index),
+            color: 0,
+        }
+    }
+
     fn guide(&self) -> Option<Guide> {
         let position: f32 = self
             .position
@@ -80,7 +94,12 @@ impl NewGuideDialog {
     fn ui(&mut self, ui: &mut Ui, frame: Rect) -> Outcome {
         let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
         let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
-        common::frame(ui, frame, "New guide", theme::dialog_bold(pt(13.0)));
+        let title = if self.editing.is_some() {
+            "Edit Guide"
+        } else {
+            "New guide"
+        };
+        common::frame(ui, frame, title, theme::dialog_bold(pt(13.0)));
         ui.painter().text(
             at(20.0, 57.0),
             Align2::LEFT_CENTER,

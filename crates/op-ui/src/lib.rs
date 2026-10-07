@@ -827,9 +827,18 @@ impl OpenPhotoApp {
             dialogs::NewGuideOutcome::Open => self.state.new_guide_dialog = Some(dialog),
             dialogs::NewGuideOutcome::Cancel => {}
             dialogs::NewGuideOutcome::Apply(guide) => {
+                let editing = dialog.editing;
                 if let Some(state) = self.state.active() {
-                    state.doc.guides.push(guide);
-                    state.record("New Guide");
+                    match editing {
+                        Some(i) if i < state.doc.guides.len() => {
+                            state.doc.guides[i] = guide;
+                            state.record("Edit Guide");
+                        }
+                        _ => {
+                            state.doc.guides.push(guide);
+                            state.record("New Guide");
+                        }
+                    }
                 }
             }
         }

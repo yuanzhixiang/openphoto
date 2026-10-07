@@ -6796,6 +6796,78 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn guides_select_edit_and_clear() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        doc.guides.push(op_core::Guide {
+            vertical: true,
+            position: 100.0,
+        });
+        doc.guides.push(op_core::Guide {
+            vertical: false,
+            position: 200.0,
+        });
+    }
+    h.state_mut().state.select_tool(op_tools::Tool::Move);
+    h.run_steps(2);
+    assert!(!Command::ClearSelectedGuides.enabled(&h.state().state));
+    // A click selects a guide; Shift-click adds the other
+    let guide = doc_point(&h, 100.0, 400.0);
+    click(&mut h, guide);
+    assert_eq!(active(&h).selected_guides, vec![0]);
+    shot(&mut h, "guide_selected");
+    let p = doc_point(&h, 500.0, 200.0);
+    h.hover_at(p);
+    h.event_modifiers(
+        egui::Event::PointerButton {
+            pos: p,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers: Modifiers::SHIFT,
+        },
+        Modifiers::SHIFT,
+    );
+    h.event_modifiers(
+        egui::Event::PointerButton {
+            pos: p,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: Modifiers::SHIFT,
+        },
+        Modifiers::SHIFT,
+    );
+    h.run_steps(2);
+    assert_eq!(active(&h).selected_guides, vec![0, 1]);
+    // Edit needs one guide; with one, OK records "Edit Guide"
+    assert!(!Command::EditSelectedGuides.enabled(&h.state().state));
+    click(&mut h, guide);
+    run_command(&mut h, Command::EditSelectedGuides);
+    h.run_steps(2);
+    assert_eq!(
+        h.state().state.new_guide_dialog.as_ref().unwrap().editing,
+        Some(0)
+    );
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(last_history(&h), "Edit Guide");
+    assert_eq!(active(&h).doc.guides.len(), 2);
+    // Clear Selected Guides removes just it
+    run_command(&mut h, Command::ClearSelectedGuides);
+    assert_eq!(active(&h).doc.guides.len(), 1);
+    assert!(!active(&h).doc.guides[0].vertical);
+    // Show › Canvas Guides off hides them
+    run_command(&mut h, Command::ToggleCanvasGuides);
+    assert!(!h.state().state.view.guides_visible());
+    run_command(&mut h, Command::ToggleCanvasGuides);
+    run_command(&mut h, Command::ClearCanvasGuides);
+    assert!(active(&h).doc.guides.is_empty());
+    assert_eq!(last_history(&h), "Clear Canvas Guides");
+}
+
+#[test]
 fn new_guide_layout_previews_and_applies() {
     use crate::commands::Command;
     let mut h = harness(Vec::new());

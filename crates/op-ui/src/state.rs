@@ -131,6 +131,8 @@ pub struct DocState {
     /// use being `clone_source` / `clone_offset`.
     pub clone_slots: [(Option<egui::Pos2>, Option<egui::Vec2>); 5],
     pub clone_slot: usize,
+    /// The guides selected with the Move tool (by index).
+    pub selected_guides: Vec<usize>,
     /// The Crop tool's box, while the Crop tool is in use.
     pub crop: Option<CropBox>,
     /// The Perspective Crop tool's box, while it is in use.
@@ -263,6 +265,7 @@ impl DocState {
             picking_clone_source: false,
             clone_slots: [(None, None); 5],
             clone_slot: 0,
+            selected_guides: Vec::new(),
             gradient_drag: None,
             shape_drag: None,
             text_edit: None,
@@ -531,6 +534,16 @@ impl DocState {
         hist
     }
 
+    /// The selected guides that still exist.
+    pub fn guide_selection(&self) -> Vec<usize> {
+        let n = self.doc.guides.len();
+        self.selected_guides
+            .iter()
+            .copied()
+            .filter(|&i| i < n)
+            .collect()
+    }
+
     /// The Clone Source panel's slot `k` becomes the one in use: the current
     /// source goes back to its slot and slot `k`'s comes out.
     pub fn choose_clone_slot(&mut self, k: usize) {
@@ -785,6 +798,9 @@ pub struct ViewOptions {
     pub guides: bool,
     pub grid: bool,
     pub lock_guides: bool,
+    /// View > Show > Canvas Guides (on by default): with no artboards,
+    /// every guide is a canvas guide.
+    pub canvas_guides: bool,
     /// View > Show > Smart Guides (on in Photoshop by default); nothing
     /// draws them yet.
     pub smart_guides: bool,
@@ -814,6 +830,7 @@ impl Default for ViewOptions {
             guides: true,
             grid: false,
             lock_guides: false,
+            canvas_guides: true,
             smart_guides: true,
             pixel_grid: true,
             selection_edges: true,

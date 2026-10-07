@@ -172,6 +172,10 @@ Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's men
 | ClearGuides | View › Guides › Clear Guides | None |
 | NewGuide | View › Guides › New Guide... | None |
 | NewGuideLayout | View › Guides › New Guide Layout... (opens the dialog, `dialogs/guide_layout.md`) | None |
+| EditSelectedGuides | View › Guides › Edit Selected Guides... (one guide selected) | None |
+| ClearSelectedGuides | View › Guides › Clear Selected Guides (guides selected) | None |
+| ClearCanvasGuides | View › Guides › Clear Canvas Guides (guides present) | None |
+| ToggleCanvasGuides | View › Show › Canvas Guides (check mark) | None |
 | HideApp | OpenPhoto › Hide OpenPhoto | ⌃⌘H |
 | ToggleHistory | Window › History | None |
 | ToggleHistogram | Window › Histogram | None |

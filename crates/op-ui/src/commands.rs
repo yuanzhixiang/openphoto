@@ -302,6 +302,13 @@ pub enum Command {
     NewGuide,
     /// View > Guides > New Guide Layout... (opens the dialog).
     NewGuideLayout,
+    /// View > Guides > Edit Selected Guides..., Clear Selected Guides,
+    /// Clear Canvas Guides.
+    EditSelectedGuides,
+    ClearSelectedGuides,
+    ClearCanvasGuides,
+    /// View > Show > Canvas Guides.
+    ToggleCanvasGuides,
     /// Hide OpenPhoto (Ctrl+Cmd+H, as Photoshop: Cmd+H is Extras).
     HideApp,
     ToggleHistory,
@@ -672,7 +679,11 @@ impl Command {
             | Self::ActualSize
             | Self::ClearGuides
             | Self::NewGuide
-            | Self::NewGuideLayout => {
+            | Self::NewGuideLayout
+            | Self::EditSelectedGuides
+            | Self::ClearSelectedGuides
+            | Self::ClearCanvasGuides
+            | Self::ToggleCanvasGuides => {
                 return None;
             }
             Self::DeleteLayer
@@ -712,6 +723,7 @@ impl Command {
             Self::ToggleRulers => v.rulers,
             Self::ToggleExtras => v.extras,
             Self::ToggleGuides => v.guides,
+            Self::ToggleCanvasGuides => v.canvas_guides,
             Self::ToggleGrid => v.grid,
             Self::TogglePixelGrid => v.pixel_grid,
             Self::ToggleSmartGuides => v.smart_guides,
@@ -777,6 +789,7 @@ impl Command {
             | Self::ToggleRulers
             | Self::ToggleExtras
             | Self::ToggleGuides
+            | Self::ToggleCanvasGuides
             | Self::ToggleGrid
             | Self::TogglePixelGrid
             | Self::ToggleSmartGuides
@@ -797,7 +810,11 @@ impl Command {
             | Self::RulerUnits(_)
             | Self::LockGuides => true,
             Self::FlipView => doc.is_some(),
-            Self::ClearGuides => doc.is_some_and(|d| !d.doc.guides.is_empty()),
+            Self::ClearGuides | Self::ClearCanvasGuides => {
+                doc.is_some_and(|d| !d.doc.guides.is_empty())
+            }
+            Self::ClearSelectedGuides => doc.is_some_and(|d| !d.guide_selection().is_empty()),
+            Self::EditSelectedGuides => doc.is_some_and(|d| d.guide_selection().len() == 1),
             Self::Revert => doc.is_some_and(|d| d.path.is_some() && d.is_dirty()),
             Self::Undo | Self::ToggleLastState => doc.is_some_and(|d| d.history.can_undo()),
             Self::Redo => doc.is_some_and(|d| d.history.can_redo()),
@@ -1696,6 +1713,33 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::ToggleRulers => app.view.rulers = !app.view.rulers,
         Command::ToggleExtras => app.view.extras = !app.view.extras,
         Command::ToggleGuides => app.view.guides = !app.view.guides,
+        Command::ToggleCanvasGuides => app.view.canvas_guides = !app.view.canvas_guides,
+        Command::ClearSelectedGuides => {
+            if let Some(state) = app.active() {
+                let mut chosen = state.guide_selection();
+                chosen.sort_unstable();
+                for i in chosen.into_iter().rev() {
+                    state.doc.guides.remove(i);
+                }
+                state.selected_guides.clear();
+                state.record("Clear Selected Guides");
+            }
+        }
+        Command::ClearCanvasGuides => {
+            if let Some(state) = app.active() {
+                state.doc.guides.clear();
+                state.selected_guides.clear();
+                state.record("Clear Canvas Guides");
+            }
+        }
+        Command::EditSelectedGuides => {
+            if let Some(state) = app.active()
+                && let [i] = state.guide_selection()[..]
+            {
+                let guide = state.doc.guides[i];
+                app.new_guide_dialog = Some(crate::dialogs::NewGuideDialog::editing(guide, i));
+            }
+        }
         Command::ToggleGrid => app.view.grid = !app.view.grid,
         Command::TogglePixelGrid => app.view.pixel_grid = !app.view.pixel_grid,
         Command::ToggleSmartGuides => app.view.smart_guides = !app.view.smart_guides,

@@ -344,6 +344,26 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
         crate::rulers::start_move(state, i);
         crate::snap::begin(state, &view_options, false);
     }
+    // A click on a guide selects it (Shift adds or removes it); with the
+    // Move tool, a click elsewhere drops the guide selection
+    if guides_live
+        && (tool == Tool::Move || cmd)
+        && response.clicked()
+        && let Some(p) = response.interact_pointer_pos()
+    {
+        let shift = ui.input(|i| i.modifiers.shift);
+        match crate::rulers::guide_at(state, p, ppp) {
+            Some(i) if shift => {
+                if let Some(k) = state.selected_guides.iter().position(|&g| g == i) {
+                    state.selected_guides.remove(k);
+                } else {
+                    state.selected_guides.push(i);
+                }
+            }
+            Some(i) => state.selected_guides = vec![i],
+            None => state.selected_guides.clear(),
+        }
+    }
     let (space, alt, zoom_delta, scroll) = ui.input(|i| {
         (
             i.key_down(Key::Space),

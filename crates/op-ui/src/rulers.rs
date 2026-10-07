@@ -16,6 +16,8 @@ use crate::theme::pt;
 pub const RULER: f32 = pt(19.0);
 /// Photoshop's default guide color (Cyan).
 const GUIDE: Color32 = Color32::from_rgb(0x4a, 0xff, 0xff);
+/// A selected guide's color.
+const SELECTED_GUIDE: Color32 = Color32::from_rgb(0x2e, 0x7c, 0xf6);
 const GRID: Color32 = Color32::from_rgba_premultiplied(0x50, 0x50, 0x50, 0x80);
 const RULER_BG: Color32 = Color32::from_gray(0x47);
 const TICK: Color32 = Color32::from_gray(0x66);
@@ -419,16 +421,19 @@ pub fn draw_guides(ui: &Ui, state: &DocState, canvas: Rect, ppp: f32) {
     let painter = ui.painter_at(canvas);
     let dragged = state.guide_drag.map(|d| d.guide);
     let moving = state.guide_drag.and_then(|d| d.index);
+    let selected = state.guide_selection();
     let guides = state
         .doc
         .guides
         .iter()
         .enumerate()
         .filter(|(i, _)| Some(*i) != moving)
-        .map(|(_, g)| *g)
-        .chain(dragged);
-    for g in guides {
-        painter.line_segment(guide_line(state, g, ppp), Stroke::new(1.0, GUIDE));
+        .map(|(i, g)| (*g, selected.contains(&i)))
+        .chain(dragged.map(|g| (g, false)));
+    for (g, chosen) in guides {
+        // A selected guide shows in the selection color
+        let color = if chosen { SELECTED_GUIDE } else { GUIDE };
+        painter.line_segment(guide_line(state, g, ppp), Stroke::new(1.0, color));
     }
 }
 
@@ -527,7 +532,7 @@ pub fn drag(ui: &Ui, state: &mut DocState, canvas: Rect, ppp: f32) {
 impl ViewOptions {
     /// Guides are drawn when both Extras and Show > Guides are on.
     pub fn guides_visible(&self) -> bool {
-        self.extras && self.guides
+        self.extras && self.guides && self.canvas_guides
     }
 
     pub fn grid_visible(&self) -> bool {
