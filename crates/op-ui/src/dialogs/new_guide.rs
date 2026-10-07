@@ -1,16 +1,27 @@
-//! View > Guides > New Guide...: Orientation (Horizontal or Vertical) and
-//! Position in pixels, laid out after Photoshop's dialog. Sizes are in
-//! Photoshop points.
+//! View > Guides > New Guide...: Orientation (Horizontal or Vertical),
+//! Position and Color, laid out at the positions measured on Photoshop
+//! 2026's "New guide" dialog (390 × 188 pt, a UXP dialog). Sizes are in
+//! Photoshop points from the dialog's top-left corner.
 
-use egui::{Align2, Color32, FontId, Key, Rect, Sense, Ui, vec2};
+use egui::{Align2, Color32, CornerRadius, Key, Rect, Sense, Stroke, StrokeKind, Ui, vec2};
 use op_core::Guide;
 
-use super::common;
-use crate::theme::{self, color, pt};
+use super::{common, uxp};
+use crate::theme::{self, pt};
 
-const SIZE: egui::Vec2 = vec2(pt(330.0), pt(170.0));
-const FONT: f32 = pt(12.5);
-const BUTTON: egui::Vec2 = vec2(pt(88.0), pt(24.0));
+const SIZE: egui::Vec2 = vec2(pt(390.0), pt(188.0));
+/// Photoshop's guide colors, Cyan first (the default).
+const COLORS: [(&str, [u8; 3]); 9] = [
+    ("Cyan", [0x85, 0xfb, 0xfd]),
+    ("Light Blue", [0x4a, 0x9c, 0xff]),
+    ("Light Red", [0xff, 0x6e, 0x6e]),
+    ("Green", [0x4a, 0xff, 0x4a]),
+    ("Medium Blue", [0x31, 0x31, 0xff]),
+    ("Yellow", [0xff, 0xff, 0x4a]),
+    ("Magenta", [0xff, 0x4a, 0xff]),
+    ("Gray", [0x80, 0x80, 0x80]),
+    ("Black", [0, 0, 0]),
+];
 
 pub enum Outcome {
     Open,
@@ -21,7 +32,8 @@ pub enum Outcome {
 pub struct NewGuideDialog {
     vertical: bool,
     position: String,
-    first_frame: bool,
+    /// An index into [`COLORS`]; guides are drawn in one color for now.
+    color: usize,
 }
 
 impl Default for NewGuideDialog {
@@ -29,8 +41,8 @@ impl Default for NewGuideDialog {
     fn default() -> Self {
         Self {
             vertical: false,
-            position: "0".into(),
-            first_frame: true,
+            position: "0 px".into(),
+            color: 0,
         }
     }
 }
@@ -59,7 +71,6 @@ impl NewGuideDialog {
                 let (rect, _) = ui.allocate_exact_size(SIZE, Sense::hover());
                 outcome = self.ui(ui, rect);
             });
-        self.first_frame = false;
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
             outcome = Outcome::Cancel;
         }
@@ -67,70 +78,98 @@ impl NewGuideDialog {
     }
 
     fn ui(&mut self, ui: &mut Ui, frame: Rect) -> Outcome {
-        let at = |x: f32, y: f32| frame.min + vec2(x, y);
-        let font = FontId::proportional(FONT);
-        common::frame(ui, frame, "New Guide", theme::semibold(pt(13.0)));
+        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
+        let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
+        common::frame(ui, frame, "New guide", theme::dialog_bold(pt(13.0)));
         ui.painter().text(
-            at(pt(20.0), pt(50.0)),
+            at(20.0, 57.0),
             Align2::LEFT_CENTER,
             "Orientation",
-            theme::semibold(FONT),
-            color::TEXT,
+            theme::uxp_bold(pt(12.0)),
+            uxp::TEXT,
         );
-        for (k, (vertical, label)) in [(false, "Horizontal"), (true, "Vertical")]
-            .into_iter()
-            .enumerate()
-        {
-            let r = Rect::from_min_size(
-                at(pt(32.0), pt(66.0) + pt(22.0) * k as f32),
-                vec2(pt(150.0), pt(18.0)),
-            );
-            let mut child = ui.new_child(egui::UiBuilder::new().max_rect(r));
-            child.radio_value(
-                &mut self.vertical,
-                vertical,
-                egui::RichText::new(label).font(font.clone()),
-            );
+        for (vertical, label, x) in [(false, "Horizontal", 26.0), (true, "Vertical", 108.0)] {
+            if uxp::radio(ui, at(x, 84.0), label, self.vertical == vertical) {
+                self.vertical = vertical;
+            }
         }
-        ui.painter().text(
-            at(pt(20.0), pt(132.0)),
-            Align2::LEFT_CENTER,
-            "Position:",
-            font.clone(),
-            color::TEXT,
-        );
-        let field = Rect::from_min_size(at(pt(84.0), pt(121.0)), vec2(pt(80.0), pt(22.0)));
-        common::number_field(
+        let right_label = |ui: &Ui, cy: f32, text: &str| {
+            ui.painter().text(
+                at(59.5, cy),
+                Align2::RIGHT_CENTER,
+                text,
+                uxp::font(),
+                uxp::TEXT,
+            );
+        };
+        right_label(ui, 120.5, "Position");
+        common::text_field(
             ui,
-            field,
+            r(68.0, 108.0, 161.0, 132.0),
             &mut self.position,
             "guide-position",
-            FONT,
-            self.first_frame,
-        );
-        ui.painter().text(
-            at(pt(172.0), pt(132.0)),
-            Align2::LEFT_CENTER,
-            "px",
-            font,
-            color::TEXT_DIM,
+            uxp::font(),
+            pt(11.5),
+            false,
         );
 
-        let x = frame.width() - pt(108.0);
-        let button_font = FontId::proportional(pt(13.0));
-        let guide = self.guide();
-        let ok = common::pill_button(
+        right_label(ui, 156.5, "Color");
+        let (name, [cr, cg, cb]) = COLORS[self.color];
+        let mut chosen = self.color;
+        common::ps_dropdown(
             ui,
-            Rect::from_min_size(at(x, pt(44.0)), BUTTON),
-            "OK",
-            button_font.clone(),
-            guide.is_some(),
+            r(68.0, 144.0, 228.0, 168.0),
+            "guide-color",
+            |painter, rect| {
+                let swatch = Rect::from_min_size(
+                    rect.min + vec2(pt(7.0), pt(4.0)),
+                    vec2(pt(16.0), pt(16.0)),
+                );
+                painter.rect(
+                    swatch,
+                    CornerRadius::same(pt(2.0) as u8),
+                    Color32::from_rgb(cr, cg, cb),
+                    Stroke::new(pt(1.0), Color32::from_gray(0xa9)),
+                    StrokeKind::Inside,
+                );
+                painter.text(
+                    rect.left_center() + vec2(pt(30.5), pt(0.75)),
+                    Align2::LEFT_CENTER,
+                    name,
+                    uxp::font(),
+                    uxp::TEXT,
+                );
+            },
+            |ui| {
+                for (k, (label, _)) in COLORS.iter().enumerate() {
+                    ui.selectable_value(&mut chosen, k, *label);
+                }
+            },
         );
-        let cancel = common::pill_button(
+        self.color = chosen;
+        // The custom color's swatch
+        ui.painter().rect(
+            r(240.0, 144.0, 288.0, 168.0),
+            CornerRadius::same(pt(3.0) as u8),
+            Color32::WHITE,
+            Stroke::new(pt(1.0), Color32::from_gray(0xa9)),
+            StrokeKind::Inside,
+        );
+
+        // No field has the focus: OK does, as in Photoshop
+        let guide = self.guide();
+        let ok = common::ps_focused_button(
             ui,
-            Rect::from_min_size(at(x, pt(76.0)), BUTTON),
+            r(300.0, 48.0, 370.0, 72.0),
+            "OK",
+            theme::uxp_bold(pt(12.0)),
+        );
+        let cancel = common::ps_button(
+            ui,
+            r(300.0, 84.0, 370.0, 108.0),
             "Cancel",
-            button_font,
+            false,
+            true,
             true,
         );
         if cancel.clicked() {

@@ -4663,3 +4663,33 @@ fn canvas_size_dialog_resizes_around_the_anchor() {
     h.run_steps(3);
     assert_eq!(active(&h).doc.width, 800);
 }
+
+#[test]
+#[ignore]
+fn screenshot_new_guide_dialog() {
+    let mut h = harness(Vec::new());
+    probe_document(&mut h);
+    run_command(&mut h, crate::commands::Command::NewGuide);
+    h.run_steps(3);
+    shot_dialog(&mut h, "new_guide", 390.0, 188.0);
+}
+
+#[test]
+fn new_guide_dialog_adds_a_guide() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::NewGuide);
+    h.run_steps(3);
+    let (x, y) = dialog_origin(&mut h);
+    // Vertical, then 100 in Position
+    click(&mut h, at_pt(x + 108.0, y + 84.0));
+    click(&mut h, at_pt(x + 110.0, y + 120.0));
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("100 px".into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    let guides = &active(&h).doc.guides;
+    assert_eq!(guides.len(), 1);
+    assert!(guides[0].vertical);
+    assert_eq!(guides[0].position, 100.0);
+}
