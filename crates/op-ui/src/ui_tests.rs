@@ -8750,6 +8750,7 @@ fn screenshot_plain_filter_dialogs() {
         (Command::Extrude, "extrude", 402.0, 167.0),
         (Command::Fibers, "fibers", 445.0, 445.0),
         (Command::LensFlare, "lens_flare", 430.0, 450.0),
+        (Command::SmartBlur, "smart_blur", 410.0, 491.0),
     ] {
         let mut h = harness(Vec::new());
         reference_document(&mut h);

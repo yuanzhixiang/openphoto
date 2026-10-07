@@ -524,43 +524,6 @@ pub const OFFSET: &Layout = &Layout {
     ],
 };
 
-pub const SMART_BLUR: &Layout = &Layout {
-    size: (324.0, 454.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: true,
-    rows: &[
-        number(
-            "Radius:",
-            135.0,
-            [140.0, 287.0, 200.5, 306.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 313.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Threshold:",
-            135.0,
-            [140.0, 336.0, 200.5, 355.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 362.0)),
-            Scale::Linear,
-        ),
-        Row::Popup {
-            label: "Quality:",
-            label_right: 135.0,
-            rect: [140.0, 385.0, 300.0, 406.0],
-        },
-        Row::Popup {
-            label: "Mode:",
-            label_right: 135.0,
-            rect: [140.0, 418.0, 300.0, 439.0],
-        },
-    ],
-};
-
 pub const SHAPE_BLUR: &Layout = &Layout {
     size: (324.0, 372.0),
     button_width: 59.5,

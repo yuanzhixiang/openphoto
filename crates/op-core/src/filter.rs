@@ -137,9 +137,13 @@ const PINCH_SHIFT: [f32; 21] = [
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Filter {
     /// Blur > Gaussian Blur; the radius is the standard deviation in pixels.
-    GaussianBlur { radius: f32 },
+    GaussianBlur {
+        radius: f32,
+    },
     /// Blur > Box Blur: the average of a (2r + 1)² square.
-    BoxBlur { radius: u32 },
+    BoxBlur {
+        radius: u32,
+    },
     /// Blur > Average: the selection filled with its average color.
     Average,
     /// Sharpen > Unsharp Mask: amount in percent, Gaussian radius, and the
@@ -157,12 +161,20 @@ pub enum Filter {
         monochromatic: bool,
     },
     /// Noise > Median over a (2r + 1)² square, per channel.
-    Median { radius: u32 },
+    Median {
+        radius: u32,
+    },
     /// Other > Minimum: each channel's smallest value within `radius`
     /// (Preserve: Squareness, or Roundness when `round`).
-    Minimum { radius: f32, round: bool },
+    Minimum {
+        radius: f32,
+        round: bool,
+    },
     /// Other > Maximum: the largest value.
-    Maximum { radius: f32, round: bool },
+    Maximum {
+        radius: f32,
+        round: bool,
+    },
     /// Blur > Blur: a light 3 × 3 blur.
     Blur,
     /// Blur > Blur More: a stronger 3 × 3 blur.
@@ -174,7 +186,10 @@ pub enum Filter {
     /// Stylize > Find Edges: white where flat, darker the steeper the edge.
     FindEdges,
     /// Blur > Motion Blur: `distance` pixels along `angle` degrees.
-    MotionBlur { angle: i32, distance: u32 },
+    MotionBlur {
+        angle: i32,
+        distance: u32,
+    },
     /// Stylize > Emboss: angle in degrees, height in pixels (1–100), amount
     /// in percent (1–500).
     Emboss {
@@ -193,9 +208,15 @@ pub enum Filter {
         offset: i16,
     },
     /// Blur > Surface Blur: radius 1–100, threshold 2–255.
-    SurfaceBlur { radius: u32, threshold: u8 },
+    SurfaceBlur {
+        radius: u32,
+        threshold: u8,
+    },
     /// Noise > Dust & Scratches: radius 1–500, threshold 0–255.
-    DustAndScratches { radius: u32, threshold: u8 },
+    DustAndScratches {
+        radius: u32,
+        threshold: u8,
+    },
     /// Noise > Despeckle: Blur More, held back where the image has edges.
     Despeckle,
     /// Sharpen > Sharpen Edges: Sharpen, only where the image has edges.
@@ -203,39 +224,71 @@ pub enum Filter {
     /// Stylize > Trace Contour: per channel, white with black lines along
     /// where values cross `level`, on its lower side (`upper`) or its
     /// upper side.
-    TraceContour { level: u8, upper: bool },
+    TraceContour {
+        level: u8,
+        upper: bool,
+    },
     /// Stylize > Wind: streaks blown from the left (`from_left`) or the
     /// right. Random, like Photoshop's, but repeatable.
-    Wind { method: WindMethod, from_left: bool },
+    Wind {
+        method: WindMethod,
+        from_left: bool,
+    },
     /// Distort > Twirl: degrees (−999–999) at the center, fading out.
-    Twirl { angle: i32 },
+    Twirl {
+        angle: i32,
+    },
     /// Distort > Pinch: −100–100 percent (positive pinches in).
-    Pinch { amount: i32 },
+    Pinch {
+        amount: i32,
+    },
     /// Distort > Spherize: −100–100 percent, in `mode`.
-    Spherize { amount: i32, mode: SpherizeMode },
+    Spherize {
+        amount: i32,
+        mode: SpherizeMode,
+    },
     /// Distort > Polar Coordinates: Rectangular to Polar (`to_polar`) or
     /// Polar to Rectangular.
-    PolarCoordinates { to_polar: bool },
+    PolarCoordinates {
+        to_polar: bool,
+    },
     /// Other > High Pass: the image minus its Gaussian blur, around gray.
-    HighPass { radius: f32 },
+    HighPass {
+        radius: f32,
+    },
     /// Other > Offset: shifts the layer by (dx, dy) pixels.
-    Offset { dx: i32, dy: i32, fill: OffsetFill },
+    Offset {
+        dx: i32,
+        dy: i32,
+        fill: OffsetFill,
+    },
     /// Pixelate > Mosaic: squares of `cell` pixels filled with their average.
-    Mosaic { cell: u32 },
+    Mosaic {
+        cell: u32,
+    },
     /// Stylize > Solarize: values above 127 are inverted.
     Solarize,
     /// Pixelate > Crystallize: Voronoi cells around one randomly placed
     /// point per `cell` × `cell` block, each filled with its average color.
-    Crystallize { cell: u32 },
+    Crystallize {
+        cell: u32,
+    },
     /// Pixelate > Pointillize: dots about `cell` pixels across in the
     /// colors under them (a little varied), on the background color.
-    Pointillize { cell: u32 },
+    Pointillize {
+        cell: u32,
+    },
     /// Distort > Ripple: waves along both axes, `amount` −999–999 percent,
     /// their length set by `size`.
-    Ripple { amount: i32, size: RippleSize },
+    Ripple {
+        amount: i32,
+        size: RippleSize,
+    },
     /// Pixelate > Mezzotint: each channel turned to full or nothing at
     /// random, in dots, lines or strokes.
-    Mezzotint { kind: MezzotintType },
+    Mezzotint {
+        kind: MezzotintType,
+    },
     /// Stylize > Tiles: the layer cut into square tiles, at least `count`
     /// across its shorter side, each shifted at random up to `offset`
     /// percent of a tile, the gaps filled as `fill` says.
@@ -247,7 +300,10 @@ pub enum Filter {
     },
     /// Pixelate > Color Halftone: each of the first three channels as dots
     /// on a screen at its angle (degrees), up to `radius` pixels.
-    ColorHalftone { radius: u32, angles: [i32; 4] },
+    ColorHalftone {
+        radius: u32,
+        angles: [i32; 4],
+    },
     /// Distort > ZigZag: ripples out from the center, `amount` −100–100,
     /// `ridges` 0–20 across the radius, in `style`.
     ZigZag {
@@ -265,7 +321,9 @@ pub enum Filter {
     /// patches.
     Facet,
     /// Stylize > Diffuse: pixels swapped with random neighbors, in `mode`.
-    Diffuse { mode: DiffuseMode },
+    Diffuse {
+        mode: DiffuseMode,
+    },
     /// Render > Clouds: soft fractal noise between the foreground and
     /// background colors, filling the layer opaquely; a new pattern each
     /// time (`seed`).
@@ -312,6 +370,7 @@ pub enum Filter {
     SmartBlur {
         radius: f32,
         threshold: f32,
+        quality: u8,
         mode: crate::more_filters::SmartBlurMode,
     },
     ShapeBlur {
@@ -1963,7 +2022,9 @@ fn filtered(
             let px: Vec<[u8; 4]> = src.px.iter().map(|&p| Buffer::straight(p)).collect();
             // Lens Blur's depth map from the transparency
             let alpha: Option<Vec<u8>> = match filter {
-                Filter::LensBlur(o) if o.depth == crate::more_filters::DepthSource::Transparency => {
+                Filter::LensBlur(o)
+                    if o.depth == crate::more_filters::DepthSource::Transparency =>
+                {
                     Some(px.iter().map(|p| p[3]).collect())
                 }
                 _ => None,
@@ -2024,13 +2085,7 @@ fn filtered(
 /// The `more_filters` ones.
 /// The filters in `more_filters` (`depth`: Lens Blur's depth map from the
 /// layer mask, one value a pixel).
-fn more(
-    px: &[[u8; 4]],
-    w: usize,
-    h: usize,
-    filter: Filter,
-    depth: Option<&[u8]>,
-) -> Vec<[u8; 4]> {
+fn more(px: &[[u8; 4]], w: usize, h: usize, filter: Filter, depth: Option<&[u8]>) -> Vec<[u8; 4]> {
     use crate::more_filters as m;
     match filter {
         Filter::Wave(s) => m::wave(px, w, h, s),
@@ -2068,8 +2123,9 @@ fn more(
         Filter::SmartBlur {
             radius,
             threshold,
+            quality,
             mode,
-        } => m::smart_blur(px, w, h, radius, threshold, mode),
+        } => m::smart_blur(px, w, h, radius, threshold, quality, mode),
         Filter::ShapeBlur { radius, shape } => m::shape_blur(px, w, h, radius, shape),
         Filter::LensBlur(o) => m::lens_blur(px, w, h, &o, depth),
         Filter::ReduceNoise {

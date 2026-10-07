@@ -291,16 +291,21 @@ pub enum SmartBlurMode {
 /// Blur › Smart Blur: each pixel averages the neighbours within `radius`
 /// whose colors are within `threshold` levels of it (edges stay sharp).
 /// Edge Only draws the edges (where neighbours differ more) white on
-/// black; Overlay Edge draws them white over the blurred image.
+/// black; Overlay Edge draws them white over the blurred image. Quality
+/// (0 Low, 1 Medium, 2 High) is how densely the neighbourhood is read:
+/// every third, every second or every pixel across and down (the nearest
+/// four always count, so edges are found the same way).
 pub fn smart_blur(
     px: &[Px],
     w: usize,
     h: usize,
     radius: f32,
     threshold: f32,
+    quality: u8,
     mode: SmartBlurMode,
 ) -> Vec<Px> {
     let r = radius.round().max(1.0) as i64;
+    let stride = 3 - quality.min(2) as i64;
     let at = |x: i64, y: i64| {
         px[y.clamp(0, h as i64 - 1) as usize * w + x.clamp(0, w as i64 - 1) as usize]
     };
@@ -314,6 +319,10 @@ pub fn smart_blur(
             for dy in -r..=r {
                 for dx in -r..=r {
                     if dx * dx + dy * dy > r * r {
+                        continue;
+                    }
+                    let near = dx.abs() + dy.abs() <= 1;
+                    if !near && (dx % stride != 0 || dy % stride != 0) {
                         continue;
                     }
                     let q = at(x + dx, y + dy);
@@ -1243,15 +1252,27 @@ mod tests {
         let flat = vec![[90, 120, 150, 255]; 16 * 16];
         assert_eq!(shape_blur(&flat, 16, 16, 3.0, BlurShape::Heart), flat);
         assert_eq!(
-            smart_blur(&flat, 16, 16, 3.0, 25.0, SmartBlurMode::Normal),
+            smart_blur(&flat, 16, 16, 3.0, 25.0, 2, SmartBlurMode::Normal),
             flat
         );
         // Smart Blur keeps the checker's edges (beyond the threshold)
         assert_eq!(
-            smart_blur(&px, 32, 32, 3.0, 25.0, SmartBlurMode::Normal),
+            smart_blur(&px, 32, 32, 3.0, 25.0, 2, SmartBlurMode::Normal),
             px
         );
-        let edges = smart_blur(&px, 32, 32, 3.0, 25.0, SmartBlurMode::EdgeOnly);
+        let edges = smart_blur(&px, 32, 32, 3.0, 25.0, 2, SmartBlurMode::EdgeOnly);
+        // Lower quality reads fewer neighbours, so it blurs a little
+        // differently
+        let noisy: Vec<Px> = (0..32 * 32)
+            .map(|i| {
+                let v = (hash((i % 32) as i64, (i / 32) as i64, 1, 5) * 20.0) as u8 + 100;
+                [v, v, v, 255]
+            })
+            .collect();
+        assert_ne!(
+            smart_blur(&noisy, 32, 32, 4.0, 25.0, 0, SmartBlurMode::Normal),
+            smart_blur(&noisy, 32, 32, 4.0, 25.0, 2, SmartBlurMode::Normal)
+        );
         assert_eq!(edges[0][0], 0);
         assert_eq!(edges[3][0], 255);
     }

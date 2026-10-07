@@ -498,8 +498,8 @@ impl Spline {
                 a[i] = h[i - 1];
                 b[i] = 2.0 * (h[i - 1] + h[i]);
                 c[i] = h[i];
-                d[i] = 6.0
-                    * ((pts[i + 1].1 - pts[i].1) / h[i] - (pts[i].1 - pts[i - 1].1) / h[i - 1]);
+                d[i] =
+                    6.0 * ((pts[i + 1].1 - pts[i].1) / h[i] - (pts[i].1 - pts[i - 1].1) / h[i - 1]);
             }
             // Thomas algorithm on rows 1..n-1 (m[0] = m[n-1] = 0)
             for i in 2..n - 1 {

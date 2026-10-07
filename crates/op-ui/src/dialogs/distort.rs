@@ -68,6 +68,11 @@ pub struct Layout {
     /// How far the slider rows' fields and tracks sit below the usual
     /// place (`FIELD_Y`, `TRACK_Y`): Lens Flare's are 3 pt higher.
     pub rows_dy: f32,
+    /// The fields' width (`FIELD_W` in most; Smart Blur's are 42.5).
+    pub field_w: f32,
+    /// Pop-ups for the settings after the sliders (Smart Blur's Quality
+    /// and Mode): each rect (x0, y0, x1, y1) and its label's right end.
+    pub popups: &'static [([f32; 4], f32)],
     pub control: Control,
     /// A pop-up for the last setting (Spherize's Mode, Ripple's Size,
     /// Mezzotint's Type): its rect (x0, y0, x1, y1) and its label's left.
@@ -75,6 +80,30 @@ pub struct Layout {
     /// The diagram's top-left corner.
     pub diagram: Option<(f32, f32)>,
 }
+
+/// Blur › Smart Blur: Radius and Threshold over sliders, then the
+/// Quality and Mode pop-ups (410 × 491 pt).
+pub const SMART_BLUR: Layout = Layout {
+    size: (410.0, 491.0),
+    buttons_x: 303.5,
+    buttons_w: 89.0,
+    randomize: None,
+    view: None,
+    after: None,
+    rows_dy: 0.0,
+    field_w: 42.5,
+    popups: &[
+        ([77.5, 418.0, 276.5, 435.0], 64.0),
+        ([77.5, 455.0, 276.5, 472.5], 64.0),
+    ],
+    control: Control::Sliders {
+        label_ys: &[327.0, 377.0],
+        field_x: 229.0,
+        track_x1: 275.5,
+    },
+    mode: None,
+    diagram: None,
+};
 
 /// Render › Fibers: Variance and Strength over sliders and Randomize
 /// under them; 128.5 pt buttons (445 × 445 pt).
@@ -86,6 +115,8 @@ pub const FIBERS: Layout = Layout {
     view: None,
     after: None,
     rows_dy: 0.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::Sliders {
         label_ys: &[327.0, 377.0],
         field_x: 231.0,
@@ -110,6 +141,8 @@ pub const LENS_FLARE: Layout = Layout {
         ys: &[380.0, 396.0, 412.0, 428.0],
     }),
     rows_dy: -3.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::Slider {
         label_y: 324.0,
         field_x: 203.0,
@@ -127,6 +160,8 @@ pub const TWIRL: Layout = Layout {
     view: None,
     after: None,
     rows_dy: 0.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::Slider {
         label_y: 327.0,
         field_x: 223.0,
@@ -146,6 +181,8 @@ pub const CELL_SIZE: Layout = Layout {
     view: None,
     after: None,
     rows_dy: 0.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::Slider {
         label_y: 327.0,
         field_x: 284.0,
@@ -165,6 +202,8 @@ pub const RIPPLE: Layout = Layout {
     view: None,
     after: None,
     rows_dy: 0.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::Slider {
         label_y: 327.0,
         field_x: 218.0,
@@ -183,6 +222,8 @@ pub const MEZZOTINT: Layout = Layout {
     view: None,
     after: None,
     rows_dy: 0.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::None,
     mode: Some(([55.0, 318.0, 253.0, 336.0], 21.0)),
     diagram: None,
@@ -198,6 +239,8 @@ pub const ZIGZAG: Layout = Layout {
     view: None,
     after: None,
     rows_dy: 0.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::Sliders {
         label_ys: &[327.0, 377.0],
         field_x: 231.0,
@@ -215,6 +258,8 @@ pub const PINCH: Layout = Layout {
     view: None,
     after: None,
     rows_dy: 0.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::Slider {
         label_y: 324.0,
         field_x: 253.0,
@@ -232,6 +277,8 @@ pub const SPHERIZE: Layout = Layout {
     view: None,
     after: None,
     rows_dy: 0.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::Slider {
         label_y: 327.0,
         field_x: 218.0,
@@ -249,6 +296,8 @@ pub const POLAR: Layout = Layout {
     view: None,
     after: None,
     rows_dy: 0.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::Radios(&[RadioGroup {
         title: None,
         rect: [8.0, 317.0, 281.0, 366.0],
@@ -286,6 +335,8 @@ pub const WIND: Layout = Layout {
     view: None,
     after: None,
     rows_dy: 0.0,
+    field_w: FIELD_W,
+    popups: &[],
     control: Control::Radios(&[
         RadioGroup {
             title: Some(("Method", 334.0)),

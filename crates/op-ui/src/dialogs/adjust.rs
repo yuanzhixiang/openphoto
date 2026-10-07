@@ -631,7 +631,6 @@ impl Kind {
             Self::Offset => l::OFFSET,
             Self::TraceContour => l::TRACE_CONTOUR,
             Self::Diffuse => l::DIFFUSE,
-            Self::SmartBlur => l::SMART_BLUR,
             Self::ShapeBlur => l::SHAPE_BLUR,
             Self::ReduceNoise => l::REDUCE_NOISE,
             Self::SmartSharpen => l::SMART_SHARPEN,
@@ -672,6 +671,7 @@ impl Kind {
             Self::PolarCoordinates => &distort::POLAR,
             Self::Wind => &distort::WIND,
             Self::Fibers => &distort::FIBERS,
+            Self::SmartBlur => &distort::SMART_BLUR,
             Self::LensFlare => &distort::LENS_FLARE,
             _ => return None,
         })
@@ -1422,6 +1422,7 @@ impl AdjustDialog {
             Kind::SmartBlur => Filter::SmartBlur {
                 radius: v[0],
                 threshold: v[1],
+                quality: v[2] as u8,
                 mode: [
                     mf::SmartBlurMode::Normal,
                     mf::SmartBlurMode::EdgeOnly,
@@ -2106,7 +2107,7 @@ impl AdjustDialog {
         frame: Rect,
         label_ys: &[f32],
         (field_x, track_x1): (f32, f32),
-        rows_dy: f32,
+        (rows_dy, field_w): (f32, f32),
     ) {
         let params = self.kind.params();
         for (k, &label_y) in label_ys.iter().enumerate() {
@@ -2125,7 +2126,7 @@ impl AdjustDialog {
             distort::label(ui, at(23.5, label_ys[0]), Align2::LEFT_CENTER, label);
             let field = Rect::from_min_max(
                 at_row(field_x, distort::FIELD_Y.0),
-                at_row(field_x + distort::FIELD_W, distort::FIELD_Y.1),
+                at_row(field_x + field_w, distort::FIELD_Y.1),
             );
             appkit::field(
                 ui,
@@ -2133,14 +2134,18 @@ impl AdjustDialog {
                 &mut self.values[k],
                 ("distort-field", k),
                 (p.min, p.max),
-                1.0,
-                0,
+                10f32.powi(-(p.decimals as i32)),
+                p.decimals,
                 self.first_frame && k == 0,
             );
             // Crystallize's, Pointillize's and ZigZag's settings have no unit
             let unit = match self.kind {
                 Kind::Twirl => "°",
-                Kind::Crystallize | Kind::Pointillize | Kind::ZigZag | Kind::Fibers => "",
+                Kind::Crystallize
+                | Kind::Pointillize
+                | Kind::ZigZag
+                | Kind::Fibers
+                | Kind::SmartBlur => "",
                 _ => "%",
             };
             appkit::text(
@@ -2159,7 +2164,8 @@ impl AdjustDialog {
                 && let Some(pointer) = response.interact_pointer_pos()
             {
                 let t = distort::slider_place(at_row, track_x1, pointer.x);
-                self.set(k, (p.min + (p.max - p.min) * t).round());
+                let round = 10f32.powi(p.decimals as i32);
+                self.set(k, ((p.min + (p.max - p.min) * t) * round).round() / round);
             }
             let v = self.value(k).unwrap_or(p.default);
             distort::slider(ui, at_row, track_x1, (v - p.min) / (p.max - p.min));
@@ -2236,12 +2242,24 @@ impl AdjustDialog {
                 label_y,
                 field_x,
                 track_x1,
-            } => self.distort_sliders(ui, frame, &[label_y], (field_x, track_x1), layout.rows_dy),
+            } => self.distort_sliders(
+                ui,
+                frame,
+                &[label_y],
+                (field_x, track_x1),
+                (layout.rows_dy, layout.field_w),
+            ),
             distort::Control::Sliders {
                 label_ys,
                 field_x,
                 track_x1,
-            } => self.distort_sliders(ui, frame, label_ys, (field_x, track_x1), layout.rows_dy),
+            } => self.distort_sliders(
+                ui,
+                frame,
+                label_ys,
+                (field_x, track_x1),
+                (layout.rows_dy, layout.field_w),
+            ),
             distort::Control::None => {}
             distort::Control::Radios(groups) => {
                 for (i, group) in groups.iter().enumerate() {
@@ -2272,6 +2290,34 @@ impl AdjustDialog {
                         self.values[i] = k.to_string();
                     }
                 }
+            }
+        }
+        // Pop-ups for the settings after the sliders
+        let rows = match layout.control {
+            distort::Control::Slider { .. } => 1,
+            distort::Control::Sliders { label_ys, .. } => label_ys.len(),
+            _ => 0,
+        };
+        for (k, &(rect, label_right)) in layout.popups.iter().enumerate() {
+            let i = rows + k;
+            let Some(ParamKind::Choice(options)) = params.get(i).map(|p| p.kind) else {
+                continue;
+            };
+            distort::label(
+                ui,
+                at(label_right, (rect[1] + rect[3]) / 2.0),
+                Align2::RIGHT_CENTER,
+                params[i].label,
+            );
+            let chosen = (self.value(i).unwrap_or(0.0) as usize).min(options.len() - 1);
+            if let Some(k) = appkit::popup(
+                ui,
+                r(rect[0], rect[1], rect[2], rect[3]),
+                &format!("distort-popup-{i}"),
+                options[chosen],
+                &appkit::choices(options.iter().copied(), chosen),
+            ) {
+                self.values[i] = k.to_string();
             }
         }
         // The pop-up sets the last setting
