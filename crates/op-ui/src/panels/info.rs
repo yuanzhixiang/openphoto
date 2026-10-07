@@ -5,22 +5,13 @@
 use egui::{Align2, Pos2, Ui, Vec2};
 
 use super::floating::small;
+use crate::rulers::RulerUnit;
 use crate::state::AppState;
 use crate::theme::{color, pt};
 
-/// Photoshop's "Doc:" sizes: the flattened image (8-bit RGB) and the
-/// layered document (here 3 bytes a pixel per layer, so a one-layer
-/// document shows the same size twice, as in Photoshop), in K or M.
-fn size_label(bytes: f64) -> String {
-    if bytes >= 1024.0 * 1024.0 {
-        format!("{:.2}M", bytes / 1024.0 / 1024.0)
-    } else {
-        format!("{:.1}K", bytes / 1024.0)
-    }
-}
-
 pub fn show(ui: &mut Ui, app: &mut AppState) {
     let rect = ui.max_rect();
+    let app_units = app.ruler_units;
     let Some(state) = app.active() else {
         return;
     };
@@ -30,8 +21,6 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
             .then(|| state.sample_average(p.x as u32, p.y as u32, 1, op_core::SampleScope::All))?
     });
     let sel = state.doc.selection().and_then(|s| s.bounds());
-    let (w, h) = (state.doc.width as f64, state.doc.height as f64);
-    let layers = state.doc.layers.len() as f64;
     let painter = ui.painter();
     let font = small();
     let text = |s: String, x: f32, y: f32| {
@@ -67,23 +56,45 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         ],
         egui::Stroke::new(1.0, color::SEPARATOR_LIGHT),
     );
+    // In the rulers' unit, from their origin
+    let unit = app_units;
     let (x, y) = pointer.map_or((String::new(), String::new()), |p| {
-        (format!("{:.0}", p.x.floor()), format!("{:.0}", p.y.floor()))
+        let o = state.ruler_origin;
+        (
+            unit_value(unit, &state.doc, true, p.x - o.x),
+            unit_value(unit, &state.doc, false, p.y - o.y),
+        )
     });
     text(format!("X:  {x}"), pt(18.0), y0);
     text(format!("Y:  {y}"), pt(18.0), y0 + line);
     let (sw, sh) = sel.map_or((String::new(), String::new()), |(x0, y0, x1, y1)| {
-        ((x1 - x0).to_string(), (y1 - y0).to_string())
+        (
+            unit_value(unit, &state.doc, true, (x1 - x0) as f32),
+            unit_value(unit, &state.doc, false, (y1 - y0) as f32),
+        )
     });
     text(format!("W:  {sw}"), col2, y0);
     text(format!("H:  {sh}"), col2, y0 + line);
 
+    let (flat, layered) = crate::status_info::document_sizes(state);
     let doc = format!(
         "Doc: {}/{}",
-        size_label(w * h * 3.0),
-        size_label(w * h * 3.0 * layers)
+        crate::status_info::size(flat),
+        crate::status_info::size(layered)
     );
     text(doc, 0.0, y0 + 2.6 * line);
+}
+
+/// A length in document pixels in the rulers' unit: whole pixels, inches
+/// to three decimals, centimeters and picas to two, the rest to one.
+fn unit_value(unit: RulerUnit, doc: &op_core::Document, horizontal: bool, px: f32) -> String {
+    let v = px / unit.pixels(doc, horizontal);
+    match unit {
+        RulerUnit::Pixels => format!("{:.0}", v.floor()),
+        RulerUnit::Inches => format!("{v:.3}"),
+        RulerUnit::Centimeters | RulerUnit::Picas => format!("{v:.2}"),
+        RulerUnit::Millimeters | RulerUnit::Points | RulerUnit::Percent => format!("{v:.1}"),
+    }
 }
 
 #[cfg(test)]
@@ -91,8 +102,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sizes_read_like_photoshop() {
-        assert_eq!(size_label(1920.0 * 1080.0 * 3.0), "5.93M");
-        assert_eq!(size_label(100.0 * 100.0 * 3.0), "29.3K");
+    fn lengths_in_the_rulers_unit() {
+        let doc = op_core::Document::from_rgba8("t", 200, 100, &vec![0; 200 * 100 * 4]);
+        assert_eq!(unit_value(RulerUnit::Pixels, &doc, true, 36.6), "36");
+        // 72 ppi: 36 px are half an inch, 1.27 cm, 36 points, 3 picas
+        let res = doc.resolution;
+        assert_eq!(
+            unit_value(RulerUnit::Inches, &doc, true, res / 2.0),
+            "0.500"
+        );
+        assert_eq!(
+            unit_value(RulerUnit::Centimeters, &doc, true, res / 2.0),
+            "1.27"
+        );
+        assert_eq!(unit_value(RulerUnit::Percent, &doc, true, 50.0), "25.0");
+        assert_eq!(unit_value(RulerUnit::Percent, &doc, false, 50.0), "50.0");
     }
 }
