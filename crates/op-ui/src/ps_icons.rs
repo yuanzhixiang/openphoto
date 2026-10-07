@@ -85,6 +85,26 @@ pub enum Icon {
     QuickSubtract,
     /// Brush angle.
     Angle,
+    /// Toggle the Brush Settings panel: a square with a brush cut out.
+    BrushPanel,
+    /// Toggle the Clone Source panel: a square with a stamp cut out.
+    CloneSourcePanel,
+    /// Pressure for opacity: a hatched ring and a pen.
+    OpacityPressure,
+    /// Airbrush: a spray and a pen.
+    Airbrush,
+    /// Painting symmetry: a butterfly (with a menu).
+    Symmetry,
+    /// Ignore adjustment layers when cloning.
+    IgnoreAdjustments,
+    /// Color Replacement / Background Eraser sampling: continuous, once,
+    /// background swatch.
+    SampleContinuous,
+    SampleOnce,
+    SampleSwatch,
+    /// Mixer Brush: load the brush after each stroke, clean it.
+    MixerLoad,
+    MixerClean,
     Eye,
     /// A partly locked layer's lock (and the background's): hollow.
     LayerLock,
@@ -931,6 +951,133 @@ pub fn paint_scaled(
             pen.line(&[(-12.0, 7.0), (6.5, -9.5)], 2.6);
             pen.rect(-12.5, 6.5, 13.5, 8.5);
             pen.arc(-12.0, 7.5, 13.0, (-0.95, 0.0), 1.8);
+        }
+        Icon::BrushPanel | Icon::CloneSourcePanel => {
+            pen.rect(-17.0, -16.5, -1.0, -12.0);
+            pen.rect(-17.0, -12.0, 17.0, 16.0);
+            let hole = Pen {
+                color: background,
+                ..pen
+            };
+            if icon == Icon::BrushPanel {
+                hole.round_line((7.5, -8.0), (-1.0, 2.5), 3.5);
+                hole.poly(&[
+                    (-4.0, 3.0),
+                    (-1.0, 5.0),
+                    (-2.0, 9.0),
+                    (-6.0, 11.5),
+                    (-11.0, 12.5),
+                    (-9.5, 8.0),
+                    (-8.0, 4.5),
+                ]);
+            } else {
+                hole.dot(-1.0, -5.0, 4.0);
+                hole.rect(-2.5, -1.5, 0.5, 5.0);
+                hole.rect(-9.0, 5.0, 7.5, 9.5);
+                hole.rect(-7.0, 10.5, 5.5, 12.0);
+            }
+        }
+        Icon::OpacityPressure => {
+            pen.arc(-3.5, 0.5, 13.0, (-0.23, 4.62), 1.8);
+            let faint = Pen {
+                color: pen.color.gamma_multiply(0.45),
+                ..pen
+            };
+            for k in 0..5 {
+                let d = -12.0 + 6.0 * k as f32;
+                faint.line(&[(-14.0 + d, 10.0), (-2.0 + d, -2.0)], 1.4);
+            }
+            pen.round_line((11.0, -16.0), (-2.0, -2.5), 6.5);
+        }
+        Icon::Airbrush => {
+            let spray = Pen {
+                color: pen.color.gamma_multiply(0.55),
+                ..pen
+            };
+            spray.poly(&[
+                (-6.0, -10.0),
+                (-0.5, -11.0),
+                (-5.0, -5.0),
+                (-7.0, 2.0),
+                (-5.0, 10.0),
+                (-1.5, 13.0),
+                (-9.0, 13.5),
+                (-14.0, 7.0),
+                (-15.0, -1.0),
+                (-12.0, -7.0),
+            ]);
+            pen.round_line((12.5, -14.0), (1.0, -1.0), 7.0);
+            pen.line(&[(-1.0, 1.0), (-10.0, 11.0)], 2.0);
+            pen.line(&[(1.5, 4.0), (6.0, 9.0)], 2.0);
+            pen.line(&[(-4.0, 13.0), (4.0, 7.5), (11.0, 14.5)], 2.0);
+        }
+        Icon::Symmetry => {
+            pen.arc(-6.5, -6.0, 7.0, (1.2, 5.1), 2.0);
+            pen.arc(6.5, -6.0, 7.0, (-1.95, 1.95), 2.0);
+            pen.arc(-6.0, 9.5, 6.5, (1.4, 4.7), 2.0);
+            pen.arc(6.0, 9.5, 6.5, (-1.55, 1.75), 2.0);
+            for y in [-15.0, -11.0, -3.0, 5.0, 9.0, 13.0, 17.0] {
+                pen.rect(-1.0, y, 1.0, y + 2.0);
+            }
+            pen.poly(&[(14.0, 17.0), (19.0, 17.0), (19.0, 12.0)]);
+        }
+        Icon::IgnoreAdjustments => {
+            pen.ring(2.0, 3.0, 9.5, 1.6);
+            pen.line(&[(-13.0, -11.5), (11.5, 13.0)], 1.6);
+            let fill = Pen {
+                color: pen.color.gamma_multiply(0.7),
+                ..pen
+            };
+            fill.poly(&[(3.0, -6.0), (11.0, 2.0), (6.0, 9.0), (-5.0, -2.0)]);
+        }
+        Icon::SampleContinuous | Icon::SampleOnce | Icon::SampleSwatch => {
+            // The eyedropper, top right
+            pen.round_line((14.0, -12.5), (10.5, -9.0), 5.0);
+            pen.poly(&[(4.5, -13.0), (12.5, -5.0), (9.5, -2.0), (1.5, -10.0)]);
+            pen.line(&[(5.5, -6.0), (-6.0, 6.0)], 2.0);
+            pen.line(&[(8.5, -3.0), (-3.0, 9.0)], 2.0);
+            match icon {
+                Icon::SampleContinuous => {
+                    let fade = Pen {
+                        color: pen.color.gamma_multiply(0.5),
+                        ..pen
+                    };
+                    pen.rect(-15.0, 9.0, -7.0, 15.0);
+                    fade.rect(-7.0, 9.0, 5.0, 15.0);
+                }
+                Icon::SampleOnce => {
+                    pen.ring(-9.0, 9.0, 6.5, 1.8);
+                    pen.rect(-10.0, 0.0, -8.0, 18.0);
+                    pen.rect(-18.0, 8.0, 0.0, 10.0);
+                }
+                _ => {
+                    pen.rect(-13.0, -2.0, 1.0, 12.0);
+                    let hole = Pen {
+                        color: background,
+                        ..pen
+                    };
+                    hole.rect(-11.0, 0.0, -1.0, 10.0);
+                    pen.rect(-11.0, 4.0, -5.0, 10.0);
+                }
+            }
+        }
+        Icon::MixerLoad | Icon::MixerClean => {
+            pen.round_line((13.0, -14.0), (2.0, 0.0), 4.0);
+            pen.poly(&[
+                (-1.0, -1.0),
+                (3.0, 2.0),
+                (1.0, 7.0),
+                (-5.0, 11.0),
+                (-11.0, 12.5),
+                (-8.0, 7.0),
+                (-6.0, 2.0),
+            ]);
+            if icon == Icon::MixerLoad {
+                pen.dot(-9.0, -6.0, 4.0);
+                pen.poly(&[(-9.0, -15.0), (-5.2, -7.0), (-12.8, -7.0)]);
+            } else {
+                pen.line(&[(-14.0, -14.0), (14.0, 14.0)], 2.2);
+            }
         }
         Icon::Swap => {
             pen.rect(-7.5, -7.0, 4.0, -5.0);

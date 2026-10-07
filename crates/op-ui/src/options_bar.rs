@@ -223,7 +223,10 @@ fn measured_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) -> bool {
         Tool::MagicWand => wand_bar(&mut b, app),
         Tool::ObjectSelection => object_selection_bar(&mut b, app),
         Tool::QuickSelection => quick_selection_bar(&mut b, app),
-        _ => return false,
+        tool => match crate::options_tools::layout(tool) {
+            Some(items) => crate::options_tools::show(&mut b, app, items),
+            None => return false,
+        },
     }
     true
 }
@@ -503,7 +506,7 @@ fn quick_selection_bar(b: &mut crate::options_kit::Bar, app: &mut AppState) {
     }
     b.sep(202.0);
     let size = app.setting("quick.size", "30").clone();
-    b.brush_picker(221.5, &size, 1.0);
+    b.brush_picker(221.5, &size, size.parse().unwrap_or(30.0), 1.0);
     b.sep(253.0);
     b.icon(266.0, Icon::Angle, "Set the brush angle", false, true);
     setting_field(b, app, (277.0, 318.5), "quick.angle", "0°", true);
@@ -1105,7 +1108,7 @@ fn value_box(ui: &mut Ui, rect: Rect, id: &str, shown: String, enabled: bool) ->
 }
 
 /// A number typed with or without its unit ("60 px", "50%", "15°").
-fn typed_number(text: &str) -> Option<f32> {
+pub fn typed_number(text: &str) -> Option<f32> {
     let t = text
         .trim()
         .trim_end_matches("px")

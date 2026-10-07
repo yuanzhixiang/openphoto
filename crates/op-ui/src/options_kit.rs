@@ -278,10 +278,18 @@ impl<'a> Bar<'a> {
         response.on_hover_text(tip)
     }
 
-    /// The brush preset picker centered at `cx`: the brush's tip (a 14 pt
-    /// dot), its size below it and a chevron 20.75 pt to the right.
-    pub fn brush_picker(&mut self, cx: f32, size: &str, hardness: f32) -> egui::Response {
-        let rect = Rect::from_min_max(self.at(cx - 13.0, 4.0), self.at(cx + 26.0, 31.0));
+    /// The brush preset picker centered at `cx`: the brush's tip as
+    /// Photoshop previews it (its size in device pixels up to 28, soft
+    /// brushes fading out; centered 11 pt down), the size below it (y
+    /// 26.25) and a chevron 21 pt to the right.
+    pub fn brush_picker(
+        &mut self,
+        cx: f32,
+        label: &str,
+        size: f32,
+        hardness: f32,
+    ) -> egui::Response {
+        let rect = Rect::from_min_max(self.at(cx - 13.0, 4.0), self.at(cx + 27.0, 31.0));
         let response = self
             .ui
             .interact(rect, self.ui.id().with("brush-picker"), Sense::click());
@@ -290,23 +298,131 @@ impl<'a> Bar<'a> {
             p.rect_filled(rect, CornerRadius::same(pt(3.0) as u8), color::HOVER);
         }
         let c = self.at(cx, 11.0);
-        let _ = hardness;
-        p.circle_filled(c, pt(7.0), Color32::from_gray(0xf0));
+        let ppp = self.ui.ctx().pixels_per_point();
+        let radius = size.clamp(1.0, 28.0) / 2.0 / ppp;
+        let hard = hardness.clamp(0.0, 1.0);
+        // From the edge in: each ring a little more opaque
+        let rings = 12;
+        for k in 0..rings {
+            let t = 1.0 - k as f32 / rings as f32;
+            let r = radius * t;
+            let alpha = if t <= hard.max(0.02) {
+                1.0
+            } else {
+                ((1.0 - t) / (1.0 - hard.max(0.02))).clamp(0.0, 1.0)
+            };
+            p.circle_filled(
+                c,
+                r,
+                Color32::from_gray(0xf0).gamma_multiply(alpha.powf(1.5)),
+            );
+        }
         p.text(
             self.at(cx, 26.25),
             Align2::CENTER_CENTER,
-            size,
+            label,
             egui::FontId::proportional(pt(10.5)),
             LABEL,
         );
         crate::ps_icons::paint(
             p,
-            self.at(cx + 20.75, 18.25),
+            self.at(cx + 21.0, 18.25),
             Icon::Caret,
             color::OPTIONS_ICON,
             color::OPTIONS_BAR,
         );
         response
+    }
+
+    /// The chevron box after a percentage field (`x0` to `x1`, sharing its
+    /// edge); a click opens a slider. Returns the slider's new value.
+    pub fn slider_box(&mut self, x0: f32, x1: f32, id: &str, current: f32) -> Option<f32> {
+        let rect = self.rect(x0, FIELD_Y, x1);
+        let response =
+            self.ui
+                .interact(rect, self.ui.id().with(("slider-box", id)), Sense::click());
+        let fill = if response.hovered() {
+            Color32::from_gray(0x4f)
+        } else {
+            color::FIELD
+        };
+        self.ui.painter().rect(
+            rect,
+            CornerRadius::same(pt(2.0) as u8),
+            fill,
+            Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+            StrokeKind::Inside,
+        );
+        crate::ps_icons::paint(
+            self.ui.painter(),
+            rect.center() + egui::vec2(0.0, pt(0.5)),
+            Icon::Caret,
+            color::OPTIONS_ICON,
+            fill,
+        );
+        let mut value = current;
+        let mut changed = false;
+        egui::Popup::from_response(&response)
+            .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .show(|ui| {
+                changed = ui
+                    .add(
+                        egui::Slider::new(&mut value, 0.0..=100.0)
+                            .max_decimals(0)
+                            .suffix("%"),
+                    )
+                    .changed();
+            });
+        changed.then_some(value.round())
+    }
+
+    /// A swatch from `x0` to `x1` and its chevron: right after it (the
+    /// Mixer Brush's load color) or in a box (`chevron_box`, the Pattern
+    /// Stamp's pattern).
+    pub fn swatch(&mut self, x0: f32, x1: f32, fill: Color32, chevron_box: Option<(f32, f32)>) {
+        let rect = self.rect(x0, (5.0, 30.0), x1);
+        self.ui.painter().rect_filled(rect, 0, fill);
+        if chevron_box.is_some() {
+            // The default pattern: leaves of green on dark green
+            let leaf = Color32::from_rgb(0x3f, 0x7a, 0x3a);
+            for k in 0..24 {
+                let (i, j) = (k % 6, k / 6);
+                let (x, y) = (
+                    x0 + 2.5 + 4.5 * i as f32 + (j % 2) as f32 * 2.0,
+                    7.5 + 5.5 * j as f32,
+                );
+                self.ui
+                    .painter()
+                    .circle_filled(self.at(x, y), pt(1.3), leaf);
+            }
+            self.ui.painter().rect_stroke(
+                rect,
+                0,
+                Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+                StrokeKind::Inside,
+            );
+        }
+        let cx = match chevron_box {
+            Some((b0, b1)) => {
+                self.ui.painter().rect(
+                    self.rect(b0, (5.0, 30.0), b1),
+                    CornerRadius::same(pt(2.0) as u8),
+                    color::FIELD,
+                    Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+                    StrokeKind::Inside,
+                );
+                (b0 + b1) / 2.0
+            }
+            None => x1 + 4.0,
+        };
+        crate::ps_icons::paint(
+            self.ui.painter(),
+            self.at(cx, 18.0),
+            Icon::Caret,
+            color::OPTIONS_ICON,
+            color::OPTIONS_BAR,
+        );
     }
 
     /// A pressed-look box around `x0`–`x1` with a small triangle at its
