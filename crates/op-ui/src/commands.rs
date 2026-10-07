@@ -1538,6 +1538,10 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                         // Gradient Map runs from the foreground to the background color
                         dialog.set_gradient_colors(colors);
                         dialog.set_colors(colors);
+                        if kind == AdjustKind::ReplaceColor {
+                            dialog.extra.thumb =
+                                crate::dialogs::adjust_thumbnail(&state.doc, (370, 280));
+                        }
                         if kind == AdjustKind::MatchColor {
                             let layer = state
                                 .doc

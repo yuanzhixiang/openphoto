@@ -353,6 +353,7 @@ const SHADOWS_HIGHLIGHTS: &[Param] = &[
     param("Midtone:", -100.0, 100.0, 0.0, 0),
     param("Black Clip:", 0.0, 50.0, 0.01, 2),
     param("White Clip:", 0.0, 50.0, 0.01, 2),
+    check("Show More Options", false),
 ];
 
 const HDR_TONING: &[Param] = &[
@@ -781,7 +782,7 @@ pub struct AdjustDialog {
 }
 
 /// What some filter and adjustment dialogs need besides their fields.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct Extra {
     /// The random pattern (Fibers, Wave, Extrude): a new one each opening.
     pub seed: u32,
@@ -804,6 +805,49 @@ pub struct Extra {
     pub auto_options: op_core::auto::Options,
     /// Options... was clicked: the app opens Auto Color Correction Options.
     pub wants_auto_options: bool,
+    /// Replace Color's preview: the layer made small (width, height,
+    /// pixels), whether it shows the image instead of the selection, and
+    /// the texture with what it was made from.
+    pub thumb: Option<(usize, usize, Vec<[u8; 3]>)>,
+    pub show_image: bool,
+    pub preview_texture: Option<(([u8; 3], u32, bool), egui::TextureHandle)>,
+}
+
+/// The active layer made small for a preview box `max` pixels at most
+/// (each pixel the nearest one; transparent ones white).
+pub fn thumbnail(
+    doc: &op_core::Document,
+    max: (usize, usize),
+) -> Option<(usize, usize, Vec<[u8; 3]>)> {
+    let image = doc
+        .active_layer
+        .and_then(|id| doc.layer(id))
+        .and_then(|l| l.image())?;
+    let (w, h) = (doc.width as usize, doc.height as usize);
+    if w == 0 || h == 0 {
+        return None;
+    }
+    let k = (max.0 as f32 / w as f32)
+        .min(max.1 as f32 / h as f32)
+        .min(1.0);
+    let (tw, th) = (
+        ((w as f32 * k) as usize).max(1),
+        ((h as f32 * k) as usize).max(1),
+    );
+    let mut px = Vec::with_capacity(tw * th);
+    for y in 0..th {
+        for x in 0..tw {
+            let sx = ((x as f32 + 0.5) / k) as u32;
+            let sy = ((y as f32 + 0.5) / k) as u32;
+            let p = image.pixel(sx.min(doc.width - 1), sy.min(doc.height - 1));
+            px.push(if p[3] == 0 {
+                [255; 3]
+            } else {
+                [p[0], p[1], p[2]]
+            });
+        }
+    }
+    Some((tw, th, px))
 }
 
 impl Extra {
@@ -1198,7 +1242,16 @@ impl AdjustDialog {
     pub fn wants_pane(&self) -> bool {
         self.kind == Kind::Custom
             || self.kind.distort().is_some()
-            || self.kind.layout().is_some_and(|l| l.pane)
+            || self.layout().is_some_and(|l| l.pane)
+    }
+
+    /// The classic layout as shown now: Shadows/Highlights has a short one
+    /// until Show More Options is checked.
+    fn layout(&self) -> Option<&'static filter_layout::Layout> {
+        if self.kind == Kind::ShadowsHighlights && self.value(10) != Some(1.0) {
+            return Some(filter_layout::SHADOWS_HIGHLIGHTS_SIMPLE);
+        }
+        self.kind.layout()
     }
 
     /// Gradient Map's two colors (the foreground and background colors).
@@ -1585,13 +1638,15 @@ impl AdjustDialog {
                     Some(Custom::Threshold(_)) => threshold::SIZE,
                     Some(Custom::GradientMap(_)) => gradient_map::SIZE,
                     Some(Custom::Kernel(_)) => custom_filter::SIZE,
-                    None => self.kind.size(),
+                    None => self
+                        .layout()
+                        .map_or_else(|| self.kind.size(), |l| vec2(pt(l.size.0), pt(l.size.1))),
                 };
                 let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
                 self.rect = rect;
                 outcome = if self.custom.is_some() {
                     self.custom_ui(ui, rect)
-                } else if let Some(layout) = self.kind.layout() {
+                } else if let Some(layout) = self.layout() {
                     self.classic_ui(ui, rect, layout)
                 } else if let Some(layout) = self.kind.plain() {
                     self.plain_ui(ui, rect, layout)
@@ -1688,6 +1743,76 @@ impl AdjustDialog {
             Some(uxp::Button::Ok) => self.effect().map_or(Outcome::Open, Outcome::Apply),
             Some(uxp::Button::Cancel) => Outcome::Cancel,
             _ => Outcome::Open,
+        }
+    }
+
+    /// Replace Color's preview box: the selection (white where the sampled
+    /// color is replaced, by Fuzziness) or the image, with the Selection
+    /// and Image radio buttons under it.
+    fn replace_preview(&mut self, ui: &mut Ui, frame: Rect) {
+        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
+        let b = filter_layout::REPLACE_PREVIEW;
+        let rect = Rect::from_min_max(at(b[0], b[1]), at(b[2], b[3]));
+        let painter = ui.painter().clone();
+        painter.rect_filled(rect, 0, Color32::BLACK);
+        let fuzziness = self.value(0).unwrap_or(40.0);
+        let key = (
+            self.extra.sample,
+            fuzziness.to_bits(),
+            self.extra.show_image,
+        );
+        if let Some((w, h, px)) = &self.extra.thumb
+            && self
+                .extra
+                .preview_texture
+                .as_ref()
+                .is_none_or(|(k, _)| *k != key)
+        {
+            let pixels: Vec<Color32> = px
+                .iter()
+                .map(|&p| {
+                    if self.extra.show_image {
+                        Color32::from_rgb(p[0], p[1], p[2])
+                    } else {
+                        let v =
+                            op_core::color_match::replace_weight(p, self.extra.sample, fuzziness);
+                        Color32::from_gray((v * 255.0).round() as u8)
+                    }
+                })
+                .collect();
+            let image = egui::ColorImage::new([*w, *h], pixels);
+            let texture =
+                ui.ctx()
+                    .load_texture("replace-color-preview", image, egui::TextureOptions::LINEAR);
+            self.extra.preview_texture = Some((key, texture));
+        }
+        if let Some((_, texture)) = &self.extra.preview_texture {
+            // Fitted into the box, centered
+            let size = texture.size_vec2();
+            let k = (rect.width() / size.x).min(rect.height() / size.y);
+            let shown = Rect::from_center_size(rect.center(), size * k);
+            painter.image(
+                texture.id(),
+                shown,
+                Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                Color32::WHITE,
+            );
+        }
+        painter.rect_stroke(
+            rect,
+            0,
+            Stroke::new(pt(1.0), Color32::from_gray(0x30)),
+            egui::StrokeKind::Outside,
+        );
+        for (k, (label, (x, y))) in ["Selection", "Image"]
+            .into_iter()
+            .zip(filter_layout::REPLACE_RADIOS)
+            .enumerate()
+        {
+            let chosen = self.extra.show_image == (k == 1);
+            if appkit::radio(ui, at(x, y), label, chosen) {
+                self.extra.show_image = k == 1;
+            }
         }
     }
 
@@ -1812,7 +1937,11 @@ impl AdjustDialog {
                     appkit::checkbox(ui, at(min.0, min.1), label, &mut on);
                     self.values[i] = (on as u8).to_string();
                 }
+                Row::Hidden => {}
             }
+        }
+        if self.kind == Kind::ReplaceColor {
+            self.replace_preview(ui, frame);
         }
 
         // OK, Cancel and Preview at the top right

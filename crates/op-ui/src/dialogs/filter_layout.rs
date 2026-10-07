@@ -43,6 +43,9 @@ pub enum Row {
         /// The box's top-left corner.
         min: (f32, f32),
     },
+    /// A setting this layout doesn't show (Shadows/Highlights without
+    /// Show More Options).
+    Hidden,
 }
 
 /// Where a value sits along a slider track, 0–1. Photoshop's sliders are
@@ -1077,7 +1080,7 @@ pub const DISPLACE: &Layout = &Layout {
 };
 
 pub const SHADOWS_HIGHLIGHTS: &Layout = &Layout {
-    size: (324.0, 531.0),
+    size: (324.0, 560.0),
     button_width: 59.5,
     preview_y: 118.5,
     pane: false,
@@ -1172,6 +1175,50 @@ pub const SHADOWS_HIGHLIGHTS: &Layout = &Layout {
             Some((21.0, 206.0, 505.0)),
             Scale::Linear,
         ),
+        Row::Check {
+            label: "Show More Options",
+            min: (21.0, 530.0),
+        },
+    ],
+};
+
+/// Shadows/Highlights without Show More Options: the two amounts.
+pub const SHADOWS_HIGHLIGHTS_SIMPLE: &Layout = &Layout {
+    size: (324.0, 170.0),
+    button_width: 59.5,
+    preview_y: 118.5,
+    pane: false,
+    rows: &[
+        number(
+            "Shadows Amount:",
+            135.0,
+            [140.0, 38.0, 200.5, 57.0],
+            "%",
+            205.5,
+            Some((21.0, 206.0, 64.0)),
+            Scale::Linear,
+        ),
+        Row::Hidden,
+        Row::Hidden,
+        number(
+            "Highlights Amount:",
+            135.0,
+            [140.0, 87.0, 200.5, 106.0],
+            "%",
+            205.5,
+            Some((21.0, 206.0, 113.0)),
+            Scale::Linear,
+        ),
+        Row::Hidden,
+        Row::Hidden,
+        Row::Hidden,
+        Row::Hidden,
+        Row::Hidden,
+        Row::Hidden,
+        Row::Check {
+            label: "Show More Options",
+            min: (21.0, 140.0),
+        },
     ],
 };
 
@@ -1270,8 +1317,10 @@ pub const HDR_TONING: &Layout = &Layout {
     ],
 };
 
+/// Replace Color: Fuzziness, then the selection preview (drawn by the
+/// dialog itself in `REPLACE_PREVIEW`), then the replacement.
 pub const REPLACE_COLOR: &Layout = &Layout {
-    size: (324.0, 237.0),
+    size: (324.0, 410.0),
     button_width: 59.5,
     preview_y: 118.5,
     pane: false,
@@ -1288,32 +1337,37 @@ pub const REPLACE_COLOR: &Layout = &Layout {
         number(
             "Hue:",
             135.0,
-            [140.0, 87.0, 200.5, 106.0],
+            [140.0, 260.0, 200.5, 279.0],
             "",
             205.5,
-            Some((21.0, 206.0, 113.0)),
+            Some((21.0, 206.0, 286.0)),
             Scale::Linear,
         ),
         number(
             "Saturation:",
             135.0,
-            [140.0, 136.0, 200.5, 155.0],
+            [140.0, 309.0, 200.5, 328.0],
             "",
             205.5,
-            Some((21.0, 206.0, 162.0)),
+            Some((21.0, 206.0, 335.0)),
             Scale::Linear,
         ),
         number(
             "Lightness:",
             135.0,
-            [140.0, 185.0, 200.5, 204.0],
+            [140.0, 358.0, 200.5, 377.0],
             "",
             205.5,
-            Some((21.0, 206.0, 211.0)),
+            Some((21.0, 206.0, 384.0)),
             Scale::Linear,
         ),
     ],
 };
+
+/// Replace Color's preview box, and the centers of its Selection and
+/// Image radio buttons below it.
+pub const REPLACE_PREVIEW: [f32; 4] = [21.0, 82.0, 206.0, 222.0];
+pub const REPLACE_RADIOS: [(f32, f32); 2] = [(27.0, 238.0), (117.0, 238.0)];
 
 pub const MATCH_COLOR: &Layout = &Layout {
     size: (324.0, 248.0),

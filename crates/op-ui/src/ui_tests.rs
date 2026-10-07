@@ -7061,6 +7061,49 @@ fn screenshot_pixelate_and_diffuse_dialogs() {
 }
 
 #[test]
+fn shadows_highlights_more_options_and_replace_color_preview() {
+    use crate::commands::Command;
+    use crate::theme::pt;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // Shadows/Highlights opens short; Show More Options shows every setting
+    run_command(&mut h, Command::ShadowsHighlights);
+    h.run_steps(2);
+    let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
+    assert!((rect.height() - pt(170.0)).abs() < 1.0, "{rect:?}");
+    click(&mut h, rect.min + egui::vec2(pt(27.0), pt(146.0)));
+    h.run_steps(2);
+    let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
+    assert!((rect.height() - pt(560.0)).abs() < 1.0, "{rect:?}");
+    shot(&mut h, "shadows_highlights_more");
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    // Replace Color previews its selection, white on the sampled color
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    run_command(&mut h, Command::ReplaceColor);
+    h.run_steps(2);
+    let dialog = h.state().state.adjust_dialog.as_ref().unwrap();
+    let (w, _, px) = dialog.extra.thumb.as_ref().expect("a thumbnail");
+    assert!(*w > 0 && !px.is_empty());
+    assert!(dialog.extra.preview_texture.is_some());
+    assert!(!dialog.extra.show_image);
+    let rect = dialog.rect;
+    shot(&mut h, "replace_color_preview");
+    click(&mut h, rect.min + egui::vec2(pt(117.0), pt(238.0)));
+    assert!(
+        h.state()
+            .state
+            .adjust_dialog
+            .as_ref()
+            .unwrap()
+            .extra
+            .show_image
+    );
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+}
+
+#[test]
 fn more_filters_and_adjustments_apply() {
     use crate::commands::Command;
     let mut h = harness(Vec::new());

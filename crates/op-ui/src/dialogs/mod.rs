@@ -45,7 +45,10 @@ mod trim;
 mod uxp;
 mod vibrance;
 
-pub use adjust::{AdjustDialog, Effect, Kind as AdjustKind, Outcome as AdjustOutcome, Remembered};
+pub use adjust::{
+    AdjustDialog, Effect, Kind as AdjustKind, Outcome as AdjustOutcome, Remembered,
+    thumbnail as adjust_thumbnail,
+};
 pub use canvas_size::{CanvasSizeDialog, Outcome};
 pub use color_picker::{ColorPicker, Outcome as ColorPickerOutcome};
 pub use duplicate_layer::{Destination, DuplicateLayerDialog, Outcome as DuplicateOutcome};
