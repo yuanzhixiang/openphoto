@@ -28,6 +28,8 @@ Implemented items emit a `Command`; items not yet implemented are shown grayed o
 
 Both use `popup`: a native context menu of check items at the pointer. `NativeMenu::popup_ruler_units` shows a ruler's right-click menu (the seven units of `rulers.md`, the current one checked; `Command::RulerUnits`). `NativeMenu::popup_status` shows the status bar's menu (`status_info.md`) as a native context menu in the window's view (`set_view`, the NSView from the window handle, given by `lib.rs` at startup): Photoshop's 15 items as check items with the current one checked, at the pointer. Its items carry `Command::StatusInfo` ids, so a pick arrives through the same event channel as the menu bar's.
 
+`NativeMenu::popup_menu(request, scale)` opens a dialog dropdown's menu laid out like a macOS pop-up button's (the checked entry over the button, the button's width at least, the system's light or dark look); see `native_popup.md`.
+
 ## Dynamic content
 
 `update()` is called every frame to synchronize menu state, calling the native interface only when a value actually changes:
@@ -43,7 +45,7 @@ Both use `popup`: a native context menu of check items at the pointer. `NativeMe
 
 ## Event delivery
 
-Menu events happen outside the egui frame. The event handler puts the command into a channel and calls `request_repaint`; on the next frame `poll()` takes it out and executes it.
+Menu events happen outside the egui frame. The event handler puts the command into a channel and calls `request_repaint`; on the next frame `poll()` takes it out and executes it. Events whose id is `popup:<index>` come from a dialog dropdown's menu (`popup_menu`, see `native_popup.md`) and go through a separate channel that `popup_menu` reads when the menu closes.
 
 ## Known limitations
 

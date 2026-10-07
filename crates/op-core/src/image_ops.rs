@@ -511,7 +511,25 @@ fn resample_buffer(
 /// scaled to `width` × `height`. Colors are resampled premultiplied by
 /// alpha; results are clamped (bicubic can overshoot).
 pub fn resize(doc: &mut Document, width: u32, height: u32, method: Resample) {
+    resize_reducing_noise(doc, width, height, method, 0.0);
+}
+
+/// [`resize`] with Preserve Details' Reduce Noise (`amount` 0–1): after
+/// resampling, each color is pulled toward the mean of its 3 × 3
+/// neighbours that are close to it (edges are kept), by `amount`. Other
+/// methods ignore it.
+pub fn resize_reducing_noise(
+    doc: &mut Document,
+    width: u32,
+    height: u32,
+    method: Resample,
+    amount: f32,
+) {
     assert!(width > 0 && height > 0);
+    let amount = match method {
+        Resample::PreserveDetails | Resample::PreserveDetails2 => amount.clamp(0.0, 1.0),
+        _ => 0.0,
+    };
     let (sw, sh) = (doc.width as usize, doc.height as usize);
     let (kx, ky) = (width as f32 / sw as f32, height as f32 / sh as f32);
     doc.map_guides(|g| Guide {
@@ -524,7 +542,7 @@ pub fn resize(doc: &mut Document, width: u32, height: u32, method: Resample) {
         height,
         |image| {
             if image.has_pixels_outside() {
-                return resize_with_outside(image, kx, ky, width, height, method);
+                return resize_with_outside(image, (kx, ky), width, height, method, amount);
             }
             let raw = image.to_rgba8();
             let src: Vec<f32> = raw
@@ -536,7 +554,8 @@ pub fn resize(doc: &mut Document, width: u32, height: u32, method: Resample) {
                     [r as f32 * k, g as f32 * k, b as f32 * k, a as f32]
                 })
                 .collect();
-            let out = resample_buffer(&src, sw, sh, dw, dh, 4, method);
+            let mut out = resample_buffer(&src, sw, sh, dw, dh, 4, method);
+            reduce_noise(&mut out, dw, dh, amount);
             let pixels: Vec<u8> = out
                 .as_chunks::<4>()
                 .0
@@ -576,11 +595,11 @@ pub fn resize(doc: &mut Document, width: u32, height: u32, method: Resample) {
 /// place relative to the image (as in Photoshop).
 fn resize_with_outside(
     image: &crate::tile::TiledImage,
-    kx: f32,
-    ky: f32,
+    (kx, ky): (f32, f32),
     width: u32,
     height: u32,
     method: Resample,
+    amount: f32,
 ) -> crate::tile::TiledImage {
     let (cw, ch) = (image.width() as i64, image.height() as i64);
     let (x0, y0, x1, y1) = image.content_bounds().map_or((0, 0, cw, ch), |b| {
@@ -599,7 +618,8 @@ fn resize_with_outside(
         .collect();
     let dw = ((rw as f32 * kx).round() as usize).max(1);
     let dh = ((rh as f32 * ky).round() as usize).max(1);
-    let out = resample_buffer(&src, rw, rh, dw, dh, 4, method);
+    let mut out = resample_buffer(&src, rw, rh, dw, dh, 4, method);
+    reduce_noise(&mut out, dw, dh, amount);
     let pixels: Vec<u8> = out
         .as_chunks::<4>()
         .0
@@ -623,6 +643,40 @@ fn resize_with_outside(
         (y0 as f32 * ky).round() as i64,
     );
     crate::tile::TiledImage::from_region(width, height, dx0, dy0, dw as u32, dh as u32, &pixels)
+}
+
+/// Pulls each premultiplied RGBA pixel of `buf` (w × h) toward the mean of
+/// the 3 × 3 neighbours whose color is within 24 levels of it, by `amount`
+/// (Reduce Noise: smooths speckle, keeps edges).
+fn reduce_noise(buf: &mut [f32], w: usize, h: usize, amount: f32) {
+    if amount <= 0.0 {
+        return;
+    }
+    const CLOSE: f32 = 24.0;
+    let src = buf.to_vec();
+    let at = |x: usize, y: usize| &src[(y * w + x) * 4..(y * w + x) * 4 + 4];
+    for y in 0..h {
+        for x in 0..w {
+            let p = at(x, y);
+            let mut sum = [0.0f32; 4];
+            let mut n = 0.0;
+            for ny in y.saturating_sub(1)..(y + 2).min(h) {
+                for nx in x.saturating_sub(1)..(x + 2).min(w) {
+                    let q = at(nx, ny);
+                    if (0..4).all(|c| (q[c] - p[c]).abs() <= CLOSE) {
+                        for c in 0..4 {
+                            sum[c] += q[c];
+                        }
+                        n += 1.0;
+                    }
+                }
+            }
+            let out = &mut buf[(y * w + x) * 4..(y * w + x) * 4 + 4];
+            for c in 0..4 {
+                out[c] = p[c] + (sum[c] / n - p[c]) * amount;
+            }
+        }
+    }
 }
 
 /// What Image > Trim removes ("Based On").
@@ -976,6 +1030,51 @@ mod tests {
         resize(&mut e, 6, 4, Resample::Bilinear);
         let edge = pixel(&e, 1, 0);
         assert!(edge[1] > 0 && edge[1] < 255, "{edge:?}");
+    }
+
+    #[test]
+    fn reduce_noise_smooths_speckle_and_keeps_edges() {
+        // Gray speckle (±10) on the left, black on the right
+        let make = || {
+            let mut d = Document::new_with_background("t", 16, 8, Color::WHITE);
+            let id = d.active_layer.unwrap();
+            let image = d.layer_mut(id).unwrap().image_mut().unwrap();
+            for y in 0..8 {
+                for x in 0..16 {
+                    let v = if x >= 8 {
+                        0
+                    } else if (x + y) % 2 == 0 {
+                        138
+                    } else {
+                        118
+                    };
+                    image.set_pixel(x, y, [v, v, v, 255]);
+                }
+            }
+            d
+        };
+        let spread = |d: &Document| {
+            let row: Vec<i32> = (2..12).map(|x| pixel(d, x, 8)[0] as i32).collect();
+            row.iter().max().unwrap() - row.iter().min().unwrap()
+        };
+        let mut plain = make();
+        resize(&mut plain, 32, 16, Resample::PreserveDetails);
+        let mut quiet = make();
+        resize_reducing_noise(&mut quiet, 32, 16, Resample::PreserveDetails, 1.0);
+        assert!(
+            spread(&quiet) < spread(&plain) / 2,
+            "{} {}",
+            spread(&quiet),
+            spread(&plain)
+        );
+        // The edge stays hard
+        assert!(pixel(&quiet, 18, 8)[0] < 5);
+        // Other methods ignore it
+        let mut a = make();
+        let mut b = make();
+        resize(&mut a, 32, 16, Resample::Bicubic);
+        resize_reducing_noise(&mut b, 32, 16, Resample::Bicubic, 1.0);
+        assert_eq!(pixel(&a, 4, 4), pixel(&b, 4, 4));
     }
 
     #[test]

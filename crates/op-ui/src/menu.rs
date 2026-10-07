@@ -287,8 +287,20 @@ pub const TRANSFORM_MODES: [Command; 5] = {
     ]
 };
 
+/// Where a dropdown's menu opens against its button (view points), as
+/// macOS places a pop-up button's.
+const POPUP_LEFT: f64 = -13.5;
+const POPUP_TOP: f64 = -4.5;
+const POPUP_WIDER: f64 = 0.0;
+
 fn id(command: Command) -> String {
     format!("{command:?}")
+}
+
+/// "⌥1" as a menu key equivalent.
+fn popup_accelerator(key: &str) -> Option<Accelerator> {
+    let digit = key.strip_prefix('\u{2325}')?;
+    accelerator(&format!("Alt+{digit}"))
 }
 
 fn accelerator(text: &str) -> Option<Accelerator> {
@@ -311,7 +323,12 @@ pub struct NativeMenu {
     /// shows).
     open_recent: Submenu,
     recent_shown: u64,
+    /// Picks from dialog dropdown menus (`native_popup`), by entry index.
+    popup_events: Receiver<usize>,
 }
+
+/// Menu ids of dialog dropdown entries.
+const POPUP_PREFIX: &str = "popup:";
 
 impl NativeMenu {
     pub fn install(ctx: &egui::Context) -> Self {
@@ -1156,8 +1173,19 @@ impl NativeMenu {
         // Menu events arrive on the main thread outside egui's frame; queue
         // them and wake egui up.
         let (tx, events) = channel();
+        let (popup_tx, popup_events) = channel();
         let ctx = ctx.clone();
         MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
+            if let Some(index) = event
+                .id
+                .as_ref()
+                .strip_prefix(POPUP_PREFIX)
+                .and_then(|n| n.parse::<usize>().ok())
+            {
+                let _ = popup_tx.send(index);
+                ctx.request_repaint();
+                return;
+            }
             if let Some(&command) = ALL_COMMANDS.iter().find(|c| event.id == id(**c).as_str()) {
                 // Lock Layers... shows Cmd+/, but in Photoshop the key toggles
                 // Lock all; only the menu opens the dialog
@@ -1183,6 +1211,7 @@ impl NativeMenu {
             view: None,
             open_recent,
             recent_shown: 0,
+            popup_events,
         }
     }
 
@@ -1259,6 +1288,64 @@ impl NativeMenu {
         unsafe {
             menu.show_context_menu_for_nsview(view as *const std::ffi::c_void, None);
         }
+    }
+
+    /// A dialog dropdown's menu as macOS shows a pop-up button's: the
+    /// checked entry over the button's value, at least as wide as the
+    /// button. Returns the picked entry's index once the menu closes.
+    /// `scale` turns egui points into the view's points.
+    pub fn popup_menu(&self, request: &crate::native_popup::Request, scale: f32) -> Option<usize> {
+        use crate::native_popup::Entry;
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+        use objc2_foundation::{NSPoint, NSRect};
+        let view = self.view? as *mut AnyObject;
+        while self.popup_events.try_recv().is_ok() {}
+        let menu = Menu::new();
+        for (i, entry) in request.entries.iter().enumerate() {
+            let _ = match entry {
+                Entry::Item {
+                    label,
+                    checked,
+                    enabled,
+                    shortcut,
+                } => menu.append(&CheckMenuItem::with_id(
+                    format!("{POPUP_PREFIX}{i}"),
+                    label,
+                    *enabled,
+                    *checked,
+                    shortcut.as_deref().and_then(popup_accelerator),
+                )),
+                Entry::Separator => menu.append(&PredefinedMenuItem::separator()),
+            };
+        }
+        let b = request.button;
+        // SAFETY: the window's live content view and the menu's NSMenu, on
+        // the main thread
+        unsafe {
+            let ns_menu = menu.ns_menu() as *mut AnyObject;
+            let item: *mut AnyObject =
+                msg_send![ns_menu, itemAtIndex: request.positioning() as isize];
+            let _: () =
+                msg_send![ns_menu, setMinimumWidth: (b.width() * scale) as f64 + POPUP_WIDER];
+            // The system's look (light or dark), as Photoshop's menus, not
+            // the window's dark one
+            let app: *mut AnyObject = msg_send![objc2::class!(NSApplication), sharedApplication];
+            let appearance: *mut AnyObject = msg_send![app, effectiveAppearance];
+            let _: () = msg_send![ns_menu, setAppearance: appearance];
+            let frame: NSRect = msg_send![view, frame];
+            let flipped: bool = msg_send![view, isFlipped];
+            let x = (b.left() * scale) as f64 + POPUP_LEFT;
+            let y = (b.top() * scale) as f64 + POPUP_TOP;
+            let y = if flipped { y } else { frame.size.height - y };
+            let _: bool = msg_send![
+                ns_menu,
+                popUpMenuPositioningItem: item,
+                atLocation: NSPoint::new(x, y),
+                inView: view
+            ];
+        }
+        self.popup_events.try_recv().ok()
     }
 
     /// Commands chosen from the menu (or via their shortcuts) since the last call.

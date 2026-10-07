@@ -1497,7 +1497,8 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                     height: d.height,
                 };
                 let dialog = crate::dialogs::ImageSizeDialog::new(d.width, d.height, d.resolution)
-                    .with_preview(preview);
+                    .with_preview(preview)
+                    .with_extra(app.image_size_extra);
                 app.image_size_dialog = Some(dialog);
             }
         }

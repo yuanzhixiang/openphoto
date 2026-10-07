@@ -405,6 +405,61 @@ pub fn field_dropdown(
     }
 }
 
+/// [`field_dropdown`] opening `entries` as a native menu (`native_popup`);
+/// returns the index of the entry picked.
+pub fn field_popup(
+    ui: &mut Ui,
+    rect: Rect,
+    id: &str,
+    text: &str,
+    enabled: bool,
+    entries: &[crate::native_popup::Entry],
+) -> Option<usize> {
+    let sense = if enabled {
+        Sense::click()
+    } else {
+        Sense::hover()
+    };
+    let response = ui.interact(rect, ui.id().with(id), sense);
+    let (fill, border, tint) = if enabled {
+        (color::FIELD, Color32::from_gray(0x66), FIELD_VALUE)
+    } else {
+        (
+            Color32::from_gray(0x4e),
+            Color32::from_gray(0x5e),
+            FIELD_OFF,
+        )
+    };
+    ui.painter().rect(
+        rect,
+        CornerRadius::same(pt(2.0) as u8),
+        fill,
+        Stroke::new(pt(1.0), border),
+        StrokeKind::Inside,
+    );
+    // Too long a value is cut short with "..." before the chevron
+    let room = rect.width() - pt(8.5) - pt(18.5);
+    let shown = elide(ui, text, room);
+    ui.painter().text(
+        rect.left_center() + vec2(pt(8.5), 0.0),
+        Align2::LEFT_CENTER,
+        shown,
+        theme::dialog(pt(12.0)),
+        tint,
+    );
+    crate::ps_icons::paint(
+        ui.painter(),
+        Pos2::new(rect.right() - pt(7.5), rect.center().y + pt(0.25)),
+        crate::ps_icons::Icon::Caret,
+        tint,
+        fill,
+    );
+    if !enabled {
+        return None;
+    }
+    crate::native_popup::dropdown(ui, &response, ui.id().with((id, "menu")), entries)
+}
+
 /// `text`, or as much of it as fits in `width` followed by "...".
 pub fn elide(ui: &Ui, text: &str, width: f32) -> String {
     let fits = |t: &str| {

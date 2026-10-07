@@ -1337,6 +1337,8 @@ pub struct AppState {
     pub rotate_dialog: Option<crate::dialogs::RotateCanvasDialog>,
     /// Image > Image Size, while open.
     pub image_size_dialog: Option<crate::dialogs::ImageSizeDialog>,
+    /// How far the Image Size window was last enlarged (Photoshop points).
+    pub image_size_extra: egui::Vec2,
     /// Image > Trim, while open.
     pub trim_dialog: Option<crate::dialogs::TrimDialog>,
     /// Equalize's question when there is a selection.
@@ -1420,6 +1422,7 @@ impl Default for AppState {
             trim_dialog: None,
             equalize_dialog: None,
             image_size_dialog: None,
+            image_size_extra: egui::Vec2::ZERO,
             new_guide_dialog: None,
             new_layer_dialog: None,
             ruler_units: Default::default(),

@@ -8,6 +8,8 @@ Sets the image's pixel dimensions (resampling) and resolution; on OK, `lib.rs` c
 
 - `ImageSizeDialog::new(width, height, resolution)`: the current document's width, height, and resolution. Every opening restores the defaults: width/height unit Inches, resolution unit Pixels/Inch, Dimensions unit Pixels, width and height linked, Resample on, method Automatic, Fit To Original Size, Scale Styles checked (matching Photoshop 2026's defaults).
 - `with_preview(Preview { rgba, width, height })`: the document's composite pixels, for the preview on the left; passed in when the command opens the dialog.
+- `with_extra(size)`: how far the window was enlarged the last time (`AppState::image_size_extra`, which `lib.rs` updates from `extra` every frame), so it reopens at that size.
+- The presets folder (`size_presets::folder()`, or `set_preset_folder` in tests) is read on opening for Fit To's saved presets.
 
 ## Layout (measured in Photoshop 2026, 665 × 358 pt, relative to the top-left corner)
 
@@ -18,13 +20,31 @@ Compared item by item against screenshots; text positions and widths differ from
 - Right column text is the AppKit system font 12 pt (`theme::dialog`); labels and descriptive text are `#d6d6d6`, right-aligned to x 423.5:
   - "Image Size:" center y 50.25, value at x 431.5: the RGB memory size of the result (M with two decimals when ≥ 1 MB, otherwise K with one decimal), with "(was 1.70M)" appended when it differs from the original. To the right, (633.5, 41.5)–(654.5, 58.5) is the gear button, whose menu has only the checkable "Scale Styles" (there are no layer styles yet; only the state is saved).
   - "Dimensions:" center y 79.75; (432, 70.5)–(450, 88) is a small box with a V-shaped arrow, clicked to choose the unit (Percent, Pixels, Inches, Centimeters, Millimeters, Points, Picas); from x 459 is "734 px × 811 px", where "×" is 14 pt and its ink is 8.5 pt from the text on either side.
-  - "Fit To:" dropdown (428, 97)–(655, 118): Original Size, Auto Resolution... (grayed out, see Known Limitations), three groups of presets (four screen sizes such as 960 x 640 px 144 ppi; A4, A6, Legal, Letter; 4 x 6, 5 x 7, 8 x 10, 11 x 14 in 300 dpi), Load/Save/Delete Preset... (grayed out), Custom (grayed out, shown only after values are changed).
+  - "Fit To:" dropdown (428, 97)–(655, 118): Original Size, Auto Resolution..., three groups of presets (four screen sizes such as 960 x 640 px 144 ppi; A4, A6, Legal, Letter; 4 x 6, 5 x 7, 8 x 10, 11 x 14 in 300 dpi), a group of the saved presets (only when there are any, oldest first, named after their files), Load Preset..., Save Preset..., Delete Preset... (grayed out without saved presets), and Custom. The current choice is checked.
   - "Width:"/"Height:" center y 136.5 / 165.5: fields (427.5, 127)–(503, 146) and (427.5, 156)–(503, 175), unit dropdowns (511, 126)–(655, 147) and (511, 155)–(655, 176) (Percent, Pixels, Inches, Centimeters, Millimeters, Points, Picas, Columns; width and height share one unit). On open, Width receives focus with all text selected.
   - Chain: button (349, 142)–(365, 160), `#383838` fill, `#636363` border; inside are two interlocking rings and a vertical bar (traced from a 2x screenshot; no vertical bar when unlinked); above and below, a `#828282` bracket line connects to the Width and Height labels.
   - "Resolution:" center y 194.75: field (427.5, 185)–(503, 204), unit dropdown (511, 184)–(655, 205) (Pixels/Inch, Pixels/Centimeter).
   - "Resample:" checkbox at (334.5, 217.5), method dropdown (428, 213)–(655, 234): Automatic | Preserve Details (enlargement), Preserve Details 2.0, Bicubic Smoother (enlargement) | Bicubic Sharper (reduction) | Bicubic (smooth gradients), Nearest Neighbor (hard edges), Bilinear, with ⌥1 … ⌥8 shown on the right of the menu.
+- Reduce Noise (only while Resample is on with Preserve Details or Preserve Details 2.0, as in Photoshop): "Reduce Noise:" right-aligned to x 423.5 at center y 251.5; a 3 pt `#757575` track from x 431.5 to 569.5 (y 248.5–251.5) with a white pin (`appkit::pin`) whose tip at y 245.5 runs from x 431.5 (0%) to 564 (100%); clicking or dragging on it sets whole percentages; the field (580.5, 241.5)–(641, 260.5) and "%" at x 643.5.
 - The description "Create a new, larger document with more detail" is at (328.5, 276.5), followed by the underlined blue `#5e9eee` link "Open in Generative Upscale...".
 - Buttons: Cancel (329, 311.5)–(486.5, 337.5); OK (496.5, 311.5)–(654, 337.5) is the default button.
+
+## Menus
+
+Every dropdown (Fit To, the Dimensions box, the Width/Height and Resolution units, the resampling method and the gear) opens a native macOS menu like Photoshop's (`native_popup.md`): light or dark as the system is, the current item checked and placed over the button. The method menu shows ⌥1 … ⌥8 at the right as key equivalents.
+
+## Resizing
+
+Like Photoshop's window, it can be enlarged by dragging its right edge, bottom edge or bottom-right corner (4 pt grips; resize cursors), never below 665 × 358. Its top-left corner stays put while dragging; the preview grows with the window, the right column (labels, fields, menus, the chain, Reduce Noise, the description and link) keeps its distance from the right edge, and Cancel/OK keep theirs from the bottom-right corner. The size is kept for the next opening (which centers the window again).
+
+## Auto Resolution and presets
+
+- Fit To › Auto Resolution... opens its sheet (`auto_resolution.md`); its OK sets the resolution keeping the printed size (`Model::auto_resolution`: with Resample on the pixels follow, so 64 × 72 px at 72 ppi set to 200 ppi gives 178 × 200 px) and Fit To shows "Auto Resolution...".
+- Save Preset... opens the macOS save panel ("Save settings in:", "Untitled.imz", in the presets folder); the settings are written as an `.imz` file (`size_presets.md`) and, saved in that folder, become the checked Fit To entry.
+- A saved preset from the menu (`Model::apply_preset`) sets its unit, resolution unit, resolution, chain and Resample; with Resample on its size is applied in that unit (pixels, percent of the image, or a printed size at its resolution), fitted proportionally inside it when the chain is on, exactly when off.
+- Load Preset... opens the macOS open panel for `.imz` files and applies the chosen file the same way; Fit To shows its name when it is one of the listed presets, otherwise Custom.
+- Delete Preset... opens the Delete Preset sheet (`size_presets.md`); after the confirming alert the file is removed, the list is reread, and Fit To shows Custom if that preset was chosen.
+- Custom in the menu only marks Fit To as Custom.
 
 ## Interaction (`Model`, matching Photoshop)
 
@@ -34,13 +54,15 @@ Compared item by item against screenshots; text positions and widths differ from
 - Fit To presets: fit the image proportionally into the preset's box (the box is turned to the image's orientation, so a portrait image uses a portrait box), set the preset's resolution and unit, and turn on Resample and the chain; Original Size restores the original pixels and resolution. After any further value change, Fit To shows Custom.
 - ⌥1 … ⌥8: choose the corresponding resampling method.
 - Valid range: width and height 1–30000 pixels, resolution 1–10000; OK is grayed out when invalid.
-- OK or Enter: returns `Outcome::Apply { width, height, resolution, resample }` (pixels rounded; `resample` is `None` when Resample is off); Cancel or Esc: `Outcome::Cancel`. Modal while open.
+- OK or Enter: returns `Outcome::Apply { width, height, resolution, resample, reduce_noise }` (pixels rounded; `resample` is `None` when Resample is off; `reduce_noise` 0–1, applied by `image_ops::resize_reducing_noise`); Cancel or Esc: `Outcome::Cancel`. While a sheet (Auto Resolution, Delete Preset) is open it takes Enter and Escape and the dialog behind it does not react. Modal while open.
 
 ## Known Limitations
 
-- The dropdown menus are egui popup menus, whereas Photoshop uses native macOS menus here (light and translucent, checkmark on the left), so the appearance differs.
-- Auto Resolution... and Load/Save Preset... are not implemented yet (grayed out); Generative Upscale depends on Adobe cloud services, and the link does nothing.
-- A focused field has a 2 pt blue outer ring, whereas Photoshop has a 1 pt blue border; the dialog cannot be resized by dragging.
+- Generative Upscale depends on Adobe cloud services, and the link does nothing.
+- A focused field has a 2 pt blue outer ring, whereas Photoshop has a 1 pt blue border.
+- Scale Styles only keeps its check state: there are no layer styles (P2).
+- macOS gives Photoshop's Fit To menu 18 pt rows; ours has the system's 24 pt rows (the other menus match).
+- The `.imz` unit numbers for millimeters, points, picas and columns follow Photoshop's unit order (0 pixels, 1 inches, 2 centimeters and 6 percent were read from files Photoshop saved); the reserved field at 0x10 is always written as 0.
 
 ## Test Coverage
 
@@ -50,4 +72,8 @@ Compared item by item against screenshots; text positions and widths differ from
 - `fit_to_presets`: the 1024 × 768 preset turns into a 768 × 1024 box for a portrait image, giving 768 × 849; 4 × 6 in 300 dpi gives 1200 × 1326; after a change it is Custom, and Original Size restores it.
 - `ui_tests::image_size_resamples_proportionally`: entering 5.097 inches and confirming makes the document 367 × 405 and records "Image Size".
 - `ui_tests::image_size_dialog_controls`: ⌥5 chooses Bicubic Sharper; clicking the chain unlinks it; turning off Resample restores the pixels and the chain, and ⌥ number keys have no effect; Cancel closes.
+- `ui_tests::image_size_auto_resolution`: Fit To › Auto Resolution... opens the sheet; Best and OK give 2712 × 2996 at 266 ppi with Fit To "Auto Resolution..."; reopened, the sheet keeps Best; Escape closes only the sheet.
+- `ui_tests::image_size_presets`: saving A4 as "a4 test" picks it in Fit To; Original Size, then the saved preset from the menu, gives A4's result again; Delete Preset... → Delete → Enter (Yes) removes the file and Fit To shows Custom.
+- `ui_tests::image_size_reduce_noise`: ⌥2 shows Reduce Noise; a click halfway along the track sets 50%; OK at twice the size enlarges the document.
+- `ui_tests::image_size_window_resizes`: dragging the corner by 150 × 100 enlarges the window and moves Cancel with it; reopening keeps the size; it can't be dragged smaller than at first.
 - `ui_tests::screenshot_image_size_dialog` (ignored, run manually): for comparison with Photoshop screenshots.

@@ -13,8 +13,11 @@ use egui::{
 };
 use op_core::image_ops::Resample;
 
+use super::auto_resolution::{AutoResolutionDialog, Outcome as AutoOutcome};
 use super::canvas_size::MAX_DIMENSION;
 use super::common;
+use super::size_presets::{self, DeleteOutcome, DeletePresetDialog, SizePreset};
+use crate::native_popup::{self, Entry};
 use crate::theme::{self, pt};
 
 const SIZE: egui::Vec2 = vec2(pt(665.0), pt(358.0));
@@ -117,8 +120,13 @@ impl ResolutionUnit {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum FitTo {
     Original,
+    /// The resolution from the Auto Resolution sheet.
+    AutoResolution,
     /// Width × height, a unit and the resolution (ppi).
     Preset(&'static str, f64, f64, SizeUnit, f64),
+    /// One of the presets saved with Save Preset..., by its place in the
+    /// menu.
+    User(usize),
     Custom,
 }
 
@@ -195,8 +203,9 @@ impl FitTo {
     pub fn label(self) -> &'static str {
         match self {
             Self::Original => "Original Size",
+            Self::AutoResolution => "Auto Resolution...",
             Self::Preset(name, ..) => name,
-            Self::Custom => "Custom",
+            Self::User(_) | Self::Custom => "Custom",
         }
     }
 }
@@ -226,6 +235,8 @@ pub struct Model {
     pub method: Resample,
     pub fit: FitTo,
     pub scale_styles: bool,
+    /// Preserve Details' Reduce Noise, 0–100 %.
+    pub reduce_noise: f64,
 }
 
 /// Column width and gutter in points (Photoshop's defaults).
@@ -248,6 +259,7 @@ impl Model {
             method: Resample::Automatic,
             fit: FitTo::Original,
             scale_styles: true,
+            reduce_noise: 0.0,
         }
     }
 
@@ -390,13 +402,85 @@ impl Model {
                     self.to_pixels(bw, self.original.0, ppi),
                     self.to_pixels(bh, self.original.1, ppi),
                 );
-                let k = (bw / w0).min(bh / h0);
-                self.width = w0 * k;
-                self.height = h0 * k;
+                self.fit_box(bw, bh);
             }
-            FitTo::Custom => {}
+            FitTo::AutoResolution | FitTo::User(_) | FitTo::Custom => {}
         }
         self.fit = fit;
+    }
+
+    /// Fits the image in a `bw` × `bh` pixel box, keeping its proportions.
+    fn fit_box(&mut self, bw: f64, bh: f64) {
+        let (w0, h0) = (self.original.0 as f64, self.original.1 as f64);
+        let k = (bw / w0).min(bh / h0);
+        self.width = w0 * k;
+        self.height = h0 * k;
+    }
+
+    /// The settings as a preset named `name` (Save Preset...).
+    pub fn to_preset(&self, name: &str) -> SizePreset {
+        let (width, height) = match self.unit {
+            SizeUnit::Pixels => (self.width.round(), self.height.round()),
+            SizeUnit::Percent => (
+                self.in_unit(self.width, self.original.0, SizeUnit::Percent),
+                self.in_unit(self.height, self.original.1, SizeUnit::Percent),
+            ),
+            _ => (self.width / self.resolution, self.height / self.resolution),
+        };
+        SizePreset {
+            name: name.to_owned(),
+            unit: self.unit,
+            pixels: (self.width.round() as u32, self.height.round() as u32),
+            width,
+            height,
+            resolution: self.resolution,
+            resolution_unit: self.resolution_unit,
+            constrain: self.constrain,
+            resample: self.resample,
+        }
+    }
+
+    /// Applies a saved preset: its units, chain, Resample and resolution;
+    /// with Resample on, its size (with the chain on the image is fitted in
+    /// that size, keeping its proportions, as the built-in presets do).
+    pub fn apply_preset(&mut self, p: &SizePreset, fit: FitTo) {
+        self.unit = p.unit;
+        self.resolution_unit = p.resolution_unit;
+        self.resample = p.resample;
+        self.resolution = p.resolution;
+        if p.resample {
+            self.constrain = p.constrain;
+            let (w0, h0) = (self.original.0 as f64, self.original.1 as f64);
+            let (w, h) = match p.unit {
+                SizeUnit::Pixels => (p.width, p.height),
+                SizeUnit::Percent => (w0 * p.width / 100.0, h0 * p.height / 100.0),
+                _ => (p.width * p.resolution, p.height * p.resolution),
+            };
+            if p.constrain {
+                self.fit_box(w, h);
+            } else {
+                self.width = w;
+                self.height = h;
+            }
+        } else {
+            self.constrain = true;
+            self.width = self.original.0 as f64;
+            self.height = self.original.1 as f64;
+        }
+        self.fit = fit;
+    }
+
+    /// Auto Resolution's OK: the new resolution keeps the printed size, so
+    /// with Resample on the pixels follow (64 × 72 px at 72 ppi set to 200
+    /// ppi is 178 × 200 px, as in Photoshop).
+    pub fn auto_resolution(&mut self, ppi: f64) {
+        if self.resample {
+            let k = ppi / self.resolution;
+            self.width *= k;
+            self.height *= k;
+        }
+        self.resolution = ppi;
+        self.fit = FitTo::AutoResolution;
     }
 
     /// The result: whole pixels within Photoshop's limits, and the
@@ -477,6 +561,8 @@ pub enum Outcome {
         resolution: f32,
         /// `None` when Resample is off (only the resolution changes).
         resample: Option<Resample>,
+        /// Preserve Details' Reduce Noise, 0–1.
+        reduce_noise: f32,
     },
 }
 
@@ -492,11 +578,37 @@ pub struct ImageSizeDialog {
     width_text: String,
     height_text: String,
     resolution_text: String,
+    noise_text: String,
     preview: Option<Preview>,
     /// The image point at the preview's center.
     center: (f32, f32),
     texture: Option<(egui::TextureHandle, (i64, i64))>,
     first_frame: bool,
+    /// The Auto Resolution sheet, while it's open.
+    pub auto: Option<AutoResolutionDialog>,
+    corner: Pos2,
+    /// Saved presets (the folder, and its files with their settings).
+    folder: Option<std::path::PathBuf>,
+    pub presets: Vec<(std::path::PathBuf, SizePreset)>,
+    /// The Delete Preset sheet, while it's open.
+    pub delete: Option<DeletePresetDialog>,
+    /// How much larger than its smallest size the window has been dragged
+    /// (Photoshop points); the app keeps it for the next opening.
+    pub extra: egui::Vec2,
+    /// The window's top-left corner: it stays put while resizing.
+    origin: Option<Pos2>,
+}
+
+/// What a Fit To menu entry does.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum FitAction {
+    Fit(FitTo),
+    Auto,
+    Load,
+    Save,
+    Delete,
+    Custom,
+    Nothing,
 }
 
 impl ImageSizeDialog {
@@ -507,18 +619,127 @@ impl ImageSizeDialog {
             width_text: String::new(),
             height_text: String::new(),
             resolution_text: String::new(),
+            noise_text: "0".into(),
             preview: None,
             center: (width as f32 / 2.0, height as f32 / 2.0),
             texture: None,
             first_frame: true,
+            auto: None,
+            corner: Pos2::ZERO,
+            folder: None,
+            presets: Vec::new(),
+            delete: None,
+            extra: egui::Vec2::ZERO,
+            origin: None,
         };
+        dialog.set_preset_folder(size_presets::folder());
         dialog.refresh(None);
         dialog
+    }
+
+    /// Opens at the size it was last left at.
+    pub fn with_extra(mut self, extra: egui::Vec2) -> Self {
+        self.extra = extra.max(egui::Vec2::ZERO);
+        self
     }
 
     pub fn with_preview(mut self, preview: Preview) -> Self {
         self.preview = Some(preview);
         self
+    }
+
+    /// Where presets are saved and listed from (rereads the list).
+    pub fn set_preset_folder(&mut self, folder: Option<std::path::PathBuf>) {
+        self.presets = folder
+            .as_deref()
+            .map(size_presets::list)
+            .unwrap_or_default();
+        self.folder = folder;
+    }
+
+    /// Fit To's text: a saved preset shows its name.
+    pub fn fit_label(&self) -> String {
+        match self.model.fit {
+            FitTo::User(i) => self
+                .presets
+                .get(i)
+                .map_or("Custom".into(), |(_, p)| p.name.clone()),
+            fit => fit.label().into(),
+        }
+    }
+
+    /// Save Preset...'s file: writes the settings there and, when it's in
+    /// the presets folder, picks it in Fit To.
+    pub fn save_preset_to(&mut self, path: &std::path::Path) -> std::io::Result<()> {
+        let path = if path.extension().is_none() {
+            path.with_extension("imz")
+        } else {
+            path.to_path_buf()
+        };
+        let name = path
+            .file_stem()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        size_presets::write(&path, &self.model.to_preset(&name))?;
+        self.set_preset_folder(self.folder.clone());
+        if let Some(i) = self.presets.iter().position(|(p, _)| *p == path) {
+            self.model.fit = FitTo::User(i);
+        }
+        Ok(())
+    }
+
+    /// Load Preset...'s file: applies its settings (Fit To shows Custom
+    /// unless the file is one of the listed presets).
+    pub fn load_preset_from(&mut self, path: &std::path::Path) -> bool {
+        let Some(preset) = size_presets::read(path) else {
+            return false;
+        };
+        let fit = self
+            .presets
+            .iter()
+            .position(|(p, _)| p == path)
+            .map_or(FitTo::Custom, FitTo::User);
+        self.model.apply_preset(&preset, fit);
+        self.refresh(None);
+        true
+    }
+
+    /// Fit To's menu: Original Size and Auto Resolution..., the built-in
+    /// groups, the saved presets, the preset commands and Custom.
+    fn fit_menu(&self) -> Vec<(Entry, FitAction)> {
+        let fit = self.model.fit;
+        let item = |label: &str, f: FitTo| (Entry::item(label, fit == f), FitAction::Fit(f));
+        let mut menu = vec![
+            item(FitTo::Original.label(), FitTo::Original),
+            (
+                Entry::item(FitTo::AutoResolution.label(), fit == FitTo::AutoResolution),
+                FitAction::Auto,
+            ),
+        ];
+        let separator = (Entry::Separator, FitAction::Nothing);
+        for group in FIT_PRESETS {
+            menu.push(separator.clone());
+            menu.extend(group.iter().map(|&p| item(p.label(), p)));
+        }
+        if !self.presets.is_empty() {
+            menu.push(separator.clone());
+            for (i, (_, p)) in self.presets.iter().enumerate() {
+                menu.push(item(&p.name, FitTo::User(i)));
+            }
+        }
+        menu.push(separator.clone());
+        menu.push((Entry::item("Load Preset...", false), FitAction::Load));
+        menu.push((Entry::item("Save Preset...", false), FitAction::Save));
+        menu.push((
+            Entry::item("Delete Preset...", false).enabled(!self.presets.is_empty()),
+            FitAction::Delete,
+        ));
+        menu.push(separator);
+        menu.push((
+            Entry::item("Custom", fit == FitTo::Custom),
+            FitAction::Custom,
+        ));
+        menu
     }
 
     /// Rewrites the fields from the model, except the one being edited.
@@ -537,28 +758,116 @@ impl ImageSizeDialog {
 
     pub fn show(&mut self, ctx: &egui::Context) -> Outcome {
         let mut outcome = Outcome::Open;
+        let size = SIZE + self.extra * pt(1.0);
+        let origin = *self
+            .origin
+            .get_or_insert_with(|| ctx.content_rect().center() - size / 2.0);
         egui::Modal::new(egui::Id::new("image-size"))
+            .area(
+                egui::Modal::default_area(egui::Id::new("image-size-area"))
+                    .anchor(Align2::LEFT_TOP, origin.to_vec2()),
+            )
             .frame(egui::Frame::NONE)
             .backdrop_color(Color32::TRANSPARENT)
             .show(ctx, |ui| {
-                let (rect, _) = ui.allocate_exact_size(SIZE, Sense::hover());
+                let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+                self.corner = rect.min;
                 outcome = self.ui(ui, rect);
+                self.resize_ui(ui, rect);
             });
         self.first_frame = false;
+        // A sheet takes the keys while it's open
+        if let Some(delete) = &mut self.delete {
+            match delete.show(ctx, self.corner) {
+                DeleteOutcome::Open => {}
+                DeleteOutcome::Cancel => self.delete = None,
+                DeleteOutcome::Delete(i) => {
+                    self.delete = None;
+                    if let Some((path, _)) = self.presets.get(i) {
+                        let _ = std::fs::remove_file(path);
+                    }
+                    if self.model.fit == FitTo::User(i) {
+                        self.model.fit = FitTo::Custom;
+                    }
+                    self.set_preset_folder(self.folder.clone());
+                }
+            }
+            return Outcome::Open;
+        }
+        if let Some(auto) = &mut self.auto {
+            match auto.show(ctx, self.corner) {
+                AutoOutcome::Open => {}
+                AutoOutcome::Cancel => self.auto = None,
+                AutoOutcome::Apply(ppi) => {
+                    self.auto = None;
+                    self.model.auto_resolution(ppi);
+                    self.refresh(None);
+                }
+            }
+            return Outcome::Open;
+        }
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
             outcome = Outcome::Cancel;
         }
         outcome
     }
 
+    /// Dragging the window's right or bottom edge or its corner resizes it
+    /// (never below its first size): the preview grows, the controls keep
+    /// to the right and the buttons to the bottom, as in Photoshop.
+    fn resize_ui(&mut self, ui: &mut Ui, frame: Rect) {
+        let grip = pt(4.0);
+        let handles = [
+            (
+                Rect::from_min_max(
+                    Pos2::new(frame.right() - grip, frame.top() + common::TITLE_BAR),
+                    Pos2::new(frame.right() + grip, frame.bottom() - grip),
+                ),
+                vec2(1.0, 0.0),
+                egui::CursorIcon::ResizeHorizontal,
+            ),
+            (
+                Rect::from_min_max(
+                    Pos2::new(frame.left(), frame.bottom() - grip),
+                    Pos2::new(frame.right() - grip, frame.bottom() + grip),
+                ),
+                vec2(0.0, 1.0),
+                egui::CursorIcon::ResizeVertical,
+            ),
+            (
+                Rect::from_center_size(frame.right_bottom(), vec2(grip * 2.0, grip * 2.0)),
+                vec2(1.0, 1.0),
+                egui::CursorIcon::ResizeNwSe,
+            ),
+        ];
+        for (k, (rect, axes, cursor)) in handles.into_iter().enumerate() {
+            let response = ui
+                .interact(rect, ui.id().with(("image-size-resize", k)), Sense::drag())
+                .on_hover_cursor(cursor);
+            if response.dragged() {
+                let delta = response.drag_delta() * axes / pt(1.0);
+                self.extra = (self.extra + delta).max(egui::Vec2::ZERO);
+            }
+        }
+    }
+
     fn ui(&mut self, ui: &mut Ui, frame: Rect) -> Outcome {
-        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
+        let (grow_w, grow_h) = (self.extra.x, self.extra.y);
+        // The controls keep to the right edge
+        let column = frame.translate(vec2(pt(grow_w), 0.0));
+        let at = |x: f32, y: f32| column.min + vec2(pt(x), pt(y));
         let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
         let font = theme::dialog(pt(12.0));
         common::frame(ui, frame, "Image Size", theme::dialog_bold(pt(13.0)));
         let painter = ui.painter().clone();
         traffic_lights(&painter, frame);
-        self.preview_ui(ui, r(10.0, 38.0, 288.0, 316.0));
+        self.preview_ui(
+            ui,
+            Rect::from_min_max(
+                frame.min + vec2(pt(10.0), pt(38.0)),
+                frame.min + vec2(pt(288.0 + grow_w), pt(316.0 + grow_h)),
+            ),
+        );
 
         let label = |text: &str, cy: f32| {
             painter.text(
@@ -582,13 +891,10 @@ impl ImageSizeDialog {
         let gear = r(633.5, 41.5, 654.5, 58.5);
         let response = ui.interact(gear, ui.id().with("gear"), Sense::click());
         gear_icon(&painter, gear.center());
-        let mut scale_styles = self.model.scale_styles;
-        egui::Popup::menu(&response)
-            .id(ui.id().with("gear-menu"))
-            .show(|ui| {
-                ui.checkbox(&mut scale_styles, "Scale Styles");
-            });
-        self.model.scale_styles = scale_styles;
+        let styles = [Entry::item("Scale Styles", self.model.scale_styles)];
+        if native_popup::dropdown(ui, &response, ui.id().with("gear-menu"), &styles).is_some() {
+            self.model.scale_styles = !self.model.scale_styles;
+        }
 
         // Dimensions, with the unit chosen from the box's menu
         label("Dimensions:", 79.75);
@@ -611,15 +917,13 @@ impl ImageSizeDialog {
             ],
             Stroke::new(pt(1.0), Color32::from_gray(0xdd)),
         ));
-        let mut dims_unit = self.model.dimensions_unit;
-        egui::Popup::menu(&response)
-            .id(ui.id().with("dims-menu"))
-            .show(|ui| {
-                for u in &SizeUnit::ALL[..7] {
-                    ui.selectable_value(&mut dims_unit, *u, u.label());
-                }
-            });
-        self.model.dimensions_unit = dims_unit;
+        let units: Vec<Entry> = SizeUnit::ALL[..7]
+            .iter()
+            .map(|&u| Entry::item(u.label(), u == self.model.dimensions_unit))
+            .collect();
+        if let Some(k) = native_popup::dropdown(ui, &response, ui.id().with("dims-menu"), &units) {
+            self.model.dimensions_unit = SizeUnit::ALL[k];
+        }
         let (dw, dh) = self.model.dimensions_text();
         let value = painter.layout_no_wrap(dw, font.clone(), LABEL);
         let x = at(459.0, 0.0).x;
@@ -641,38 +945,57 @@ impl ImageSizeDialog {
 
         // Fit To
         label("Fit To:", 107.5);
-        let mut fit = None;
-        common::field_dropdown(
+        let menu = self.fit_menu();
+        let entries: Vec<Entry> = menu.iter().map(|(e, _)| e.clone()).collect();
+        let picked = common::field_popup(
             ui,
             r(428.0, 97.0, 655.0, 118.0),
             "fit-to",
-            self.model.fit.label(),
+            &self.fit_label(),
             true,
-            |ui| {
-                if ui.button(FitTo::Original.label()).clicked() {
-                    fit = Some(FitTo::Original);
-                }
-                // Its own dialog, not here yet
-                ui.add_enabled(false, egui::Button::new("Auto Resolution..."));
-                for group in FIT_PRESETS {
-                    ui.separator();
-                    for &p in group {
-                        if ui.button(p.label()).clicked() {
-                            fit = Some(p);
-                        }
-                    }
-                }
-                ui.separator();
-                for item in ["Load Preset...", "Save Preset...", "Delete Preset..."] {
-                    ui.add_enabled(false, egui::Button::new(item));
-                }
-                ui.separator();
-                ui.add_enabled(false, egui::Button::new("Custom"));
-            },
+            &entries,
         );
-        if let Some(fit) = fit {
-            self.model.fit_to(fit);
-            self.refresh(None);
+        match picked.map(|k| menu[k].1) {
+            Some(FitAction::Fit(FitTo::User(i))) => {
+                if let Some((_, preset)) = self.presets.get(i).cloned() {
+                    self.model.apply_preset(&preset, FitTo::User(i));
+                    self.refresh(None);
+                }
+            }
+            Some(FitAction::Fit(fit)) => {
+                self.model.fit_to(fit);
+                self.refresh(None);
+            }
+            Some(FitAction::Auto) => self.auto = Some(AutoResolutionDialog::new()),
+            Some(FitAction::Custom) => self.model.fit = FitTo::Custom,
+            Some(FitAction::Delete) => {
+                let names = self.presets.iter().map(|(_, p)| p.name.clone()).collect();
+                self.delete = Some(DeletePresetDialog::new(names));
+            }
+            // macOS's own panels, as Photoshop's
+            Some(FitAction::Save) => {
+                let mut panel = rfd::FileDialog::new()
+                    .set_title("Save settings in:")
+                    .set_file_name("Untitled.imz")
+                    .add_filter("Image Size", &["imz"]);
+                if let Some(dir) = &self.folder {
+                    let _ = std::fs::create_dir_all(dir);
+                    panel = panel.set_directory(dir);
+                }
+                if let Some(path) = panel.save_file() {
+                    let _ = self.save_preset_to(&path);
+                }
+            }
+            Some(FitAction::Load) => {
+                let mut panel = rfd::FileDialog::new().add_filter("Image Size", &["imz"]);
+                if let Some(dir) = &self.folder {
+                    panel = panel.set_directory(dir);
+                }
+                if let Some(path) = panel.pick_file() {
+                    self.load_preset_from(&path);
+                }
+            }
+            Some(FitAction::Nothing) | None => {}
         }
 
         // Width and Height, the chain between them, and their unit
@@ -713,25 +1036,23 @@ impl ImageSizeDialog {
                 }
                 self.refresh(Some(k as u8));
             }
-            let mut unit = self.model.unit;
-            common::field_dropdown(
+            let units: Vec<Entry> = SizeUnit::ALL
+                .iter()
+                .map(|&u| Entry::item(u.label(), u == self.model.unit))
+                .collect();
+            if let Some(i) = common::field_popup(
                 ui,
                 r(511.0, dy, 655.0, dy + 21.0),
                 if k == 0 { "width-unit" } else { "height-unit" },
-                unit.label(),
+                self.model.unit.label(),
                 true,
-                |ui| {
-                    for u in SizeUnit::ALL {
-                        ui.selectable_value(&mut unit, u, u.label());
-                    }
-                },
-            );
-            if unit != self.model.unit {
-                self.model.unit = unit;
+                &units,
+            ) {
+                self.model.unit = SizeUnit::ALL[i];
                 self.refresh(None);
             }
         }
-        self.chain_ui(ui, frame);
+        self.chain_ui(ui, column);
 
         // Resolution
         label("Resolution:", 194.75);
@@ -750,21 +1071,19 @@ impl ImageSizeDialog {
             self.model.set_resolution(v);
             self.refresh(Some(2));
         }
-        let mut res_unit = self.model.resolution_unit;
-        common::field_dropdown(
+        let units: Vec<Entry> = ResolutionUnit::ALL
+            .iter()
+            .map(|&u| Entry::item(u.label(), u == self.model.resolution_unit))
+            .collect();
+        if let Some(i) = common::field_popup(
             ui,
             r(511.0, 184.0, 655.0, 205.0),
             "resolution-unit",
-            res_unit.label(),
+            self.model.resolution_unit.label(),
             true,
-            |ui| {
-                for u in ResolutionUnit::ALL {
-                    ui.selectable_value(&mut res_unit, u, u.label());
-                }
-            },
-        );
-        if res_unit != self.model.resolution_unit {
-            self.model.resolution_unit = res_unit;
+            &units,
+        ) {
+            self.model.resolution_unit = ResolutionUnit::ALL[i];
             self.refresh(None);
         }
 
@@ -807,27 +1126,38 @@ impl ImageSizeDialog {
                 }
             }
         });
-        common::field_dropdown(
+        let mut methods = Vec::new();
+        let mut picks = Vec::new();
+        for (k, m) in Resample::ALL.into_iter().enumerate() {
+            methods
+                .push(Entry::item(m.label(), m == method).shortcut(format!("\u{2325}{}", k + 1)));
+            picks.push(Some(m));
+            if m.separator_after() {
+                methods.push(Entry::Separator);
+                picks.push(None);
+            }
+        }
+        if let Some(Some(m)) = common::field_popup(
             ui,
             r(428.0, 213.0, 655.0, 234.0),
             "resample",
             method.label(),
             self.model.resample,
-            |ui| {
-                for (k, m) in Resample::ALL.into_iter().enumerate() {
-                    let item = egui::Button::new(m.label())
-                        .selected(m == method)
-                        .shortcut_text(format!("\u{2325}{}", k + 1));
-                    if ui.add(item).clicked() {
-                        method = m;
-                    }
-                    if m.separator_after() {
-                        ui.separator();
-                    }
-                }
-            },
-        );
+            &methods,
+        )
+        .map(|k| picks[k])
+        {
+            method = m;
+        }
         self.model.method = method;
+        if self.model.resample
+            && matches!(
+                method,
+                Resample::PreserveDetails | Resample::PreserveDetails2
+            )
+        {
+            self.reduce_noise_ui(ui, column);
+        }
 
         // Generative Upscale lives in Adobe's cloud: the link is shown but
         // leads nowhere here
@@ -853,7 +1183,7 @@ impl ImageSizeDialog {
         let values = self.model.result();
         let cancel = common::ps_button(
             ui,
-            r(329.0, 311.5, 486.5, 337.5),
+            r(329.0, 311.5 + grow_h, 486.5, 337.5 + grow_h),
             "Cancel",
             false,
             true,
@@ -861,7 +1191,7 @@ impl ImageSizeDialog {
         );
         let ok = common::ps_button(
             ui,
-            r(496.5, 311.5, 654.0, 337.5),
+            r(496.5, 311.5 + grow_h, 654.0, 337.5 + grow_h),
             "OK",
             true,
             values.is_some(),
@@ -870,7 +1200,8 @@ impl ImageSizeDialog {
         if cancel.clicked() {
             return Outcome::Cancel;
         }
-        let enter = ui.input(|i| i.key_pressed(Key::Enter));
+        let enter =
+            self.auto.is_none() && self.delete.is_none() && ui.input(|i| i.key_pressed(Key::Enter));
         if (ok.clicked() || enter)
             && let Some((width, height, resolution)) = values
         {
@@ -879,9 +1210,62 @@ impl ImageSizeDialog {
                 height,
                 resolution,
                 resample: self.model.resample.then_some(self.model.method),
+                reduce_noise: self.model.reduce_noise as f32 / 100.0,
             };
         }
         Outcome::Open
+    }
+
+    /// Preserve Details' Reduce Noise row (Photoshop 2026): the label, a
+    /// slider with a white pin on a 3 pt `#757575` track, the percentage.
+    fn reduce_noise_ui(&mut self, ui: &mut Ui, frame: Rect) {
+        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
+        let painter = ui.painter().clone();
+        painter.text(
+            at(LABEL_RIGHT, 251.5),
+            Align2::RIGHT_CENTER,
+            "Reduce Noise:",
+            theme::dialog(pt(12.0)),
+            LABEL,
+        );
+        const TRACK: (f32, f32) = (431.5, 569.5);
+        // The pin's tip runs from the track's start to 5.5 pt before its end
+        let span = TRACK.1 - 5.5 - TRACK.0;
+        let track = Rect::from_min_max(at(TRACK.0, 248.5), at(TRACK.1, 251.5));
+        painter.rect_filled(track, 0.0, Color32::from_gray(0x75));
+        let hit = Rect::from_min_max(at(TRACK.0 - 6.0, 243.0), at(TRACK.1, 258.0));
+        let response = ui.interact(hit, ui.id().with("reduce-noise"), Sense::click_and_drag());
+        if let Some(p) = response.interact_pointer_pos()
+            && (response.dragged() || response.clicked())
+        {
+            let t = ((p.x - at(TRACK.0, 0.0).x) / pt(span)).clamp(0.0, 1.0);
+            self.model.reduce_noise = (t * 100.0).round() as f64;
+            self.noise_text = format!("{}", self.model.reduce_noise);
+        }
+        let x = TRACK.0 + span * self.model.reduce_noise as f32 / 100.0;
+        super::appkit::pin(&painter, at(x, 245.5), super::appkit::Pin::White);
+        let field = Rect::from_min_max(at(580.5, 241.5), at(641.0, 260.5));
+        let response = common::text_field(
+            ui,
+            field,
+            &mut self.noise_text,
+            "reduce-noise-field",
+            theme::dialog(pt(12.0)),
+            pt(4.5),
+            false,
+        );
+        if response.changed()
+            && let Ok(v) = self.noise_text.trim().parse::<f64>()
+        {
+            self.model.reduce_noise = v.clamp(0.0, 100.0);
+        }
+        painter.text(
+            at(643.5, 251.5),
+            Align2::LEFT_CENTER,
+            "%",
+            theme::dialog(pt(12.0)),
+            LABEL,
+        );
     }
 
     /// The chain button between Width and Height with its bracket.

@@ -111,24 +111,16 @@ impl FadeDialog {
             "Mode:",
             appkit::TEXT,
         );
-        let mut mode = self.mode;
-        appkit::popup(
+        let (entries, modes) = appkit::blend_modes(self.mode);
+        if let Some(k) = appkit::popup(
             ui,
             r(51.0, 85.0, 184.5, 106.0),
             "fade-mode",
-            mode.label(),
-            |ui| {
-                for (gi, group) in BlendMode::GROUPS.iter().enumerate() {
-                    if gi > 0 {
-                        ui.separator();
-                    }
-                    for &m in *group {
-                        ui.selectable_value(&mut mode, m, m.label());
-                    }
-                }
-            },
-        );
-        self.mode = mode;
+            self.mode.label(),
+            &entries,
+        ) {
+            self.mode = modes[k].unwrap_or(self.mode);
+        }
 
         let ok = appkit::button(
             ui,

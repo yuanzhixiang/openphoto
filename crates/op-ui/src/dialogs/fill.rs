@@ -4,6 +4,7 @@
 //! 2026's dialog (348 × 293 pt, a classic AppKit dialog). Sizes are in
 //! Photoshop points from the dialog's top-left corner.
 
+use crate::native_popup::Entry;
 use egui::{Align2, Color32, Key, Rect, Sense, Ui, vec2};
 use op_core::fill::FillOptions;
 use op_core::{BlendMode, Color};
@@ -160,23 +161,25 @@ impl FillDialog {
         };
 
         label(ui, 48.5, "Contents:");
-        let mut contents = self.contents;
-        appkit::popup(
+        let mut entries = Vec::new();
+        let mut kinds = Vec::new();
+        for (i, c) in Contents::ALL.into_iter().enumerate() {
+            if i == 3 || i == 6 {
+                entries.push(Entry::Separator);
+                kinds.push(None);
+            }
+            entries.push(Entry::item(c.label(), c == self.contents).enabled(c.available()));
+            kinds.push(Some(c));
+        }
+        let contents = appkit::popup(
             ui,
             r(118.0, 38.0, 263.0, 59.0),
             "fill-contents",
-            contents.label(),
-            |ui| {
-                for (i, c) in Contents::ALL.into_iter().enumerate() {
-                    if i == 3 || i == 6 {
-                        ui.separator();
-                    }
-                    ui.add_enabled_ui(c.available(), |ui| {
-                        ui.selectable_value(&mut contents, c, c.label());
-                    });
-                }
-            },
-        );
+            self.contents.label(),
+            &entries,
+        )
+        .and_then(|k| kinds[k])
+        .unwrap_or(self.contents);
         if contents == Contents::Color && self.contents != Contents::Color {
             // "Color..." opens the Color Picker; the choice applies once a
             // color is confirmed there
@@ -213,24 +216,16 @@ impl FillDialog {
         );
 
         label(ui, 208.5, "Mode:");
-        let mut mode = self.mode;
-        appkit::popup(
+        let (entries, modes) = appkit::blend_modes(self.mode);
+        if let Some(k) = appkit::popup(
             ui,
             r(118.0, 198.0, 253.0, 219.0),
             "fill-mode",
-            mode.label(),
-            |ui| {
-                for (gi, group) in BlendMode::GROUPS.iter().enumerate() {
-                    if gi > 0 {
-                        ui.separator();
-                    }
-                    for &m in *group {
-                        ui.selectable_value(&mut mode, m, m.label());
-                    }
-                }
-            },
-        );
-        self.mode = mode;
+            self.mode.label(),
+            &entries,
+        ) {
+            self.mode = modes[k].unwrap_or(self.mode);
+        }
 
         label(ui, 236.5, "Opacity:");
         appkit::field(

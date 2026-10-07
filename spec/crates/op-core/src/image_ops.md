@@ -10,7 +10,8 @@ Implements the Image menu operations that change the whole canvas: Image Size re
 
 - `Resample`: the eight methods in the Photoshop 2026 menu, in the same order and with the same labels (`ALL`, `label`, `separator_after`):
   - `Automatic` (default): uses Bicubic Sharper when reducing and Bicubic Smoother when enlarging (`resolve`).
-  - `PreserveDetails`, `PreserveDetails2`: Lanczos 3 (radius 3). Photoshop's Preserve Details (2.0 uses machine learning) includes noise reduction and other processing; here it is only approximated as Lanczos.
+  - `PreserveDetails`, `PreserveDetails2`: Lanczos 3 (radius 3). Photoshop's Preserve Details (2.0 uses machine learning) is Adobe's own processing; here it is approximated as Lanczos.
+- `resize_reducing_noise(doc, w, h, method, amount)`: `resize` with the Image Size dialog's Reduce Noise (`amount` 0–1, only for the two Preserve Details methods; other methods ignore it). After resampling, each premultiplied color is pulled toward the mean of its 3 × 3 neighbours whose four channels are within 24 levels of it, by `amount`: speckle is smoothed and edges stay hard. `resize` is this with 0.
   - `BicubicSmoother`: Mitchell–Netravali (B = C = 1/3), softer.
   - `BicubicSharper`: cubic convolution with a = −0.75, sharper.
   - `Bicubic`: cubic convolution with a = −0.5.
@@ -52,6 +53,7 @@ Implements the Image menu operations that change the whole canvas: Image Size re
 ## Known limitations
 
 - Cropping always deletes pixels outside the new canvas (`clipped`, equivalent to Photoshop with "Delete Cropped Pixels" on); Photoshop's Crop tool can turn it off and keep pixels outside the canvas.
+- Preserve Details and Preserve Details 2.0 (Lanczos 3) and Reduce Noise (edge-keeping 3 × 3 smoothing) are stand-ins for Adobe's proprietary algorithms; results differ from Photoshop's.
 - `remapped` expands the whole image into a buffer, using image size × 4 bytes of memory regardless of how sparse the layers are.
 
 ## Test coverage
@@ -60,5 +62,6 @@ Implements the Image menu operations that change the whole canvas: Image Size re
 - `the_selection_turns_with_the_canvas`: after a clockwise rotation the selection moves to the top-right corner.
 - `crop_keeps_the_selected_area`: after cropping to the selection, size, pixels, and selection position are correct; no crop with no selection.
 - `resize_scales_layers_and_selection`: a 4×2 image with a red left half reduced by half gives a mostly red left pixel and a near-white right pixel, with the selection following; nearest-neighbor enlargement keeps hard edges; bilinear enlargement blends colors at the edge.
+- `reduce_noise_smooths_speckle_and_keeps_edges`: doubling a ±10 gray checker beside black with Preserve Details at full Reduce Noise leaves less than half the speckle of plain Preserve Details, the edge stays black, and Bicubic ignores the amount.
 - `trim_removes_borders_of_the_corner_color`: trimming by the top-left color trims all four sides, trimming by the bottom-right color trims only the top; trimming by transparent pixels on an opaque background changes nothing.
 - `pixels_outside_the_canvas_follow_merges_rotation_and_image_size`: in a 100×100 document, a square half off the left side is merged with another block, then rotated clockwise, reduced by half, and flipped horizontally; at every step the layer range (including outside the canvas) matches Photoshop 2026 measurements: (−20, 10, 60, 60) → (40, −20, 90, 60) → (20, −10, 45, 30) → (5, −10, 30, 30).

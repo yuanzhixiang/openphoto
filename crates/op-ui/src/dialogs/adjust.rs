@@ -999,19 +999,16 @@ impl AdjustDialog {
                         appkit::TEXT,
                     );
                     if let ParamKind::Choice(options) = p.kind {
-                        let mut chosen = self.value(i).unwrap_or(0.0) as usize;
-                        appkit::popup(
+                        let chosen = (self.value(i).unwrap_or(0.0) as usize).min(options.len() - 1);
+                        if let Some(k) = appkit::popup(
                             ui,
                             rect,
                             "filter-popup",
-                            options[chosen.min(options.len() - 1)],
-                            |ui| {
-                                for (k, o) in options.iter().enumerate() {
-                                    ui.selectable_value(&mut chosen, k, *o);
-                                }
-                            },
-                        );
-                        self.values[i] = chosen.to_string();
+                            options[chosen],
+                            &appkit::choices(options.iter().copied(), chosen),
+                        ) {
+                            self.values[i] = k.to_string();
+                        }
                     }
                 }
                 Row::Radios { title, group, ys } => {
@@ -1187,19 +1184,16 @@ impl AdjustDialog {
                 Align2::LEFT_CENTER,
                 params[last].label,
             );
-            let mut chosen = self.value(last).unwrap_or(0.0) as usize;
-            appkit::popup(
+            let chosen = (self.value(last).unwrap_or(0.0) as usize).min(options.len() - 1);
+            if let Some(k) = appkit::popup(
                 ui,
                 r(rect[0], rect[1], rect[2], rect[3]),
                 "distort-mode",
-                options[chosen.min(options.len() - 1)],
-                |ui| {
-                    for (k, o) in options.iter().enumerate() {
-                        ui.selectable_value(&mut chosen, k, *o);
-                    }
-                },
-            );
-            self.values[last] = chosen.to_string();
+                options[chosen],
+                &appkit::choices(options.iter().copied(), chosen),
+            ) {
+                self.values[last] = k.to_string();
+            }
         }
         if let (Some((x, y)), Some(Effect::Filter(filter))) = (layout.diagram, self.effect()) {
             if self.diagram.as_ref().is_none_or(|(v, _)| *v != self.values) {

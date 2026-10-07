@@ -3,6 +3,7 @@
 //! own levels. Sizes are Photoshop points from the dialog's top-left
 //! corner.
 
+use crate::native_popup::Entry;
 use egui::{Color32, Key, Mesh, Modifiers, Pos2, Rect, Sense, Ui, vec2};
 use op_core::adjust::{Adjustment, Levels};
 
@@ -156,19 +157,16 @@ impl Dialog {
         // Preset
         appkit::label(ui, at(11.0, 50.0), "Preset:");
         let preset = self.preset();
-        let mut reset = false;
-        appkit::popup(
+        let reset = appkit::popup(
             ui,
             r(59.0, 39.5, 266.0, 60.5),
             "levels-preset",
             preset,
-            |ui| {
-                if ui.button("Default").clicked() {
-                    reset = true;
-                }
-                ui.add_enabled(false, egui::Button::new("Custom"));
-            },
-        );
+            &[
+                Entry::item("Default", preset == "Default"),
+                Entry::item("Custom", preset == "Custom").enabled(false),
+            ],
+        ) == Some(0);
         if reset {
             self.values = std::array::from_fn(|_| DEFAULTS.map(String::from));
         }
@@ -191,19 +189,20 @@ impl Dialog {
         line(at(295.5, 90.5), at(295.5, 359.5));
         line(at(11.0, 359.5), at(295.5, 359.5));
         appkit::label(ui, at(30.5, 90.5), "Channel:");
-        let mut channel = self.channel;
-        appkit::popup(
+        let channels: Vec<Entry> = CHANNELS
+            .iter()
+            .enumerate()
+            .map(|(k, name)| Entry::item(format!("{name}    ⌥{}", k + 2), k == self.channel))
+            .collect();
+        if let Some(k) = appkit::popup(
             ui,
             r(85.0, 80.0, 206.5, 101.0),
             "levels-channel",
-            CHANNELS[channel],
-            |ui| {
-                for (k, name) in CHANNELS.iter().enumerate() {
-                    ui.selectable_value(&mut channel, k, format!("{name}    ⌥{}", k + 2));
-                }
-            },
-        );
-        self.channel = channel;
+            CHANNELS[self.channel],
+            &channels,
+        ) {
+            self.channel = k;
+        }
         let c = self.channel;
 
         appkit::label(ui, at(20.5, 118.5), "Input Levels:");

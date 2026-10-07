@@ -3,6 +3,7 @@
 //! own curve; the display options on the right change only how the graph
 //! is drawn. Sizes are Photoshop points from the dialog's top-left corner.
 
+use crate::native_popup::Entry;
 use egui::{Color32, Key, Mesh, Modifiers, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, vec2};
 use op_core::adjust::{Adjustment, curve_table};
 
@@ -167,19 +168,16 @@ impl Dialog {
         // Preset
         appkit::label(ui, at(11.0, 56.25), "Preset:");
         let preset = self.preset();
-        let mut reset = false;
-        appkit::popup(
+        let reset = appkit::popup(
             ui,
             r(56.0, 46.0, 345.0, 67.0),
             "curves-preset",
             preset,
-            |ui| {
-                if ui.button("Default").clicked() {
-                    reset = true;
-                }
-                ui.add_enabled(false, egui::Button::new("Custom"));
-            },
-        );
+            &[
+                Entry::item("Default", preset == "Default"),
+                Entry::item("Custom", preset == "Custom").enabled(false),
+            ],
+        ) == Some(0);
         if reset {
             self.points = std::array::from_fn(|_| identity());
             self.selected = None;
@@ -200,18 +198,19 @@ impl Dialog {
             (at(25.5, 0.0).x, at(172.5, 0.0).x),
         );
         appkit::label(ui, at(30.5, 86.75), "Channel:");
-        let mut channel = self.channel;
-        appkit::popup(
+        let channels: Vec<Entry> = CHANNELS
+            .iter()
+            .enumerate()
+            .map(|(k, name)| Entry::item(format!("{name}    ⌥{}", k + 2), k == self.channel))
+            .collect();
+        let channel = appkit::popup(
             ui,
             r(85.0, 76.5, 170.0, 97.5),
             "curves-channel",
-            CHANNELS[channel],
-            |ui| {
-                for (k, name) in CHANNELS.iter().enumerate() {
-                    ui.selectable_value(&mut channel, k, format!("{name}    ⌥{}", k + 2));
-                }
-            },
-        );
+            CHANNELS[self.channel],
+            &channels,
+        )
+        .unwrap_or(self.channel);
         if channel != self.channel {
             self.channel = channel;
             self.selected = None;

@@ -44,7 +44,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `clipboard`: the clipboard used by Cut/Copy/Paste (see `clipboard.md`). By default it is not connected to the system clipboard (windowless tests must not alter the user's clipboard); `OpenPhotoApp::new` replaces it at startup with a version connected to the system clipboard.
 - `typing`: whether a text field had keyboard focus in the previous frame, updated each frame before commands run. Decides whether the menu's Cut/Copy/Paste act on the text field or the document.
 - `forward_events`: events to inject into egui's input for the next frame (used when the menu's Cut/Copy/Paste is handed to a text field; see `commands.md`).
-- `image_size_dialog`: the Image Size dialog, `Some` while open.
+- `image_size_dialog`: the Image Size dialog, `Some` while open. `image_size_extra`: how far its window was last enlarged (Photoshop points), for the next opening.
 - `trim_dialog`: the Trim dialog, `Some` while open.
 - `adjust_dialog`: an adjustment or filter dialog (see `dialogs/adjust.md`), `Some` while open.
 - `last_transform`: the most recently applied transform mapping, used by Edit › Transform › Again; kept only for the current run and shared by all documents.

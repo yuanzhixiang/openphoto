@@ -2228,6 +2228,212 @@ fn image_size_dialog_controls() {
 }
 
 #[test]
+fn image_size_auto_resolution() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.key_press_modifiers(Modifiers::COMMAND | Modifiers::ALT, egui::Key::I);
+    h.run_steps(3);
+    let at = |x: f32, y: f32| at_pt(342.5 + x, 221.0 + y);
+    // Fit To › Auto Resolution... opens the sheet 15 pt in from the corner
+    click(&mut h, at(541.5, 107.5));
+    h.get_by_label("Auto Resolution...").click();
+    h.run_steps(3);
+    let dialog = |h: &Harness<'_, OpenPhotoApp>| {
+        h.state()
+            .state
+            .image_size_dialog
+            .as_ref()
+            .unwrap()
+            .auto
+            .is_some()
+    };
+    assert!(dialog(&h));
+    shot(&mut h, "auto_resolution");
+    // Best, then OK: 133 lines/inch makes 266 ppi, keeping the printed size
+    let sheet = |x: f32, y: f32| at(15.0 + x, 15.0 + y);
+    click(&mut h, sheet(190.75, 107.0));
+    click(&mut h, sheet(308.0, 51.5));
+    assert!(!dialog(&h));
+    let m = h
+        .state()
+        .state
+        .image_size_dialog
+        .as_ref()
+        .unwrap()
+        .model
+        .clone();
+    assert_eq!(m.fit, crate::dialogs::image_size::FitTo::AutoResolution);
+    assert_eq!(m.result(), Some((2712, 2996, 266.0)));
+    // Escape closes the sheet but not Image Size; the sheet remembers Best
+    click(&mut h, at(541.5, 107.5));
+    h.get_by_label("Auto Resolution...").click();
+    h.run_steps(3);
+    let quality = h
+        .state()
+        .state
+        .image_size_dialog
+        .as_ref()
+        .unwrap()
+        .auto
+        .as_ref()
+        .unwrap()
+        .settings
+        .quality;
+    assert_eq!(quality, crate::dialogs::auto_resolution::Quality::Best);
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert!(h.state().state.image_size_dialog.is_some() && !dialog(&h));
+}
+
+#[test]
+fn image_size_presets() {
+    use crate::dialogs::image_size::{FIT_PRESETS, FitTo};
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.key_press_modifiers(Modifiers::COMMAND | Modifiers::ALT, egui::Key::I);
+    h.run_steps(3);
+    let at = |x: f32, y: f32| at_pt(342.5 + x, 221.0 + y);
+    let dir = std::env::temp_dir().join(format!("op-ui-size-presets-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    // Save Preset... (the panel's file): A4, saved as "a4 test"
+    let a4 = {
+        let d = h.state_mut().state.image_size_dialog.as_mut().unwrap();
+        d.set_preset_folder(Some(dir.clone()));
+        d.model.fit_to(FIT_PRESETS[1][0]);
+        let a4 = d.model.result();
+        d.save_preset_to(&dir.join("a4 test")).unwrap();
+        assert_eq!(d.model.fit, FitTo::User(0));
+        assert_eq!(d.fit_label(), "a4 test");
+        a4
+    };
+    assert!(dir.join("a4 test.imz").exists());
+    let model = |h: &Harness<'_, OpenPhotoApp>| {
+        h.state()
+            .state
+            .image_size_dialog
+            .as_ref()
+            .unwrap()
+            .model
+            .clone()
+    };
+    // Back to Original Size, then the saved preset from the menu
+    click(&mut h, at(541.5, 107.5));
+    h.get_by_label("Original Size").click();
+    h.run_steps(2);
+    assert_eq!(model(&h).result(), Some((734, 811, 72.0)));
+    click(&mut h, at(541.5, 107.5));
+    h.get_by_label("a4 test").click();
+    h.run_steps(2);
+    assert_eq!(model(&h).result(), a4);
+    assert_eq!(model(&h).fit, FitTo::User(0));
+    // Delete Preset...: the sheet, Delete, then Yes in the alert
+    click(&mut h, at(541.5, 107.5));
+    h.get_by_label("Delete Preset...").click();
+    h.run_steps(3);
+    assert!(
+        h.state()
+            .state
+            .image_size_dialog
+            .as_ref()
+            .unwrap()
+            .delete
+            .is_some()
+    );
+    shot(&mut h, "delete_size_preset");
+    click(&mut h, at(11.0 + 313.5, 28.0 + 51.5));
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    let d = h.state().state.image_size_dialog.as_ref().unwrap();
+    assert!(d.delete.is_none() && d.presets.is_empty());
+    assert_eq!(d.model.fit, FitTo::Custom);
+    assert!(!dir.join("a4 test.imz").exists());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn image_size_reduce_noise() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.key_press_modifiers(Modifiers::COMMAND | Modifiers::ALT, egui::Key::I);
+    h.run_steps(3);
+    let at = |x: f32, y: f32| at_pt(342.5 + x, 221.0 + y);
+    let model = |h: &Harness<'_, OpenPhotoApp>| {
+        h.state()
+            .state
+            .image_size_dialog
+            .as_ref()
+            .unwrap()
+            .model
+            .clone()
+    };
+    // Preserve Details (Alt+2) shows Reduce Noise; a click halfway sets 50%
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Num2);
+    h.run_steps(2);
+    shot(&mut h, "image_size_reduce_noise");
+    click(&mut h, at(431.5 + (569.5 - 5.5 - 431.5) / 2.0, 250.0));
+    assert_eq!(model(&h).reduce_noise, 50.0);
+    // Twice the size, then OK: the document is enlarged
+    {
+        let m = &mut h
+            .state_mut()
+            .state
+            .image_size_dialog
+            .as_mut()
+            .unwrap()
+            .model;
+        m.unit = crate::dialogs::image_size::SizeUnit::Pixels;
+        m.set_width(1468.0);
+    }
+    click(&mut h, at(575.0, 324.5));
+    assert!(h.state().state.image_size_dialog.is_none());
+    let d = &active(&h).doc;
+    assert_eq!((d.width, d.height), (1468, 1622));
+}
+
+#[test]
+fn image_size_window_resizes() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.key_press_modifiers(Modifiers::COMMAND | Modifiers::ALT, egui::Key::I);
+    h.run_steps(3);
+    // Drag the bottom-right corner (342.5 + 665, 221 + 358) by 150 × 100
+    let corner = at_pt(342.5 + 665.0, 221.0 + 358.0);
+    drag(
+        &mut h,
+        corner,
+        corner + egui::vec2(pt(150.0), pt(100.0)),
+        Modifiers::NONE,
+    );
+    let extra = h.state().state.image_size_dialog.as_ref().unwrap().extra;
+    assert!(
+        (extra.x - 150.0).abs() < 1.0 && (extra.y - 100.0).abs() < 1.0,
+        "{extra:?}"
+    );
+    shot(&mut h, "image_size_resized");
+    // The buttons moved with the corner: Cancel is now 150 right, 100 down
+    click(&mut h, at_pt(342.5 + 400.0 + 150.0, 221.0 + 324.5 + 100.0));
+    assert!(h.state().state.image_size_dialog.is_none());
+    // It reopens at that size, centered again
+    h.key_press_modifiers(Modifiers::COMMAND | Modifiers::ALT, egui::Key::I);
+    h.run_steps(3);
+    let extra = h.state().state.image_size_dialog.as_ref().unwrap().extra;
+    assert!((extra.x - 150.0).abs() < 1.0, "{extra:?}");
+    // Not smaller than at first
+    let corner = corner + egui::vec2(pt(75.0), pt(50.0));
+    drag(
+        &mut h,
+        corner,
+        corner - egui::vec2(pt(400.0), pt(400.0)),
+        Modifiers::NONE,
+    );
+    let extra = h.state().state.image_size_dialog.as_ref().unwrap().extra;
+    assert_eq!(extra, egui::Vec2::ZERO);
+}
+
+#[test]
 fn rotate_canvas_dialog() {
     use crate::commands::Command;
     let mut h = harness(Vec::new());

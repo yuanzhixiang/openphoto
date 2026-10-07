@@ -18,6 +18,7 @@ mod free_transform;
 mod icons;
 #[cfg(target_os = "macos")]
 mod menu;
+mod native_popup;
 mod options_bar;
 mod options_kit;
 mod options_tools;
@@ -86,6 +87,7 @@ impl OpenPhotoApp {
                     && let RawWindowHandle::AppKit(appkit) = handle.as_raw()
                 {
                     menu.set_view(appkit.ns_view.as_ptr());
+                    native_popup::set_available(&cc.egui_ctx, true);
                 }
             }
             app.menu = Some(menu);
@@ -335,7 +337,9 @@ impl OpenPhotoApp {
         let Some(mut dialog) = self.state.image_size_dialog.take() else {
             return;
         };
-        match dialog.show(ctx) {
+        let outcome = dialog.show(ctx);
+        self.state.image_size_extra = dialog.extra;
+        match outcome {
             dialogs::ImageSizeOutcome::Open => self.state.image_size_dialog = Some(dialog),
             dialogs::ImageSizeOutcome::Cancel => {}
             dialogs::ImageSizeOutcome::Apply {
@@ -343,6 +347,7 @@ impl OpenPhotoApp {
                 height,
                 resolution,
                 resample,
+                reduce_noise,
             } => {
                 let Some(state) = self.state.active() else {
                     return;
@@ -351,7 +356,13 @@ impl OpenPhotoApp {
                 if let Some(method) = resample
                     && (width, height) != (state.doc.width, state.doc.height)
                 {
-                    op_core::image_ops::resize(&mut state.doc, width, height, method);
+                    op_core::image_ops::resize_reducing_noise(
+                        &mut state.doc,
+                        width,
+                        height,
+                        method,
+                        reduce_noise,
+                    );
                     changed = true;
                 }
                 if resolution != state.doc.resolution {
@@ -820,6 +831,13 @@ impl eframe::App for OpenPhotoApp {
             }
             if std::mem::take(&mut self.state.ruler_menu) {
                 menu.popup_ruler_units(&self.state);
+            }
+            // A dialog dropdown's menu
+            if let Some(request) = native_popup::take_request(&ctx) {
+                let scale = ctx.pixels_per_point() / ctx.native_pixels_per_point().unwrap_or(1.0);
+                if let Some(index) = menu.popup_menu(&request, scale) {
+                    native_popup::deliver(&ctx, request.id, index);
+                }
             }
         }
 

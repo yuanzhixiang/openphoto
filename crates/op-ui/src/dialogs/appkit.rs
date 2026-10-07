@@ -6,6 +6,7 @@
 use egui::{Align2, Color32, CornerRadius, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, vec2};
 
 use super::common;
+use crate::native_popup::{self, Entry};
 use crate::ps_icons::{self, Icon};
 use crate::theme::{self, color, pt};
 
@@ -82,8 +83,9 @@ pub fn field(
 }
 
 /// A pop-up menu button: `#454545` with a `#666666` border, its value 8.5 pt
-/// in and a chevron 7.75 pt from the right; clicking opens `menu`.
-pub fn popup(ui: &mut Ui, rect: Rect, id: &str, value: &str, menu: impl FnOnce(&mut Ui)) {
+/// in and a chevron 7.75 pt from the right; clicking opens `entries` as a
+/// native menu (`native_popup`). Returns the index of the entry picked.
+pub fn popup(ui: &mut Ui, rect: Rect, id: &str, value: &str, entries: &[Entry]) -> Option<usize> {
     let response = ui.interact(rect, ui.id().with(id), Sense::click());
     let fill = if response.hovered() {
         Color32::from_gray(0x4c)
@@ -111,9 +113,16 @@ pub fn popup(ui: &mut Ui, rect: Rect, id: &str, value: &str, menu: impl FnOnce(&
         TEXT,
         fill,
     );
-    egui::Popup::menu(&response)
-        .id(ui.id().with((id, "menu")))
-        .show(menu);
+    native_popup::dropdown(ui, &response, ui.id().with((id, "menu")), entries)
+}
+
+/// Menu entries for `options`, `chosen` checked.
+pub fn choices<'a>(options: impl IntoIterator<Item = &'a str>, chosen: usize) -> Vec<Entry> {
+    options
+        .into_iter()
+        .enumerate()
+        .map(|(k, o)| Entry::item(o, k == chosen))
+        .collect()
 }
 
 /// A 26 pt push button: the default one with a light border.
@@ -331,4 +340,22 @@ pub fn radio_with(
         TEXT,
     );
     clicked
+}
+
+/// Blend mode menu entries in Photoshop's groups, `chosen` checked, and the
+/// mode each entry stands for (`None` for the separators).
+pub fn blend_modes(chosen: op_core::BlendMode) -> (Vec<Entry>, Vec<Option<op_core::BlendMode>>) {
+    let mut entries = Vec::new();
+    let mut modes = Vec::new();
+    for (gi, group) in op_core::BlendMode::GROUPS.iter().enumerate() {
+        if gi > 0 {
+            entries.push(Entry::Separator);
+            modes.push(None);
+        }
+        for &m in *group {
+            entries.push(Entry::item(m.label(), m == chosen));
+            modes.push(Some(m));
+        }
+    }
+    (entries, modes)
 }

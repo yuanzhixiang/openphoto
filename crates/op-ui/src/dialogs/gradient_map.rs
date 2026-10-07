@@ -127,19 +127,19 @@ impl Dialog {
         appkit::checkbox(ui, at(20.0, 139.0), "Dither", &mut self.dither);
         appkit::checkbox(ui, at(20.0, 166.0), "Reverse", &mut self.reverse);
         appkit::label(ui, at(20.5, 200.0), "Method:");
-        let mut method = self.method;
-        appkit::popup(
+        let chosen = Method::ALL
+            .iter()
+            .position(|&m| m == self.method)
+            .unwrap_or(0);
+        if let Some(k) = appkit::popup(
             ui,
             r(72.0, 189.5, 157.0, 210.5),
             "gradient-map-method",
-            method.label(),
-            |ui| {
-                for m in Method::ALL {
-                    ui.selectable_value(&mut method, m, m.label());
-                }
-            },
-        );
-        self.method = method;
+            self.method.label(),
+            &appkit::choices(Method::ALL.iter().map(|m| m.label()), chosen),
+        ) {
+            self.method = Method::ALL[k];
+        }
 
         let ok = appkit::button(ui, r(325.5, 45.0, 385.5, 71.0), "OK", true, true);
         let cancel = appkit::button(ui, r(325.5, 80.0, 385.5, 106.0), "Cancel", false, true);
