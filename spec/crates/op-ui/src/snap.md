@@ -26,6 +26,7 @@ Gathered once when a drag starts (`begin`, called by `document_view.rs`) and kep
 - `point`: a document point pulled to the targets. Used by the Rectangular and Elliptical Marquee (the start point and the dragged point) and by the shape tools (Rectangle, Ellipse, Triangle, Polygon, Line, Custom Shape). The marquee then rounds to whole pixels as usual.
 - `offset`: the Move tool's drag offset adjusted so the left edge, right edge or center (top, bottom, middle) of the box being moved lands on a target; of the candidates within the distance, the one changing the offset least wins. The box is `op_core::transform::bounds` at the start (the selection's bounds, or the moved layers' pixels). The moved layers (the selected layers and those linked to them) are left out of the targets.
 - Holding Control while dragging turns snapping off for that moment, as in Photoshop.
+- For a Move drag, `begin` also starts the smart guides (`smart_guides.md`), whose pull competes with this one per axis.
 
 ## Known limitations
 

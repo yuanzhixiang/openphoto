@@ -243,6 +243,7 @@ pub enum Command {
     FlipView,
     /// View > Show > Pixel Grid, Selection Edges, Layer Edges, All, None.
     TogglePixelGrid,
+    ToggleSmartGuides,
     ToggleSelectionEdges,
     ToggleLayerEdges,
     ShowAllExtras,
@@ -465,6 +466,7 @@ impl Command {
             | Self::ToggleHistogram
             | Self::FlipView
             | Self::TogglePixelGrid
+            | Self::ToggleSmartGuides
             | Self::ToggleSelectionEdges
             | Self::ToggleLayerEdges
             | Self::ShowAllExtras
@@ -644,6 +646,7 @@ impl Command {
             Self::ToggleGuides => v.guides,
             Self::ToggleGrid => v.grid,
             Self::TogglePixelGrid => v.pixel_grid,
+            Self::ToggleSmartGuides => v.smart_guides,
             Self::ToggleSelectionEdges => v.selection_edges,
             Self::ToggleLayerEdges => v.layer_edges,
             Self::ToggleSnap => v.snap,
@@ -706,6 +709,7 @@ impl Command {
             | Self::ToggleGuides
             | Self::ToggleGrid
             | Self::TogglePixelGrid
+            | Self::ToggleSmartGuides
             | Self::ToggleSelectionEdges
             | Self::ToggleLayerEdges
             | Self::ShowAllExtras
@@ -1482,6 +1486,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::ToggleGuides => app.view.guides = !app.view.guides,
         Command::ToggleGrid => app.view.grid = !app.view.grid,
         Command::TogglePixelGrid => app.view.pixel_grid = !app.view.pixel_grid,
+        Command::ToggleSmartGuides => app.view.smart_guides = !app.view.smart_guides,
         Command::ToggleSelectionEdges => app.view.selection_edges = !app.view.selection_edges,
         Command::ToggleLayerEdges => app.view.layer_edges = !app.view.layer_edges,
         Command::ShowAllExtras | Command::ShowNoExtras => {

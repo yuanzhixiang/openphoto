@@ -5631,6 +5631,8 @@ fn snapping_to_guides_layers_and_bounds() {
         }
         doc.mark_dirty();
     }
+    // (only the plain snapping here; see smart_guides_line_up_a_moved_layer)
+    h.state_mut().state.view.smart_guides = false;
     h.state_mut().state.select_tool(Tool::Move);
     h.run_steps(1);
     let (a, b) = (doc_point(&h, 250.0, 350.0), doc_point(&h, 297.0, 350.0));
@@ -6302,4 +6304,88 @@ fn open_recent_reopens_files() {
     assert!(names(&h).is_empty());
     assert!(!Command::ClearRecent.enabled(&h.state().state));
     let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn smart_guides_line_up_a_moved_layer() {
+    use crate::commands::Command;
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // Snap off, so only the smart guides pull
+    run_command(&mut h, Command::ToggleSnap);
+    run_command(&mut h, Command::NewLayerNoDialog);
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.active_layer.unwrap();
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 50..150 {
+            for x in 50..150 {
+                image.set_pixel(x, y, [255, 255, 255, 255]);
+            }
+        }
+        doc.mark_dirty();
+    }
+    h.state_mut().state.active().unwrap().record("Fill");
+    h.state_mut().state.select_tool(Tool::Move);
+    h.run_steps(2);
+    let bounds = |h: &Harness<'_, OpenPhotoApp>| {
+        let doc = &active(h).doc;
+        doc.layer(doc.active_layer.unwrap())
+            .unwrap()
+            .image()
+            .unwrap()
+            .content_bounds()
+            .unwrap()
+    };
+    // The square's center (100, 100) dragged to 3 px short of the
+    // canvas's (367, 405.5): held there, the guides show
+    let (from, to) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 364.0, 300.0));
+    h.hover_at(from);
+    h.event(egui::Event::PointerButton {
+        pos: from,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    for i in 1..=4 {
+        h.event(egui::Event::PointerMoved(
+            from + (to - from) * (i as f32 / 4.0),
+        ));
+        h.step();
+    }
+    let lines = active(&h).smart_guides.as_ref().unwrap().lines.clone();
+    assert!(
+        lines.iter().any(|l| l[0].x == 367.0 && l[1].x == 367.0),
+        "{lines:?}"
+    );
+    // Drawn in Photoshop's magenta
+    let image = h.render().unwrap();
+    let k = 2.0 * UI_SCALE;
+    let p = doc_point(&h, 367.0, 600.0);
+    let magenta = (-2..=2).any(|d| {
+        let px = image
+            .get_pixel(((p.x * k) as i32 + d) as u32, (p.y * k) as u32)
+            .0;
+        px[0] > 200 && px[1] < 120 && px[2] > 200
+    });
+    assert!(magenta);
+    h.event(egui::Event::PointerButton {
+        pos: to,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(3);
+    // Centered across; the guides go once let go
+    let (x0, _, x1, _) = bounds(&h);
+    assert_eq!((x0, x1), (317, 417));
+    assert!(active(&h).smart_guides.is_none());
+    // Show › Smart Guides off: moved exactly as dragged
+    run_command(&mut h, Command::Undo);
+    h.state_mut().state.view.smart_guides = false;
+    drag(&mut h, from, to, Modifiers::NONE);
+    let (x0, _, _, _) = bounds(&h);
+    assert_eq!(x0, 314);
 }

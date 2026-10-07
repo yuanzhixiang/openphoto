@@ -742,6 +742,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     if view_options.extras && view_options.layer_edges {
         draw_layer_edges(ui, state, canvas_rect, ppp);
     }
+    crate::smart_guides::draw(ui, state, canvas_rect, ppp);
     // The color samplers show with the tools that use them
     if view_options.extras && matches!(tool, Tool::Eyedropper | Tool::ColorSampler) {
         draw_samplers(ui, state, canvas_rect, ppp);
@@ -1409,15 +1410,28 @@ fn move_input(
     let pointer = ui
         .input(|i| i.pointer.interact_pos())
         .map(|p| to_doc(state, p, ppp));
-    let Some((m, start)) = &state.move_drag else {
+    let Some((_, start)) = &state.move_drag else {
         return None;
     };
-    let delta = pointer.map_or(egui::Vec2::ZERO, |p| p - *start);
-    let delta = crate::snap::offset(ui, state, delta, ppp);
+    let raw = pointer.map_or(egui::Vec2::ZERO, |p| p - *start);
+    let mut delta = crate::snap::offset(ui, state, raw, ppp);
+    // Smart guides pull the move into line too (Control held: not)
+    let tolerance = crate::snap::tolerance(state, ppp);
+    if let Some(smart) = &mut state.smart_guides {
+        if ui.input(|i| i.modifiers.ctrl) {
+            smart.lines.clear();
+        } else {
+            delta = smart.align_with(raw, delta, tolerance);
+        }
+    }
+    let Some((m, _)) = &state.move_drag else {
+        return None;
+    };
     let (dx, dy) = (delta.x.round() as i64, delta.y.round() as i64);
     m.apply(&mut state.doc, dx, dy);
     if !ui.input(|i| i.pointer.primary_down()) {
         state.move_drag = None;
+        state.smart_guides = None;
         if dx != 0 || dy != 0 {
             state.record("Move");
         }

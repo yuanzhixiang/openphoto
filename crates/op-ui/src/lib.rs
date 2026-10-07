@@ -26,6 +26,7 @@ mod ps_icons;
 mod recent;
 mod rulers;
 mod selection_brush;
+mod smart_guides;
 mod snap;
 mod state;
 mod status_info;

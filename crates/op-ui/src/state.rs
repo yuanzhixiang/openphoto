@@ -86,6 +86,8 @@ pub struct DocState {
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
     /// What the drag in progress snaps to (View › Snap).
     pub snap: Option<crate::snap::Targets>,
+    /// The Move tool's smart guides while it drags.
+    pub smart_guides: Option<crate::smart_guides::SmartGuides>,
     /// The History Brush's source: a history state's id, or `None` for the
     /// snapshot of the document as opened (Photoshop's default). A state
     /// that is no longer kept falls back to the snapshot.
@@ -227,6 +229,7 @@ impl DocState {
             quick: None,
             object_drag: None,
             snap: None,
+            smart_guides: None,
             history_source: None,
             fade: None,
             selection_stroke: None,

@@ -14,7 +14,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `ruler_units` (`rulers::RulerUnit`) and `ruler_menu` (a ruler was right-clicked; its menu opens after the frame).
 - `status_info` (what the status bar shows, `status_info.md`), `status_menu` (its arrow was clicked; the menu opens after the frame), `last_timing` (seconds the last document-changing command took, for Timing).
 - `screen_mode` (`ScreenMode`: Standard, FullWithMenus, Full; `cycle` gives the next or previous for F / Shift+F), `hide_tools`, `hide_panels` (Tab, Shift+Tab), `full_screen_prompt` / `skip_full_screen_prompt` (Full Screen Mode's warning, `FULL_SCREEN_WARNING`, Photoshop's `$$$/FullScreenModeWarningWithShortcut` text with F). `set_screen_mode` asks first when entering Full Screen Mode; `enter_screen_mode` switches without asking: entering Full Screen Mode hides the tools and panels, leaving it shows them; `toggle_hidden` is Tab's rule (see `actions.md`).
-- `view`: view toggles (`ViewOptions`, see `rulers.md`). Among them, `smart_guides` (Smart Guides, on by default) is toggled only from the Properties panel's Guides section and has no effect yet.
+- `view`: view toggles (`ViewOptions`, see `rulers.md`). Among them, `smart_guides` (Smart Guides, on by default) is toggled by View › Show › Smart Guides and the Properties panel's Guides section (see `smart_guides.md`). `DocState::smart_guides`: the Move drag's smart guides.
 - `modify_dialog`: the Select › Modify dialog, `Some` while open.
 - `new_document_dialog`: the New dialog, `Some` while open.
 - `new_guide_dialog`: the New Guide dialog, `Some` while open.

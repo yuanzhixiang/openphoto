@@ -152,6 +152,7 @@ Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's men
 | ToggleGuides | View › Show › Guides | ⌘; |
 | FlipView | View › Flip Horizontal | — |
 | TogglePixelGrid | View › Show › Pixel Grid | — |
+| ToggleSmartGuides | View › Show › Smart Guides | — |
 | ToggleSelectionEdges | View › Show › Selection Edges | — |
 | ToggleLayerEdges | View › Show › Layer Edges | — |
 | ShowAllExtras | View › Show › All | — |

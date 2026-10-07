@@ -140,6 +140,8 @@ Applies to the Rectangular, Elliptical, Single Row, and Single Column Marquee:
 
 ## Move tool
 
+- Smart guides: while dragging, the move lines up with the canvas's and other layers' edges and centers, shown by magenta lines (`smart_guides.md`).
+
 - Drag: moves the pixels of the current layer; with a selection, only the selected pixels move (rules in `crates/op-core/src/move_tool.md`). The offset is the drag distance rounded to whole pixels, and each step is recomputed from the pixels at the start. On release, "Move" is recorded if anything actually moved.
 - When moving is not possible (locked, hidden, background layer without a selection), Photoshop's alert appears when the drag starts.
 - Auto-Select (options bar, off by default): on mouse press, makes the topmost visible layer showing pixels under the pointer the current layer (`Document::layer_at`), then drags it as usual. Holding ⌘ inverts this (temporarily on when off, temporarily off when on), matching Photoshop. When no layer has pixels under the pointer, the current layer stays the same. No auto-select happens when pressing on a transform control handle. Switching the current layer records no history.

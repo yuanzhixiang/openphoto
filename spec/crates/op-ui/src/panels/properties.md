@@ -28,7 +28,7 @@ When no document is open, the panel shows "No Properties" in the center.
 - Width/height and resolution cannot be edited here (in Photoshop they can be changed directly). Use Image › Canvas Size to change the canvas size.
 - Color mode and bit depth cannot be converted.
 - Photoshop's dropdown borders are thinner than this app's (about 0.5 pt).
-- Ruler units, guide line style, the pixel grid and the other Fill options cannot be switched yet; the smart guides toggle has no effect yet (smart guides are not drawn).
+- Ruler units, guide line style, the pixel grid and the other Fill options cannot be switched yet; the smart guides toggle is View › Show › Smart Guides (see `smart_guides.md`).
 
 ## Test coverage
 

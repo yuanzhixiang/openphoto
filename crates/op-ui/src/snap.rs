@@ -122,6 +122,11 @@ pub fn begin(state: &mut DocState, view: &ViewOptions, moving: bool) {
     } else {
         Vec::new()
     };
+    state.smart_guides = if moving {
+        crate::smart_guides::SmartGuides::begin(state, view, &skip)
+    } else {
+        None
+    };
     state.snap = Targets::new(state, view, &skip).map(|mut t| {
         if moving {
             t.moving = op_core::transform::bounds(&state.doc).ok();
