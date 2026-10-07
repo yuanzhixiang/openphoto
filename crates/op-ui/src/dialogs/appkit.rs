@@ -13,7 +13,7 @@ use crate::theme::{self, color, pt};
 pub const TEXT: Color32 = Color32::from_gray(0xf0);
 pub const TEXT_OFF: Color32 = Color32::from_gray(0x8e);
 pub const FIELD: Color32 = Color32::from_gray(0x45);
-const FIELD_BORDER: Color32 = Color32::from_gray(0x66);
+pub(crate) const FIELD_BORDER: Color32 = Color32::from_gray(0x66);
 /// Group box frames.
 pub const GROUP_LINE: Color32 = Color32::from_gray(0x42);
 const PIN_OUTLINE: Color32 = Color32::from_gray(0x1a);

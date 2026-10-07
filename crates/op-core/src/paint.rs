@@ -363,6 +363,10 @@ pub struct Stroke {
     mixer: (Option<[f32; 3]>, f32),
     /// The Clone Source panel's scale and angle for a `Source` stroke.
     source_transform: Option<SourceTransform>,
+    /// The healing tools' Mode and Diffusion, and the Spot Healing Brush's
+    /// Create Texture.
+    heal_style: crate::heal::HealStyle,
+    create_texture: bool,
 }
 
 impl Stroke {
@@ -437,7 +441,22 @@ impl Stroke {
             dab_center: (0.0, 0.0),
             mixer: (None, 1.0),
             source_transform: None,
+            heal_style: crate::heal::HealStyle::default(),
+            create_texture: false,
         })
+    }
+
+    /// A healing stroke's Mode and Diffusion.
+    pub fn with_heal_style(mut self, style: crate::heal::HealStyle) -> Self {
+        self.heal_style = style;
+        self
+    }
+
+    /// The Spot Healing Brush's Create Texture: each dab heals with a
+    /// texture made from the pixels around it instead of a nearby spot.
+    pub fn with_create_texture(mut self, on: bool) -> Self {
+        self.create_texture = on;
+        self
     }
 
     /// Scales and turns a `Source` stroke's source about its source point
@@ -885,8 +904,18 @@ impl Stroke {
         let Some(current) = doc.layer(self.layer).and_then(|l| l.image()) else {
             return;
         };
+        let texture;
         let (source, offset) = match &self.kind {
             StrokeKind::Heal { source, dx, dy } => (source, (*dx, *dy)),
+            StrokeKind::SpotHeal(source) if self.create_texture => {
+                texture = crate::heal::mirrored_texture(
+                    source,
+                    (x0, y0, bw, bh),
+                    (cx, cy),
+                    tip.diameter / 2.0,
+                );
+                (&texture, (x0 as i64, y0 as i64))
+            }
             StrokeKind::SpotHeal(source) => {
                 let Some(o) = crate::heal::proximity_match(source, (cx, cy), tip.diameter / 2.0)
                 else {
@@ -896,9 +925,15 @@ impl Stroke {
             }
             _ => return,
         };
-        let Some(healed) =
-            crate::heal::heal_window(current, source, (x0, y0, bw, bh), &inside, offset)
-        else {
+        let style = self.heal_style;
+        let Some(healed) = crate::heal::heal_window_with(
+            current,
+            source,
+            (x0, y0, bw, bh),
+            &inside,
+            offset,
+            style,
+        ) else {
             return;
         };
         let opacity = self.opacity;
@@ -915,7 +950,16 @@ impl Stroke {
             let selected = selection
                 .as_ref()
                 .map_or(1.0, |s| s.get(x, y) as f32 / 255.0);
-            let amount = cover[k] * opacity * selected;
+            let mut amount = cover[k] * opacity * selected;
+            // Replace keeps the grain: a pixel takes the healed color or
+            // keeps its own
+            if style.mode == crate::heal::HealMode::Replace {
+                amount = if crate::heal::replace_takes(x, y, amount) {
+                    1.0
+                } else {
+                    0.0
+                };
+            }
             let p = image.pixel(x, y);
             let [r, g, b] = healed[k].map(|v| v.round() as u8);
             image.set_pixel(x, y, mix(p, [r, g, b, p[3]], amount, preserve));

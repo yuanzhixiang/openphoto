@@ -44,8 +44,9 @@ pub enum Item {
     Button(f32, f32, &'static str, bool),
     /// An unusable pop-up showing its text.
     PopupOff(f32, f32, &'static str),
-    /// An empty, unusable pattern box with its chevron box.
-    NoPattern(f32, f32, f32),
+    /// The pattern box (x0–x1) with its chevron box (to x2), the pattern
+    /// picker, usable when `PatternUse` says so (empty otherwise).
+    PatternBox(f32, f32, f32, PatternUse),
     /// A color box from x0 to x1.
     ColorBox(f32, f32, [u8; 3]),
     /// The current gradient (foreground to background) from x0 to x1, its
@@ -1033,7 +1034,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
                 "heal.source",
             ),
             Sep(497.0),
-            NoPattern(502.0, 532.0, 544.0),
+            PatternBox(502.0, 532.0, 544.0, PatternUse::Choice("heal.source")),
             Sep(548.0),
             Check(553.0, "Aligned", "heal.aligned", false),
             Check(613.5, "Use Legacy", "heal.legacy", false),
@@ -1071,8 +1072,8 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             ),
             Check(511.5, "Transparent", "patch.transparent", false),
             Sep(597.5),
-            Button(607.5, 685.0, "Use Pattern", false),
-            NoPattern(688.5, 718.5, 730.5),
+            Button(607.5, 685.0, "Use Pattern", true),
+            PatternBox(688.5, 718.5, 730.5, PatternUse::Selection),
             Sep(738.5),
             Label(749.5, "Diffusion:"),
             Percent(803.0, 831.5, 846.0, "patch.diffusion", "5"),
@@ -1158,7 +1159,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
         ],
         PaintBucket => &[
             Popup(110.0, 191.0, "bucket.source", &["Foreground", "Pattern"]),
-            NoPattern(193.5, 223.5, 235.5),
+            PatternBox(193.5, 223.5, 235.5, PatternUse::Choice("bucket.source")),
             Label(239.5, "Mode:"),
             Popup(274.0, 373.0, "bucket.mode", BLEND),
             Label(377.0, "Opacity:"),
@@ -1932,13 +1933,19 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                     set_choice(app, key, value);
                 }
             }
+            // The Patch tool's Use Pattern needs a selection
+            Button(x0, x1, "Use Pattern", _) => {
+                let usable = has_selection(app);
+                if b.button(x0, x1, "Use Pattern", usable).clicked() {
+                    use_pattern(app);
+                }
+            }
             Button(x0, x1, label, enabled) => {
                 b.button(x0, x1, label, enabled);
             }
             PopupOff(x0, x1, label) => {
                 b.popup(x0, x1, label, label, false, |_| {});
             }
-            NoPattern(x0, x1, x2) => b.empty_pattern(x0, x1, x2),
             ColorBox(x0, x1, [r, g, bl]) => {
                 b.color_box(x0, x1, egui::Color32::from_rgb(r, g, bl));
             }
@@ -2202,27 +2209,80 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 b.swatch(x0, x1, fill, None)
             }
             // The Pattern Stamp's pattern, its chevron the pattern picker
-            Swatch(x0, x1, x2, false) => {
-                let k = app.pattern.min(app.patterns.len().saturating_sub(1));
-                let image = app.patterns[k].image.clone();
-                let chevron = b.pattern_swatch(x0, x1, (x1 - 1.0, x2), &image);
-                let entries: Vec<_> = app
-                    .patterns
-                    .iter()
-                    .enumerate()
-                    .map(|(i, p)| crate::native_popup::Entry::item(p.name.clone(), i == k))
-                    .collect();
-                if let Some(i) = crate::native_popup::dropdown(
-                    b.ui,
-                    &chevron,
-                    b.ui.id().with("patterns"),
-                    &entries,
-                ) {
-                    app.pattern = i;
+            Swatch(x0, x1, x2, false) => pattern_box(b, app, (x0, x1, x2)),
+            PatternBox(x0, x1, x2, usable) => {
+                let usable = match usable {
+                    PatternUse::Choice(key) => choice(app, key) == 1,
+                    PatternUse::Selection => has_selection(app),
+                };
+                if usable {
+                    pattern_box(b, app, (x0, x1, x2));
+                } else {
+                    b.empty_pattern(x0, x1, x2);
                 }
             }
         }
     }
+}
+
+/// The Patch tool's Use Pattern: the selection healed with the current
+/// pattern (tiled from the document's corner), with the tool's Transparent
+/// and Diffusion.
+fn use_pattern(app: &mut AppState) {
+    let options = heal_options(app);
+    let k = app.pattern.min(app.patterns.len().saturating_sub(1));
+    let pattern = app.patterns[k].image.clone();
+    let Some(state) = app.active() else {
+        return;
+    };
+    let Some(selection) = state.doc.selection().cloned() else {
+        return;
+    };
+    let source = op_core::heal::tiled_pattern(&pattern, state.doc.width, state.doc.height);
+    if op_core::heal::patch_with(
+        &mut state.doc,
+        &selection,
+        &source,
+        (0, 0),
+        options.patch_style,
+        options.patch_transparent,
+    ) {
+        state.record("Patch Tool");
+    }
+}
+
+/// When a pattern box can be used.
+#[derive(Clone, Copy, Debug)]
+pub enum PatternUse {
+    /// When a choice setting is at 1 (Source: Pattern).
+    Choice(&'static str),
+    /// When the document has a selection (the Patch tool).
+    Selection,
+}
+
+/// The pattern box: the current pattern, its chevron the pattern picker.
+fn pattern_box(b: &mut Bar, app: &mut AppState, (x0, x1, x2): (f32, f32, f32)) {
+    let k = app.pattern.min(app.patterns.len().saturating_sub(1));
+    let image = app.patterns[k].image.clone();
+    let chevron = b.pattern_swatch(x0, x1, (x1 - 1.0, x2), &image);
+    let entries: Vec<_> = app
+        .patterns
+        .iter()
+        .enumerate()
+        .map(|(i, p)| crate::native_popup::Entry::item(p.name.clone(), i == k))
+        .collect();
+    if let Some(i) = crate::native_popup::dropdown(
+        b.ui,
+        &chevron,
+        b.ui.id().with(("patterns", x0 as i32)),
+        &entries,
+    ) {
+        app.pattern = i;
+    }
+}
+
+fn has_selection(app: &mut AppState) -> bool {
+    app.active().is_some_and(|d| d.doc.selection().is_some())
 }
 
 fn to32(c: op_core::Color) -> egui::Color32 {
@@ -2468,19 +2528,38 @@ pub fn red_eye_options(app: &mut AppState) -> (f32, f32) {
     (pct(app, "redeye.pupil"), pct(app, "redeye.darken"))
 }
 
-/// The healing tools' options: the Healing Brush's Aligned and Sample, the
-/// Spot Healing Brush's Sample All Layers, the Patch tool's Destination
-/// mode and Content-Aware Move's Extend.
+/// The healing tools' options: the Healing Brush's Mode, Source, Aligned,
+/// Sample, Use Legacy and Diffusion, the Spot Healing Brush's Mode, Type
+/// and Sample All Layers, the Patch tool's Destination mode, Transparent
+/// and Diffusion, and Content-Aware Move's Extend.
 #[derive(Clone, Copy, Debug)]
 pub struct HealOptions {
     pub aligned: bool,
     pub scope: op_core::SampleScope,
+    /// The Healing Brush's Source: Pattern.
+    pub pattern_source: bool,
+    pub heal_style: op_core::heal::HealStyle,
+    pub spot_style: op_core::heal::HealStyle,
+    /// The Spot Healing Brush's Type: Create Texture (Content-Aware and
+    /// Proximity Match both look for a nearby spot).
+    pub create_texture: bool,
     pub spot_all_layers: bool,
     pub patch_destination: bool,
+    pub patch_transparent: bool,
+    pub patch_style: op_core::heal::HealStyle,
     pub extend: bool,
 }
 
 pub fn heal_options(app: &mut AppState) -> HealOptions {
+    use op_core::heal::{HealMode, HealStyle};
+    let diffusion = |app: &mut AppState, key: &'static str| {
+        crate::options_bar::typed_number(&text(app, key, "5"))
+            .map_or(5, |v| v.round().clamp(1.0, 7.0) as u8)
+    };
+    let mode = |app: &mut AppState, key: &'static str| {
+        HealMode::ALL[choice(app, key).min(HealMode::ALL.len() - 1)]
+    };
+    let heal_diffusion = diffusion(app, "heal.diffusion");
     HealOptions {
         aligned: flag(app, "heal.aligned", false),
         scope: match choice(app, "heal.sample") {
@@ -2488,10 +2567,30 @@ pub fn heal_options(app: &mut AppState) -> HealOptions {
             2 => op_core::SampleScope::All,
             _ => op_core::SampleScope::Current,
         },
+        pattern_source: choice(app, "heal.source") == 1,
+        heal_style: HealStyle {
+            mode: mode(app, "heal.mode"),
+            diffusion: (!flag(app, "heal.legacy", false)).then_some(heal_diffusion),
+        },
+        spot_style: HealStyle {
+            mode: mode(app, "spotheal.mode"),
+            diffusion: None,
+        },
+        create_texture: choice(app, "spotheal.type") == 1,
         spot_all_layers: flag(app, "spotheal.all_layers", false),
         patch_destination: choice(app, "patch.source") == 1,
+        patch_transparent: flag(app, "patch.transparent", false),
+        patch_style: HealStyle {
+            mode: HealMode::Normal,
+            diffusion: Some(diffusion(app, "patch.diffusion")),
+        },
         extend: choice(app, "cam.move") == 1,
     }
+}
+
+/// The Paint Bucket's Source: Pattern.
+pub fn bucket_uses_pattern(app: &mut AppState) -> bool {
+    choice(app, "bucket.source") == 1
 }
 
 /// The Magnetic Lasso's Width (pixels), Contrast (0–1) and Frequency

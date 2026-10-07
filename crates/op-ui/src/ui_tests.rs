@@ -6514,6 +6514,57 @@ fn healing_tools() {
 }
 
 #[test]
+fn healing_with_patterns_and_fill_pattern() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A two-color pattern, chosen
+    {
+        let app = &mut h.state_mut().state;
+        let mut image = op_core::TiledImage::new(2, 1);
+        image.set_pixel(0, 0, [255, 0, 0, 255]);
+        image.set_pixel(1, 0, [0, 0, 255, 255]);
+        app.patterns.push(crate::state::Pattern {
+            name: "Stripes".into(),
+            image,
+        });
+        app.pattern = app.patterns.len() - 1;
+    }
+    // Healing Brush, Source: Pattern: no source point needed, and the
+    // stripes' texture shows where it heals
+    *h.state_mut().state.setting("heal.source", "0") = "1".into();
+    h.state_mut().state.select_tool(Tool::HealingBrush);
+    h.state_mut().state.healing_brush.size = 20.0;
+    h.run_steps(1);
+    let p = doc_point(&h, 300.0, 300.0);
+    click(&mut h, p);
+    assert_eq!(last_history(&h), "Healing Brush");
+    let (a, b) = (
+        composite_pixel(&mut h, 300, 300),
+        composite_pixel(&mut h, 301, 300),
+    );
+    assert!(
+        a[0].abs_diff(b[0]) > 40 || a[2].abs_diff(b[2]) > 40,
+        "{a:?} {b:?}"
+    );
+
+    // Edit › Fill with Pattern
+    h.state_mut().state.fill_dialog = Some(Default::default());
+    h.state_mut()
+        .state
+        .fill_dialog
+        .as_mut()
+        .unwrap()
+        .set_contents_for_test(crate::dialogs::FillContents::Pattern);
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(composite_pixel(&mut h, 10, 10), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 11, 10), [0, 0, 255, 255]);
+    assert_eq!(last_history(&h), "Fill");
+}
+
+#[test]
 fn magnetic_lasso_follows_edges() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);
@@ -8910,20 +8961,37 @@ fn marquee_fixed_ratio_and_fixed_size() {
     h.run_steps(2);
     // Fixed Ratio 2:1: a drag 100 × 20 becomes 100 × 50
     h.state_mut().state.marquee.style = MarqueeStyle::FixedRatio;
-    h.state_mut().state.tool_settings.insert("marquee.ratio_w", "2".into());
+    h.state_mut()
+        .state
+        .tool_settings
+        .insert("marquee.ratio_w", "2".into());
     let (a, b) = (doc_point(&h, 50.0, 50.0), doc_point(&h, 150.0, 70.0));
     drag(&mut h, a, b, Modifiers::NONE);
     h.run_steps(2);
     let bounds = active(&h).doc.selection().and_then(|s| s.bounds()).unwrap();
-    assert_eq!((bounds.2 - bounds.0, bounds.3 - bounds.1), (100, 50), "{bounds:?}");
+    assert_eq!(
+        (bounds.2 - bounds.0, bounds.3 - bounds.1),
+        (100, 50),
+        "{bounds:?}"
+    );
     // Fixed Size 64 × 30: a click selects that size at the point
     h.state_mut().state.marquee.style = MarqueeStyle::FixedSize;
-    h.state_mut().state.tool_settings.insert("marquee.size_h", "30 px".into());
+    h.state_mut()
+        .state
+        .tool_settings
+        .insert("marquee.size_h", "30 px".into());
     let p = doc_point(&h, 200.0, 120.0);
     click(&mut h, p);
     h.run_steps(2);
     let bounds = active(&h).doc.selection().and_then(|s| s.bounds()).unwrap();
-    assert_eq!((bounds.2 - bounds.0, bounds.3 - bounds.1), (64, 30), "{bounds:?}");
-    assert!((bounds.0 as i32 - 200).abs() <= 1 && (bounds.1 as i32 - 120).abs() <= 1, "{bounds:?}");
+    assert_eq!(
+        (bounds.2 - bounds.0, bounds.3 - bounds.1),
+        (64, 30),
+        "{bounds:?}"
+    );
+    assert!(
+        (bounds.0 as i32 - 200).abs() <= 1 && (bounds.1 as i32 - 120).abs() <= 1,
+        "{bounds:?}"
+    );
     assert_eq!(last_history(&h), "Rectangular Marquee");
 }

@@ -1808,7 +1808,7 @@ fn h_paint_bucket(s: &mut AppState, a: &Value) -> Result<Value, String> {
         all_layers,
     };
     let (id, m) = s.get_mut(a)?;
-    match op_core::fill::bucket(&mut m.doc, x, y, color, opts) {
+    match op_core::fill::bucket(&mut m.doc, x, y, color, None, opts) {
         Ok(false) => Err("click is outside the document".to_string()),
         Ok(true) => {
             m.history.record(&m.doc, "Paint Bucket");

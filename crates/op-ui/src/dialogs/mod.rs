@@ -59,7 +59,9 @@ pub use color_picker::{ColorPicker, Outcome as ColorPickerOutcome};
 pub use duplicate_layer::{Destination, DuplicateLayerDialog, Outcome as DuplicateOutcome};
 pub use equalize::{EqualizeDialog, Outcome as EqualizeOutcome};
 pub use fade::{FadeDialog, Outcome as FadeOutcome};
-pub use fill::{FillDialog, Outcome as FillOutcome};
+#[cfg(test)]
+pub use fill::Contents as FillContents;
+pub use fill::{FillDialog, FillWith, Outcome as FillOutcome};
 pub use image_size::{ImageSizeDialog, Outcome as ImageSizeOutcome, Preview as ImageSizePreview};
 pub use lock_layers::{LockLayersDialog, Outcome as LockOutcome};
 pub use modify_selection::{ModifyDialog, ModifyKind, Outcome as ModifyOutcome};

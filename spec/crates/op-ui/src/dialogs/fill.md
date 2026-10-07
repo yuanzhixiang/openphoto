@@ -2,7 +2,7 @@
 
 ## Component responsibilities
 
-Edit › Fill... (⇧F5). Chooses the fill contents and blending; on OK, `lib.rs` calls `op_core::fill::fill` to fill the current layer's selection (the whole layer when there is no selection) and records a "Fill" history entry.
+Edit › Fill... (⇧F5). Chooses the fill contents and blending; on OK (`Outcome::Apply { with: FillWith, options }`), `lib.rs` calls `op_core::fill::fill` (a color), `fill_pattern` (Pattern) or `fill_history` (History) to fill the current layer's selection (the whole layer when there is no selection) and records a "Fill" history entry.
 
 ## Layout
 
@@ -10,7 +10,7 @@ Measured point by point from Photoshop 2026's Fill dialog (a classic AppKit dial
 
 - Title bar: `common::frame`, system bold 13 pt "Fill". Text is 12 pt system font (`theme::dialog`, with macOS tracking), `#f0f0f0`.
 - "Contents:" right-aligned at 112.5, centered at y 48.5; dropdown (118–263, y 38–59).
-- **Options** group box (11.5–262.5, y 116–166): 1 pt `#424242` line, the title "Options" starting at 30.5 on top of the upper line, with the line leaving 5 pt on each side of the title. Inside is the disabled "Color Adaptation" checkbox (20, 141.5): it only matters for Content-Aware, and Content-Aware is not implemented yet, so it is always grayed out.
+- **Options** group box (11.5–262.5, y 116–166): 1 pt `#424242` line, the title "Options" starting at 30.5 on top of the upper line, with the line leaving 5 pt on each side of the title. Inside is the disabled "Color Adaptation" checkbox (20, 141.5): it only matters for Content-Aware, which is not implemented (P3 #26), so it is always grayed out. With Pattern chosen, the group holds "Custom Pattern:" (right-aligned at 112.5, y 141.5) and the pattern swatch (118–148, y 128.5–155.5: the pattern tiled a pixel a point, `#666666` border) with its chevron box (147–160) instead; the chevron opens the patterns (`AppState::patterns`, the current one checked) as a native pop-up menu, and the pick becomes `AppState::pattern`, shared with the tools' pattern pickers.
 - **Blending** group box (11.5–262.5, y 184–282): "Mode:" (centered at y 208.5) and dropdown (118–253, y 198–219, all 27 blend modes, grouped as in Photoshop's menu); "Opacity:" (236.5) and input field (117–169, y 227–246, focused with everything selected on open, ↑↓ step 1, ⇧ step 10) plus "%" (177.5); "Preserve Transparency" checkbox (20, 257.5).
 - Checkboxes are 12 pt, with text 11 pt to the right of the box; when disabled, a `#4d4d4d` box, `#5d5d5d` border and `#8e8e8e` text.
 - OK (default button, bright border) (278.5–338.5, y 38.5–64.5), Cancel (y 73.5–99.5): 26 pt high capsule buttons.
@@ -19,7 +19,10 @@ Compared with Photoshop screenshots, each element differs by no more than 1 pt.
 
 ## Contents options
 
-Foreground Color (default), Background Color, Color...; Content-Aware, Pattern, History (grayed out); Black, 50% Gray (128), White.
+Foreground Color (default), Background Color, Color...; Content-Aware (grayed out), Pattern, History; Black, 50% Gray (128), White.
+
+- Pattern fills with the chosen pattern tiled from the document's corner.
+- History fills with the active layer as it is in the History panel's source state (the History Brush's source, by default the document as opened). When that state has no such layer, or a different canvas size, the alert "Could not complete the Fill command because the history state does not contain a corresponding layer." appears and nothing is filled.
 
 Choosing "Color..." opens the Color Picker titled "Color Picker (Fill Color)"; after OK there, Contents becomes Color... and uses the chosen color; Cancel keeps the previous choice.
 
@@ -34,5 +37,6 @@ The opacity must be a number from 0–100, otherwise OK is grayed out.
 
 ## Known limitations
 
-- Content-Aware, Pattern and History are not implemented yet, so Color Adaptation is always grayed out; there is no pattern picker for Pattern and no script options.
+- Content-Aware is not implemented (P3 #26), so Color Adaptation is always grayed out. Pattern's Script option (Scripted Patterns) is not shown: it runs Photoshop's pattern scripts (P3 #25).
+- The Pattern layout of the Options group (Custom Pattern's label and swatch) is placed by eye, not measured against Photoshop.
 - The last settings are not remembered.

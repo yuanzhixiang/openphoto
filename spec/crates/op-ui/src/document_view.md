@@ -123,9 +123,9 @@ While the document is in Free Transform, presses, drags, Enter, and Esc on the c
 
 ## Healing tools
 
-- Healing Brush: ⌥-click picks the source (shared with the Clone Stamp: `clone_source` / `clone_offset`); Aligned (`heal.aligned`, off by default); Sample scope (`heal.sample`); the stroke blends the source's texture into the target's surroundings (`paint.md`), recording "Healing Brush". Without a source the alert "Could not use the healing brush because the area to heal has not been defined (option-click to define a source point)." appears.
-- Spot Healing Brush: the stroke kind `SpotHeal`, on the current layer or on all layers (`spotheal.all_layers`), recording "Spot Healing Brush".
-- Patch and Content-Aware Move (`patch_input`): without a selection, or when pressing outside it, they draw a freehand selection like the Lasso (recording "Lasso"). Dragging inside the selection moves its outline (`DocState::patch_drag`, the outline drawn offset). On release: Patch with Source → `heal::patch`, Destination → `heal::patch_to` (the selection follows); Content-Aware Move with Move → `heal::content_aware_move`, Extend → `heal::patch_to`; the selection follows the moved pixels. Records "Patch Tool" / "Content-Aware Move". A zero-length drag does nothing.
+- Healing Brush: ⌥-click picks the source (shared with the Clone Stamp: `clone_source` / `clone_offset`); Aligned (`heal.aligned`, off by default); Sample scope (`heal.sample`); the stroke blends the source's texture into the target's surroundings (`paint.md`) in the options bar's Mode and Diffusion (`Stroke::with_heal_style`; Use Legacy: no Diffusion), recording "Healing Brush". With Source: Pattern the source is the chosen pattern (`AppState::pattern`) tiled from the document's corner (`heal::tiled_pattern`) and no source point is needed. With Sampled and no source the alert "Could not use the healing brush because the area to heal has not been defined (option-click to define a source point)." appears.
+- Spot Healing Brush: the stroke kind `SpotHeal`, on the current layer or on all layers (`spotheal.all_layers`), in the options bar's Mode (Legacy healing), with Create Texture (`Stroke::with_create_texture`) when that Type is chosen, recording "Spot Healing Brush".
+- Patch and Content-Aware Move (`patch_input`): without a selection, or when pressing outside it, they draw a freehand selection like the Lasso (recording "Lasso"). Dragging inside the selection moves its outline (`DocState::patch_drag`, the outline drawn offset). On release: Patch with Source → `heal::patch_with` with the layer as source and the bar's Diffusion and Transparent, Destination → `heal::patch_to` (the selection follows); Content-Aware Move with Move → `heal::content_aware_move`, Extend → `heal::patch_to`; the selection follows the moved pixels. Records "Patch Tool" / "Content-Aware Move". A zero-length drag does nothing.
 - When the window size changes, the document stays centered (the view offset is stored relative to the viewport center).
 
 ## Marquee tools
@@ -154,7 +154,7 @@ Applies to the Rectangular, Elliptical, Single Row, and Single Column Marquee:
 
 ## Paint Bucket
 
-Clicking the document: fills the region of similar color at the click point with the foreground color according to the Paint Bucket options (see `crates/op-core/src/fill.md`), recording "Paint Bucket". When filling is not possible, Photoshop's alert appears. The cursor is a crosshair.
+Clicking the document: fills the region of similar color at the click point with the foreground color (Source: Pattern, the chosen pattern, `options_tools::bucket_uses_pattern`) according to the Paint Bucket options (see `crates/op-core/src/fill.md`), recording "Paint Bucket". When filling is not possible, Photoshop's alert appears. The cursor is a crosshair.
 
 ## Painting tools
 

@@ -94,7 +94,8 @@ The styles (`ArtStyle`) give a length in diameters, a looseness, and whether the
 ## Healing strokes
 
 - `Heal { source, dx, dy }` (Healing Brush) and `SpotHeal(source)` (Spot Healing Brush) don't go through the coverage map. Each dab heals the pixels under the tip with `heal::heal_window` over the dab's box plus one pixel (the edge values come from the layer as it is at that moment, so dabs follow on from earlier ones), and mixes them into the layer by the tip's coverage × opacity × selection; alpha is kept (or follows `mix` when transparency isn't locked).
-- The Healing Brush takes its texture at the fixed offset; the Spot Healing Brush picks an offset per dab with `heal::proximity_match` on its source image. A dab whose source would leave the image changes nothing.
+- The Healing Brush takes its texture at the fixed offset (for Source: Pattern the UI passes the tiled pattern at offset 0); the Spot Healing Brush picks an offset per dab with `heal::proximity_match` on its source image, or with Create Texture (`with_create_texture`) heals from `heal::mirrored_texture` of the dab. A dab whose source would leave the image changes nothing.
+- `with_heal_style(style)`: the dabs heal with `heal::heal_window_with` in that Mode and Diffusion (default: Normal, Legacy). In Replace mode each pixel's amount is 1 or 0 by `heal::replace_takes(x, y, coverage × opacity × selection)` instead of a mix.
 
 ## Pixel rules
 

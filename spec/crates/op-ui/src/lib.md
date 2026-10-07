@@ -65,7 +65,8 @@ When the dialog returns OK, if the new size differs from the current size, `resi
 ## Wiring the Fill dialog
 
 - When the Fill dialog requests a color (Contents set to Color...), the Color Picker opens with the title "Color Picker (Fill Color)", and on OK the color is written back to the dialog.
-- On OK, the fill is applied to the current document and "Fill" is recorded; on failure an alert is shown.
+- The dialog's Custom Pattern picker shows and sets `AppState::pattern` among `AppState::patterns`.
+- On OK, the fill is applied to the current document and "Fill" is recorded; on failure an alert is shown. A color fills with `fill::fill`, Pattern with `fill::fill_pattern` and the chosen pattern, History with `fill::fill_history` and the active layer in the History Brush's source state (`history_brush_snapshot`); when that state has no such layer or a different size, the alert "Could not complete the Fill command because the history state does not contain a corresponding layer." appears instead.
 
 ## Wiring adjustment and filter dialogs (preview)
 

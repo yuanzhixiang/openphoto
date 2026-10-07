@@ -228,7 +228,9 @@ impl OpenPhotoApp {
         };
         let (fg, bg) = (self.state.foreground, self.state.background);
         let active = self.state.color_picker.is_none();
-        let outcome = dialog.show(ctx, fg, bg, active);
+        let mut pattern = self.state.pattern;
+        let outcome = dialog.show(ctx, fg, bg, active, (&self.state.patterns, &mut pattern));
+        self.state.pattern = pattern;
         if let Some(color) = dialog.take_color_picker_request() {
             self.state.color_picker = Some(state::PickerSession {
                 picker: dialogs::ColorPicker::new("Color Picker (Fill Color)", color),
@@ -238,13 +240,52 @@ impl OpenPhotoApp {
         match outcome {
             dialogs::FillOutcome::Open => self.state.fill_dialog = Some(dialog),
             dialogs::FillOutcome::Cancel => {}
-            dialogs::FillOutcome::Apply { color, options } => {
-                let [r, g, b, _] = color.to_rgba8();
-                if let Some(state) = self.state.active() {
-                    match op_core::fill::fill(&mut state.doc, [r, g, b], options) {
-                        Ok(()) => state.record_fadeable("Fill"),
-                        Err(e) => self.state.alert = Some(e.message("Fill")),
+            dialogs::FillOutcome::Apply { with, options } => {
+                let k = self
+                    .state
+                    .pattern
+                    .min(self.state.patterns.len().saturating_sub(1));
+                let pattern = self.state.patterns.get(k).map(|p| p.image.clone());
+                let Some(state) = self.state.active() else {
+                    return;
+                };
+                let result = match with {
+                    dialogs::FillWith::Color(color) => {
+                        let [r, g, b, _] = color.to_rgba8();
+                        op_core::fill::fill(&mut state.doc, [r, g, b], options)
                     }
+                    dialogs::FillWith::Pattern => match &pattern {
+                        Some(p) => op_core::fill::fill_pattern(&mut state.doc, p, options),
+                        None => Ok(()),
+                    },
+                    dialogs::FillWith::History => {
+                        // The History panel's source state of this layer
+                        let image = state.doc.active_layer.and_then(|id| {
+                            let snapshot = state.history_brush_snapshot()?;
+                            let layer = op_core::Document::snapshot_layer(snapshot, id)?;
+                            layer.image().cloned()
+                        });
+                        match image {
+                            Some(image)
+                                if (image.width(), image.height())
+                                    == (state.doc.width, state.doc.height) =>
+                            {
+                                op_core::fill::fill_history(&mut state.doc, &image, options)
+                            }
+                            _ => {
+                                self.state.alert = Some(
+                                    "Could not complete the Fill command because the history \
+                                     state does not contain a corresponding layer."
+                                        .into(),
+                                );
+                                return;
+                            }
+                        }
+                    }
+                };
+                match result {
+                    Ok(()) => state.record_fadeable("Fill"),
+                    Err(e) => self.state.alert = Some(e.message("Fill")),
                 }
             }
         }

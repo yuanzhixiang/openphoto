@@ -160,16 +160,25 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let clone_panel = app.clone_panel;
     // The Art History Brush's Style, Area, Tolerance and Opacity
     let art = (tool == Tool::ArtHistoryBrush).then(|| art_settings(app));
-    // The Pattern Stamp's pattern and Impressionist
-    let pattern = (tool == Tool::PatternStamp).then(|| {
-        let k = app.pattern.min(app.patterns.len().saturating_sub(1));
-        (
-            app.patterns[k].image.clone(),
-            app.flag("pattern.impressionist", false),
-        )
-    });
+    // The Pattern Stamp's pattern and Impressionist (the Healing Brush's
+    // and the Patch tool's pattern too)
+    let pattern =
+        matches!(tool, Tool::PatternStamp | Tool::HealingBrush | Tool::Patch).then(|| {
+            let k = app.pattern.min(app.patterns.len().saturating_sub(1));
+            (
+                app.patterns[k].image.clone(),
+                app.flag("pattern.impressionist", false),
+            )
+        });
     let (foreground, background) = (app.foreground, app.background);
     let bucket = app.bucket;
+    // The Paint Bucket's Source: Pattern
+    let bucket_pattern =
+        (tool == Tool::PaintBucket && crate::options_tools::bucket_uses_pattern(app)).then(|| {
+            app.patterns[app.pattern.min(app.patterns.len().saturating_sub(1))]
+                .image
+                .clone()
+        });
     let view_options = app.view;
     let retouch = app.retouch;
     let shape_options = app.shape;
@@ -634,6 +643,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                             d.x as u32,
                             d.y as u32,
                             [r, g, b],
+                            bucket_pattern.as_ref(),
                             bucket,
                         ) {
                             Ok(true) => state.record_fadeable("Paint Bucket"),
@@ -2065,6 +2075,18 @@ fn paint_input(
             }
             other => other,
         };
+        // The Healing Brush's Pattern source: the pattern tiled from the
+        // document's corner, no source point needed
+        let kind = match &pattern {
+            Some((image, _)) if tool == Tool::HealingBrush && heal.pattern_source => {
+                Ok(op_core::paint::StrokeKind::Heal {
+                    source: op_core::heal::tiled_pattern(image, state.doc.width, state.doc.height),
+                    dx: 0,
+                    dy: 0,
+                })
+            }
+            _ => kind,
+        };
         let kind = match kind {
             Ok(kind) => kind,
             Err(message) => {
@@ -2107,6 +2129,15 @@ fn paint_input(
                 }
                 if let Some((_, impressionist)) = &pattern {
                     stroke = stroke.with_impressionist(*impressionist);
+                }
+                match tool {
+                    Tool::HealingBrush => stroke = stroke.with_heal_style(heal.heal_style),
+                    Tool::SpotHealingBrush => {
+                        stroke = stroke
+                            .with_heal_style(heal.spot_style)
+                            .with_create_texture(heal.create_texture);
+                    }
+                    _ => {}
                 }
                 let start = ui
                     .input(|i| i.pointer.press_origin())
@@ -2807,7 +2838,22 @@ fn patch_input(
                 true,
             ),
             Tool::Patch => (
-                op_core::heal::patch(&mut state.doc, &selection, (dx, dy)),
+                state
+                    .doc
+                    .active_layer
+                    .and_then(|id| state.doc.layer(id))
+                    .and_then(|l| l.image())
+                    .cloned()
+                    .is_some_and(|source| {
+                        op_core::heal::patch_with(
+                            &mut state.doc,
+                            &selection,
+                            &source,
+                            (-dx, -dy),
+                            heal.patch_style,
+                            heal.patch_transparent,
+                        )
+                    }),
                 "Patch Tool",
                 false,
             ),

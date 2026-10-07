@@ -55,16 +55,29 @@ impl Contents {
         }
     }
 
-    /// Content-Aware, Pattern and History aren't implemented.
+    /// Content-Aware isn't implemented.
     fn available(self) -> bool {
-        !matches!(self, Self::ContentAware | Self::Pattern | Self::History)
+        self != Self::ContentAware
     }
+}
+
+/// What OK fills with.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum FillWith {
+    Color(Color),
+    /// The pattern chosen under Custom Pattern (`AppState::pattern`).
+    Pattern,
+    /// The History panel's source state of the layer.
+    History,
 }
 
 pub enum Outcome {
     Open,
     Cancel,
-    Apply { color: Color, options: FillOptions },
+    Apply {
+        with: FillWith,
+        options: FillOptions,
+    },
 }
 
 pub struct FillDialog {
@@ -98,10 +111,23 @@ impl FillDialog {
         std::mem::take(&mut self.wants_color_picker).then_some(self.color)
     }
 
+    #[cfg(test)]
+    pub fn set_contents_for_test(&mut self, contents: Contents) {
+        self.contents = contents;
+    }
+
     /// The Color Picker was confirmed for "Color...".
     pub fn set_color(&mut self, color: Color) {
         self.contents = Contents::Color;
         self.color = color;
+    }
+
+    fn fill_with(&self, foreground: Color, background: Color) -> FillWith {
+        match self.contents {
+            Contents::Pattern => FillWith::Pattern,
+            Contents::History => FillWith::History,
+            _ => FillWith::Color(self.fill_color(foreground, background)),
+        }
     }
 
     fn fill_color(&self, foreground: Color, background: Color) -> Color {
@@ -122,13 +148,16 @@ impl FillDialog {
         (0.0..=100.0).contains(&v).then_some(v / 100.0)
     }
 
-    /// `active` is false while the Color Picker is open on top.
+    /// `active` is false while the Color Picker is open on top. `patterns`
+    /// are the Custom Pattern picker's patterns and `pattern` the chosen
+    /// one.
     pub fn show(
         &mut self,
         ctx: &egui::Context,
         foreground: Color,
         background: Color,
         active: bool,
+        (patterns, pattern): (&[crate::state::Pattern], &mut usize),
     ) -> Outcome {
         let mut outcome = Outcome::Open;
         egui::Modal::new(egui::Id::new("fill-dialog"))
@@ -136,7 +165,13 @@ impl FillDialog {
             .backdrop_color(Color32::TRANSPARENT)
             .show(ctx, |ui| {
                 let (rect, _) = ui.allocate_exact_size(SIZE, Sense::hover());
-                outcome = self.ui(ui, rect, foreground, background, active);
+                outcome = self.ui(
+                    ui,
+                    rect,
+                    (foreground, background),
+                    active,
+                    (patterns, pattern),
+                );
             });
         self.first_frame = false;
         if active && ctx.input(|i| i.key_pressed(Key::Escape)) {
@@ -149,9 +184,9 @@ impl FillDialog {
         &mut self,
         ui: &mut Ui,
         frame: Rect,
-        foreground: Color,
-        background: Color,
+        (foreground, background): (Color, Color),
         active: bool,
+        (patterns, pattern): (&[crate::state::Pattern], &mut usize),
     ) -> Outcome {
         let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
         let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
@@ -204,16 +239,72 @@ impl FillDialog {
                 (t.left() - pt(5.0), t.right() + pt(5.0)),
             );
         }
-        // Color Adaptation only applies to Content-Aware, which isn't
-        // available
-        appkit::checkbox_with(
-            ui,
-            at(20.0, 141.5),
-            (12.0, 11.0),
-            "Color Adaptation",
-            &mut false,
-            false,
-        );
+        if self.contents == Contents::Pattern && !patterns.is_empty() {
+            // Custom Pattern: the pattern, its chevron the picker
+            label(ui, 141.5, "Custom Pattern:");
+            let k = (*pattern).min(patterns.len() - 1);
+            let image = &patterns[k].image;
+            let swatch = r(118.0, 128.5, 148.0, 155.5);
+            let painter = ui.painter_at(swatch);
+            let (pw, ph) = (image.width().max(1), image.height().max(1));
+            let (cols, rows) = (
+                (swatch.width() / pt(1.0)).ceil() as u32,
+                (swatch.height() / pt(1.0)).ceil() as u32,
+            );
+            for y in 0..rows {
+                for x in 0..cols {
+                    let [r, g, b, _] = image.pixel(x % pw, y % ph);
+                    let cell = Rect::from_min_size(
+                        swatch.min + vec2(x as f32 * pt(1.0), y as f32 * pt(1.0)),
+                        vec2(pt(1.0), pt(1.0)),
+                    );
+                    painter.rect_filled(cell, 0, Color32::from_rgb(r, g, b));
+                }
+            }
+            ui.painter().rect_stroke(
+                swatch,
+                0,
+                egui::Stroke::new(pt(1.0), appkit::FIELD_BORDER),
+                egui::StrokeKind::Inside,
+            );
+            let chevron_rect = r(147.0, 128.5, 160.0, 155.5);
+            let chevron = ui.interact(chevron_rect, ui.id().with("fill-pattern"), Sense::click());
+            ui.painter().rect(
+                chevron_rect,
+                0,
+                appkit::FIELD,
+                egui::Stroke::new(pt(1.0), appkit::FIELD_BORDER),
+                egui::StrokeKind::Inside,
+            );
+            crate::ps_icons::paint(
+                ui.painter(),
+                chevron_rect.center(),
+                crate::ps_icons::Icon::Caret,
+                Color32::from_gray(0xd0),
+                appkit::FIELD,
+            );
+            let entries: Vec<_> = patterns
+                .iter()
+                .enumerate()
+                .map(|(i, p)| Entry::item(p.name.clone(), i == k))
+                .collect();
+            if let Some(i) =
+                crate::native_popup::dropdown(ui, &chevron, ui.id().with("fill-patterns"), &entries)
+            {
+                *pattern = i;
+            }
+        } else {
+            // Color Adaptation only applies to Content-Aware, which isn't
+            // available
+            appkit::checkbox_with(
+                ui,
+                at(20.0, 141.5),
+                (12.0, 11.0),
+                "Color Adaptation",
+                &mut false,
+                false,
+            );
+        }
 
         label(ui, 208.5, "Mode:");
         let (entries, modes) = appkit::blend_modes(self.mode);
@@ -265,7 +356,7 @@ impl FillDialog {
             && let Some(opacity) = opacity
         {
             return Outcome::Apply {
-                color: self.fill_color(foreground, background),
+                with: self.fill_with(foreground, background),
                 options: FillOptions {
                     mode: self.mode,
                     opacity,

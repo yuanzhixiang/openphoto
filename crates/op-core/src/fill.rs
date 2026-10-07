@@ -82,6 +82,16 @@ fn fill_masked(
     options: FillOptions,
     mask: Option<&Selection>,
 ) -> Result<bool, FillError> {
+    fill_masked_with(doc, &|_, _| color, options, mask)
+}
+
+/// [`fill_masked`] with each pixel's color from `paint` (a pattern).
+fn fill_masked_with(
+    doc: &mut Document,
+    paint: &dyn Fn(u32, u32) -> [u8; 3],
+    options: FillOptions,
+    mask: Option<&Selection>,
+) -> Result<bool, FillError> {
     target(doc)?;
     let selection = doc.selection().cloned();
     let (w, h) = (doc.width, doc.height);
@@ -89,13 +99,8 @@ fn fill_masked(
     // The background layer and masks are always opaque; locked transparency
     // keeps alpha
     let keep_alpha = target.keep_alpha || options.preserve_transparency;
-    let color = if target.mask {
-        crate::adjust::mask_gray(color)
-    } else {
-        color
-    };
+    let on_mask = target.mask;
     let image = target.image;
-    let src = color.map(|v| v as f32 / 255.0);
     let mut changed = false;
     for y in 0..h {
         for x in 0..w {
@@ -113,6 +118,13 @@ fn fill_masked(
             if keep_alpha && base[3] == 0 {
                 continue;
             }
+            let color = paint(x, y);
+            let color = if on_mask {
+                crate::adjust::mask_gray(color)
+            } else {
+                color
+            };
+            let src = color.map(|v| v as f32 / 255.0);
             let dst = base.map(|v| v as f32 / 255.0);
             let out = if keep_alpha {
                 // Recolor in place: blend as if the pixel were opaque, keep alpha
@@ -137,6 +149,38 @@ fn fill_masked(
     }
     doc.mark_dirty();
     Ok(changed)
+}
+
+/// `pattern`'s color at (x, y), tiled from the document's corner.
+fn pattern_at(pattern: &TiledImage) -> impl Fn(u32, u32) -> [u8; 3] + '_ {
+    let (pw, ph) = (pattern.width().max(1), pattern.height().max(1));
+    move |x, y| {
+        let [r, g, b, _] = pattern.pixel(x % pw, y % ph);
+        [r, g, b]
+    }
+}
+
+/// Edit > Fill with a pattern tiled from the document's corner.
+pub fn fill_pattern(
+    doc: &mut Document,
+    pattern: &TiledImage,
+    options: FillOptions,
+) -> Result<(), FillError> {
+    fill_masked_with(doc, &pattern_at(pattern), options, None).map(|_| ())
+}
+
+/// Edit > Fill with History: each pixel from `source` (the layer as it was
+/// in the History panel's source state, the document's size).
+pub fn fill_history(
+    doc: &mut Document,
+    source: &TiledImage,
+    options: FillOptions,
+) -> Result<(), FillError> {
+    let paint = |x: u32, y: u32| {
+        let [r, g, b, _] = source.pixel(x, y);
+        [r, g, b]
+    };
+    fill_masked_with(doc, &paint, options, None).map(|_| ())
 }
 
 /// Edit > Fill with a solid color.
@@ -339,13 +383,15 @@ fn bucket_region(source: &TiledImage, x: u32, y: u32, options: &BucketOptions) -
     Selection::from_mask(w, h, mask, options.anti_alias)
 }
 
-/// Paint Bucket click at (`x`, `y`) with `color`. Returns `Ok(false)` when
-/// the click is outside the document.
+/// Paint Bucket click at (`x`, `y`) with `color` (or, Source: Pattern,
+/// with `pattern` tiled from the document's corner). Returns `Ok(false)`
+/// when the click is outside the document.
 pub fn bucket(
     doc: &mut Document,
     x: u32,
     y: u32,
     color: [u8; 3],
+    pattern: Option<&TiledImage>,
     options: BucketOptions,
 ) -> Result<bool, FillError> {
     let id = target(doc)?;
@@ -359,7 +405,10 @@ pub fn bucket(
         layer.image().expect("checked: not a group").clone()
     };
     let region = bucket_region(&source, x, y, &options);
-    fill_masked(doc, color, options.fill, Some(&region))
+    match pattern {
+        Some(p) => fill_masked_with(doc, &pattern_at(p), options.fill, Some(&region)),
+        None => fill_masked(doc, color, options.fill, Some(&region)),
+    }
 }
 
 #[cfg(test)]
@@ -509,7 +558,7 @@ mod tests {
             anti_alias: false,
             ..Default::default()
         };
-        bucket(&mut d, 1, 1, [255, 0, 0], opts).unwrap();
+        bucket(&mut d, 1, 1, [255, 0, 0], None, opts).unwrap();
         assert_eq!(px(&d, 4, 9), [255, 0, 0, 255]);
         assert_eq!(px(&d, 5, 5), [0, 0, 0, 255]);
         assert_eq!(px(&d, 8, 8), [255, 255, 255, 255]);
@@ -519,7 +568,7 @@ mod tests {
             anti_alias: false,
             ..Default::default()
         };
-        bucket(&mut d, 8, 8, [0, 255, 0], opts).unwrap();
+        bucket(&mut d, 8, 8, [0, 255, 0], None, opts).unwrap();
         assert_eq!(px(&d, 8, 8), [0, 255, 0, 255]);
         assert_eq!(px(&d, 1, 1), [255, 0, 0, 255]);
     }
@@ -543,6 +592,27 @@ mod tests {
             FillError::Locked.message("Fill"),
             "Could not complete the Fill command because the layer is locked."
         );
+    }
+
+    #[test]
+    fn bucket_fills_with_a_pattern() {
+        let mut d = doc();
+        let mut pattern = TiledImage::new(2, 1);
+        pattern.set_pixel(0, 0, [255, 0, 0, 255]);
+        pattern.set_pixel(1, 0, [0, 0, 255, 255]);
+        bucket(
+            &mut d,
+            3,
+            3,
+            [0, 0, 0],
+            Some(&pattern),
+            BucketOptions::default(),
+        )
+        .unwrap();
+        assert_eq!(px(&d, 4, 7), [255, 0, 0, 255]);
+        assert_eq!(px(&d, 5, 7), [0, 0, 255, 255]);
+        fill_pattern(&mut d, &pattern, FillOptions::default()).unwrap();
+        assert_eq!(px(&d, 0, 0), [255, 0, 0, 255]);
     }
 }
 
