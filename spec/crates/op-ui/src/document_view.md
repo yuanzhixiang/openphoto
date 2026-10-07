@@ -179,7 +179,8 @@ Applies to the Brush, Pencil, Eraser, and retouching tools (Dodge, Burn, Sponge,
 - Height 16, with a 1 pt `#444444` line at the top, background in the panel color.
 - From left to right: zoom percentage (a 60-wide `#414141` box, text centered), document size and resolution starting at 89 from the left (e.g. `734 px x 811 px (96 ppi)`), and a right-pointing arrow at 237 from the left.
 - From 243 from the left up to the vertical scrollbar column is the horizontal scrollbar: track `#4a4a4a`, thumb 10 high, color `#696969`. The corner below the vertical scrollbar column stays the panel color.
-- The zoom box does not accept input, and the arrow has no menu.
+- The zoom box (`zoom_box`) is a text field: clicking it selects the whole percentage; a typed value (with or without "%", e.g. `200` or `50%`) zooms around the window's center when Enter is pressed or the box loses focus, clamped to 1%–12800%; Esc or text that is not a positive number leaves the zoom unchanged, and the box shows the current zoom again. While it has focus, single-key shortcuts are off (digits go into the box). Until it is edited, the percentage is painted as a label rather than by the text edit, so it stays exactly where it was (the text edit would place it a fraction of a pixel off). The selection highlight color while editing (`#2c5fb8`) has not been measured against Photoshop.
+- The arrow has no menu.
 
 ## Visible area
 

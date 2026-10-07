@@ -5744,3 +5744,38 @@ fn screen_modes_and_hiding_panels() {
     assert!(h.state().state.full_screen_prompt.is_none());
     assert_eq!(h.state().state.screen_mode, ScreenMode::Full);
 }
+
+#[test]
+fn status_bar_zoom_box_takes_a_percentage() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let vp = active(&h).view.viewport;
+    // The zoom box: the first 60 pt of the status bar below the view
+    let zoom_box = Pos2::new(vp.left() + 30.0, vp.bottom() + crate::theme::pt(8.5));
+    let before = active(&h).view.zoom;
+    // Typing a percentage and Enter zooms around the window's center
+    click(&mut h, zoom_box);
+    h.event(egui::Event::Text("200".into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(active(&h).view.zoom, 2.0);
+    // "%" is fine; the zoom stays within 1%–12800%
+    click(&mut h, zoom_box);
+    h.event(egui::Event::Text("50000%".into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(active(&h).view.zoom, 128.0);
+    // Escape leaves the zoom as it was, and the box shows it again
+    click(&mut h, zoom_box);
+    h.event(egui::Event::Text("10".into()));
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert_eq!(active(&h).view.zoom, 128.0);
+    // Text that is not a number changes nothing
+    click(&mut h, zoom_box);
+    h.event(egui::Event::Text("abc".into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(active(&h).view.zoom, 128.0);
+    assert_ne!(before, 128.0);
+}

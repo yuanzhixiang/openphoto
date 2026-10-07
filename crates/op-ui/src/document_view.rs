@@ -1963,6 +1963,67 @@ fn vertical_scrollbar(ui: &mut Ui, state: &mut DocState, column: Rect, ppp: f32)
     clamp_offset(state, ppp);
 }
 
+/// The status bar's zoom box: clicking selects the percentage; a typed
+/// one (with or without "%") zooms around the window's center on Enter
+/// or when the box loses focus; Escape leaves the zoom as it was.
+fn zoom_box(ui: &mut Ui, state: &mut DocState, rect: Rect, ppp: f32) {
+    use egui::text::{CCursor, CCursorRange};
+    let id = ui.id().with("zoom-box");
+    let edit_id = id.with("edit");
+    let focused = ui.memory(|m| m.has_focus(edit_id));
+    let mut text = ui
+        .data(|d| d.get_temp::<String>(id))
+        .filter(|_| focused)
+        .unwrap_or_else(|| zoom_label(state.view.zoom));
+    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect));
+    child.style_mut().visuals.extreme_bg_color = Color32::TRANSPARENT;
+    child.style_mut().visuals.selection.bg_fill = Color32::from_rgb(0x2c, 0x5f, 0xb8);
+    let output = egui::TextEdit::singleline(&mut text)
+        .id(edit_id)
+        .frame(egui::Frame::NONE)
+        .font(theme::body())
+        // Until it's being edited, the percentage is painted as a label
+        // (the text edit would put it a fraction of a pixel off)
+        .text_color(if focused {
+            color::TEXT
+        } else {
+            Color32::TRANSPARENT
+        })
+        .horizontal_align(egui::Align::Center)
+        .vertical_align(egui::Align::Center)
+        .desired_width(rect.width())
+        .min_size(Vec2::new(rect.width(), rect.height()))
+        .show(&mut child);
+    let response = output.response.response;
+    if !focused {
+        ui.painter().text(
+            rect.center(),
+            Align2::CENTER_CENTER,
+            zoom_label(state.view.zoom),
+            theme::body(),
+            color::TEXT,
+        );
+    }
+    if response.gained_focus() {
+        let mut s = output.state;
+        let end = CCursor::new(text.chars().count());
+        s.cursor
+            .set_char_range(Some(CCursorRange::two(CCursor::new(0), end)));
+        s.store(ui.ctx(), edit_id);
+    }
+    if response.has_focus() {
+        ui.data_mut(|d| d.insert_temp(id, text));
+    } else if response.lost_focus() {
+        ui.data_mut(|d| d.remove::<String>(id));
+        if !ui.input(|i| i.key_pressed(Key::Escape))
+            && let Some(percent) = crate::options_bar::typed_number(&text)
+            && percent > 0.0
+        {
+            zoom_to(state, percent / 100.0, ppp);
+        }
+    }
+}
+
 /// Photoshop's status bar: zoom box, document info, the info menu caret,
 /// then the horizontal scrollbar filling the rest.
 fn status_bar(ui: &mut Ui, state: &mut DocState, rect: Rect, ppp: f32) {
@@ -1974,13 +2035,7 @@ fn status_bar(ui: &mut Ui, state: &mut DocState, rect: Rect, ppp: f32) {
 
     let zoom_rect = Rect::from_min_size(body.min, Vec2::new(ZOOM_BOX_W, body.height()));
     painter.rect_filled(zoom_rect, 0, Color32::from_gray(0x41));
-    painter.text(
-        zoom_rect.center(),
-        Align2::CENTER_CENTER,
-        zoom_label(state.view.zoom),
-        theme::body(),
-        color::TEXT,
-    );
+    zoom_box(ui, state, zoom_rect, ppp);
 
     let doc = &state.doc;
     let info = format!(
