@@ -704,6 +704,133 @@ impl Buffer {
         }
     }
 
+    fn transposed(&self) -> Self {
+        let mut px = vec![[0f32; 4]; self.w * self.h];
+        for y in 0..self.h {
+            for x in 0..self.w {
+                px[x * self.h + y] = self.px[y * self.w + x];
+            }
+        }
+        Self {
+            w: self.h,
+            h: self.w,
+            px,
+        }
+    }
+
+    /// Motion Blur as Photoshop computes it (fitted to its impulse
+    /// responses, within a level at every angle and distance measured): the
+    /// line is `m = ⌊d·cos a + 0.5⌋` pixels along and `n = ⌊d·sin a + 0.5⌋`
+    /// across (truncated toward zero; the steeper axis is "along"). The
+    /// image is sheared so the line lies along a row, each column moved by
+    /// −(x + 0.5)·n/m with a = −0.75 bicubic interpolation; the rows are
+    /// averaged over m + 1 pixels from −⌈m/2⌉; the result is sheared back.
+    /// Each intermediate is clamped to 0–255.
+    fn motion_blur(&self, angle: i32, distance: u32) -> Self {
+        let a = (angle.clamp(-90, 90) as f64).to_radians();
+        let d = distance as f64;
+        let m = (d * a.cos() + 0.5) as i64;
+        let n = (d * a.sin() + 0.5) as i64;
+        if n.abs() > m.abs() {
+            return self.transposed().motion_rows(n, m).transposed();
+        }
+        self.motion_rows(m, n)
+    }
+
+    /// Motion Blur along rows (`m` along, `n` across; see `motion_blur`).
+    fn motion_rows(&self, m: i64, n: i64) -> Self {
+        let (w, h) = (self.w, self.h);
+        let taps = m.unsigned_abs() as usize + 1;
+        let start = -((m.abs() + 1) / 2);
+        // Averages a row of `w` pixels over the taps, edges repeated
+        let average = |row: &[[f32; 4]]| -> Vec<[f32; 4]> {
+            let lo = start;
+            let hi = start + taps as i64 - 1;
+            // prefix sums over x − o for o in lo..=hi
+            let first = -hi;
+            let len = w as i64 + hi - lo;
+            let mut prefix = vec![[0f32; 4]; len as usize + 1];
+            for i in 0..len {
+                let p = row[(first + i).clamp(0, w as i64 - 1) as usize];
+                for c in 0..4 {
+                    prefix[i as usize + 1][c] = prefix[i as usize][c] + p[c];
+                }
+            }
+            (0..w as i64)
+                .map(|x| {
+                    let (a, b) = ((x - hi - first) as usize, (x - lo - first) as usize + 1);
+                    let mut out = [0f32; 4];
+                    for c in 0..4 {
+                        out[c] = ((prefix[b][c] - prefix[a][c]) / taps as f32).clamp(0.0, 255.0);
+                    }
+                    out
+                })
+                .collect()
+        };
+        if n == 0 {
+            let mut px = Vec::with_capacity(w * h);
+            for y in 0..h {
+                px.extend(average(&self.px[y * w..(y + 1) * w]));
+            }
+            return Self { w, h, px };
+        }
+        let cubic = |t: f64| -> f32 {
+            const A: f64 = -0.75;
+            let t = t.abs();
+            (if t < 1.0 {
+                (A + 2.0) * t * t * t - (A + 3.0) * t * t + 1.0
+            } else if t < 2.0 {
+                A * t * t * t - 5.0 * A * t * t + 8.0 * A * t - 4.0 * A
+            } else {
+                0.0
+            }) as f32
+        };
+        // Each column's shift: its integer part and four weights
+        let slope = n as f64 / m as f64;
+        let split = |s: f64| {
+            let i0 = s.floor();
+            let f = s - i0;
+            (i0 as i64, [-1.0, 0.0, 1.0, 2.0].map(|j: f64| cubic(f - j)))
+        };
+        let forward: Vec<_> = (0..w).map(|x| split(-(x as f64 + 0.5) * slope)).collect();
+        let back: Vec<_> = (0..w).map(|x| split((x as f64 + 0.5) * slope)).collect();
+        // Sheared rows reach this far beyond the image
+        let reach = (w as f64 * slope.abs()).ceil() as i64 + 4;
+        let mut acc = vec![[0f32; 4]; w * h];
+        let mut sheared = vec![[0f32; 4]; w];
+        for r in -reach..h as i64 + reach {
+            // Row r of the sheared image
+            for (x, (i0, wts)) in forward.iter().enumerate() {
+                let mut p = [0f32; 4];
+                for (j, wt) in wts.iter().enumerate() {
+                    let y = (r + i0 + j as i64 - 1).clamp(0, h as i64 - 1) as usize;
+                    let q = self.px[y * w + x];
+                    for c in 0..4 {
+                        p[c] += wt * q[c];
+                    }
+                }
+                sheared[x] = p.map(|v| v.clamp(0.0, 255.0));
+            }
+            let blurred = average(&sheared);
+            // Sheared back: output (x, y) reads rows y + i0 + j − 1
+            for (x, (i0, wts)) in back.iter().enumerate() {
+                for (j, wt) in wts.iter().enumerate() {
+                    let y = r - i0 - j as i64 + 1;
+                    if (0..h as i64).contains(&y) {
+                        let o = &mut acc[y as usize * w + x];
+                        for c in 0..4 {
+                            o[c] += wt * blurred[x][c];
+                        }
+                    }
+                }
+            }
+        }
+        for p in &mut acc {
+            *p = p.map(|v| v.clamp(0.0, 255.0));
+        }
+        Self { w, h, px: acc }
+    }
+
     /// A 3 × 3 kernel (rows top to bottom) as taps.
     fn kernel3(&self, k: [[f32; 3]; 3]) -> Self {
         let mut taps = Vec::new();
@@ -1568,43 +1695,12 @@ fn filtered(
                 })
                 .collect()
         }
-        Filter::MotionBlur { angle, distance } => {
-            // distance + 1 samples one pixel apart along the angle, each
-            // spread bilinearly (exact for horizontal blurs)
-            let (sin, cos) = (angle as f32).to_radians().sin_cos();
-            let n = distance as usize + 1;
-            let start = -((distance as f32) / 2.0).ceil();
-            let mut weights: std::collections::BTreeMap<(isize, isize), f32> = Default::default();
-            for i in 0..n {
-                let t = start + i as f32;
-                let (x, y) = (t * cos, -t * sin);
-                let (x0, y0) = (x.floor(), y.floor());
-                let (fx, fy) = (x - x0, y - y0);
-                for (dx, dy, wgt) in [
-                    (0, 0, (1.0 - fx) * (1.0 - fy)),
-                    (1, 0, fx * (1.0 - fy)),
-                    (0, 1, (1.0 - fx) * fy),
-                    (1, 1, fx * fy),
-                ] {
-                    if wgt > 0.0 {
-                        *weights
-                            .entry((x0 as isize + dx, y0 as isize + dy))
-                            .or_default() += wgt / n as f32;
-                    }
-                }
-            }
-            // The points traced are where a pixel's light lands (the
-            // impulse response), so the taps read the opposite way
-            let taps: Vec<_> = weights
-                .into_iter()
-                .map(|((dx, dy), w)| ((-dx, -dy), w))
-                .collect();
-            src.taps(&taps)
-                .px
-                .into_iter()
-                .map(Buffer::straight)
-                .collect()
-        }
+        Filter::MotionBlur { angle, distance } => src
+            .motion_blur(angle, distance)
+            .px
+            .into_iter()
+            .map(Buffer::straight)
+            .collect(),
         Filter::Fragment => {
             let taps: Vec<_> = [(4, 4), (-4, 4), (4, -4), (-4, -4)]
                 .map(|o| (o, 0.25))
@@ -1709,23 +1805,42 @@ fn filtered(
             height,
             amount,
         } => {
-            // Gray plus the difference between samples half the height away
-            // on either side along the angle (bilinear; Photoshop's own
-            // sampling is a little sharper off the axes)
+            // Gray plus the difference between the points half the height
+            // away on either side along the angle. Each point reads the
+            // pixels within one pixel of it, weighted 1 − d − 0.012·d³ by
+            // their distance d and not normalized: fitted to Photoshop's
+            // impulse responses (within a level at every angle measured,
+            // exact on the axes).
             let (sin, cos) = (angle as f32).to_radians().sin_cos();
             let reach = height as f32 / 2.0;
-            let (dx, dy) = (reach * cos, -reach * sin);
+            let (qx, qy) = (reach * cos, -reach * sin);
+            let mut taps = Vec::new();
+            for dy in qy.floor() as isize - 1..=qy.ceil() as isize + 1 {
+                for dx in qx.floor() as isize - 1..=qx.ceil() as isize + 1 {
+                    let d = ((dx as f32 - qx).powi(2) + (dy as f32 - qy).powi(2)).sqrt();
+                    let wgt = 1.0 - d - 0.012 * d * d * d;
+                    if wgt > 0.0 {
+                        taps.push((dx, dy, wgt));
+                    }
+                }
+            }
             let k = amount as f32 / 100.0;
+            let color = |x: isize, y: isize, c: usize| {
+                let p = src.at(x, y);
+                if p[3] > 0.0 { p[c] * 255.0 / p[3] } else { 0.0 }
+            };
             (0..w * h)
                 .map(|i| {
-                    let (x, y) = ((i % w) as f32, (i / w) as f32);
-                    let a = Buffer::straight(src.sample(x + dx, y + dy));
-                    let b = Buffer::straight(src.sample(x - dx, y - dy));
+                    let (x, y) = ((i % w) as isize, (i / w) as isize);
                     let mut out = Buffer::straight(src.px[i]);
-                    for c in 0..3 {
-                        out[c] = (128.0 + (a[c] as f32 - b[c] as f32) * k)
-                            .round()
-                            .clamp(0.0, 255.0) as u8;
+                    for (c, v) in out.iter_mut().take(3).enumerate() {
+                        let diff: f32 = taps
+                            .iter()
+                            .map(|&(dx, dy, wgt)| {
+                                (color(x + dx, y + dy, c) - color(x - dx, y - dy, c)) * wgt
+                            })
+                            .sum();
+                        *v = (128.0 + diff * k).round().clamp(0.0, 255.0) as u8;
                     }
                     out
                 })
@@ -2020,6 +2135,21 @@ pub fn apply(doc: &mut Document, filter: Filter, background: [u8; 3]) -> Result<
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[ignore]
+    fn motion_blur_speed() {
+        let (w, h) = (3000, 2000);
+        let src = Buffer {
+            w,
+            h,
+            px: (0..w * h).map(|i| [(i % 251) as f32, 50.0, 90.0, 255.0]).collect(),
+        };
+        let t = std::time::Instant::now();
+        let out = src.motion_blur(30, 50);
+        eprintln!("3000 x 2000, 30°, 50 px: {:?}", t.elapsed());
+        assert_eq!(out.px.len(), w * h);
+    }
+
     use super::*;
     use crate::color::Color;
     use crate::layer::Layer;
