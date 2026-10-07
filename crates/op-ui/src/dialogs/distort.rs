@@ -396,11 +396,159 @@ pub fn radio(ui: &mut Ui, center: Pos2, label: &str, chosen: bool) -> bool {
 /// pixels (Pinch, Spherize) or a cross through the center (Twirl), bent
 /// by the distortion. Black one-pixel lines on white, as Photoshop draws
 /// them.
+/// Pinch's diagram as Photoshop 2026 draws it, which is not the filter's
+/// own mapping: for Amount −100, −75 … 100 (rows), the distance from the
+/// middle (in units of half the diagram) that a pixel at distance 0, 0.05,
+/// … 1 shows. Measured from captures of the dialog's diagram.
+const PINCH_DIAGRAM: [[f32; 21]; 9] = [
+    // -100%
+    [
+        0.0000, 0.0291, 0.0582, 0.0873, 0.1164, 0.1419, 0.1740, 0.2061, 0.2382, 0.2677, 0.3059,
+        0.3441, 0.3771, 0.4296, 0.4831, 0.5459, 0.6269, 0.7342, 0.8626, 0.9299, 1.0000,
+    ],
+    // -75%
+    [
+        0.0000, 0.0340, 0.0681, 0.1021, 0.1316, 0.1654, 0.2003, 0.2352, 0.2669, 0.3091, 0.3514,
+        0.3895, 0.4431, 0.4966, 0.5561, 0.6272, 0.7047, 0.7800, 0.8691, 0.9299, 1.0000,
+    ],
+    // -50%
+    [
+        0.0000, 0.0372, 0.0744, 0.1116, 0.1441, 0.1865, 0.2290, 0.2646, 0.3068, 0.3490, 0.3863,
+        0.4398, 0.4934, 0.5440, 0.6057, 0.6713, 0.7523, 0.8205, 0.8810, 0.9405, 1.0000,
+    ],
+    // -25%
+    [
+        0.0000, 0.0457, 0.0914, 0.1371, 0.1765, 0.2238, 0.2635, 0.3107, 0.3578, 0.4000, 0.4535,
+        0.5033, 0.5520, 0.6054, 0.6540, 0.7156, 0.7704, 0.8432, 0.8967, 0.9484, 1.0000,
+    ],
+    // 0%
+    [
+        0.0000, 0.0500, 0.1000, 0.1500, 0.2000, 0.2500, 0.3000, 0.3500, 0.4000, 0.4500, 0.5000,
+        0.5500, 0.6000, 0.6500, 0.7000, 0.7500, 0.8000, 0.8500, 0.9000, 0.9500, 1.0000,
+    ],
+    // 25%
+    [
+        0.0000, 0.0696, 0.1391, 0.1901, 0.2513, 0.3027, 0.3643, 0.4115, 0.4647, 0.5089, 0.5558,
+        0.6028, 0.6423, 0.6893, 0.7363, 0.7760, 0.8230, 0.8700, 0.9087, 0.9544, 1.0000,
+    ],
+    // 50%
+    [
+        0.0000, 0.0842, 0.1604, 0.2433, 0.3022, 0.3625, 0.4096, 0.4624, 0.5067, 0.5535, 0.6003,
+        0.6387, 0.6806, 0.7226, 0.7574, 0.7954, 0.8334, 0.8714, 0.9087, 0.9544, 1.0000,
+    ],
+    // 75%
+    [
+        0.0000, 0.1564, 0.2344, 0.3110, 0.3709, 0.4339, 0.4738, 0.5188, 0.5603, 0.6017, 0.6359,
+        0.6738, 0.7116, 0.7494, 0.7789, 0.8136, 0.8482, 0.8774, 0.9183, 0.9591, 1.0000,
+    ],
+    // 100%
+    [
+        0.0000, 0.2286, 0.3084, 0.3786, 0.4395, 0.5053, 0.5380, 0.5718, 0.6057, 0.6339, 0.6654,
+        0.6970, 0.7285, 0.7552, 0.7898, 0.8245, 0.8591, 0.8890, 0.9260, 0.9630, 1.0000,
+    ],
+];
+
+/// Spherize's diagram as Photoshop 2026 draws it, laid out as
+/// `PINCH_DIAGRAM` (its lines don't bunch into a circle at the edge, as
+/// the filter's own mapping would draw them).
+const SPHERIZE_DIAGRAM: [[f32; 21]; 9] = [
+    // -100%
+    [
+        0.0000, 0.0842, 0.1604, 0.2433, 0.3090, 0.3813, 0.4552, 0.5237, 0.5848, 0.6364, 0.6978,
+        0.7549, 0.7976, 0.8445, 0.8809, 0.9007, 0.9206, 0.9404, 0.9603, 0.9801, 1.0000,
+    ],
+    // -75%
+    [
+        0.0000, 0.0696, 0.1391, 0.1989, 0.2632, 0.3342, 0.3957, 0.4686, 0.5264, 0.5878, 0.6396,
+        0.7011, 0.7541, 0.8002, 0.8471, 0.8824, 0.9059, 0.9294, 0.9530, 0.9765, 1.0000,
+    ],
+    // -50%
+    [
+        0.0000, 0.0593, 0.1185, 0.1737, 0.2488, 0.3027, 0.3643, 0.4161, 0.4777, 0.5296, 0.5912,
+        0.6430, 0.7046, 0.7558, 0.8028, 0.8498, 0.8849, 0.9137, 0.9424, 0.9712, 1.0000,
+    ],
+    // -25%
+    [
+        0.0000, 0.0593, 0.1185, 0.1647, 0.2178, 0.2630, 0.3249, 0.3811, 0.4387, 0.5004, 0.5459,
+        0.5993, 0.6442, 0.6975, 0.7509, 0.7958, 0.8492, 0.8890, 0.9260, 0.9630, 1.0000,
+    ],
+    // 0%
+    [
+        0.0000, 0.0500, 0.1000, 0.1500, 0.2000, 0.2500, 0.3000, 0.3500, 0.4000, 0.4500, 0.5000,
+        0.5500, 0.6000, 0.6500, 0.7000, 0.7500, 0.8000, 0.8500, 0.9000, 0.9500, 1.0000,
+    ],
+    // 25%
+    [
+        0.0000, 0.0457, 0.0914, 0.1371, 0.1765, 0.2238, 0.2635, 0.3107, 0.3578, 0.4000, 0.4535,
+        0.5033, 0.5520, 0.6054, 0.6504, 0.7038, 0.7523, 0.8205, 0.8810, 0.9405, 1.0000,
+    ],
+    // 50%
+    [
+        0.0000, 0.0410, 0.0821, 0.1231, 0.1579, 0.2002, 0.2425, 0.2780, 0.3202, 0.3623, 0.4031,
+        0.4566, 0.5027, 0.5552, 0.6086, 0.6577, 0.7194, 0.7749, 0.8477, 0.9147, 1.0000,
+    ],
+    // 75%
+    [
+        0.0000, 0.0372, 0.0744, 0.1116, 0.1429, 0.1812, 0.2194, 0.2541, 0.2897, 0.3278, 0.3659,
+        0.4029, 0.4501, 0.4973, 0.5417, 0.5951, 0.6450, 0.7179, 0.7952, 0.8911, 1.0000,
+    ],
+    // 100%
+    [
+        0.0000, 0.0340, 0.0681, 0.1021, 0.1316, 0.1654, 0.2003, 0.2352, 0.2656, 0.3038, 0.3419,
+        0.3774, 0.4159, 0.4581, 0.5003, 0.5449, 0.5984, 0.6495, 0.7224, 0.8227, 1.0000,
+    ],
+];
+
+/// A distance (0–1) through one of the diagram tables, interpolated
+/// between amounts (−100 … 100) and distances.
+fn diagram_distance(table: &[[f32; 21]; 9], amount: i32, r: f32) -> f32 {
+    let a = (amount.clamp(-100, 100) + 100) as f32 / 25.0;
+    let (i, fa) = ((a.floor() as usize).min(7), a - a.floor().min(7.0));
+    let t = r.clamp(0.0, 1.0) * 20.0;
+    let (j, fr) = ((t.floor() as usize).min(19), t - t.floor().min(19.0));
+    let at = |row: usize| table[row][j] + (table[row][j + 1] - table[row][j]) * fr;
+    at(i) + (at(i + 1) - at(i)) * fa
+}
+
+/// Where Pinch's or Spherize's diagram takes pixel (`x`, `y`) of an
+/// `n`-pixel square from: radially through the table (Spherize's
+/// Horizontal or Vertical Only along that axis alone); other filters use
+/// their own mapping.
+fn diagram_source(filter: Filter, x: f32, y: f32, n: f32) -> (f32, f32) {
+    let c = n / 2.0;
+    let (dx, dy) = ((x - c) / c, (y - c) / c);
+    let r = (dx * dx + dy * dy).sqrt();
+    let radial = |table: &[[f32; 21]; 9], amount: i32| {
+        if r >= 1.0 || r == 0.0 {
+            return (x, y);
+        }
+        let k = diagram_distance(table, amount, r) / r;
+        (c + dx * k * c, c + dy * k * c)
+    };
+    let along = |d: f32, amount: i32| {
+        if d.abs() >= 1.0 || d == 0.0 {
+            d
+        } else {
+            d.signum() * diagram_distance(&SPHERIZE_DIAGRAM, amount, d.abs())
+        }
+    };
+    use op_core::filter::SpherizeMode as M;
+    match filter {
+        Filter::Pinch { amount } => radial(&PINCH_DIAGRAM, amount),
+        Filter::Spherize { amount, mode } => match mode {
+            M::Normal => radial(&SPHERIZE_DIAGRAM, amount),
+            M::HorizontalOnly => (c + along(dx, amount) * c, y),
+            M::VerticalOnly => (x, c + along(dy, amount) * c),
+        },
+        _ => filter::distortion_source(filter, x, y, n, n),
+    }
+}
+
 pub fn diagram(filter: Filter, size: usize) -> ColorImage {
     let cross = matches!(filter, Filter::Twirl { .. } | Filter::ZigZag { .. });
     let n = size as f32;
     let step = n / 16.0;
-    let source = |x: usize, y: usize| filter::distortion_source(filter, x as f32, y as f32, n, n);
+    let source = |x: usize, y: usize| diagram_source(filter, x as f32, y as f32, n);
     // Which band between lines a source coordinate falls in
     let band = |v: f32| {
         if !(0.0..=n).contains(&v) {
@@ -414,7 +562,8 @@ pub fn diagram(filter: Filter, size: usize) -> ColorImage {
     // A pixel is on a line where its source crosses one since the pixel to
     // its left or above, so lines stay one pixel wide however the
     // distortion stretches or squeezes them
-    let crosses = |a: f32, b: f32| matches!((band(a), band(b)), (Some(p), Some(q)) if p != q);
+    let crosses =
+        |a: f32, b: f32| matches!((band(a), band(b)), (Some(p), Some(q)) if (p - q).abs() == 1);
     let mut pixels = vec![Color32::WHITE; size * size];
     for y in 1..size {
         for x in 1..size {
@@ -466,5 +615,65 @@ mod tests {
         assert_eq!(twirled.pixels[100 * 256 + 128], Color32::WHITE);
         // Lines stay about a pixel wide
         assert!(black(&twirled) < 256 * 2 * 3, "{}", black(&twirled));
+    }
+}
+
+#[cfg(test)]
+mod dump {
+    /// Writes the diagrams for comparing with Photoshop's captures.
+    #[test]
+    #[ignore]
+    fn dump_diagrams() {
+        use op_core::filter::Filter;
+        let dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/ui-shots");
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut cases: Vec<(String, Filter)> = Vec::new();
+        for a in [100, 50, -50, -100] {
+            cases.push((format!("pinch_{a}"), Filter::Pinch { amount: a }));
+        }
+        use op_core::filter::SpherizeMode as M;
+        for a in [100, 75, 50, 25, -25, -50, -75, -100] {
+            cases.push((
+                format!("sph_{a}"),
+                Filter::Spherize {
+                    amount: a,
+                    mode: M::Normal,
+                },
+            ));
+        }
+        cases.push((
+            "sph_h100".into(),
+            Filter::Spherize {
+                amount: 100,
+                mode: M::HorizontalOnly,
+            },
+        ));
+        cases.push((
+            "sph_h-100".into(),
+            Filter::Spherize {
+                amount: -100,
+                mode: M::HorizontalOnly,
+            },
+        ));
+        cases.push((
+            "sph_v100".into(),
+            Filter::Spherize {
+                amount: 100,
+                mode: M::VerticalOnly,
+            },
+        ));
+        for (name, f) in cases {
+            let img = super::diagram(f, 256);
+            let px: Vec<u8> = img
+                .pixels
+                .iter()
+                .flat_map(|c| [c.r(), c.g(), c.b(), 255])
+                .collect();
+            image::RgbaImage::from_raw(256, 256, px)
+                .unwrap()
+                .save(dir.join(format!("ours_{name}.png")))
+                .unwrap();
+        }
     }
 }

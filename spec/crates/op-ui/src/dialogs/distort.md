@@ -28,9 +28,12 @@ Twirl..., Pinch..., Spherize..., Polar Coordinates... under Filter › Distort, 
 
 ## Diagram
 
-`diagram(filter, size)` produces a `size` × `size` pixel (128 pt, i.e. 256 pixels, in the dialog) black-on-white line drawing: Pinch and Spherize use a grid with a line every 1/16, Twirl a cross through the center; each pixel's source position is found with `op_core::filter::distortion_source`, and the pixel is painted black when a line is crossed between it and the source position of the pixel to its left or above, so lines are always about one pixel wide. The host regenerates the texture when settings change (displayed nearest-neighbor).
+`diagram(filter, size)` produces a `size` × `size` pixel (128 pt, i.e. 256 pixels, in the dialog) black-on-white line drawing: Pinch and Spherize use a grid with a line every 1/16, Twirl a cross through the center. Each pixel's source position comes from `diagram_source`, and the pixel is painted black when exactly one line is crossed between it and the source position of the pixel to its left or above, so lines are always about one pixel wide (where the mapping is so steep that neighbors are several lines apart, nothing is drawn, as in Photoshop's drawings).
 
-Known difference: Photoshop's diagrams are not drawn strictly from the filter's own mapping: Spherize has no circle formed by lines bunching at the ellipse edge, and Pinch bends slightly differently; here the diagram is drawn faithfully from the filter mapping.
+- **Pinch and Spherize** use Photoshop's own diagram curves, not the filters' mappings: Photoshop draws its diagrams differently from what the filters do. `PINCH_DIAGRAM` and `SPHERIZE_DIAGRAM` give, for Amount −100, −75 … 100, the distance from the middle (in half-diagrams) that a pixel at distance 0, 0.05 … 1 shows. They were measured from captures of Photoshop 2026's dialogs: the grid lines' positions on rows 8 px above and below the middle, with lines merged near the middle left out. `diagram_distance` interpolates between amounts and distances. Pinch and Spherize Normal apply them radially inside the circle; Spherize's Horizontal Only and Vertical Only apply them along that axis alone. Outside the circle (or past the edge) the grid is untouched.
+- **Matching:** the grid lines along those rows now land within about a pixel of Photoshop's for Pinch and within about 2 for Spherize. Spherize no longer bunches its lines into a ring at the edge. Beyond distance 0.9 the tables are interpolated to the edge, since Photoshop's lines there can't be told apart.
+- **Twirl** and the others draw from the filter's mapping (`op_core::filter::distortion_source`).
+- **Redrawing:** the host regenerates the texture when settings change (displayed nearest-neighbor).
 
 ## Interaction
 
@@ -42,4 +45,5 @@ Known difference: Photoshop's diagrams are not drawn strictly from the filter's 
 ## Test coverage
 
 - `diagrams_bend_with_the_filter`: with no distortion the grid has a line every 16 pixels; at Pinch 100 many pixels change; at Twirl 0 the cross passes through the center; at Twirl 120 the top of the vertical line stays put and the part near the center swings away; lines stay about one pixel wide.
+- `dump::dump_diagrams` (`#[ignore]`) writes Pinch's and Spherize's diagrams to `target/ui-shots` for comparing with Photoshop's captures.
 - `distort_filters_from_the_menu` in `ui_tests.rs` (applying from the menu with default values) and `screenshot_filter_dialogs` (side-by-side comparison with Photoshop screenshots).
