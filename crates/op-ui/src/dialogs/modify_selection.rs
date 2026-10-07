@@ -1,15 +1,16 @@
 //! Select > Modify: Border..., Smooth..., Expand..., Contract... and
 //! Feather... (Shift+F6). One value in pixels each, plus "Apply effect at
-//! canvas bounds" for Smooth, Contract and Feather, as in Photoshop.
+//! canvas bounds", laid out at the positions measured on Photoshop 2026's
+//! dialogs (295 × 128 pt, UXP). Sizes are in Photoshop points from the
+//! dialog's top-left corner.
 
-use egui::{Align2, Color32, FontId, Key, Rect, Sense, Ui, vec2};
+use egui::{Color32, Key, Rect, Sense, Ui, vec2};
 use op_core::Selection;
 
-use super::common;
-use crate::theme::{self, color, pt};
+use super::{common, uxp};
+use crate::theme::{self, pt};
 
-const FONT: f32 = pt(12.5);
-const BUTTON: egui::Vec2 = vec2(pt(88.0), pt(24.0));
+const SIZE: egui::Vec2 = vec2(pt(295.0), pt(128.0));
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ModifyKind {
@@ -33,11 +34,11 @@ impl ModifyKind {
 
     fn label(self) -> &'static str {
         match self {
-            Self::Border => "Width:",
-            Self::Smooth => "Sample Radius:",
-            Self::Expand => "Expand By:",
-            Self::Contract => "Contract By:",
-            Self::Feather => "Feather Radius:",
+            Self::Border => "Width",
+            Self::Smooth => "Sample Radius",
+            Self::Expand => "Expand By",
+            Self::Contract => "Contract By",
+            Self::Feather => "Feather Radius",
         }
     }
 
@@ -58,10 +59,6 @@ impl ModifyKind {
             Self::Smooth | Self::Expand | Self::Contract => (1.0, 500.0),
             Self::Feather => (0.1, 1000.0),
         }
-    }
-
-    fn has_bounds_option(self) -> bool {
-        matches!(self, Self::Smooth | Self::Contract | Self::Feather)
     }
 
     /// The modified selection.
@@ -106,17 +103,12 @@ impl ModifyDialog {
     }
 
     pub fn show(&mut self, ctx: &egui::Context) -> Outcome {
-        let height = if self.kind.has_bounds_option() {
-            pt(140.0)
-        } else {
-            pt(116.0)
-        };
         let mut outcome = Outcome::Open;
         egui::Modal::new(egui::Id::new("modify-selection"))
             .frame(egui::Frame::NONE)
             .backdrop_color(Color32::TRANSPARENT)
             .show(ctx, |ui| {
-                let (rect, _) = ui.allocate_exact_size(vec2(pt(380.0), height), Sense::hover());
+                let (rect, _) = ui.allocate_exact_size(SIZE, Sense::hover());
                 outcome = self.ui(ui, rect);
             });
         self.first_frame = false;
@@ -127,59 +119,49 @@ impl ModifyDialog {
     }
 
     fn ui(&mut self, ui: &mut Ui, frame: Rect) -> Outcome {
-        let at = |x: f32, y: f32| frame.min + vec2(x, y);
-        let font = FontId::proportional(FONT);
-        common::frame(ui, frame, self.kind.title(), theme::semibold(pt(13.0)));
-        let label = ui.painter().text(
-            at(pt(20.0), pt(56.0)),
-            Align2::LEFT_CENTER,
-            self.kind.label(),
-            font.clone(),
-            color::TEXT,
+        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
+        let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
+        common::frame(ui, frame, self.kind.title(), theme::dialog_bold(pt(13.0)));
+        // The field follows its label, 9 pt after it
+        let label = uxp::label(ui, at(20.5, 60.0), self.kind.label());
+        let field_x = label.right() + pt(9.0);
+        let field = Rect::from_min_max(
+            egui::pos2(field_x, at(0.0, 48.0).y),
+            egui::pos2(field_x + pt(36.0), at(0.0, 72.0).y),
         );
-        let field = Rect::from_min_size(
-            egui::pos2(label.right() + pt(8.0), label.center().y - pt(11.0)),
-            vec2(pt(60.0), pt(22.0)),
-        );
-        common::number_field(
+        common::text_field(
             ui,
             field,
             &mut self.value,
             "modify-value",
-            FONT,
+            uxp::font(),
+            pt(11.5),
             self.first_frame,
         );
-        ui.painter().text(
-            field.right_center() + vec2(pt(6.0), 0.0),
-            Align2::LEFT_CENTER,
-            "pixels",
-            font.clone(),
-            color::TEXT,
+        uxp::label(ui, field.right_center() + vec2(pt(5.5), 0.0), "pixels");
+        common::ps_checkbox(
+            ui,
+            at(20.0, 90.0),
+            "Apply effect at canvas bounds",
+            &mut self.at_bounds,
+            true,
         );
-        if self.kind.has_bounds_option() {
-            let r = Rect::from_min_size(at(pt(20.0), pt(88.0)), vec2(pt(240.0), pt(18.0)));
-            let mut child = ui.new_child(egui::UiBuilder::new().max_rect(r));
-            child.checkbox(
-                &mut self.at_bounds,
-                egui::RichText::new("Apply effect at canvas bounds").font(font),
-            );
-        }
 
-        let x = frame.width() - pt(108.0);
-        let button_font = FontId::proportional(pt(13.0));
         let value = self.value();
-        let ok = common::pill_button(
+        let ok = common::ps_button(
             ui,
-            Rect::from_min_size(at(x, pt(44.0)), BUTTON),
+            r(205.0, 48.0, 275.0, 72.0),
             "OK",
-            button_font.clone(),
+            true,
             value.is_some(),
+            true,
         );
-        let cancel = common::pill_button(
+        let cancel = common::ps_button(
             ui,
-            Rect::from_min_size(at(x, pt(76.0)), BUTTON),
+            r(205.0, 84.0, 275.0, 108.0),
             "Cancel",
-            button_font,
+            false,
+            true,
             true,
         );
         if cancel.clicked() {

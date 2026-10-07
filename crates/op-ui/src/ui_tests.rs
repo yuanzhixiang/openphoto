@@ -4693,3 +4693,15 @@ fn new_guide_dialog_adds_a_guide() {
     assert!(guides[0].vertical);
     assert_eq!(guides[0].position, 100.0);
 }
+
+#[test]
+#[ignore]
+fn screenshot_feather_dialog() {
+    let mut h = harness(Vec::new());
+    probe_document(&mut h);
+    run_command(&mut h, crate::commands::Command::SelectAll);
+    run_command(&mut h, crate::commands::Command::ModifyFeather);
+    h.event(egui::Event::Text("5".into()));
+    h.run_steps(3);
+    shot_dialog(&mut h, "feather", 295.0, 128.0);
+}
