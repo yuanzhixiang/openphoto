@@ -1,5 +1,6 @@
 //! Photoshop 2026's small filter dialogs without a preview (Stylize ›
-//! Tiles..., Pixelate › Color Halftone..., Blur › Radial Blur...): OK and Cancel
+//! Tiles..., Pixelate › Color Halftone..., Blur › Radial Blur...,
+//! Distort › Shear...): OK and Cancel
 //! (89 pt wide) at the top right and the settings as text, fields, radio
 //! buttons and checkboxes, measured on Photoshop. Coordinates are
 //! Photoshop points from the dialog's top-left corner.
@@ -36,6 +37,13 @@ pub enum Item {
     /// Radial Blur's Blur Center: a white box drawing the blur's pattern
     /// around the center, which a click or drag moves; sets nothing.
     CenterBox { rect: [f32; 4] },
+    /// Shear's curve grid (x0, y0, x1, y1): a white box with dotted
+    /// quarter lines and the curve the image is sheared along; sets
+    /// nothing (the curve is the dialog's own).
+    CurveGrid { rect: [f32; 4] },
+    /// The preview of the document as filtered, at 100%, in a box
+    /// (x0, y0, x1, y1); sets nothing.
+    Pane { rect: [f32; 4] },
 }
 
 pub struct Layout {
@@ -187,6 +195,31 @@ pub const RADIAL_BLUR: Layout = Layout {
         },
         Item::CenterBox {
             rect: [132.0, 140.0, 262.0, 270.0],
+        },
+    ],
+};
+
+/// Distort › Shear (318 × 392 pt): the curve grid, Undefined Areas, and the
+/// preview box under them.
+pub const SHEAR: Layout = Layout {
+    size: (318.0, 392.0),
+    buttons_x: 215.5,
+    buttons: (88.5, 35.0, 71.0, 26.0, 13.0),
+    text_size: 11.0,
+    items: &[
+        Item::CurveGrid {
+            rect: [8.0, 34.0, 138.0, 164.0],
+        },
+        Item::Group {
+            title: "Undefined Areas:",
+            rect: [8.0, 181.0, 143.5, 222.5],
+        },
+        Item::Radios {
+            centers: &[(20.0, 196.0), (20.0, 212.0)],
+            gap: 13.5,
+        },
+        Item::Pane {
+            rect: [8.0, 234.0, 310.0, 386.0],
         },
     ],
 };

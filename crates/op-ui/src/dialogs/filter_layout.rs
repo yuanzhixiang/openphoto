@@ -973,47 +973,6 @@ pub const WAVE: &Layout = &Layout {
     ],
 };
 
-pub const SHEAR: &Layout = &Layout {
-    size: (324.0, 518.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: true,
-    rows: &[
-        number(
-            "Top:",
-            135.0,
-            [140.0, 287.0, 200.5, 306.0],
-            "%",
-            205.5,
-            Some((21.0, 303.0, 313.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Middle:",
-            135.0,
-            [140.0, 336.0, 200.5, 355.0],
-            "%",
-            205.5,
-            Some((21.0, 303.0, 362.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Bottom:",
-            135.0,
-            [140.0, 385.0, 200.5, 404.0],
-            "%",
-            205.5,
-            Some((21.0, 303.0, 411.0)),
-            Scale::Linear,
-        ),
-        Row::Radios {
-            title: "Undefined Areas",
-            group: [10.5, 434.0, 314.0, 503.0],
-            ys: &[459.0, 486.0],
-        },
-    ],
-};
-
 pub const DISPLACE: &Layout = &Layout {
     size: (324.0, 311.5),
     button_width: 59.5,

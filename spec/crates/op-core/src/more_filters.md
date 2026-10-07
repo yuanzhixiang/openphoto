@@ -11,7 +11,7 @@ The pixel work of more of the Filter menu, on a layer's straight RGBA pixels, re
 ## Filters
 
 - Wave (`Wave`): Generators (1–999) waves, each with a wavelength and amplitude drawn between the Min and Max from the seed (Randomize = another seed), Sine / Triangle / Square, the horizontal and vertical Scale (%), and Undefined Areas; x moves by the waves along y and y by those along x. Defaults are Photoshop's (5, 10–120, 5–35, 100 %, Sine, Repeat Edge Pixels).
-- Shear: each row moves sideways by the curve's offset at its height (`shear_offsets` turns up to eight (height, offset) points into one offset per row, linear between them).
+- Shear: each row moves sideways by the curve's offset at its height (`shear_offsets` turns up to eight (height 0–1, offset −0.5–0.5 of the width) points into one offset per row along a natural cubic spline through them, the same as Curves' (`adjust::Spline`), so the curve bends smoothly as Photoshop's does).
 - Displace: a registered map (`register_map`, `map`; tiled, or stretched to fit) moves pixels by `(value − 128) / 128 × 128 px × scale %` (red horizontally, green vertically).
 - Radial Blur: Spin (along circles, the amount as degrees) or Zoom (along rays, the amount as percent of the distance), 8 / 16 / 32 samples for Draft / Good / Best, about a center in 0–1 of the image.
 - Smart Blur: the mean of the neighbours within the radius whose channels are within the threshold; Edge Only (white edges on black) and Overlay Edge (white edges on the blur).

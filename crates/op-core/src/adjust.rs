@@ -473,68 +473,84 @@ pub(crate) fn hsl_to_rgb([h, s, l]: [f32; 3]) -> [f32; 3] {
     [channel(h + 1.0 / 3.0), channel(h), channel(h - 1.0 / 3.0)]
 }
 
+/// A natural cubic spline through points (sorted by x, duplicates
+/// dropped), flat beyond the first and last points.
+pub struct Spline {
+    pts: Vec<(f32, f32)>,
+    /// Second derivatives at the points.
+    m: Vec<f32>,
+}
+
+impl Spline {
+    pub fn new(points: &[(f32, f32)]) -> Self {
+        let mut pts = points.to_vec();
+        pts.sort_by(|a, b| a.0.total_cmp(&b.0));
+        pts.dedup_by(|a, b| a.0 == b.0);
+        let n = pts.len();
+        let mut m = vec![0f32; n];
+        if n > 2 {
+            let h: Vec<f32> = (0..n - 1).map(|i| pts[i + 1].0 - pts[i].0).collect();
+            let mut a = vec![0f32; n];
+            let mut b = vec![0f32; n];
+            let mut c = vec![0f32; n];
+            let mut d = vec![0f32; n];
+            for i in 1..n - 1 {
+                a[i] = h[i - 1];
+                b[i] = 2.0 * (h[i - 1] + h[i]);
+                c[i] = h[i];
+                d[i] = 6.0
+                    * ((pts[i + 1].1 - pts[i].1) / h[i] - (pts[i].1 - pts[i - 1].1) / h[i - 1]);
+            }
+            // Thomas algorithm on rows 1..n-1 (m[0] = m[n-1] = 0)
+            for i in 2..n - 1 {
+                let w = a[i] / b[i - 1];
+                b[i] -= w * c[i - 1];
+                d[i] -= w * d[i - 1];
+            }
+            for i in (1..n - 1).rev() {
+                let next = if i + 1 < n - 1 { m[i + 1] } else { 0.0 };
+                m[i] = (d[i] - c[i] * next) / b[i];
+            }
+        }
+        Self { pts, m }
+    }
+
+    /// The curve's value at `x` (0 without points).
+    pub fn at(&self, x: f32) -> f32 {
+        let (pts, m, n) = (&self.pts, &self.m, self.pts.len());
+        if n == 0 {
+            return 0.0;
+        }
+        if x <= pts[0].0 {
+            return pts[0].1;
+        }
+        if x >= pts[n - 1].0 {
+            return pts[n - 1].1;
+        }
+        let i = (0..n - 1).find(|&i| x <= pts[i + 1].0).unwrap_or(n - 2);
+        let (x0, y0) = pts[i];
+        let (x1, y1) = pts[i + 1];
+        let h = x1 - x0;
+        let (s, u) = ((x1 - x) / h, (x - x0) / h);
+        s * y0 + u * y1 + ((s * s * s - s) * m[i] + (u * u * u - u) * m[i + 1]) * h * h / 6.0
+    }
+}
+
 /// The curve through `points` (sorted by input) as a 256-entry table: a
 /// natural cubic spline, flat beyond the first and last points, clamped to
 /// 0–255.
 pub fn curve_table(points: &[(u8, u8)]) -> [u8; 256] {
-    let mut pts: Vec<(f32, f32)> = points.iter().map(|&(x, y)| (x as f32, y as f32)).collect();
-    pts.sort_by(|a, b| a.0.total_cmp(&b.0));
-    pts.dedup_by(|a, b| a.0 == b.0);
     let mut table = [0u8; 256];
-    match pts.len() {
-        0 => {
-            for (i, t) in table.iter_mut().enumerate() {
-                *t = i as u8;
-            }
-            return table;
+    if points.is_empty() {
+        for (i, t) in table.iter_mut().enumerate() {
+            *t = i as u8;
         }
-        1 => {
-            table.fill(pts[0].1.round() as u8);
-            return table;
-        }
-        _ => {}
+        return table;
     }
-    // Second derivatives of the natural spline (tridiagonal solve)
-    let n = pts.len();
-    let mut m = vec![0f32; n];
-    if n > 2 {
-        let h: Vec<f32> = (0..n - 1).map(|i| pts[i + 1].0 - pts[i].0).collect();
-        let mut a = vec![0f32; n];
-        let mut b = vec![0f32; n];
-        let mut c = vec![0f32; n];
-        let mut d = vec![0f32; n];
-        for i in 1..n - 1 {
-            a[i] = h[i - 1];
-            b[i] = 2.0 * (h[i - 1] + h[i]);
-            c[i] = h[i];
-            d[i] = 6.0 * ((pts[i + 1].1 - pts[i].1) / h[i] - (pts[i].1 - pts[i - 1].1) / h[i - 1]);
-        }
-        // Thomas algorithm on rows 1..n-1 (m[0] = m[n-1] = 0)
-        for i in 2..n - 1 {
-            let w = a[i] / b[i - 1];
-            b[i] -= w * c[i - 1];
-            d[i] -= w * d[i - 1];
-        }
-        for i in (1..n - 1).rev() {
-            let next = if i + 1 < n - 1 { m[i + 1] } else { 0.0 };
-            m[i] = (d[i] - c[i] * next) / b[i];
-        }
-    }
+    let pts: Vec<(f32, f32)> = points.iter().map(|&(x, y)| (x as f32, y as f32)).collect();
+    let spline = Spline::new(&pts);
     for (x, t) in table.iter_mut().enumerate() {
-        let x = x as f32;
-        let y = if x <= pts[0].0 {
-            pts[0].1
-        } else if x >= pts[n - 1].0 {
-            pts[n - 1].1
-        } else {
-            let i = (0..n - 1).find(|&i| x <= pts[i + 1].0).unwrap_or(n - 2);
-            let (x0, y0) = pts[i];
-            let (x1, y1) = pts[i + 1];
-            let h = x1 - x0;
-            let (s, u) = ((x1 - x) / h, (x - x0) / h);
-            s * y0 + u * y1 + ((s * s * s - s) * m[i] + (u * u * u - u) * m[i + 1]) * h * h / 6.0
-        };
-        *t = y.round().clamp(0.0, 255.0) as u8;
+        *t = spline.at(x as f32).round().clamp(0.0, 255.0) as u8;
     }
     table
 }

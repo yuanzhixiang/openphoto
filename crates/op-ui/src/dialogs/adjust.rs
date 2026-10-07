@@ -328,12 +328,12 @@ const WAVE: &[Param] = &[
     choice("Undefined Areas", &["Wrap Around", "Repeat Edge Pixels"], 1),
 ];
 
-const SHEAR: &[Param] = &[
-    param("Top:", -100.0, 100.0, 0.0, 0),
-    param("Middle:", -100.0, 100.0, 0.0, 0),
-    param("Bottom:", -100.0, 100.0, 0.0, 0),
-    choice("Undefined Areas", &["Wrap Around", "Repeat Edge Pixels"], 1),
-];
+/// Shear's curve is the dialog's own (`Extra::shear_points`).
+const SHEAR: &[Param] = &[choice(
+    "Undefined Areas",
+    &["Wrap Around", "Repeat Edge Pixels"],
+    0,
+)];
 
 const DISPLACE: &[Param] = &[
     param("Horizontal Scale:", -999.0, 999.0, 10.0, 0),
@@ -632,7 +632,6 @@ impl Kind {
             Self::Extrude => l::EXTRUDE,
             Self::OilPaint => l::OIL_PAINT,
             Self::Wave => l::WAVE,
-            Self::Shear => l::SHEAR,
             Self::Displace => l::DISPLACE,
             Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
             Self::HdrToning => l::HDR_TONING,
@@ -650,6 +649,7 @@ impl Kind {
             Self::ColorHalftone => &plain_filter::COLOR_HALFTONE,
             Self::HsbHsl => &plain_filter::HSB_HSL,
             Self::RadialBlur => &plain_filter::RADIAL_BLUR,
+            Self::Shear => &plain_filter::SHEAR,
             _ => return None,
         })
     }
@@ -863,6 +863,11 @@ pub struct Extra {
     /// Radial Blur's center, 0–1 across and down the image (the middle at
     /// first; Blur Center sets it).
     pub radial_center: (f32, f32),
+    /// Shear's curve: (height 0–1, offset −0.5–0.5 of the width), the top
+    /// and bottom ends first (a straight line at first), and the point
+    /// being dragged.
+    pub shear_points: Vec<(f32, f32)>,
+    pub shear_drag: Option<usize>,
 }
 
 /// The active layer made small for a preview box `max` pixels at most
@@ -1019,7 +1024,8 @@ impl AdjustDialog {
                 .map(|p| format(kind, p.default, p.decimals))
                 .collect(),
             // The dialogs without a preview don't preview on the document
-            preview: kind.plain().is_none(),
+            // (Shear previews in its own box)
+            preview: kind.plain().is_none() || kind == Kind::Shear,
             histogram,
             first_frame: true,
             previewing: None,
@@ -1042,6 +1048,7 @@ impl AdjustDialog {
                     Vec::new()
                 },
                 radial_center: (0.5, 0.5),
+                shear_points: vec![(0.0, 0.0), (1.0, 0.0)],
                 ..Default::default()
             },
             custom: match kind {
@@ -1297,6 +1304,7 @@ impl AdjustDialog {
     /// Whether this dialog shows the classic preview pane.
     pub fn wants_pane(&self) -> bool {
         self.kind == Kind::Custom
+            || self.kind == Kind::Shear
             || self.kind.distort().is_some()
             || self.layout().is_some_and(|l| l.pane)
     }
@@ -1472,15 +1480,12 @@ impl AdjustDialog {
             }),
             Kind::Shear => {
                 let mut points = [(0.0, 0.0); 8];
-                points[..3].copy_from_slice(&[
-                    (0.0, v[0] / 200.0),
-                    (0.5, v[1] / 200.0),
-                    (1.0, v[2] / 200.0),
-                ]);
+                let count = e.shear_points.len().min(8);
+                points[..count].copy_from_slice(&e.shear_points[..count]);
                 Filter::Shear {
                     points,
-                    count: 3,
-                    undefined: undefined(v[3]),
+                    count: count as u8,
+                    undefined: undefined(v[0]),
                 }
             }
             Kind::Displace => Filter::Displace {
@@ -2285,9 +2290,21 @@ impl AdjustDialog {
                         g,
                         (title_x - pt(4.0), title_x + galley.size().x + pt(4.0)),
                     );
-                    label(ui, Pos2::new(title_x, g.top() + pt(1.75)), title);
+                    label(ui, Pos2::new(title_x, g.top() - pt(0.25)), title);
                 }
                 Item::CenterBox { rect } => self.center_box(ui, r(rect)),
+                Item::CurveGrid { rect } => self.curve_grid(ui, r(rect)),
+                Item::Pane { rect } => {
+                    let b = r(rect);
+                    ui.painter().rect(
+                        b,
+                        0,
+                        Color32::from_gray(0x4d),
+                        Stroke::new(pt(1.0), Color32::from_gray(0x3e)),
+                        egui::StrokeKind::Inside,
+                    );
+                    self.pane_ui(ui, b.shrink(pt(1.0)));
+                }
                 Item::Radios { centers, gap } => {
                     if let ParamKind::Choice(options) = params[i].kind {
                         let chosen = self.value(i).unwrap_or(0.0) as usize;
@@ -2338,7 +2355,9 @@ impl AdjustDialog {
     /// The preview's size in pixels (the classic pane's 196 pt square,
     /// the plug-in style dialogs' 256 pt one, at two pixels a point).
     pub fn pane_px(&self) -> (usize, usize) {
-        if self.kind.distort().is_some() {
+        if self.kind == Kind::Shear {
+            (600, 300)
+        } else if self.kind.distort().is_some() {
             (512, 512)
         } else {
             (392, 392)
@@ -2562,6 +2581,122 @@ impl AdjustDialog {
                     .collect();
                 painter.add(egui::Shape::line(arc, stroke));
             }
+        }
+    }
+
+    /// Shear's curve grid: dotted lines at the quarters, the curve (a
+    /// natural spline through its points, as the filter uses) and its
+    /// points as 4 pt black squares. Dragging a point moves it (the ends
+    /// only sideways); pressing on the curve elsewhere adds a point there,
+    /// up to eight; an inner point dragged off the box goes away.
+    fn curve_grid(&mut self, ui: &mut Ui, rect: Rect) {
+        let painter = ui.painter_at(rect.expand(pt(4.0)));
+        painter.rect(
+            rect,
+            0,
+            Color32::WHITE,
+            Stroke::new(pt(0.5), Color32::BLACK),
+            egui::StrokeKind::Inside,
+        );
+        let inner = rect.shrink(pt(0.5));
+        // Dotted: a physical pixel on, one off, as a mesh (no feathering,
+        // which would fade pixel-sized dots away)
+        let px = 1.0 / ui.ctx().pixels_per_point();
+        let snap = |v: f32| (v / px).round() * px;
+        let mut mesh = egui::Mesh::default();
+        let mut dot = |p: Pos2| {
+            mesh.add_colored_rect(
+                Rect::from_min_size(Pos2::new(snap(p.x), snap(p.y)), egui::Vec2::splat(px)),
+                Color32::BLACK,
+            );
+        };
+        for k in 1..4 {
+            let f = k as f32 / 4.0;
+            let x = inner.left() + inner.width() * f;
+            let y = inner.top() + inner.height() * f;
+            let mut t = 0.0;
+            while t < inner.height() {
+                dot(Pos2::new(x, inner.top() + t));
+                dot(Pos2::new(inner.left() + t, y));
+                t += 2.0 * px;
+            }
+        }
+        painter.add(mesh);
+        let to_screen = |(h, o): (f32, f32)| {
+            Pos2::new(
+                inner.center().x + o * inner.width(),
+                inner.top() + h * inner.height(),
+            )
+        };
+        let from_screen = |p: Pos2| {
+            (
+                ((p.y - inner.top()) / inner.height()).clamp(0.0, 1.0),
+                ((p.x - inner.center().x) / inner.width()).clamp(-0.5, 0.5),
+            )
+        };
+        let response = ui.interact(rect, ui.id().with("shear-grid"), Sense::click_and_drag());
+        let points = &mut self.extra.shear_points;
+        if response.drag_started() || (response.clicked() && self.extra.shear_drag.is_none()) {
+            // Where the press was, not where the pointer is now
+            let press = ui.input(|i| i.pointer.press_origin());
+            if let Some(p) = press.or(response.interact_pointer_pos()) {
+                let near = points
+                    .iter()
+                    .position(|&q| to_screen(q).distance(p) <= pt(4.0));
+                self.extra.shear_drag = near.or_else(|| {
+                    let spline = op_core::adjust::Spline::new(points);
+                    let (h, _) = from_screen(p);
+                    let on_curve = to_screen((h, spline.at(h))).distance(p) <= pt(4.0);
+                    (on_curve && points.len() < 8 && h > 0.0 && h < 1.0).then(|| {
+                        points.push(from_screen(p));
+                        points.len() - 1
+                    })
+                });
+            }
+        }
+        if let (Some(i), Some(p)) = (self.extra.shear_drag, response.interact_pointer_pos())
+            && response.dragged()
+            && i < points.len()
+        {
+            let (h, o) = from_screen(p);
+            if i < 2 {
+                // The ends stay at the top and bottom
+                points[i].1 = o;
+            } else if !rect.expand(pt(8.0)).contains(p) {
+                points.remove(i);
+                self.extra.shear_drag = None;
+            } else {
+                points[i] = (h.clamp(0.001, 0.999), o);
+            }
+        }
+        if response.drag_stopped() || response.clicked() {
+            self.extra.shear_drag = None;
+        }
+        let spline = op_core::adjust::Spline::new(points);
+        let n = (inner.height() / pt(1.0)).ceil() as usize;
+        let line: Vec<Pos2> = (0..=n)
+            .map(|k| {
+                let h = k as f32 / n as f32;
+                to_screen((h, spline.at(h)))
+            })
+            .collect();
+        painter.add(egui::Shape::line(
+            line,
+            Stroke::new(pt(0.5), Color32::BLACK),
+        ));
+        for (k, &q) in points.iter().enumerate() {
+            let c = to_screen(q);
+            // The ends' squares sit inside the box
+            let c = match k {
+                0 => c + vec2(0.0, pt(2.0)),
+                1 => c - vec2(0.0, pt(2.0)),
+                _ => c,
+            };
+            painter.rect_filled(
+                Rect::from_center_size(c, egui::Vec2::splat(pt(4.0))),
+                0,
+                Color32::BLACK,
+            );
         }
     }
 

@@ -8141,14 +8141,16 @@ fn more_filters_and_adjustments_apply() {
             assert_eq!(h.state().state.last_filter.map(|f| f.name()), Some(name));
         }
     }
-    // Shear with a top offset moves the rows sideways
+    // Shear with its top end moved moves the rows sideways
     run_command(&mut h, Command::Shear);
     h.state_mut()
         .state
         .adjust_dialog
         .as_mut()
         .unwrap()
-        .test_set_value(0, "50");
+        .extra
+        .shear_points[0]
+        .1 = 0.25;
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
     assert_eq!(last_history(&h), "Shear");
@@ -8585,4 +8587,64 @@ fn radial_blur_dialog_sets_its_center() {
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
     assert_eq!(last_history(&h), "Radial Blur");
+}
+
+#[test]
+fn shear_curve_grid_bends_the_line() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::Shear);
+    h.run_steps(3);
+    shot_dialog(&mut h, "shear", 318.0, 392.0);
+    let (x, y) = dialog_origin(&mut h);
+    let pt = crate::theme::pt;
+    let at = |px: f32, py: f32| egui::pos2(pt(x + px), pt(y + py));
+    // The grid's inside is 8.5–137.5 × 34.5–163.5: its middle is x 73
+    // Drag the top end a quarter of the box right
+    drag(&mut h, at(73.0, 35.0), at(105.25, 35.0), Modifiers::NONE);
+    let points = h
+        .state()
+        .state
+        .adjust_dialog
+        .as_ref()
+        .unwrap()
+        .extra
+        .shear_points
+        .clone();
+    assert!((points[0].1 - 0.25).abs() < 0.02, "{points:?}");
+    assert_eq!(points[1], (1.0, 0.0));
+    // Pressing on the curve halfway down adds a point there; drag it left
+    let mid = egui::pos2(pt(x + 73.0 + 129.0 * 0.125), pt(y + 99.0));
+    drag(&mut h, mid, at(40.75, 99.0), Modifiers::NONE);
+    let points = h
+        .state()
+        .state
+        .adjust_dialog
+        .as_ref()
+        .unwrap()
+        .extra
+        .shear_points
+        .clone();
+    assert_eq!(points.len(), 3, "{points:?}");
+    assert!(
+        (points[2].0 - 0.5).abs() < 0.03 && (points[2].1 + 0.25).abs() < 0.03,
+        "{points:?}"
+    );
+    h.run_steps(3);
+    shot_dialog(&mut h, "shear_bent", 318.0, 392.0);
+    // Dragged off the box, the inner point goes away
+    drag(&mut h, at(40.75, 99.0), at(220.0, 99.0), Modifiers::NONE);
+    let points = h
+        .state()
+        .state
+        .adjust_dialog
+        .as_ref()
+        .unwrap()
+        .extra
+        .shear_points
+        .clone();
+    assert_eq!(points.len(), 2, "{points:?}");
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Shear");
 }

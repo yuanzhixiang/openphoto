@@ -1013,22 +1013,12 @@ pub fn map(id: u32) -> Option<std::sync::Arc<Map>> {
 }
 
 /// Shear's curve: up to eight points (height 0–1, offset −0.5–0.5 of the
-/// width), sorted by height, as offsets every row.
+/// width) joined by a smooth curve (a natural cubic spline, as Curves'),
+/// as offsets every row.
 pub fn shear_offsets(points: &[(f32, f32)], rows: usize) -> Vec<f32> {
-    let mut pts = points.to_vec();
-    pts.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let spline = crate::adjust::Spline::new(points);
     (0..rows.max(2))
-        .map(|k| {
-            let t = k as f32 / (rows.max(2) - 1) as f32;
-            match pts.iter().position(|p| p.0 >= t) {
-                None => pts.last().map_or(0.0, |p| p.1),
-                Some(0) => pts[0].1,
-                Some(i) => {
-                    let (a, b) = (pts[i - 1], pts[i]);
-                    a.1 + (b.1 - a.1) * (t - a.0) / (b.0 - a.0).max(1e-6)
-                }
-            }
-        })
+        .map(|k| spline.at(k as f32 / (rows.max(2) - 1) as f32))
         .collect()
 }
 
