@@ -639,7 +639,6 @@ impl Kind {
             Self::LensFlare => l::LENS_FLARE,
             Self::Extrude => l::EXTRUDE,
             Self::OilPaint => l::OIL_PAINT,
-            Self::Wave => l::WAVE,
             Self::Displace => l::DISPLACE,
             Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
             Self::HdrToning => l::HDR_TONING,
@@ -1318,6 +1317,7 @@ impl AdjustDialog {
         self.kind == Kind::Custom
             || self.kind == Kind::Shear
             || self.kind == Kind::LensBlur
+            || self.kind == Kind::Wave
             || self.kind.distort().is_some()
             || self.layout().is_some_and(|l| l.pane)
     }
@@ -1724,6 +1724,7 @@ impl AdjustDialog {
                     Some(Custom::GradientMap(_)) => gradient_map::SIZE,
                     Some(Custom::Kernel(_)) => custom_filter::SIZE,
                     None if self.kind == Kind::LensBlur => lens_blur::size(ctx.content_rect()),
+                    None if self.kind == Kind::Wave => wave::SIZE,
                     None => self
                         .layout()
                         .map_or_else(|| self.kind.size(), |l| vec2(pt(l.size.0), pt(l.size.1))),
@@ -1734,6 +1735,8 @@ impl AdjustDialog {
                     self.custom_ui(ui, rect)
                 } else if self.kind == Kind::LensBlur {
                     self.lens_ui(ui, rect)
+                } else if self.kind == Kind::Wave {
+                    self.wave_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
                     self.classic_ui(ui, rect, layout)
                 } else if let Some(layout) = self.kind.plain() {
@@ -2384,6 +2387,12 @@ impl AdjustDialog {
     pub fn pane_px(&self) -> (usize, usize) {
         if self.kind == Kind::Shear {
             (600, 300)
+        } else if self.kind == Kind::Wave {
+            let [x0, y0, x1, y1] = wave::PREVIEW;
+            (
+                ((x1 - x0 - 2.0) * 2.0) as usize,
+                ((y1 - y0 - 2.0) * 2.0) as usize,
+            )
         } else if self.kind == Kind::LensBlur {
             // The preview's image area, at two pixels a point
             let image = lens_blur::image_rect(self.rect);
@@ -2816,6 +2825,7 @@ fn auto_brightness_contrast(histogram: &[u64; 256]) -> (i32, i32) {
 }
 
 mod lens_blur;
+mod wave;
 #[cfg(test)]
 pub use lens_blur::image_rect as lens_image_rect;
 pub use lens_blur::source as lens_blur_source;

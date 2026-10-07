@@ -8710,3 +8710,33 @@ fn lens_blur_dialog_picks_its_focal_point() {
     h.run_steps(3);
     assert_eq!(last_history(&h), "Lens Blur");
 }
+
+#[test]
+fn wave_dialog_randomizes() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::Wave);
+    h.run_steps(4);
+    shot_dialog(&mut h, "wave", 553.0, 396.0);
+    let seed = h.state().state.adjust_dialog.as_ref().unwrap().extra.seed;
+    let (x, y) = dialog_origin(&mut h);
+    let pt = crate::theme::pt;
+    click(&mut h, egui::pos2(pt(x + 417.5), pt(y + 304.0)));
+    h.run_steps(2);
+    let dialog = h.state().state.adjust_dialog.as_ref().unwrap();
+    assert_ne!(dialog.extra.seed, seed, "Randomize draws a new pattern");
+    // Dragging Wavelength's Max. slider to its end sets 999
+    drag(
+        &mut h,
+        egui::pos2(pt(x + 46.0), pt(y + 156.0)),
+        egui::pos2(pt(x + 290.0), pt(y + 156.0)),
+        Modifiers::NONE,
+    );
+    assert_eq!(
+        h.state().state.adjust_dialog.as_ref().unwrap().value_of(2),
+        Some(999.0)
+    );
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Wave");
+}
