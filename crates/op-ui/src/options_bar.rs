@@ -94,7 +94,43 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         }
         r
     };
-    response.on_hover_text("Tool Presets");
+    let response = response.on_hover_text("Tool Presets");
+    // The Tool Presets picker: the current tool's presets, and New Tool
+    // Preset...
+    if !busy {
+        let mut picked = None;
+        let mut new = false;
+        egui::Popup::from_response(&response)
+            .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .show(|ui| {
+                ui.set_min_width(220.0);
+                let tool = app.tool;
+                let mut any = false;
+                for (k, p) in app.tool_presets.iter().enumerate() {
+                    if p.tool == tool {
+                        any = true;
+                        if ui.selectable_label(false, &p.name).clicked() {
+                            picked = Some(k);
+                        }
+                    }
+                }
+                if !any {
+                    ui.weak("No tool presets defined for current tool.");
+                }
+                ui.separator();
+                if ui.button("New Tool Preset...").clicked() {
+                    new = true;
+                }
+            });
+        if let Some(k) = picked {
+            let preset = app.tool_presets[k].clone();
+            crate::tool_presets::apply(app, &preset);
+        }
+        if new {
+            crate::panels::tool_presets::open_new(app);
+        }
+    }
     let tint = if busy {
         color::OPTIONS_ICON_DISABLED
     } else {

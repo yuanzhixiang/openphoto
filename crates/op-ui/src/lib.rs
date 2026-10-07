@@ -36,6 +36,7 @@ mod status_info;
 mod theme;
 mod titlebar;
 mod tool_icons;
+mod tool_presets;
 mod toolbar;
 mod type_tool;
 mod widgets;
@@ -639,6 +640,17 @@ impl OpenPhotoApp {
                     let preset = self.state.crop_options.to_user(&name);
                     self.state.crop_presets.add(preset);
                     self.state.crop_options.user = Some(self.state.crop_presets.list().len() - 1);
+                }
+            }
+        }
+        // New Tool Preset: OK saves the current tool with its options
+        if let Some(mut dialog) = self.state.new_tool_preset.take() {
+            match dialog.show(ctx) {
+                Outcome::Open => self.state.new_tool_preset = Some(dialog),
+                Outcome::Cancel => {}
+                Outcome::Ok(name) => {
+                    let preset = tool_presets::capture(&mut self.state, name);
+                    self.state.tool_presets.push(preset);
                 }
             }
         }

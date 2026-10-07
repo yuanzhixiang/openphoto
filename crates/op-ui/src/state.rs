@@ -1596,6 +1596,11 @@ pub struct AppState {
     /// open (which panel, and the options as edited).
     pub info_options: crate::panels::panel_options::InfoOptions,
     pub navigator_box: usize,
+    /// Tool presets (this session), the Tool Presets panel's Current Tool
+    /// Only, and the New Tool Preset dialog while open.
+    pub tool_presets: Vec<crate::tool_presets::ToolPreset>,
+    pub tool_presets_current_only: bool,
+    pub new_tool_preset: Option<crate::dialogs::new_preset::NewPresetDialog>,
     pub panel_options: Option<(
         crate::panels::floating::Floating,
         crate::panels::panel_options::InfoOptions,
@@ -1793,6 +1798,9 @@ impl Default for AppState {
             histogram_channel: 0,
             info_options: Default::default(),
             navigator_box: 0,
+            tool_presets: Vec::new(),
+            tool_presets_current_only: true,
+            new_tool_preset: None,
             panel_options: None,
             full_screen_prompt: None,
             skip_full_screen_prompt: false,
@@ -1952,6 +1960,7 @@ impl AppState {
             || self.save_options.is_some()
             || self.guide_layout.is_some()
             || self.panel_options.is_some()
+            || self.new_tool_preset.is_some()
             || self.delete_crop_preset.is_some()
             || self.new_guide_dialog.is_some()
             || self.new_layer_dialog.is_some()

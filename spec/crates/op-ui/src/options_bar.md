@@ -18,7 +18,7 @@ The tool options bar at the top of the window; its content changes with the curr
 
 Separators are all 1 pt wide, 22.5 pt high `#3e3e3e` vertical lines (starting 6 pt below the top). Icon color `#dddddd`; button hit areas are 24 pt square with a rounded background on hover. All icons are vector shapes traced from Photoshop (see `ps_icons.md`), not an icon font.
 
-Home, Tool preset, and the right-side icons only have appearance and hover tooltips; clicking them does nothing.
+Home and the right-side icons only have appearance and hover tooltips; clicking them does nothing. Clicking the Tool preset button opens the Tool Presets picker (a popup): the current tool's presets (a click applies one, `tool_presets.md`; "No tool presets defined for current tool." without any) and New Tool Preset... (`panels/tool_presets.md`). It is not available while transforming.
 
 ## Options per tool
 

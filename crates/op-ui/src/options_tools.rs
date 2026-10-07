@@ -109,6 +109,31 @@ pub enum Item {
 
 use Item::*;
 
+/// The settings a tool's options bar keeps under keys (a tool preset saves
+/// their values).
+pub fn setting_keys(tool: Tool) -> Vec<&'static str> {
+    layout(tool)
+        .unwrap_or(&[])
+        .iter()
+        .filter_map(|item| match *item {
+            Toggle(_, _, _, key)
+            | Popup(_, _, key, _)
+            | Field(_, _, key, _)
+            | Percent(_, _, _, key, _)
+            | Check(_, _, key, _)
+            | Segments(_, _, key)
+            | Radio(_, _, _, key, _)
+            | Modes(_, key)
+            | Combo(_, _, _, key, _, _)
+            | LineStyle(_, _, key)
+            | Dial(_, key)
+            | IconPopup(_, _, _, key, _)
+            | LabeledRadio(_, _, _, _, _, _, key, _) => Some(key),
+            _ => None,
+        })
+        .collect()
+}
+
 const BLEND: &[&str] = &[
     "Normal",
     "Dissolve",

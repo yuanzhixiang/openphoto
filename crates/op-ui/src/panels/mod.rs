@@ -14,6 +14,7 @@ pub(crate) mod info;
 mod navigator;
 pub(crate) mod panel_options;
 mod presets;
+pub(crate) mod tool_presets;
 pub use color_panel::DEFAULT_SWATCHES;
 pub mod history;
 mod layers;

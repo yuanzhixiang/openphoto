@@ -6796,6 +6796,38 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn tool_presets_save_and_pick() {
+    use crate::commands::Command;
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.select_tool(op_tools::Tool::Brush);
+    h.state_mut().state.brush.size = 77.0;
+    h.run_steps(2);
+    // The options bar's picker: New Tool Preset..., OK
+    click(&mut h, at_pt(68.5, 45.25));
+    h.get_by_label("New Tool Preset...").click();
+    h.run_steps(2);
+    assert!(h.state().state.new_tool_preset.is_some());
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(h.state().state.tool_presets.len(), 1);
+    assert_eq!(h.state().state.tool_presets[0].name, "Brush Tool 1");
+    // From another tool, Window › Tool Presets with Current Tool Only off
+    // picks it: the Brush comes back at 77 px
+    h.state_mut().state.brush.size = 10.0;
+    h.state_mut().state.select_tool(op_tools::Tool::Eraser);
+    h.state_mut().state.tool_presets_current_only = false;
+    run_command(&mut h, Command::ToggleToolPresets);
+    h.run_steps(2);
+    shot(&mut h, "tool_presets_panel");
+    h.get_by_label("Brush Tool 1").click();
+    h.run_steps(2);
+    assert_eq!(h.state().state.tool, op_tools::Tool::Brush);
+    assert_eq!(h.state().state.brush.size, 77.0);
+}
+
+#[test]
 fn info_and_navigator_panel_options() {
     use crate::commands::Command;
     use crate::panels::panel_options::Readout;

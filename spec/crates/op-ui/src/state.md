@@ -35,6 +35,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `mixer`, `mixer_load`, `mixer_paint`: the Mixer Brush's `PaintOptions` (returned by `paint_options`), the load color sampled with Option-click (None: the foreground color), and the paint the brush keeps between strokes when it isn't cleaned.
 - `pen_pressure`: the pen's last pressure while a tablet is used (`app_kit::pen_pressure`, read by `lib.rs` before each frame in the real app); None with a mouse. `DocState::paint_smooth`: where a smoothed stroke has got to.
 - `DocState::channels_shown` / `channels_targeted`: the Channels panel's shown and targeted channels; `record` keeps the untargeted channels of an edit (`panels/channels.md`); `channel_thumbnails`: its thumbnails.
+- `tool_presets`, `tool_presets_current_only`, `new_tool_preset`: tool presets (`tool_presets.md`), the Tool Presets panel's Current Tool Only, and the New Tool Preset dialog while open (counted by `modal_open`).
 - `info_options`, `navigator_box`, `panel_options`: Info Panel Options, the Navigator's view box color, and the Panel Options dialog while open (`panels/panel_options.md`).
 - `reveal_panels`, `reveal_tools`: hidden panels or tools shown for the moment at the window's sides (`lib.md`).
 - `DocState::measure`: the Move tool's ⌘-hover distance labels (`smart_guides.md`).
