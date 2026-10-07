@@ -2,7 +2,7 @@
 
 ## 组件职责
 
-带设置的调整与滤镜对话框：Image › Adjustments 下带对话框的调整，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Surface Blur...、Motion Blur...、Unsharp Mask...、Add Noise...、Dust & Scratches...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...、Emboss...、Twirl...、Pinch...、Spherize...、Polar Coordinates...、Custom...、Trace Contour...。Levels...、Curves...、Brightness/Contrast...、Color Balance...、Hue/Saturation...、Channel Mixer...、Selective Color...、Vibrance...、Posterize...、Exposure...、Photo Filter...、Black & White...、Threshold...、Gradient Map... 已按 Photoshop 2026 重做（即全部带对话框的调整），布局与设置在各自的模块里（`levels.md`、`curves.md`、`brightness_contrast.md`、`color_balance.md`、`hue_saturation.md`、`channel_mixer.md`、`selective_color.md`、`vibrance.md`、`exposure.md`、`photo_filter.md`、`black_white.md`、`threshold.md`、`gradient_map.md`），本模块只为它们画窗口框与标题、转交 OK/Cancel 并处理预览。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
+带设置的调整与滤镜对话框：Image › Adjustments 下带对话框的调整，以及 Filter 菜单的 Gaussian Blur...、Box Blur...、Surface Blur...、Motion Blur...、Unsharp Mask...、Add Noise...、Dust & Scratches...、Median...、Minimum...、Maximum...、High Pass...、Offset...、Mosaic...、Emboss...、Twirl...、Pinch...、Spherize...、Polar Coordinates...、Custom...、Trace Contour...、Wind...。Levels...、Curves...、Brightness/Contrast...、Color Balance...、Hue/Saturation...、Channel Mixer...、Selective Color...、Vibrance...、Posterize...、Exposure...、Photo Filter...、Black & White...、Threshold...、Gradient Map... 已按 Photoshop 2026 重做（即全部带对话框的调整），布局与设置在各自的模块里（`levels.md`、`curves.md`、`brightness_contrast.md`、`color_balance.md`、`hue_saturation.md`、`channel_mixer.md`、`selective_color.md`、`vibrance.md`、`exposure.md`、`photo_filter.md`、`black_white.md`、`threshold.md`、`gradient_map.md`），本模块只为它们画窗口框与标题、转交 OK/Cancel 并处理预览。对话框只管理设置与 Preview 开关，预览与应用由 `lib.rs` 完成（见 `lib.md`「调整与滤镜对话框的接入」）。像素算法见 `op-core` 的 `adjust.md` 与 `filter.md`。
 
 对话框的结果是 `Effect`：`Adjustment(Adjustment)` 或 `Filter(Filter)`。`Effect::name()` 是历史名称，`Effect::apply(doc, background)` 调用对应的 `op-core` 函数。
 
@@ -31,6 +31,7 @@
 | Surface Blur | Radius (pixels)（1–100，5）、Threshold (levels)（2–255，15） |
 | Dust & Scratches | Radius (pixels)（1–500，1）、Threshold (levels)（0–255，0） |
 | Trace Contour | Level（0–255，128）、Edge（Lower / Upper，Upper） |
+| Wind | Method（Wind / Blast / Stagger，Wind）、Direction（From the Right / From the Left，From the Right） |
 
 - 滤镜对话框记住上次按 OK 时的设置（Photoshop 的行为）：`settings()` 返回输入框里的文字，`lib.rs` 在应用时按 `Kind` 存进 `AppState::filter_settings`，`commands.rs` 下次打开同一对话框时用 `restore(values)` 放回（个数不符时忽略）。Cancel 不记住。只在本次运行内有效，不写入偏好。调整对话框（`Custom` 的各调整变体）每次打开都是默认值，`settings()` 返回 `None`；Custom 滤镜（`Custom::Kernel`）同样记住，内容见 `custom_filter.md`。
 - Preview 默认勾选。
@@ -50,7 +51,7 @@ Gaussian Blur、Box Blur、Surface Blur、Motion Blur、Unsharp Mask、Add Noise
 
 ### 插件式扭曲对话框
 
-Twirl、Pinch、Spherize、Polar Coordinates 按 Photoshop 2026 的插件式对话框重做（`distort_ui`），布局与绘制在 `distort.rs`（见 `distort.md`）：大预览框（带滚动槽与左下缩放条）、右上 OK / Cancel（89 × 26，13 pt 文字），预览框下方是设置（输入框 + 五边形滑块，或 Polar Coordinates 的两个单选按钮），右下是扭曲示意图。设置仍存在本模块的参数表里，所以记忆、校验、预览与经典对话框相同。
+Twirl、Pinch、Spherize、Polar Coordinates、Wind 按 Photoshop 2026 的插件式对话框重做（`distort_ui`），布局与绘制在 `distort.rs`（见 `distort.md`）：大预览框（带滚动槽与左下缩放条）、右上 OK / Cancel（89 × 26，13 pt 文字），预览框下方是设置（输入框 + 五边形滑块，或 Polar Coordinates、Wind 的单选分组），右下是扭曲示意图。设置仍存在本模块的参数表里，所以记忆、校验、预览与经典对话框相同。
 
 每个滤镜对话框都有经典或插件式布局之一（`Kind::size` 在没有布局时 panic，`every_filter_dialog_has_an_effect` 会暴露遗漏）；旧的通用布局已删除。
 

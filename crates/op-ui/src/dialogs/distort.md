@@ -2,7 +2,7 @@
 
 ## 组件职责
 
-Filter › Distort 的 Twirl...、Pinch...、Spherize...、Polar Coordinates... 在 Photoshop 2026 里是「插件式」对话框，外观与经典滤镜对话框不同。本模块记录它们的布局（按 Photoshop 截图逐点测量）并提供绘制部件；设置、记忆、预览与 OK/Cancel 逻辑在宿主 `adjust.rs` 的 `distort_ui`（见 `adjust.md`）。坐标是从对话框左上角（含标题栏）起算的 Photoshop 点。
+Filter › Distort 的 Twirl...、Pinch...、Spherize...、Polar Coordinates... 与 Stylize › Wind... 在 Photoshop 2026 里是「插件式」对话框，外观与经典滤镜对话框不同。本模块记录它们的布局（按 Photoshop 截图逐点测量）并提供绘制部件；设置、记忆、预览与 OK/Cancel 逻辑在宿主 `adjust.rs` 的 `distort_ui`（见 `adjust.md`）。坐标是从对话框左上角（含标题栏）起算的 Photoshop 点。
 
 ## 布局
 
@@ -12,12 +12,14 @@ Filter › Distort 的 Twirl...、Pinch...、Spherize...、Polar Coordinates... 
 | Pinch | 468 × 367 | 347.5 | Amount：输入框 x 253，滑块到 305.5，单位「%」 | (328, 227) |
 | Spherize | 433 × 404 | 312.5 | Amount：输入框 x 218，滑块到 270.5，单位「%」；Mode 下拉框 (59, 368)–(207, 386) | (293, 264) |
 | Polar Coordinates | 405 × 375 | 298.5 | 分组框 (8, 317)–(281, 366) 内两个单选按钮，圆心 (21, 330)、(21, 354) | 无 |
+| Wind | 405 × 461 | 298.5 | Method 分组框 (8, 332)–(281, 396)，标题中线 y 334，单选按钮圆心 x 20、y 349 / 365 / 381；Direction 分组框 (8, 404)–(281, 452)，标题中线 405.75，y 421 / 437 | 无 |
 
 - 预览框：外框 (8, 36)–(281, 309)，1 pt `#3e3e3e` 边，内部 `#4d4d4d`；右侧滚动槽 (265, 37)–(280, 293) 与底部滚动槽 (119, 293)–(265, 308) 为 `#505050`，底部左段 (9, 293)–(119, 308) 与右下角为对话框底色。图像在 (9, 37)–(265, 293) 中居中显示 100%（预览纹理由 `lib.rs` 生成），外围一条一像素黑边。
 - 缩放条：「−」「+」两个 11 pt 方框（x 15、32，y 296–307，`#dddddd` 线），其后组合框 (47.5, 293)–(117.5, 307.5)（`#666666` 边），右段 98.5–117.5 为 `#454545` 并带下拉箭头，左段显示「100%」。目前只是显示。
 - OK、Cancel：89 × 26，y 41 与 77，13 pt 文字居中（`appkit::button_with`）。
 - 标签（Angle、Amount、Mode、单选项文字）为 11 pt，比经典对话框小一号；输入框（36 × 20，y 317–337）与下拉框文字仍为 12 pt。单位在输入框右侧 8.5 pt。
 - 滑块：3 pt 圆角 `#757575` 轨道，从 x 18.5、y 345 起；白色五边形滑块（`#212121` 边，尖朝上，宽 9、高 7）的中心从轨道两端各缩进 4.5 pt 之间线性移动（与 Photoshop 的实测吻合：Twirl 120、Pinch −40、Spherize 70）。
+- 单选分组（`RadioGroup`）：每个分组对应一个选项参数，按参数顺序排列；分组框 1 pt `#4f4f4f` 圆角边，有标题时标题（11 pt）在框内 x 27。
 - 单选按钮：选中为 `#b1b1b1` 实心圆加 `#3f3f3f` 圆点，未选中为 `#454545` 底与 `#808080` 环；文字在圆心右 14 pt。
 
 ## 示意图
@@ -30,7 +32,7 @@ Filter › Distort 的 Twirl...、Pinch...、Spherize...、Polar Coordinates... 
 
 - 打开时输入框获得焦点并全选；↑↓ 步进 1（⇧ 时 10）。
 - 在滑块区域按下或拖动时按指针位置线性取整数值。
-- Spherize 的 Mode 下拉框、Polar Coordinates 的单选按钮直接改设置。
+- Spherize 的 Mode 下拉框、Polar Coordinates 与 Wind 的单选按钮直接改设置。
 - OK / Enter 应用，Cancel / Esc 取消；值无效时 OK 置灰。
 
 ## 测试覆盖

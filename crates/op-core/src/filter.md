@@ -29,13 +29,18 @@
   - `Despeckle`：每个通道在原值与 Blur More（上述 3 × 3 核 / 14）之间混合，Blur More 的比例为 `1 − e`，`e = clamp((|g| − 64) / 192, 0, 1)`，`|g|` 为该通道不归一化 Sobel 梯度的长度——平坦处完全模糊，梯度 ≥ 256 的边缘保持原样（由孤立点、阶跃边与斜坡实测，与 Photoshop 相差不超过 1 级）。
   - `SharpenEdges`：同样的 `e`，在原值与 Sharpen（先截到 0–255）之间按 `e` 混合——只锐化边缘，与 Despeckle 互补（与 Photoshop 相差不超过 1 级）。
   - `TraceContour { level, upper }`：每个通道独立，结果只有 0 与 255：Upper 时值 ≤ level 且上下左右有邻点 > level 的像素为 0，Lower 时值 ≥ level 且有邻点 < level 的像素为 0，其余为 255。与 Photoshop 一致（Upper 的探测图中仅一个通道值不同：一个 255 的孤立点四周恰好等于 level 时 Photoshop 也会描出它）。
+  - `Wind { method, from_left }`：Photoshop 的 Wind 是随机的（同样参数两次结果不同），无法逐像素对照；这里按实测的统计行为还原，并用像素坐标决定随机数，同样参数总是同样结果（预览与应用一致）。沿风向（`from_left` 时向右）逐行扫描，在变暗超过一定幅度（加权亮度 3R+6G+B 差 > 40）处一半概率起一道尾迹，长度 8–31 像素：
+    - `WindMethod::Wind`：尾迹首像素为前后两像素的平均，此后每像素向所经过的像素按随机比例（0.08–0.28）衰减；
+    - `Blast`：原样延伸前一像素的颜色；
+    - `Stagger`：把该像素沿风向带走更远（24–93 像素）再放下，原处由后一像素填补。
+    - Wind 与 Blast 只会让像素变亮（取各通道较大值），平坦区域不变。
   - 扭曲（Distort）滤镜都是「逆映射 + 双线性取样」：每个像素取它从哪里映射来的位置的颜色（`distort_source`），映射在 Photoshop 2026 上用坐标图（R、G 编码 x、y）测得。Twirl、Pinch、Spherize 只作用于贴着图像四边的椭圆内，距离 `t` 以椭圆半径为 1：
     - `Twirl { angle }`：转角 `angle × (1 − t)²`（中心最大，边缘为 0）。
     - `Pinch { amount }`：取样距离 `t + amount% × h(t)`，`h` 为实测的 21 点表（`PINCH_SHIFT`，与数量成正比，正值向内收）。
     - `Spherize { amount, mode }`：正值取样距离 `t + a × ((2/π)·asin t − t)`，负值 `t + |a| × (sin(πt/2) − t)`；Horizontal only / Vertical only 只沿一个方向。
     - `PolarCoordinates { to_polar }`：Rectangular to Polar 把绕中心的角度（从正上方逆时针）映射到 x、到中心的距离映射到 y；Polar to Rectangular 反之（角度取 `(x + 1)/w` 一圈）。
     - 与 Photoshop 的平均差：Twirl 0.5 级、Pinch 0.2 级、Spherize 1.2–1.7 级、Polar 0.03–0.7 级；孤立的单像素亮点在亚像素坐标差异下会差得较多。
-- `Filter::name()`：菜单与历史名称（「Gaussian Blur」「Box Blur」「Average」「Unsharp Mask」「Add Noise」「Median」「Minimum」「Maximum」「High Pass」「Offset」「Mosaic」「Solarize」「Blur」「Blur More」「Sharpen」「Sharpen More」「Find Edges」「Motion Blur」「Emboss」「Twirl」「Pinch」「Spherize」「Polar Coordinates」「Fragment」「Custom」「Surface Blur」「Dust & Scratches」「Despeckle」「Sharpen Edges」「Trace Contour」）。
+- `Filter::name()`：菜单与历史名称（「Gaussian Blur」「Box Blur」「Average」「Unsharp Mask」「Add Noise」「Median」「Minimum」「Maximum」「High Pass」「Offset」「Mosaic」「Solarize」「Blur」「Blur More」「Sharpen」「Sharpen More」「Find Edges」「Motion Blur」「Emboss」「Twirl」「Pinch」「Spherize」「Polar Coordinates」「Fragment」「Custom」「Surface Blur」「Dust & Scratches」「Despeckle」「Sharpen Edges」「Trace Contour」「Wind」）。
 - `distortion_source(filter, x, y, w, h)`：扭曲滤镜在 `w` × `h` 图像中为像素 (x, y) 取色的源位置（其它滤镜返回原位置），供对话框画示意图。
 - `apply(doc, filter, background)`：先做与调整相同的检查（`adjust::check`：没有图层、图层隐藏、像素锁定时返回 `FillError`），再应用。`background` 是 Offset 在背景图层上使用的背景色。
 
@@ -49,6 +54,7 @@
 ## 已知限制
 
 - 全部在 CPU 上单线程计算，大图大半径时较慢。
+- Wind 的随机分布（起尾迹的概率、长度、衰减）是按探测图估计的，与 Photoshop 只在统计上相似；Stagger 的行为观察得最少。
 - Add Noise 的强度、Mosaic 以外的 Pixelate 滤镜等尚未与 Photoshop 核对。
 
 ## 测试覆盖
@@ -62,3 +68,4 @@
 - `photoshop::filters_match_photoshop`：36 组滤镜对照 Photoshop 的输出（含 Fragment、Custom 两组、Surface Blur 两组、Dust & Scratches 两组、Despeckle、Sharpen Edges、Trace Contour Lower）（`fixtures/filter`），每组限定最大误差。
 - `distortions_match_photoshop`：Twirl、Pinch、Spherize（含负值与 Vertical only）、Polar Coordinates 两个方向对照 Photoshop，按平均差断言。
 - `trace_contour_upper_matches_photoshop`：Trace Contour Level 128 Upper 对照 Photoshop，至多一个通道值不同。
+- `wind_streaks_downwind`：Wind、Blast 两个方向：结果可重复，亮点保留，尾迹只在下风侧、只变亮，32 行中有一部分起了尾迹；平坦图像三种方法都不变。
