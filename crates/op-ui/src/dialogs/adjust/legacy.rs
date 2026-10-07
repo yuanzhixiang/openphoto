@@ -171,13 +171,7 @@ impl AdjustDialog {
         }
         let (x0, x1, top) = row.track;
         if enabled {
-            self.classic_track(
-                ui,
-                i,
-                at(x0, top),
-                at(x1, 0.0).x,
-                row.scale,
-            );
+            self.classic_track(ui, i, at(x0, top), at(x1, 0.0).x, row.scale);
         } else {
             let line = Rect::from_min_max(at(x0, top), at(x1, top + 3.0));
             ui.painter().rect_filled(line, 0, Color32::from_gray(0x75));

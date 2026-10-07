@@ -547,69 +547,6 @@ pub const SHAPE_BLUR: &Layout = &Layout {
     ],
 };
 
-pub const OIL_PAINT: &Layout = &Layout {
-    size: (324.0, 584.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: true,
-    rows: &[
-        number(
-            "Stylization:",
-            135.0,
-            [140.0, 287.0, 200.5, 306.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 313.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Cleanliness:",
-            135.0,
-            [140.0, 336.0, 200.5, 355.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 362.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Scale:",
-            135.0,
-            [140.0, 385.0, 200.5, 404.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 411.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Bristle Detail:",
-            135.0,
-            [140.0, 434.0, 200.5, 453.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 460.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Angle:",
-            135.0,
-            [140.0, 483.0, 200.5, 502.0],
-            "°",
-            205.5,
-            Some((21.0, 303.0, 509.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Shine:",
-            135.0,
-            [140.0, 532.0, 200.5, 551.0],
-            "",
-            205.5,
-            Some((21.0, 303.0, 558.0)),
-            Scale::Linear,
-        ),
-    ],
-};
-
 pub const SHADOWS_HIGHLIGHTS: &Layout = &Layout {
     size: (324.0, 560.0),
     button_width: 59.5,

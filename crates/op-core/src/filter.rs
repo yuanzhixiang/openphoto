@@ -401,13 +401,7 @@ pub enum Filter {
         mask_incomplete: bool,
         seed: u32,
     },
-    OilPaint {
-        stylization: f32,
-        cleanliness: f32,
-        scale: f32,
-        angle: f32,
-        shine: f32,
-    },
+    OilPaint(crate::more_filters::OilPaint),
 }
 
 impl Filter {
@@ -427,7 +421,7 @@ impl Filter {
             Self::Fibers { .. } => "Fibers",
             Self::LensFlare { .. } => "Lens Flare",
             Self::Extrude { .. } => "Extrude",
-            Self::OilPaint { .. } => "Oil Paint",
+            Self::OilPaint(_) => "Oil Paint",
             Self::HdrToning(_) => "HDR Toning",
             Self::GaussianBlur { .. } => "Gaussian Blur",
             Self::BoxBlur { .. } => "Box Blur",
@@ -2006,7 +2000,7 @@ fn filtered(
         | Filter::Fibers { .. }
         | Filter::LensFlare { .. }
         | Filter::Extrude { .. }
-        | Filter::OilPaint { .. } => {
+        | Filter::OilPaint(_) => {
             let px: Vec<[u8; 4]> = src.px.iter().map(|&p| Buffer::straight(p)).collect();
             // Lens Blur's depth map from the transparency
             let alpha: Option<Vec<u8>> = match filter {
@@ -2150,13 +2144,7 @@ fn more(px: &[[u8; 4]], w: usize, h: usize, filter: Filter, depth: Option<&[u8]>
             mask_incomplete,
             seed,
         ),
-        Filter::OilPaint {
-            stylization,
-            cleanliness,
-            scale,
-            angle,
-            shine,
-        } => m::oil_paint(px, w, h, stylization, cleanliness, scale, angle, shine),
+        Filter::OilPaint(o) => m::oil_paint(px, w, h, &o),
         _ => px.to_vec(),
     }
 }

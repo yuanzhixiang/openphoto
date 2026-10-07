@@ -1199,20 +1199,43 @@ pub fn extrude(
 
 // --------------------------------------------------------- Oil Paint
 
+/// Oil Paint's settings, as its dialog has them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OilPaint {
+    /// Brush: Stylization 0.1–10, Cleanliness 0–10, Scale 0.1–10, Bristle
+    /// Detail 0–10.
+    pub stylization: f32,
+    pub cleanliness: f32,
+    pub scale: f32,
+    pub bristle: f32,
+    /// Lighting on, its angle in degrees and Shine 0–10.
+    pub lighting: bool,
+    pub angle: f32,
+    pub shine: f32,
+}
+
+impl Default for OilPaint {
+    fn default() -> Self {
+        Self {
+            stylization: 1.5,
+            cleanliness: 5.0,
+            scale: 1.0,
+            bristle: 0.0,
+            lighting: true,
+            angle: -60.0,
+            shine: 1.0,
+        }
+    }
+}
+
 /// Stylize › Oil Paint: brush strokes from a smoothing that keeps edges
-/// (Stylization 0.1–10, Cleanliness 0–10, Scale 0.1–10 set its reach),
-/// with lighting (angle, Shine 0–10) shading them like raised paint.
-#[allow(clippy::too_many_arguments)] // one per control in the dialog
-pub fn oil_paint(
-    px: &[Px],
-    w: usize,
-    h: usize,
-    stylization: f32,
-    cleanliness: f32,
-    scale: f32,
-    angle: f32,
-    shine: f32,
-) -> Vec<Px> {
+/// (Stylization, Cleanliness and Scale set its reach); Bristle Detail
+/// puts the image's fine grain back over the strokes (bristle marks, up
+/// to 0.8 of it at 10); with Lighting, the paint's luminosity is lit from
+/// the angle by Shine like raised paint.
+pub fn oil_paint(px: &[Px], w: usize, h: usize, o: &OilPaint) -> Vec<Px> {
+    let (stylization, cleanliness, scale, angle, shine) =
+        (o.stylization, o.cleanliness, o.scale, o.angle, o.shine);
     let r = ((stylization + scale) * 0.6).round().clamp(1.0, 12.0) as i64;
     let at = |x: i64, y: i64| {
         px[y.clamp(0, h as i64 - 1) as usize * w + x.clamp(0, w as i64 - 1) as usize]
@@ -1251,7 +1274,35 @@ pub fn oil_paint(
             [mix(0), mix(1), mix(2), p[3]]
         })
         .collect();
-    if shine <= 0.0 {
+    // Bristle Detail: the image's fine grain (its difference from a 3 × 3
+    // blur) over the strokes
+    let painted: Vec<Px> = if o.bristle > 0.0 {
+        let k = o.bristle / 10.0 * 0.8;
+        (0..w * h)
+            .map(|i| {
+                let (x, y) = ((i % w) as i64, (i / w) as i64);
+                let mut blur = [0f32; 3];
+                for dy in -1..=1 {
+                    for dx in -1..=1 {
+                        let q = at(x + dx, y + dy);
+                        for c in 0..3 {
+                            blur[c] += q[c] as f32 / 9.0;
+                        }
+                    }
+                }
+                let (p, orig) = (painted[i], px[i]);
+                let v = |c: usize| {
+                    (p[c] as f32 + (orig[c] as f32 - blur[c]) * k)
+                        .round()
+                        .clamp(0.0, 255.0) as u8
+                };
+                [v(0), v(1), v(2), p[3]]
+            })
+            .collect()
+    } else {
+        painted
+    };
+    if !o.lighting || shine <= 0.0 {
         return painted;
     }
     // Lighting: the paint's luminosity as a height, lit from `angle`
@@ -1627,7 +1678,25 @@ mod tests {
         assert_eq!(masked[31 * 32 + 31], checker(32, 32)[31 * 32 + 31]);
         assert_eq!(masked[5 * 32 + 31], checker(32, 32)[5 * 32 + 31]);
         assert_ne!(&masked[..10], &checker(32, 32)[..10]);
-        let oil = oil_paint(&checker(32, 32), 32, 32, 2.0, 5.0, 1.0, -60.0, 2.0);
+        let o = OilPaint {
+            stylization: 2.0,
+            shine: 2.0,
+            ..Default::default()
+        };
+        let oil = oil_paint(&checker(32, 32), 32, 32, &o);
         assert_eq!(oil.len(), 32 * 32);
+        // Bristle Detail and Lighting each change the strokes
+        let bristle = oil_paint(&checker(32, 32), 32, 32, &OilPaint { bristle: 10.0, ..o });
+        assert_ne!(bristle, oil);
+        let unlit = oil_paint(
+            &checker(32, 32),
+            32,
+            32,
+            &OilPaint {
+                lighting: false,
+                ..o
+            },
+        );
+        assert_ne!(unlit, oil);
     }
 }

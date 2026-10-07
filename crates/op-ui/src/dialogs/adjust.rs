@@ -334,11 +334,13 @@ const EXTRUDE: &[Param] = &[
     check("Mask Incomplete Blocks", false),
 ];
 
+/// In the dialog's order (`oil_paint`'s indexes).
 const OIL_PAINT: &[Param] = &[
     param("Stylization:", 0.1, 10.0, 1.5, 1),
     param("Cleanliness:", 0.0, 10.0, 5.0, 1),
     param("Scale:", 0.1, 10.0, 1.0, 1),
     param("Bristle Detail:", 0.0, 10.0, 0.0, 1),
+    check("Lighting", true),
     param("Angle:", -180.0, 180.0, -60.0, 0),
     param("Shine:", 0.0, 10.0, 1.0, 1),
 ];
@@ -650,7 +652,6 @@ impl Kind {
             Self::TraceContour => l::TRACE_CONTOUR,
             Self::Diffuse => l::DIFFUSE,
             Self::ShapeBlur => l::SHAPE_BLUR,
-            Self::OilPaint => l::OIL_PAINT,
             Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
             Self::HdrToning => l::HDR_TONING,
             Self::ReplaceColor => l::REPLACE_COLOR,
@@ -1539,13 +1540,15 @@ impl AdjustDialog {
                 mask_incomplete: v[5] == 1.0,
                 seed: e.seed,
             },
-            Kind::OilPaint => Filter::OilPaint {
+            Kind::OilPaint => Filter::OilPaint(mf::OilPaint {
                 stylization: v[0],
                 cleanliness: v[1],
                 scale: v[2],
-                angle: v[4],
-                shine: v[5],
-            },
+                bristle: v[oil_paint::BRISTLE],
+                lighting: v[oil_paint::LIGHTING] == 1.0,
+                angle: v[oil_paint::ANGLE],
+                shine: v[oil_paint::SHINE],
+            }),
             Kind::Wave => Filter::Wave(mf::Wave {
                 generators: v[0] as u32,
                 wavelength: (v[1], v[2].max(v[1] + 1.0)),
@@ -1784,6 +1787,7 @@ impl AdjustDialog {
                     None if self.kind == Kind::Wave => wave::SIZE,
                     None if self.kind == Kind::ReduceNoise => reduce_noise::SIZE,
                     None if self.kind == Kind::SmartSharpen => self.smart_sharpen_size(),
+                    None if self.kind == Kind::OilPaint => oil_paint::SIZE,
                     None => self
                         .layout()
                         .map_or_else(|| self.kind.size(), |l| vec2(pt(l.size.0), pt(l.size.1))),
@@ -1800,6 +1804,8 @@ impl AdjustDialog {
                     self.reduce_noise_ui(ui, rect)
                 } else if self.kind == Kind::SmartSharpen {
                     self.smart_sharpen_ui(ui, rect)
+                } else if self.kind == Kind::OilPaint {
+                    self.oil_paint_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
                     self.classic_ui(ui, rect, layout)
                 } else if let Some(layout) = self.kind.plain() {
@@ -3039,6 +3045,7 @@ fn auto_brightness_contrast(histogram: &[u64; 256]) -> (i32, i32) {
 
 mod legacy;
 mod lens_blur;
+mod oil_paint;
 mod reduce_noise;
 mod smart_sharpen;
 

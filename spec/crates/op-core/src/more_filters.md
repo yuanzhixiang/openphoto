@@ -22,7 +22,7 @@ The pixel work of more of the Filter menu, on a layer's straight RGBA pixels, re
 - Fibers: each column a random walk between the background and foreground colors, Variance its step, Strength the length of its smoothing along the column.
 - Lens Flare: a glow and ring at the center, ghosts along the line through the image's middle, a streak for Movie Prime, screened over the image; Brightness scales it; the lens sets the size.
 - Extrude: squares of the size, Blocks (rims on the lower and right edges in shadow; Solid Front Faces paints the square's average) or Pyramids (four faces lit from the top left), Depth scaling the shading, random or Level-based heights. Mask Incomplete Blocks leaves the squares cut off by the image's edge as they are.
-- Oil Paint: a Kuwahara smoothing whose reach grows with Stylization and Scale, mixed by Cleanliness, then lighting from the angle with Shine.
+- Oil Paint (`OilPaint`, `oil_paint`): a Kuwahara smoothing (the calmest of four quadrants, reach from Stylization and Scale) mixed over the image by Cleanliness; Bristle Detail puts the image's fine grain (its difference from a 3 × 3 blur) back over the strokes, up to 0.8 of it at 10; with Lighting on, the paint's luminosity is lit from the angle by Shine like raised paint.
 
 ## Not included
 
@@ -34,4 +34,4 @@ These follow Photoshop's controls and pictures; Adobe's exact algorithms are its
 
 ## Test coverage
 
-`wave_and_shear_move_pixels_sideways`, `displace_by_a_gray_map`, `blurs_soften_and_keep_flat_areas` (each blur changes a checker; flat fields stay; Smart Blur keeps the checker's edges and Edge Only finds them; Low and High quality blur noise differently), `reduce_noise_jpeg_and_channels` (Remove JPEG Artifact softens a block step; red's own Strength changes red alone), `reduce_noise_and_smart_sharpen` (fully faded shadows keep an edge's dark side; Legacy's More Accurate differs from one pass; speckle's deviation falls below 60 %; edges gain contrast), `renders` (fibers mix the colors, a flare is bright at its center and dark far away, pyramids and oil paint change the image).
+`wave_and_shear_move_pixels_sideways`, `displace_by_a_gray_map`, `blurs_soften_and_keep_flat_areas` (each blur changes a checker; flat fields stay; Smart Blur keeps the checker's edges and Edge Only finds them; Low and High quality blur noise differently), `reduce_noise_jpeg_and_channels` (Remove JPEG Artifact softens a block step; red's own Strength changes red alone), `reduce_noise_and_smart_sharpen` (fully faded shadows keep an edge's dark side; Legacy's More Accurate differs from one pass; speckle's deviation falls below 60 %; edges gain contrast), `renders` (Bristle Detail and Lighting each change Oil Paint's strokes) (fibers mix the colors, a flare is bright at its center and dark far away, pyramids and oil paint change the image).

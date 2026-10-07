@@ -8843,3 +8843,31 @@ fn smart_sharpen_dialog_opens_shadows_highlights() {
     h.run_steps(3);
     assert_eq!(last_history(&h), "Smart Sharpen");
 }
+
+#[test]
+fn oil_paint_dialog_lighting_and_bristles() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::OilPaint);
+    h.run_steps(4);
+    shot_dialog(&mut h, "oil_paint", 324.0, 651.0);
+    let (x, y) = dialog_origin(&mut h);
+    let pt = crate::theme::pt;
+    // The Lighting checkbox turns lighting off
+    click(&mut h, egui::pos2(pt(x + 36.0), pt(y + 532.5)));
+    h.run_steps(2);
+    let dialog = h.state_mut().state.adjust_dialog.as_mut().unwrap();
+    dialog.test_set_value(3, "6.0");
+    h.run_steps(2);
+    match h.state().state.adjust_dialog.as_ref().unwrap().effect() {
+        Some(crate::dialogs::Effect::Filter(op_core::filter::Filter::OilPaint(o))) => {
+            assert!(!o.lighting);
+            assert_eq!(o.bristle, 6.0);
+        }
+        other => panic!("{other:?}"),
+    }
+    shot_dialog(&mut h, "oil_paint_unlit", 324.0, 651.0);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Oil Paint");
+}
