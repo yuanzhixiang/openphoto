@@ -47,14 +47,9 @@ impl Floating {
 
     fn size(self, app: &AppState) -> Vec2 {
         match self {
-            // Taller by three lines for each row of two color samplers
-            Self::Info => {
-                let rows = super::info::sampler_rows(app);
-                Vec2::new(
-                    pt(250.0),
-                    pt(200.0) + rows as f32 * super::info::SAMPLER_ROW,
-                )
-            }
+            // Photoshop's width; as tall as the sections shown (the frame's
+            // margin is drawn over, see `info::show`)
+            Self::Info => Vec2::new(pt(214.0), super::info::height(app)),
             Self::Navigator => Vec2::new(pt(250.0), pt(230.0)),
             Self::Histogram if app.histogram_expanded => {
                 Vec2::new(pt(250.0), super::histogram::EXPANDED)

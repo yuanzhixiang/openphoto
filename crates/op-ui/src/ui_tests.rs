@@ -8521,3 +8521,31 @@ fn a_group_gets_a_mask_and_shows_it() {
     assert_eq!(composite(&h, 150, 300), [255, 255, 255]);
     shot(&mut h, "group_mask");
 }
+
+#[test]
+fn info_panel_sections() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.key_press(egui::Key::F8);
+    h.run_steps(2);
+    let s = h.state_mut().state.active().unwrap();
+    s.color_samplers.push(egui::pos2(10.0, 10.0));
+    s.color_samplers.push(egui::pos2(100.0, 60.0));
+    h.run_steps(3);
+    // Readouts, position, one row of samplers, Document Sizes
+    let app = &h.state().state;
+    let close = |a: f32, b: f32| (a - crate::theme::pt(b)).abs() < 0.01;
+    assert!(close(
+        crate::panels::info::height(app),
+        125.0 + 66.0 + 28.0 + 8.0
+    ));
+    // The Color Sampler adds its tool hint
+    h.state_mut().state.tool = op_tools::Tool::ColorSampler;
+    let app = &h.state().state;
+    assert!(close(
+        crate::panels::info::height(app),
+        125.0 + 66.0 + 28.0 + 46.0 + 8.0
+    ));
+    h.run_steps(2);
+    shot(&mut h, "info_panel");
+}

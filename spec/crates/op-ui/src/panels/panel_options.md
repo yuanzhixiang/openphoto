@@ -11,7 +11,7 @@ The options the Info and Navigator panels' panel menus open with Panel Options..
   - the first and second readout (Photoshop's defaults: Actual Color and CMYK Color);
   - the mouse coordinates' unit (None: the rulers');
   - three status lines, Document Sizes (on by default), Document Dimensions and Current Tool (`STATUS`);
-  - Show Tool Hints.
+  - Show Tool Hints (on by default, as in Photoshop): the Info panel's tool hint section (`info.md`).
 - **`info_options_ui`:** a pop-up for each readout, one for the unit ("Rulers' Units", then the rulers' units), checkboxes for the status lines, and Show Tool Hints.
 
 ## Navigator
@@ -29,7 +29,7 @@ The view box's color (`AppState::navigator_box`), picked from `VIEW_BOX_COLORS`:
 
 - The dialog uses egui's widgets and isn't laid out like Photoshop's.
 - Of the status items, only the three above are offered.
-- Show Tool Hints has no effect.
+- Show Tool Hints only has text for the tools whose hints were measured from Photoshop (`info::tool_hint`).
 
 ## Test coverage
 

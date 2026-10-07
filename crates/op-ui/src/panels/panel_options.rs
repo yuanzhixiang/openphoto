@@ -110,14 +110,14 @@ pub struct InfoOptions {
 }
 
 impl Default for InfoOptions {
-    /// Photoshop's: Actual Color and CMYK, Document Sizes.
+    /// Photoshop's: Actual Color and CMYK, Document Sizes, Show Tool Hints.
     fn default() -> Self {
         Self {
             first: Readout::Actual,
             second: Readout::Cmyk,
             units: None,
             status: [true, false, false],
-            tool_hints: false,
+            tool_hints: true,
         }
     }
 }
