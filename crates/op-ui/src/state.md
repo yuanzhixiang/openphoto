@@ -94,3 +94,4 @@
 ## 已知限制
 
 - 撤销会把图层显示/隐藏和当前选中图层一起恢复成快照里的样子；Photoshop 默认不记录这两项，撤销时也不会改变它们。
+- `new_document_recent`、`new_document_saved`、`new_document_welcome_closed`：New Document 对话框的 Recent 列表（新的在前、不重复、最多 20 个）、用存储图标存下的预设、Recent 页的欢迎框是否关过；只在本次运行内保留（见 `dialogs/new_document.md`）。

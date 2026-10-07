@@ -14,7 +14,7 @@
 
 ## 新建
 
-- `new_dialog`：File › New...（⌘N）打开 New 对话框（`dialogs/new_document.md`），名称为下一个「Untitled-N」，剪贴板里有图像时宽高取图像的尺寸（与 Photoshop 一致），否则 1920×1080。
+- `new_dialog`：File › New...（⌘N）打开 New Document 对话框（`dialogs/new_document.md`），名称为下一个「Untitled-N」，剪贴板里有图像时宽高取图像的尺寸（与 Photoshop 一致），否则取最近使用的第一个预设，都没有时 1920×1080 像素、72 ppi；同时传入本次运行的 Recent、Saved 预设、欢迎框是否关过，以及当前背景色（Background Color 的色块）。
 - `create_document(name, size, resolution, contents)`：按对话框创建文档并设为当前文档，第一条历史为「New」，未命名计数加一。背景内容为 White、Black、Background Color（当前背景色）时得到对应颜色的背景图层；Transparent 时得到透明的普通图层「Layer 1」（没有背景图层），与 Photoshop 一致。
 - `new_document`：应用启动且没有打开文件时的文档：1920×1080、白色背景、72 ppi、RGB/8，标题「Untitled-1」，不经过对话框。
 
