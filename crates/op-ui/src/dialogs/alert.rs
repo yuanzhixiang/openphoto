@@ -297,7 +297,13 @@ fn draw(
             }
         }
     } else if alert.cancel {
-        if button(row(16.0, 126.0), alert.cancel_label, CANCEL, BUTTON_TEXT, "cancel") {
+        if button(
+            row(16.0, 126.0),
+            alert.cancel_label,
+            CANCEL,
+            BUTTON_TEXT,
+            "cancel",
+        ) {
             answer = Some(Answer::Cancel);
         }
         if button(row(134.0, 244.0), alert.ok_label, OK, Color32::WHITE, "ok") {

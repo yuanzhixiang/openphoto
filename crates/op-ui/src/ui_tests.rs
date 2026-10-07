@@ -8882,10 +8882,15 @@ fn shape_blur_dialog_picks_a_shape() {
     let (x, y) = dialog_origin(&mut h);
     let pt = crate::theme::pt;
     // The fourth row is Heart
-    click(&mut h, egui::pos2(pt(x + 100.0), pt(y + 344.0 + 29.0 * 3.5)));
+    click(
+        &mut h,
+        egui::pos2(pt(x + 100.0), pt(y + 344.0 + 29.0 * 3.5)),
+    );
     h.run_steps(2);
     match h.state().state.adjust_dialog.as_ref().unwrap().effect() {
-        Some(crate::dialogs::Effect::Filter(op_core::filter::Filter::ShapeBlur { shape, .. })) => {
+        Some(crate::dialogs::Effect::Filter(op_core::filter::Filter::ShapeBlur {
+            shape, ..
+        })) => {
             assert_eq!(shape, op_core::more_filters::BlurShape::Heart);
         }
         other => panic!("{other:?}"),
@@ -8894,4 +8899,31 @@ fn shape_blur_dialog_picks_a_shape() {
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
     assert_eq!(last_history(&h), "Shape Blur");
+}
+
+#[test]
+fn marquee_fixed_ratio_and_fixed_size() {
+    use crate::state::MarqueeStyle;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.key_press(egui::Key::M);
+    h.run_steps(2);
+    // Fixed Ratio 2:1: a drag 100 × 20 becomes 100 × 50
+    h.state_mut().state.marquee.style = MarqueeStyle::FixedRatio;
+    h.state_mut().state.tool_settings.insert("marquee.ratio_w", "2".into());
+    let (a, b) = (doc_point(&h, 50.0, 50.0), doc_point(&h, 150.0, 70.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    h.run_steps(2);
+    let bounds = active(&h).doc.selection().and_then(|s| s.bounds()).unwrap();
+    assert_eq!((bounds.2 - bounds.0, bounds.3 - bounds.1), (100, 50), "{bounds:?}");
+    // Fixed Size 64 × 30: a click selects that size at the point
+    h.state_mut().state.marquee.style = MarqueeStyle::FixedSize;
+    h.state_mut().state.tool_settings.insert("marquee.size_h", "30 px".into());
+    let p = doc_point(&h, 200.0, 120.0);
+    click(&mut h, p);
+    h.run_steps(2);
+    let bounds = active(&h).doc.selection().and_then(|s| s.bounds()).unwrap();
+    assert_eq!((bounds.2 - bounds.0, bounds.3 - bounds.1), (64, 30), "{bounds:?}");
+    assert!((bounds.0 as i32 - 200).abs() <= 1 && (bounds.1 as i32 - 120).abs() <= 1, "{bounds:?}");
+    assert_eq!(last_history(&h), "Rectangular Marquee");
 }

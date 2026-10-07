@@ -135,7 +135,11 @@ Applies to the Rectangular, Elliptical, Single Row, and Single Column Marquee:
 - **Drag**: draws a rectangle or ellipse from the press point; rectangle edges snap to whole pixels. Holding Shift while dragging constrains to a square/circle; holding ⌥ draws outward from the start point (the start point is the center). A marching-ants preview is shown live while dragging.
 - **Combine mode**: if a selection already exists when the drag starts, Shift adds, ⌥ subtracts, Shift+⌥ intersects, and in this case those keys no longer act as constraints; otherwise the combine mode selected in the options bar is used.
 - **Release**: creates the shape (the ellipse is anti-aliased or not according to "Anti-alias" in the options bar; when "Feather" is greater than 0 it is feathered first), merges it into the selection, and records the history "Rectangular Marquee" or "Elliptical Marquee". Nothing happens when the width or height is less than 1 pixel.
-- **Click** (no drag): when there is a selection and neither Shift nor ⌥ is held, deselects and records "Deselect", matching Photoshop.
+- **Style** (options bar, `FixedMarquee` taken from its Width and Height at mouse-down):
+  - Fixed Ratio keeps the width to the height. The larger of the drag's two sides (in proportion) wins, and Shift doesn't constrain further.
+  - Fixed Size is the set size in pixels with its top-left corner (with ⌥, its middle) at the pointer. Dragging moves it, and a click selects it there, combined as a drag would be.
+  - A value that doesn't read as a positive number leaves the style Normal.
+- **Click** (no drag, Normal or Fixed Ratio): when there is a selection and neither Shift nor ⌥ is held, deselects and records "Deselect", matching Photoshop.
 - **Single Row/Single Column Marquee**: a click selects the entire row or column at that point (1 pixel), combined by the same rules, recording "Single Row Marquee" or "Single Column Marquee".
 
 ## Move tool
@@ -219,5 +223,4 @@ Measured against Photoshop 2026's status bar (pt from the document area's left e
 
 ## Known limitations
 
-- The marquee tool's "Fixed Ratio" and "Fixed Size" styles have no effect.
 - Scrollbar thumb length does not exactly match Photoshop (Photoshop computes the scrollable range differently), and clicking the track does not page.

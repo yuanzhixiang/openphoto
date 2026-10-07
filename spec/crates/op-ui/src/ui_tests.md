@@ -81,6 +81,7 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 - `align_buttons_line_up_selected_layers` additionally checks: after ⌘/ locks the selected layers, Align and Distribute become unavailable (the cached availability is updated accordingly).
 - `tool_icons_match_photoshops_extents`: the bright-pixel bounding boxes of the 69 tool icons differ from the bounding boxes measured in Photoshop by no more than 2 px (see `tool_icons.md`). `compare_tool_icons_with_photoshop` (`#[ignore]`) compares each one with local Photoshop screenshots.
 - `options_bars_match_photoshops_layout`: for options bars laid out by measurement, dividers and the edges of the various boxes correspond one by one to Photoshop's values (`PS_BAR_MARKS`), with a tolerance of 1 pt. `screenshot_options_bars` (`#[ignore]`) captures each tool's options bar for comparison.
+- `marquee_fixed_ratio_and_fixed_size`: with Fixed Ratio 2:1 a 100 × 20 drag selects 100 × 50; with Fixed Size 64 × 30 a click selects that size at the point and records "Rectangular Marquee".
 - `selection_options_bars_edit_their_settings`: typing 5 into Feather on the marquee bar and pressing Return takes effect, and clicking the second operation button switches to Add; the Magic Wand's Tolerance is changed to 60 and Contiguous is unchecked; the Magnetic Lasso's Frequency changed to 80 is saved in `tool_settings`.
 - `brush_options_bars_edit_their_settings`: see `options_tools.md`.
 - `fill_and_sample_options_bars_edit_their_settings`: see `options_tools.md`.

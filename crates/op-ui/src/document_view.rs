@@ -729,7 +729,11 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     app.marquee.feather,
                     app.marquee.anti_alias,
                 );
-                marquee_input(ui, &response, state, tool, options, ppp);
+                let fixed = crate::state::FixedMarquee::from_settings(
+                    app.marquee.style,
+                    &app.tool_settings,
+                );
+                marquee_input(ui, &response, state, tool, options, fixed, ppp);
             }
             _ => {}
         }
@@ -997,17 +1001,33 @@ pub(crate) fn to_screen(state: &DocState, d: Pos2, ppp: f32) -> Pos2 {
 }
 
 /// The marquee rectangle from a drag, with Photoshop's modifiers: Shift
-/// constrains to a square/circle, Alt draws from the center. Rectangles snap
-/// to whole pixels.
+/// constrains to a square/circle, Alt draws from the center. Fixed Ratio
+/// keeps the width to the height (the larger of the drag's two sides
+/// wins); Fixed Size is the set size with its corner (or, with Alt, its
+/// middle) at the pointer. Rectangles snap to whole pixels.
 fn marquee_rect(
     drag: &crate::state::MarqueeDrag,
     shift: bool,
     alt: bool,
 ) -> op_core::selection::Rect {
+    use crate::state::FixedMarquee;
     let constrain = shift && !drag.shift_for_op;
     let from_center = alt && !drag.alt_for_op;
+    if let Some(FixedMarquee::Size(w, h)) = drag.fixed {
+        let at = drag.current;
+        let (x0, y0) = if from_center {
+            ((at.x - w / 2.0).round(), (at.y - h / 2.0).round())
+        } else {
+            (at.x.round(), at.y.round())
+        };
+        return op_core::selection::Rect::new(x0, y0, x0 + w, y0 + h);
+    }
     let mut d = drag.current - drag.start;
-    if constrain {
+    if let Some(FixedMarquee::Ratio(rw, rh)) = drag.fixed {
+        let k = rw / rh;
+        let width = d.x.abs().max(d.y.abs() * k);
+        d = Vec2::new(width.copysign(d.x), (width / k).copysign(d.y));
+    } else if constrain {
         let m = d.x.abs().max(d.y.abs());
         d = Vec2::new(m.copysign(d.x), m.copysign(d.y));
     }
@@ -1435,6 +1455,7 @@ fn marquee_input(
     state: &mut DocState,
     tool: Tool,
     (mode, feather, anti_alias): (crate::state::SelectionMode, f32, bool),
+    fixed: Option<crate::state::FixedMarquee>,
     ppp: f32,
 ) {
     use op_core::Selection;
@@ -1482,6 +1503,7 @@ fn marquee_input(
             op,
             shift_for_op,
             alt_for_op,
+            fixed,
         });
     }
     let pointer = ui
@@ -1515,6 +1537,39 @@ fn marquee_input(
         } else {
             ui.ctx().request_repaint();
         }
+        return;
+    }
+    // With Fixed Size a click selects the set size there
+    if let Some(crate::state::FixedMarquee::Size(..)) = fixed
+        && response.clicked()
+        && let Some(p) = response.interact_pointer_pos()
+    {
+        let (op, shift_for_op, alt_for_op) = op_from_mods();
+        let at = to_doc(state, p, ppp);
+        let drag = crate::state::MarqueeDrag {
+            start: at,
+            current: at,
+            op,
+            shift_for_op,
+            alt_for_op,
+            fixed,
+        };
+        let rect = marquee_rect(&drag, mods.shift, mods.alt);
+        let mut shape = if tool == Tool::EllipticalMarquee {
+            Selection::ellipse(w, h, rect, anti_alias)
+        } else {
+            Selection::rect(w, h, rect)
+        };
+        if feather > 0.0 {
+            shape = shape.feather(feather);
+        }
+        let combined = Selection::combine(state.doc.selection(), shape, op);
+        state.doc.set_selection(Some(combined));
+        state.record(if tool == Tool::EllipticalMarquee {
+            "Elliptical Marquee"
+        } else {
+            "Rectangular Marquee"
+        });
         return;
     }
     // A click without a drag deselects, as in Photoshop

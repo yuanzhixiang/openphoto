@@ -850,6 +850,8 @@ pub struct MarqueeDrag {
     /// so they chose the combine mode and don't constrain the shape.
     pub shift_for_op: bool,
     pub alt_for_op: bool,
+    /// Fixed Ratio or Fixed Size, from the options bar at mouse-down.
+    pub fixed: Option<FixedMarquee>,
 }
 
 /// Type tool options: the font style and size in points (Photoshop's
@@ -1332,6 +1334,46 @@ pub enum MarqueeStyle {
 
 impl MarqueeStyle {
     pub const ALL: [Self; 3] = [Self::Normal, Self::FixedRatio, Self::FixedSize];
+
+    /// The options bar's Width and Height settings for this style (Fixed
+    /// Ratio and Fixed Size keep their own, as Photoshop does), with their
+    /// defaults.
+    pub fn keys(self) -> Option<[(&'static str, &'static str); 2]> {
+        match self {
+            Self::Normal => None,
+            Self::FixedRatio => Some([("marquee.ratio_w", "1"), ("marquee.ratio_h", "1")]),
+            Self::FixedSize => Some([("marquee.size_w", "64 px"), ("marquee.size_h", "64 px")]),
+        }
+    }
+}
+
+/// A marquee drag's fixed style: Fixed Ratio's width to height, or Fixed
+/// Size's width and height in pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum FixedMarquee {
+    Ratio(f32, f32),
+    Size(f32, f32),
+}
+
+impl FixedMarquee {
+    /// The style's numbers as the options bar holds them ("64 px", "1");
+    /// None for Normal or when a value doesn't read as a positive number.
+    pub fn from_settings(
+        style: MarqueeStyle,
+        settings: &std::collections::HashMap<&'static str, String>,
+    ) -> Option<Self> {
+        let [(kw, dw), (kh, dh)] = style.keys()?;
+        let read = |k: &str, d: &str| -> Option<f32> {
+            let t = settings.get(k).map_or(d, |s| s.as_str());
+            let n: f32 = t.trim().trim_end_matches("px").trim().parse().ok()?;
+            (n > 0.0).then_some(n)
+        };
+        let (w, h) = (read(kw, dw)?, read(kh, dh)?);
+        Some(match style {
+            MarqueeStyle::FixedRatio => Self::Ratio(w, h),
+            _ => Self::Size(w.round().max(1.0), h.round().max(1.0)),
+        })
+    }
 }
 
 pub struct MarqueeOptions {

@@ -368,22 +368,39 @@ fn selection_bar(b: &mut crate::options_kit::Bar, app: &mut AppState) {
             !single,
         );
         app.marquee.style = MarqueeStyle::ALL[style];
+        // Fixed Ratio and Fixed Size keep their own Width and Height
+        let keys = app.marquee.style.keys();
+        let shown = |app: &mut AppState, k: usize| {
+            keys.map_or(String::new(), |ks| app.setting(ks[k].0, ks[k].1).clone())
+        };
         b.label(541.0 + dx, "Width:", fixed);
-        let w = app.setting("marquee.width", "").clone();
-        if let Some(t) = b.value(574.0 + dx, 615.5 + dx, "marquee-width", w, fixed) {
-            *app.setting("marquee.width", "") = t;
+        let w = shown(app, 0);
+        if let Some(t) = b.value(574.0 + dx, 615.5 + dx, "marquee-width", w, fixed)
+            && let Some(ks) = keys
+        {
+            *app.setting(ks[0].0, ks[0].1) = t;
         }
-        b.icon(
+        if b.icon(
             638.5 + dx,
             Icon::Swap,
             "Swap height and width",
             false,
             fixed,
-        );
+        )
+        .clicked()
+            && fixed
+            && let Some(ks) = keys
+        {
+            let (w, h) = (shown(app, 0), shown(app, 1));
+            *app.setting(ks[0].0, ks[0].1) = h;
+            *app.setting(ks[1].0, ks[1].1) = w;
+        }
         b.label(663.5 + dx, "Height:", fixed);
-        let h = app.setting("marquee.height", "").clone();
-        if let Some(t) = b.value(699.5 + dx, 741.0 + dx, "marquee-height", h, fixed) {
-            *app.setting("marquee.height", "") = t;
+        let h = shown(app, 1);
+        if let Some(t) = b.value(699.5 + dx, 741.0 + dx, "marquee-height", h, fixed)
+            && let Some(ks) = keys
+        {
+            *app.setting(ks[1].0, ks[1].1) = t;
         }
         b.sep(749.0 + dx);
         b.button(760.5 + dx, 870.5 + dx, "Select and Mask...", has_selection);
