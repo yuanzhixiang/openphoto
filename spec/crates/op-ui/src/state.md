@@ -1,100 +1,101 @@
-# state.rs：应用状态与文档状态
+# state.rs: Application State and Document State
 
-## 职责
+## Responsibilities
 
-保存界面层的全部可变状态。`AppState` 是整个应用的状态，`DocState` 是单个打开文档的状态（文档本身、历史记录、视图、缓存）。
+Holds all mutable state of the UI layer. `AppState` is the state of the whole application; `DocState` is the state of a single open document (the document itself, history, view, caches).
 
 ## AppState
 
-- `docs` / `doc_order` / `active_doc`：打开的文档、标签顺序与当前文档。`add_document` 把文档加到最后并设为当前文档；`close_document` 关闭文档，关闭的是当前文档时，它左边的文档（没有则第一个）成为当前文档。
-- `tool`：当前工具，默认是矩形选框（与 Photoshop 新装后的默认一致）。
-- `tool_slots`：工具栏每一格当前显示的工具（该组最近用过的那个），初始为各组第一个。`select_tool(t)` 同时设置当前工具和它所在格显示的工具。
-- `foreground` / `background`：前景色默认 `#14a5dc`，背景色白色。
-- `view`：视图开关（`ViewOptions`，见 `rulers.md`）。其中 `smart_guides`（智能参考线，默认开）只由 Properties 面板的 Guides 分区切换，还没有效果。
-- `modify_dialog`：Select › Modify 对话框，打开期间为 `Some`。
-- `new_document_dialog`：New 对话框，打开期间为 `Some`。
-- `new_guide_dialog`：New Guide 对话框，打开期间为 `Some`。
-- `marquee`：选框工具选项：组合方式、羽化（像素）、消除锯齿（默认开启，与 Photoshop 一致）、样式。前三项在创建选区时生效，样式中的 Fixed Ratio / Fixed Size 目前没有效果。
-- `dodge`、`burn`、`sponge`、`blur`、`sharpen`、`clone_stamp`、`history_brush`：修饰工具各自的 `PaintOptions`（默认 30 px、硬度 0%；减淡/加深的不透明度即 Exposure 50%，模糊/锐化的不透明度即 Strength 50%，海绵的流量 50%）。`retouch`（`RetouchOptions`）：减淡与加深各自的 Range（默认 Midtones）、海绵是否 Saturate（默认否）、仿制图章 Aligned（默认是）。`paint_options(tool)` 也返回这些工具的设置。
-- `smudge`、`pattern_stamp`、`background_eraser`、`color_replacement`：涂抹（不透明度即 Strength 50%）、图案图章、背景橡皮擦、颜色替换的 `PaintOptions`（13 px、硬度 100%），`paint_options(tool)` 同样返回。`default_pattern()`：图案图章的默认图案。
-- `brush` / `pencil` / `eraser`：各绘画工具的 `PaintOptions`（大小 px、硬度、不透明度、流量），与 Photoshop 一样每个工具单独保存。默认值：画笔与橡皮擦 30 px、硬度 0%、不透明度和流量 100%；铅笔 1 px。`paint_options(tool)` 取当前绘画工具的设置。`size_step(size)` 是 `[`、`]` 的步长（小于 10 为 1，10–50 为 5，50–100 为 10，100–200 为 25，200–300 为 50，再往上为 100），大小范围 1–5000。
-- `eyedropper`：吸管选项（取样大小 `size`，1 表示 Point Sample；`all_layers`）。`EyedropperOptions::SIZES` 是 Photoshop 的七个取样大小。
-- `type_options`：文字工具选项（见 `type_tool.md`）。
-- `typing_text()`：当前文档有正在输入的文字时为真；此时 `modal_open()` 也为真。
-- `shape`：形状工具选项（`ShapeOptions`：多边形边数 5、直线粗细 1 px，Photoshop 的默认值）。
-- `move_options`：移动工具选项（`MoveOptions`：`auto_select`、`show_transform_controls`，都默认关闭，与 Photoshop 一致）。
-- `gradient`：渐变工具选项（`op_core::gradient::GradientOptions`：类型、混合模式、不透明度、反向）。
-- `wand`：魔棒选项：组合方式与区域规则（`op_core::fill::BucketOptions` 的容差、消除锯齿、连续、所有图层，默认值同油漆桶）。
-- `editing_background` 与 `picker_hsb`：Color 面板正在编辑前景还是背景，以及缓存的 HSB。缓存 HSB 是为了在灰色（饱和度为 0）时色相不跳回 0。
-- `floating`：浮动面板（Info、Navigator、Histogram）是否打开（见 `panels/floating.md`）。
-- `history_open`、`history_panel`：History 弹出面板是否打开，以及它的标签与高度。
-- `fill_dialog`：Fill 对话框，打开期间为 `Some`。
-- `bucket`：油漆桶选项（默认值见 `crates/op-core/src/fill.md`）。
-- `canvas_size_dialog`：Canvas Size 对话框，打开期间为 `Some`。
-- `color_picker`：Color Picker 会话，打开期间为 `Some`，包含对话框和 `PickerTarget`（确定后写入前景色、背景色、Canvas Size 的扩展颜色，还是 Fill 对话框的 Color...）。`open_color_picker(target)` 以 Photoshop 的标题打开前景或背景色拾色器。
-- `swatches`：Swatches 面板的色板列表，初始为固定的 36 个颜色，Color Picker 的「Add to Swatches」会往末尾追加。只在本次运行中保留。
-- `alert`：待显示的错误信息。
-- `delete_group_prompt`：删除含图层的组时的询问框；`delete_layers()` 删除选中图层，遇到非空组时先弹出它（「Delete the group “名字” and its contents or delete only the group?」，Group and Contents / Group Only / Cancel）。命令 DeleteLayer 和 Layers 面板的删除按钮都走它。
-- `flatten_prompt`：Flatten Image 的「Discard hidden layers?」询问框（显示期间算作模态对话框）；`skip_flatten_prompt`：其中勾选了「Don’t show again」，本次运行不再询问。
-- 关闭与退出：`close_queue` 是等待关闭的文档；`save_prompt` 是正在询问「Save changes?」的文档；`quit_after_close` 表示队列处理完后要退出；`quit_approved` 表示可以关闭窗口了（见 `actions.md`「关闭」）。
-- `clipboard`：Cut/Copy/Paste 用的剪贴板（见 `clipboard.md`）。默认不连接系统剪贴板（无窗口测试不应改动用户的剪贴板），`OpenPhotoApp::new` 启动时换成连接系统剪贴板的版本。
-- `typing`：上一帧是否有输入框获得键盘焦点，每帧执行命令前更新。决定菜单的 Cut/Copy/Paste 作用于输入框还是文档。
-- `forward_events`：要注入 egui 下一帧输入的事件（菜单的 Cut/Copy/Paste 转交给输入框时使用，见 `commands.md`）。
-- `image_size_dialog`：Image Size 对话框，打开期间为 `Some`。
-- `trim_dialog`：Trim 对话框，打开期间为 `Some`。
-- `adjust_dialog`：调整或滤镜对话框（见 `dialogs/adjust.md`），打开期间为 `Some`。
-- `last_transform`：上次应用的变换映射，供 Edit › Transform › Again 使用；只在本次运行中保留，所有文档共用。
-- `transforming()`：当前文档正在自由变换时为真；此时 `modal_open()` 也为真。
-- `last_filter`：上次成功应用的滤镜及其设置，供 Filter › Last Filter 使用；只在本次运行中保留，所有文档共用。
-- `filter_settings`：每种滤镜对话框上次按 OK 时输入框里的设置（按 `AdjustKind` 存），下次打开同一对话框时放回；只在本次运行中保留，所有文档共用。
-- `modal_open()`：Canvas Size、Image Size、New、New Guide、Modify、Fill、Trim、调整对话框、Color Picker、「Save changes?」确认或错误提示打开时为真，此时命令与单键快捷键都不执行。
+- `docs` / `doc_order` / `active_doc`: the open documents, tab order, and current document. `add_document` appends a document at the end and makes it the current document; `close_document` closes a document, and when the closed one is the current document, the document to its left (or the first one if there is none) becomes the current document.
+- `tool`: the current tool, defaulting to the Rectangular Marquee (matching the default of a fresh Photoshop install).
+- `tool_slots`: the tool currently shown in each toolbar slot (the most recently used one in that group), initially the first in each group. `select_tool(t)` sets both the current tool and the tool shown in its slot.
+- `foreground` / `background`: the foreground color defaults to `#14a5dc`, the background color to white.
+- `view`: view toggles (`ViewOptions`, see `rulers.md`). Among them, `smart_guides` (Smart Guides, on by default) is toggled only from the Properties panel's Guides section and has no effect yet.
+- `modify_dialog`: the Select › Modify dialog, `Some` while open.
+- `new_document_dialog`: the New dialog, `Some` while open.
+- `new_guide_dialog`: the New Guide dialog, `Some` while open.
+- `marquee`: marquee tool options: combine mode, feather (pixels), anti-alias (on by default, matching Photoshop), style. The first three take effect when a selection is created; the Fixed Ratio / Fixed Size styles currently have no effect.
+- `dodge`, `burn`, `sponge`, `blur`, `sharpen`, `clone_stamp`, `history_brush`: each retouching tool's own `PaintOptions` (default 30 px, hardness 0%; Dodge/Burn opacity is Exposure 50%, Blur/Sharpen opacity is Strength 50%, Sponge flow 50%). `retouch` (`RetouchOptions`): Dodge's and Burn's separate Range (default Midtones), whether Sponge uses Saturate (default no), Clone Stamp's Aligned (default yes). `paint_options(tool)` also returns these tools' settings.
+- `smudge`, `pattern_stamp`, `background_eraser`, `color_replacement`: the `PaintOptions` of Smudge (opacity is Strength 50%), Pattern Stamp, Background Eraser, and Color Replacement (13 px, hardness 100%); `paint_options(tool)` returns them as well. `default_pattern()`: the Pattern Stamp's default pattern.
+- `brush` / `pencil` / `eraser`: each painting tool's `PaintOptions` (size px, hardness, opacity, flow), saved separately per tool as in Photoshop. Defaults: Brush and Eraser 30 px, hardness 0%, opacity and flow 100%; Pencil 1 px. `paint_options(tool)` gets the current painting tool's settings. `size_step(size)` is the step for `[` and `]` (1 below 10, 5 for 10–50, 10 for 50–100, 25 for 100–200, 50 for 200–300, 100 above that); the size range is 1–5000.
+- `eyedropper`: Eyedropper options (sample size `size`, 1 means Point Sample; `all_layers`). `EyedropperOptions::SIZES` is Photoshop's seven sample sizes.
+- `type_options`: Type tool options (see `type_tool.md`).
+- `typing_text()`: true when the current document has text being typed; `modal_open()` is also true then.
+- `shape`: shape tool options (`ShapeOptions`: polygon sides 5, line weight 1 px, Photoshop's defaults).
+- `move_options`: Move tool options (`MoveOptions`: `auto_select`, `show_transform_controls`, both off by default, matching Photoshop).
+- `gradient`: Gradient tool options (`op_core::gradient::GradientOptions`: type, blend mode, opacity, reverse).
+- `wand`: Magic Wand options: combine mode and region rules (tolerance, anti-alias, contiguous, all layers from `op_core::fill::BucketOptions`, with the same defaults as the Paint Bucket).
+- `editing_background` and `picker_hsb`: whether the Color panel is editing the foreground or background, and the cached HSB. The HSB is cached so that the hue does not jump back to 0 on gray (saturation 0).
+- `floating`: whether the floating panels (Info, Navigator, Histogram) are open (see `panels/floating.md`).
+- `history_open`, `history_panel`: whether the History pop-out panel is open, and its tab and height.
+- `fill_dialog`: the Fill dialog, `Some` while open.
+- `bucket`: Paint Bucket options (defaults in `crates/op-core/src/fill.md`).
+- `canvas_size_dialog`: the Canvas Size dialog, `Some` while open.
+- `color_picker`: the Color Picker session, `Some` while open, containing the dialog and a `PickerTarget` (whether OK writes to the foreground color, the background color, Canvas Size's extension color, or the Fill dialog's Color...). `open_color_picker(target)` opens the foreground or background color picker with Photoshop's title.
+- `swatches`: the Swatches panel's swatch list, initially a fixed set of 36 colors; the Color Picker's "Add to Swatches" appends to the end. Kept only for the current run.
+- `alert`: an error message waiting to be shown.
+- `delete_group_prompt`: the prompt shown when deleting a group that contains layers; `delete_layers()` deletes the selected layers and, on reaching a non-empty group, first shows this prompt ("Delete the group “name” and its contents or delete only the group?", Group and Contents / Group Only / Cancel). Both the DeleteLayer command and the Layers panel's delete button go through it.
+- `flatten_prompt`: Flatten Image's "Discard hidden layers?" prompt (counts as a modal dialog while shown); `skip_flatten_prompt`: "Don’t show again" was checked in it, so it is not asked again during this run.
+- Closing and quitting: `close_queue` is the documents waiting to be closed; `save_prompt` is the document currently being asked "Save changes?"; `quit_after_close` means quit once the queue is processed; `quit_approved` means the window may now close (see "Closing" in `actions.md`).
+- `clipboard`: the clipboard used by Cut/Copy/Paste (see `clipboard.md`). By default it is not connected to the system clipboard (windowless tests must not alter the user's clipboard); `OpenPhotoApp::new` replaces it at startup with a version connected to the system clipboard.
+- `typing`: whether a text field had keyboard focus in the previous frame, updated each frame before commands run. Decides whether the menu's Cut/Copy/Paste act on the text field or the document.
+- `forward_events`: events to inject into egui's input for the next frame (used when the menu's Cut/Copy/Paste is handed to a text field; see `commands.md`).
+- `image_size_dialog`: the Image Size dialog, `Some` while open.
+- `trim_dialog`: the Trim dialog, `Some` while open.
+- `adjust_dialog`: an adjustment or filter dialog (see `dialogs/adjust.md`), `Some` while open.
+- `last_transform`: the most recently applied transform mapping, used by Edit › Transform › Again; kept only for the current run and shared by all documents.
+- `transforming()`: true when the current document is in Free Transform; `modal_open()` is also true then.
+- `last_filter`: the most recently successfully applied filter and its settings, used by Filter › Last Filter; kept only for the current run and shared by all documents.
+- `filter_settings`: the settings in each filter dialog's fields the last time OK was pressed (stored by `AdjustKind`), restored the next time the same dialog opens; kept only for the current run and shared by all documents.
+- `modal_open()`: true when Canvas Size, Image Size, New, New Guide, Modify, Fill, Trim, an adjustment dialog, the Color Picker, the "Save changes?" confirmation, or an error alert is open; commands and single-key shortcuts do not run then.
 
 ## DocState
 
-- `doc`：`op_core::Document`。
-- `path`：文档打开自或最近保存到的文件；新建且未保存的文档为 `None`。
-- 未保存修改：`saved_state` 记录与磁盘文件（新建文档则为新建时）一致的历史状态 id。`is_dirty()` 在当前历史状态的 id 与它不同时为真（所以撤销回保存时的状态视为没有修改，与 Photoshop 一致）；`mark_saved()` 把当前状态记为已保存。
-- `untagged`：文档没有嵌入色彩配置文件（标签标题里显示「#」）。打开的文件为真，新建的文档为假。
-- `history`：该文档的 `op_core::History`。第一条状态名为「Open」（打开文件）或「New」（新建）。
-- `view`：视图状态，见下文。
-- 合成缓存：`canvas_image()` 返回当前合成结果，只在文档 `revision` 变化时重新合成。
-- 图层缩略图：`layer_thumbnail()` 按图层缓存，文档 `revision` 变化后重新生成；最近邻缩小。
-- 移动：`move_drag` 是进行中的移动和拖动起点（文档像素）。
-- `transform_controls_bounds()`：移动工具 Show Transform Controls 的框（文档像素），即 `op_core::transform::bounds` 的结果，不能变换时为 `None`；按（修订号、当前图层、选区修订号）缓存。
-- 绘画：`stroke` 是进行中的笔画和它的工具；`last_paint_point` 是上一笔结束的位置，用于 Shift+单击画直线。
-- `text_edit`：正在输入的文字（见 `type_tool.md`）。
-- `shape_drag`：形状工具拖动中的起点与当前点。
-- `gradient_drag`：渐变工具拖动中的起点与当前点（文档像素）。
-- `clone_source`、`clone_offset`、`picking_clone_source`：仿制图章的取样点、对齐偏移，以及「这次按压是在设定取样点」的标记（见 `document_view.md`）。
-- `pointer`：指针在文档上的位置（文档像素），指针不在画布上时为 `None`；Info 面板使用。
-- `movable_layers()`：Align / Distribute 会移动的选中图层数，按文档修订号、选区修订号和选中图层缓存。对齐按钮和菜单项的可用状态每帧要问十几次，每次都要扫描图层像素的外框，不缓存时拖动大文档会明显卡顿。
-- 直方图与合成缩略图：`composite_histogram()`、`composite_texture(ctx, max_px)`，都按文档修订号缓存，供 Histogram 与 Navigator 面板使用。两者都取画布已有的合成图（`canvas_image()`），不再另外合成一遍；Quick Mask 打开时（画布带红色遮罩）Navigator 缩略图仍单独合成。
-- `guide_drag`：正在拖动的参考线（从标尺拖出时 `index` 为 `None`，否则为被移动参考线的序号）。
-- `crop`：裁剪工具的裁剪框（见 `crop_tool.md`）。
-- `free_transform`：自由变换会话（见 `free_transform.md`）。
-- `lasso`：正在绘制的套索轨迹（文档像素坐标的点、组合方式、是否为多边形套索）。
-- 画布图像（`canvas_image`）：快速蒙版模式下在合成结果上叠加红色，未选中处 50%（Photoshop 默认的「被蒙版区域」显示），按灰度值线性变化；只影响显示。
-- `sample_average(x, y, size, scope)`：吸管取样（`SampleScope`：当前图层、当前及下方、全部），见 `document_view.md`。
-- `renaming`：Layers 面板中正在改名的图层和输入中的文字（见 `panels/layers.md`）。
-- 选框拖动：`marquee_drag` 保存拖动中的起点、当前点（文档像素）、组合方式，以及 Shift/⌥ 是否已用于选择组合方式。
-- 蚂蚁线轮廓：`selection_outline()` 按选区版本号缓存轮廓线段。
-- 快照缩略图：创建 `DocState` 时生成一次文档初始状态的缩略图（最长边 96 px，最近邻），供 History 面板顶部的快照行使用，之后不再更新（快照代表打开时的文档）。
+- `doc`: `op_core::Document`.
+- `path`: the file the document was opened from or most recently saved to; `None` for a new, unsaved document.
+- Unsaved changes: `saved_state` records the id of the history state that matches the file on disk (or, for a new document, the state at creation). `is_dirty()` is true when the current history state's id differs from it (so undoing back to the saved state counts as unmodified, matching Photoshop); `mark_saved()` records the current state as saved.
+- `untagged`: the document has no embedded color profile (the tab title shows "#"). True for opened files, false for new documents.
+- `history`: the document's `op_core::History`. The first state is named "Open" (opened file) or "New" (new document).
+- `view`: view state, see below.
+- Composite cache: `canvas_image()` returns the current composite, recompositing only when the document `revision` changes.
+- Layer thumbnails: `layer_thumbnail()` caches per layer and regenerates after the document `revision` changes; downscaled with nearest neighbor.
+- Move: `move_drag` is the move in progress and the drag start point (document pixels).
+- `transform_controls_bounds()`: the box for the Move tool's Show Transform Controls (document pixels), i.e. the result of `op_core::transform::bounds`, `None` when transforming is not possible; cached by (revision, current layer, selection revision).
+- Painting: `stroke` is the stroke in progress and its tool; `last_paint_point` is where the previous stroke ended, used for Shift+click straight lines.
+- `text_edit`: the text being typed (see `type_tool.md`).
+- `shape_drag`: the start point and current point of a shape tool drag.
+- `gradient_drag`: the start point and current point of a Gradient tool drag (document pixels).
+- `clone_source`, `clone_offset`, `picking_clone_source`: the Clone Stamp's source point, aligned offset, and the flag "this press is setting the source point" (see `document_view.md`).
+- `pointer`: the pointer position on the document (document pixels), `None` when the pointer is not over the canvas; used by the Info panel.
+- `movable_layers()`: the number of selected layers that Align / Distribute would move, cached by document revision, selection revision, and selected layers. The enabled state of the align buttons and menu items is queried a dozen or so times per frame, each time scanning the bounding box of layer pixels; without the cache, dragging in a large document stutters noticeably.
+- Histogram and composite thumbnail: `composite_histogram()`, `composite_texture(ctx, max_px)`, both cached by document revision, used by the Histogram and Navigator panels. Both take the canvas's existing composite (`canvas_image()`) instead of compositing again; when Quick Mask is on (the canvas has a red overlay), the Navigator thumbnail is still composited separately.
+- `guide_drag`: the guide being dragged (`index` is `None` when dragging out of a ruler, otherwise the index of the guide being moved).
+- `crop`: the Crop tool's crop box (see `crop_tool.md`).
+- `free_transform`: the Free Transform session (see `free_transform.md`).
+- `lasso`: the lasso path being drawn (points in document pixel coordinates, combine mode, whether it is the Polygonal Lasso).
+- Canvas image (`canvas_image`): in Quick Mask mode, red is overlaid on the composite, 50% where unselected (Photoshop's default "Masked Areas" display), varying linearly with the gray value; affects display only.
+- `sample_average(x, y, size, scope)`: Eyedropper sampling (`SampleScope`: current layer, current and below, all); see `document_view.md`.
+- `renaming`: the layer being renamed in the Layers panel and the text being typed (see `panels/layers.md`).
+- Marquee drag: `marquee_drag` holds the drag's start point, current point (document pixels), combine mode, and whether Shift/⌥ has already been used to choose the combine mode.
+- Marching ants outline: `selection_outline()` caches the outline segments by selection version.
+- Snapshot thumbnail: when a `DocState` is created, a thumbnail of the document's initial state is generated once (longest side 96 px, nearest neighbor) for the snapshot row at the top of the History panel, and is not updated afterwards (the snapshot represents the document as opened).
 
-### 历史记录的接入规则
+### History Integration Rules
 
-- `record(name)`：立即记录一条历史。
-- 连续编辑（拖动不透明度、Fill 等）：编辑过程中 `mark_pending()`，编辑结束时 `commit_pending(name)`，只有确实发生过改动时才记录一条。这样一次拖动只产生一条历史。
-- `undo` / `redo` / `toggle_last_state` / `jump_to_state` / `delete_states_from` 都会清除未提交的连续编辑标记。
+- `record(name)`: records a history state immediately.
+- Continuous edits (dragging opacity, Fill, etc.): call `mark_pending()` during the edit and `commit_pending(name)` when it ends; a state is recorded only if a change actually happened. This way one drag produces only one history state.
+- `undo` / `redo` / `toggle_last_state` / `jump_to_state` / `delete_states_from` all clear the uncommitted continuous-edit flag.
 
 ### View
 
-- `zoom`：每个文档像素对应的物理像素数，1.0 = 100%。
-- `offset`：文档中心相对视口中心的偏移（逻辑点）。用中心而不是左上角做基准，窗口尺寸变化时文档保持居中，与 Photoshop 一致。
-- `initialized` / `viewport`：首次显示时等视口尺寸稳定后再决定初始缩放（见 `document_view.md`）；`viewport` 供快捷键缩放使用。
+- `zoom`: the number of physical pixels per document pixel; 1.0 = 100%.
+- `offset`: the offset of the document center relative to the viewport center (logical points). The center rather than the top-left corner is used as the reference so the document stays centered when the window size changes, matching Photoshop.
+- `initialized` / `viewport`: on first display, the initial zoom is decided only after the viewport size settles (see `document_view.md`); `viewport` is used by shortcut zooming.
 
-## 已知限制
+## Known Limitations
 
-- 撤销会把图层显示/隐藏和当前选中图层一起恢复成快照里的样子；Photoshop 默认不记录这两项，撤销时也不会改变它们。
-- `new_document_recent`、`new_document_saved`、`new_document_welcome_closed`：New Document 对话框的 Recent 列表（新的在前、不重复、最多 20 个）、用存储图标存下的预设、Recent 页的欢迎框是否关过；只在本次运行内保留（见 `dialogs/new_document.md`）。
+- Undo restores layer visibility and the currently selected layer to how they were in the snapshot; Photoshop does not record these two by default, and undo does not change them.
+- `new_document_recent`, `new_document_saved`, `new_document_welcome_closed`: the New Document dialog's Recent list (newest first, no duplicates, at most 20), presets saved with the save icon, and whether the Recent page's welcome box has been closed; kept only for the current run (see `dialogs/new_document.md`).
 - `healing_brush`, `spot_healing`: the Healing Brush's and Spot Healing Brush's `PaintOptions` (13 px, 100% hardness), returned by `paint_options(tool)`.
 - `DocState::patch_drag`: while the Patch tool or Content-Aware Move drags the selection, where the drag started and where it is (document pixels); the selection outline is drawn moved by the difference.
+- `DocState::magnetic` (`MagneticPath`): the Magnetic Lasso under way: its `EdgeMap` (built from the merged image when it starts), the indices of the anchors in `DocState::lasso`'s points, and how many points are fixed (the rest is the live wire to the pointer).

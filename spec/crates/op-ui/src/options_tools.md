@@ -60,3 +60,7 @@ Clicking it pops up Size (1–5000 px, logarithmic scale) and Hardness (not on t
 ## Healing tools
 
 `heal_options` reads the Healing Brush's Aligned (default off) and Sample (Current Layer, Current & Below, All Layers), the Spot Healing Brush's Sample All Layers, the Patch tool's Source / Destination segment and Content-Aware Move's Move / Extend, which `document_view.rs` uses when a stroke or patch starts.
+
+## Magnetic Lasso
+
+`magnetic_options` reads the Magnetic Lasso's Width (pixels, 1–256, default 10), Contrast (1–100%, default 10%) and Frequency (0–100, default 57) for `document_view.rs`.

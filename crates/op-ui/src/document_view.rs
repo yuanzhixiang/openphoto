@@ -161,6 +161,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let magic_eraser = crate::options_tools::magic_eraser_options(app);
     let red_eye = crate::options_tools::red_eye_options(app);
     let heal = crate::options_tools::heal_options(app);
+    let magnetic = crate::options_tools::magnetic_options(app);
     let sampling_ring = tool == Tool::Eyedropper && app.flag("eyedropper.ring", true);
     // The Zoom tool's Zoom Out button swaps what a click and Alt-click do
     let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
@@ -456,6 +457,14 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     app.marquee.anti_alias,
                 );
                 lasso_input(ui, &response, state, tool, options, ppp);
+            }
+            Tool::MagneticLasso => {
+                let options = (
+                    app.marquee.mode,
+                    app.marquee.feather,
+                    app.marquee.anti_alias,
+                );
+                magnetic_input(ui, &response, state, options, magnetic, ppp);
             }
             Tool::Move => {
                 let [r, g, b, _] = background.to_rgba8();
@@ -971,23 +980,149 @@ fn lasso_input(
     }
 
     if close && let Some(lasso) = state.lasso.take() {
-        let (w, h) = (state.doc.width, state.doc.height);
-        let points: Vec<(f32, f32)> = lasso.points.iter().map(|p| (p.x, p.y)).collect();
-        let mut shape = op_core::Selection::polygon(w, h, &points, anti_alias);
-        if shape.is_empty() {
-            return;
-        }
-        if feather > 0.0 {
-            shape = shape.feather(feather);
-        }
-        let combined = op_core::Selection::combine(state.doc.selection(), shape, lasso.op);
-        state.doc.set_selection(Some(combined));
-        state.record(if lasso.polygonal {
+        let name = if lasso.polygonal {
             "Polygonal Lasso"
         } else {
             "Lasso"
-        });
+        };
+        finish_lasso(state, lasso, (feather, anti_alias), name);
     }
+}
+
+/// Closes a lasso outline into a selection (feathered, combined with the
+/// current one by its operation) and records `name`. An outline enclosing
+/// nothing changes nothing.
+fn finish_lasso(
+    state: &mut DocState,
+    lasso: crate::state::LassoPath,
+    (feather, anti_alias): (f32, bool),
+    name: &str,
+) {
+    let (w, h) = (state.doc.width, state.doc.height);
+    let points: Vec<(f32, f32)> = lasso.points.iter().map(|p| (p.x, p.y)).collect();
+    let mut shape = op_core::Selection::polygon(w, h, &points, anti_alias);
+    if shape.is_empty() {
+        return;
+    }
+    if feather > 0.0 {
+        shape = shape.feather(feather);
+    }
+    let combined = op_core::Selection::combine(state.doc.selection(), shape, lasso.op);
+    state.doc.set_selection(Some(combined));
+    state.record(name);
+}
+
+/// The Magnetic Lasso: click to start, then move the pointer: the outline
+/// follows the strongest edges between the last anchor and the pointer
+/// (snapped to an edge within Width), anchors fall every so often
+/// (Frequency) and where you click. Double-click, Enter or clicking the
+/// start closes it; Backspace removes the last anchor; Escape cancels.
+fn magnetic_input(
+    ui: &Ui,
+    response: &egui::Response,
+    state: &mut DocState,
+    (mode, feather, anti_alias): (crate::state::SelectionMode, f32, bool),
+    (width, contrast, frequency): (u32, f32, f32),
+    ppp: f32,
+) {
+    use crate::state::{LassoPath, MagneticPath};
+    let pointer = ui
+        .input(|i| i.pointer.hover_pos())
+        .map(|p| to_doc(state, p, ppp));
+    let (w, h) = (state.doc.width, state.doc.height);
+    let cell = |p: Pos2| {
+        (
+            (p.x.max(0.0) as u32).min(w.saturating_sub(1)),
+            (p.y.max(0.0) as u32).min(h.saturating_sub(1)),
+        )
+    };
+    let center = |(x, y): (u32, u32)| Pos2::new(x as f32 + 0.5, y as f32 + 0.5);
+    let typing = ui.ctx().egui_wants_keyboard_input();
+    let (enter, escape, backspace) = ui.input_mut(|i| {
+        if typing {
+            return (false, false, false);
+        }
+        (
+            i.consume_key(egui::Modifiers::NONE, Key::Enter),
+            i.consume_key(egui::Modifiers::NONE, Key::Escape),
+            i.consume_key(egui::Modifiers::NONE, Key::Backspace)
+                || i.consume_key(egui::Modifiers::NONE, Key::Delete),
+        )
+    });
+
+    let Some(mut magnetic) = state.magnetic.take() else {
+        if response.clicked()
+            && let Some(p) = pointer
+            && p.x >= 0.0
+            && p.y >= 0.0
+        {
+            let image = state.canvas_image();
+            let edges = op_core::magnetic::EdgeMap::new(w, h, &image.pixels, contrast);
+            let start = edges.snap(cell(p), width);
+            let mods = ui.input(|i| i.modifiers);
+            let (op, _, _) = selection_op(mods, state.doc.selection().is_some(), mode);
+            state.lasso = Some(LassoPath {
+                points: vec![center(start)],
+                op,
+                polygonal: false,
+                held: false,
+            });
+            state.magnetic = Some(MagneticPath {
+                edges: std::sync::Arc::new(edges),
+                anchors: vec![0],
+                fixed: 1,
+            });
+            ui.ctx().request_repaint();
+        }
+        return;
+    };
+    let Some(lasso) = state.lasso.as_mut() else {
+        return;
+    };
+    if escape {
+        state.lasso = None;
+        return;
+    }
+    if backspace {
+        magnetic.anchors.pop();
+        let Some(&last) = magnetic.anchors.last() else {
+            state.lasso = None;
+            return;
+        };
+        magnetic.fixed = last + 1;
+        lasso.points.truncate(magnetic.fixed);
+    }
+    // The live wire from the last fixed point to the (snapped) pointer
+    if let Some(p) = pointer {
+        let from = cell(lasso.points[magnetic.fixed - 1]);
+        let to = magnetic.edges.snap(cell(p), width);
+        let path = magnetic.edges.trace(from, to, width);
+        lasso.points.truncate(magnetic.fixed);
+        lasso.points.extend(path.into_iter().skip(1).map(center));
+        // Anchors fall every so many points: fewer at a low Frequency
+        let spacing = (10.0 + (100.0 - frequency) * 0.9) as usize;
+        while lasso.points.len() - magnetic.fixed > spacing {
+            magnetic.fixed += spacing;
+            magnetic.anchors.push(magnetic.fixed - 1);
+        }
+    }
+    let first = lasso.points[0];
+    let near_start = pointer.is_some_and(|p| {
+        lasso.points.len() > 3 && first.distance(p) * state.view.zoom / ppp <= 5.0
+    });
+    let close = enter || response.double_clicked() || (response.clicked() && near_start);
+    if !close && response.clicked() {
+        // A click fixes the outline so far with an anchor
+        magnetic.fixed = lasso.points.len();
+        magnetic.anchors.push(magnetic.fixed - 1);
+    }
+    if close {
+        let lasso = state.lasso.take().expect("checked");
+        finish_lasso(state, lasso, (feather, anti_alias), "Magnetic Lasso");
+        return;
+    }
+    state.magnetic = Some(magnetic);
+    ui.ctx().request_repaint();
 }
 
 fn marquee_input(

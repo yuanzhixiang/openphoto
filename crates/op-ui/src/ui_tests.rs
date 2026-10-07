@@ -5230,7 +5230,11 @@ fn healing_tools() {
     h.run_steps(1);
     let p = doc_point(&h, 200.0, 200.0);
     click(&mut h, p);
-    assert!(gray(composite_pixel(&mut h, 200, 200)), "{:?}", composite_pixel(&mut h, 200, 200));
+    assert!(
+        gray(composite_pixel(&mut h, 200, 200)),
+        "{:?}",
+        composite_pixel(&mut h, 200, 200)
+    );
     assert_eq!(last_history(&h), "Spot Healing Brush");
 
     // Healing Brush: Alt-click a clean source, then paint over a spot
@@ -5250,7 +5254,12 @@ fn healing_tools() {
     h.state_mut().state.select_tool(Tool::Patch);
     h.run_steps(1);
     // A square drawn like the Lasso
-    let corners = [(590.0, 190.0), (610.0, 190.0), (610.0, 210.0), (590.0, 210.0)];
+    let corners = [
+        (590.0, 190.0),
+        (610.0, 190.0),
+        (610.0, 210.0),
+        (590.0, 210.0),
+    ];
     let pts: Vec<Pos2> = corners.iter().map(|&(x, y)| doc_point(&h, x, y)).collect();
     h.hover_at(pts[0]);
     h.event(egui::Event::PointerButton {
@@ -5276,4 +5285,56 @@ fn healing_tools() {
     drag(&mut h, c, d, Modifiers::NONE);
     assert!(gray(composite_pixel(&mut h, 600, 200)));
     assert_eq!(last_history(&h), "Patch Tool");
+}
+
+#[test]
+fn magnetic_lasso_follows_edges() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A white square from (200, 200) to (400, 400)
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.layers[0].id;
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 200..400 {
+            for x in 200..400 {
+                image.set_pixel(x, y, [255, 255, 255, 255]);
+            }
+        }
+        doc.mark_dirty();
+    }
+    h.state_mut().state.select_tool(op_tools::Tool::MagneticLasso);
+    h.run_steps(1);
+    // Start a few pixels off the edge, then go round with the pointer a
+    // little off the edges too; click at the corners
+    let start = doc_point(&h, 203.0, 300.0);
+    click(&mut h, start);
+    for &(x, y) in &[
+        (203.0, 250.0),
+        (204.0, 204.0),
+        (300.0, 196.0),
+        (396.0, 204.0),
+        (404.0, 300.0),
+        (396.0, 396.0),
+        (300.0, 404.0),
+        (204.0, 396.0),
+        (196.0, 340.0),
+    ] {
+        let p = doc_point(&h, x, y);
+        h.hover_at(p);
+        h.run_steps(2);
+        if x != 300.0 && y != 300.0 && x != 203.0 && x != 196.0 {
+            click(&mut h, p);
+        }
+    }
+    let end = doc_point(&h, 200.0, 310.0);
+    h.hover_at(end);
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    let (x0, y0, x1, y1) = active(&h).doc.selection().and_then(|s| s.bounds()).expect("a selection");
+    for (got, want) in [(x0, 200), (y0, 200), (x1, 400), (y1, 400)] {
+        assert!(got.abs_diff(want) <= 3, "{:?}", (x0, y0, x1, y1));
+    }
+    assert_eq!(last_history(&h), "Magnetic Lasso");
 }

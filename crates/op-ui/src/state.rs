@@ -69,6 +69,8 @@ pub struct DocState {
     /// The Patch or Content-Aware Move tool dragging the selection: where
     /// the drag started and where it is (document pixels).
     pub patch_drag: Option<(egui::Pos2, egui::Pos2)>,
+    /// The Magnetic Lasso under way (its outline is `lasso`).
+    pub magnetic: Option<MagneticPath>,
     /// A guide being dragged.
     pub guide_drag: Option<GuideDrag>,
     /// Where the pointer is over the document (document pixels), for the
@@ -174,6 +176,7 @@ impl DocState {
             renaming: None,
             lasso: None,
             patch_drag: None,
+            magnetic: None,
             free_transform: None,
             crop: None,
             guide_drag: None,
@@ -865,6 +868,16 @@ pub struct LassoPath {
     /// The Lasso let go with Alt held: straight edges by clicking until
     /// Alt is released (Photoshop's temporary Polygonal Lasso).
     pub held: bool,
+}
+
+/// The Magnetic Lasso's progress: the edge map it snaps to, which points
+/// of the outline (`DocState::lasso`) are anchors, and how many points are
+/// fixed (the rest is the live wire to the pointer).
+#[derive(Clone)]
+pub struct MagneticPath {
+    pub edges: Arc<op_core::magnetic::EdgeMap>,
+    pub anchors: Vec<usize>,
+    pub fixed: usize,
 }
 
 /// Eyedropper options.

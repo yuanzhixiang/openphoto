@@ -2324,3 +2324,22 @@ pub fn heal_options(app: &mut AppState) -> HealOptions {
         extend: choice(app, "cam.move") == 1,
     }
 }
+
+/// The Magnetic Lasso's Width (pixels), Contrast (0–1) and Frequency
+/// (0–100).
+pub fn magnetic_options(app: &mut AppState) -> (u32, f32, f32) {
+    let number = |app: &mut AppState, key: &'static str, default: &str| {
+        crate::options_bar::typed_number(&text(app, key, default))
+    };
+    let width = number(app, "lasso.width", "10 px")
+        .unwrap_or(10.0)
+        .clamp(1.0, 256.0);
+    let contrast = number(app, "lasso.contrast", "10%")
+        .unwrap_or(10.0)
+        .clamp(1.0, 100.0)
+        / 100.0;
+    let frequency = number(app, "lasso.frequency", "57")
+        .unwrap_or(57.0)
+        .clamp(0.0, 100.0);
+    (width as u32, contrast, frequency)
+}
