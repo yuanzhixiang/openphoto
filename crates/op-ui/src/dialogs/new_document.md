@@ -10,12 +10,12 @@ File › New...（⌘N）：Photoshop 2026 默认的新版 New Document 对话�
 
 - **窗口**：10 pt 圆角，带阴影。标题栏 0–28（`#d3d4d5`，下边一条 0.5 pt `#0c0c0c` 线），居中系统粗体 13 pt「New Document」，左上角三个交通灯（中心 x 14、34、54，y 14，半径 6：红、灰（不可用的最小化）、绿）。交通灯只有外观。
 - **标签栏** 28.5–76（`#323232`，底部 74–76 一条 `#3e3e3e`）：Recent（钟表图标中心 35，文字从 49.5）、Saved (112.5)、Photo (172)、Print (230)、Art & Illustration (280)、Web (398)、Mobile (448.5)、Film & Video (513)，14 pt，中心 y 51。当前页白字并在下面画 2 pt 白线（Recent 从钟表左缘 27 起），其它页 `#a8a8a8`，悬停变白。
-- **左侧列表**（0–770，y 76 起，`#252525`）：可滚动，下方 655–703 是 Adobe Stock 搜索栏。
+- **左侧列表**（0–770，y 76 起，`#252525`）：可滚动，下方 655–703 是模板搜索栏。
   - 标题（粗体 13 pt）「BLANK DOCUMENT PRESETS」/「YOUR RECENT ITEMS」/「YOUR SAVED PRESETS」，后接「(数量)」，左端 26.5，中心 y 103。
   - 卡片 168 pt 见方，每行 4 张，相距 180.9 pt，第一张左上角 (26, 124)。图标中心在卡片顶下 62；名称（12 pt 白字，过长截断加「...」）中心在顶下 121.5；尺寸行（如「7 x 5 in @ 300 ppi」，12 pt `#c8c8c8`）在顶下 140。选中的卡片画 3 pt `#417ee4` 边框；悬停的卡片底色 `#323232`、名称变蓝。
   - **Recent 页**：欢迎框 (13, 89)–(741, 262)，`#2e2e2e`，右上 (720, 110) 有关闭的叉；粗体 28 pt「Let’s start something new.」中心 (377, 147)；下面两行 16 pt 文字，「document presets」是带下划线的蓝色链接，点击切到 Photo 页。关闭欢迎框后不再出现（本次运行内），标题与卡片上移到与其它页相同的位置；没关时标题在 y 286、卡片从 y 307 起。
   - **Saved 页**：没有存储的预设时显示同样的框，标题「You can always find it here.」与说明文字。
-  - **搜索栏**：放大镜、斜体灰字「Search for an image or template from Adobe Stock」、下划线和描边的「Search」胶囊（656.5–727，y 664–694.5）。它搜索的是本应用不使用的 Adobe Stock，所以只有外观。
+  - **搜索栏**：放大镜、斜体灰字「Search for an image or template」、下划线和描边的「Search」胶囊（656.5–727，y 664–694.5）。Photoshop 在这里搜索 Adobe Stock，本应用没有模板服务，所以只有外观。文案去掉了 Photoshop 原文末尾的「from Adobe Stock」：界面不出现 Adobe 的品牌名（`SEARCH_PLACEHOLDER`，测试 `search_shows_no_adobe_brand` 守住这一点）。
 - **右侧详情**（770–1080，`#323232`）：标签 12 pt `#c3c3c3`，值 14–15 pt `#e3e3e3`。
   - 「PRESET DETAILS」(791, 100.75)；名称输入框（下划线 790–1015，y 149，`#909090`）；右侧存储预设图标（托盘加向下箭头，1034–1063 × 118–144，悬停提示「Save Preset」）。
   - Width (791, 168.5)：输入框 (790–862, 180.5–212.5，`#252525` 底、1 pt `#4a4a4a` 边、4 pt 圆角，聚焦时边框变蓝，值左缩进 15.5)；单位下拉 (874–1060)：Pixels、Inches、Centimeters、Millimeters、Points、Picas。
@@ -47,4 +47,5 @@ File › New...（⌘N）：Photoshop 2026 默认的新版 New Document 对话�
 ## 测试覆盖
 
 - `defaults_units_and_validation`：默认 1920 × 1080、按剪贴板尺寸、改为英寸后数值为 8.889 而像素不变、应用 7 × 5 in @ 300 ppi 预设为 2100 × 1500、宽为 0 无效、有最近使用时从它开始并选中。
+- `search_shows_no_adobe_brand`：搜索栏占位文案不含「Adobe」与「Stock」。
 - `ui_tests.rs` 的 `new_document_dialog`（⌘N 后 Enter 创建 Untitled-2，1920 × 1080；透明背景得到「Layer 1」）与 `new_document_dialog_presets_recent_and_saved`。
