@@ -10,6 +10,7 @@ pub mod floating;
 mod histogram;
 pub(crate) mod info;
 mod navigator;
+mod presets;
 pub use color_panel::DEFAULT_SWATCHES;
 pub mod history;
 mod layers;
@@ -241,6 +242,8 @@ impl Panels {
             PanelKind::Swatches => color_panel::swatches(&mut child, app),
             PanelKind::Properties => properties::show(&mut child, app),
             PanelKind::Layers => layers::show(&mut child, app),
+            PanelKind::Gradients => presets::gradients(&mut child, app),
+            PanelKind::Patterns => presets::patterns(&mut child, app),
             other => placeholder(&mut child, other),
         }
     }

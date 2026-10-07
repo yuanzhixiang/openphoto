@@ -34,7 +34,8 @@ Dragging the divider between groups changes the heights (the cursor becomes an u
 - Color, Swatches: see `color_panel.md`.
 - Properties: see `properties.md`.
 - Layers: see `layers.md`.
-- Gradients, Patterns, Adjustments, Libraries, Channels, Paths: show the placeholder text "{name} — not implemented yet".
+- Gradients, Patterns: see `presets.md`.
+- Adjustments, Libraries, Channels, Paths: show the placeholder text "{name} — not implemented yet".
 
 ## Icon column
 

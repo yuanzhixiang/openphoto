@@ -6796,6 +6796,39 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn gradients_and_patterns_panels_pick() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // The Gradients tab, then its second swatch (Foreground to Transparent)
+    click(&mut h, at_pt(1175.0, 87.0));
+    h.run_steps(2);
+    shot(&mut h, "gradients_panel");
+    click(&mut h, at_pt(1098.0, 131.0));
+    let g = h.state().state.gradient_preset.clone().expect("picked");
+    assert_eq!(g.name, "Foreground to Transparent");
+    // The Patterns tab: a second pattern, then the first again
+    h.state_mut().state.patterns.push(crate::state::Pattern {
+        name: "Red".into(),
+        image: {
+            let mut i = op_core::TiledImage::new(2, 2);
+            for y in 0..2 {
+                for x in 0..2 {
+                    i.set_pixel(x, y, [255, 0, 0, 255]);
+                }
+            }
+            i
+        },
+    });
+    click(&mut h, at_pt(1240.0, 87.0));
+    h.run_steps(2);
+    click(&mut h, at_pt(1098.0, 131.0));
+    assert_eq!(h.state().state.pattern, 1);
+    shot(&mut h, "patterns_panel");
+    click(&mut h, at_pt(1056.0, 131.0));
+    assert_eq!(h.state().state.pattern, 0);
+}
+
+#[test]
 fn hidden_panels_show_at_the_window_sides() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);
