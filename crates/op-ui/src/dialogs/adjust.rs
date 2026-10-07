@@ -774,8 +774,8 @@ pub struct AdjustDialog {
     /// Another dialog (the Color Picker) is over this one: it is drawn but
     /// takes no keys or clicks.
     pub blocked: bool,
-    /// Where a targeted adjustment drag started (screen x).
-    pub target_from: Option<f32>,
+    /// Where a targeted adjustment drag started (screen position).
+    pub target_from: Option<egui::Pos2>,
     /// What some dialogs need besides their fields.
     pub extra: Extra,
 }
@@ -1079,26 +1079,37 @@ impl AdjustDialog {
     /// Whether Hue/Saturation's targeted adjustment hand is on: drags on
     /// the image change the range under the pointer.
     pub fn targeting(&self) -> bool {
-        matches!(&self.custom, Some(Custom::HueSaturation(d)) if d.targeting)
+        match &self.custom {
+            Some(Custom::HueSaturation(d)) => d.targeting,
+            Some(Custom::Curves(d)) => d.targeting,
+            _ => false,
+        }
     }
 
     /// The hand pressed on a pixel of color `rgb` (Command: hue).
     pub fn target_press(&mut self, rgb: [u8; 3], hue: bool) {
-        if let Some(Custom::HueSaturation(d)) = &mut self.custom {
-            d.target_press(rgb, hue);
+        match &mut self.custom {
+            Some(Custom::HueSaturation(d)) => d.target_press(rgb, hue),
+            Some(Custom::Curves(d)) => d.target_press(rgb),
+            _ => {}
         }
     }
 
-    /// The hand dragged `dx` points from where it was pressed.
-    pub fn target_drag(&mut self, dx: f32, hue: bool) {
-        if let Some(Custom::HueSaturation(d)) = &mut self.custom {
-            d.target_drag(dx, hue);
+    /// The hand dragged by `delta` points from where it was pressed:
+    /// Hue/Saturation follows it sideways, Curves up and down.
+    pub fn target_drag(&mut self, delta: egui::Vec2, hue: bool) {
+        match &mut self.custom {
+            Some(Custom::HueSaturation(d)) => d.target_drag(delta.x, hue),
+            Some(Custom::Curves(d)) => d.target_drag(delta.y),
+            _ => {}
         }
     }
 
     pub fn target_release(&mut self) {
-        if let Some(Custom::HueSaturation(d)) = &mut self.custom {
-            d.target_release();
+        match &mut self.custom {
+            Some(Custom::HueSaturation(d)) => d.target_release(),
+            Some(Custom::Curves(d)) => d.target_release(),
+            _ => {}
         }
     }
 

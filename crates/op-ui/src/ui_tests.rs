@@ -962,13 +962,52 @@ fn black_and_white_auto_picks_weights_from_the_image() {
     // Auto (the third button on the right) pulls the two grays apart
     click(
         &mut h,
-        egui::pos2(rect.right() - pt(129.0 - 54.5), rect.top() + pt(48.0 + 72.0 + 12.0)),
+        egui::pos2(
+            rect.right() - pt(129.0 - 54.5),
+            rect.top() + pt(48.0 + 72.0 + 12.0),
+        ),
     );
     h.run_steps(3);
     let after = gap(&mut h);
     assert!(after > before + 20, "{before} {after}");
     h.key_press(egui::Key::Escape);
     h.run_steps(2);
+}
+
+#[test]
+fn curves_hand_drags_the_curve_at_the_pixel() {
+    use crate::theme::pt;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A gray patch across the top
+    h.state_mut().state.foreground = Color::from_rgba8([100, 100, 100, 255]);
+    select_rect(&mut h, 0.0, 0.0, 734.0, 150.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.run_steps(2);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::M);
+    h.run_steps(3);
+    let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
+    click(&mut h, rect.min + egui::vec2(pt(34.0), pt(412.0)));
+    assert!(h.state().state.adjust_dialog.as_ref().unwrap().targeting());
+    // Dragging up 40 pt on the patch raises 100 to 140
+    let (x, y) = (0..=14)
+        .map(|k| (10.0 + 50.0 * k as f32, 100.0))
+        .find(|&(x, y)| !rect.contains(doc_point(&h, x, y)))
+        .expect("part of the patch is clear of the dialog");
+    let from = doc_point(&h, x, y);
+    drag(
+        &mut h,
+        from,
+        from - egui::vec2(0.0, pt(40.0)),
+        Modifiers::NONE,
+    );
+    h.run_steps(2);
+    let [r, ..] = composite_pixel(&mut h, x as u32, y as u32);
+    assert!(r.abs_diff(140) <= 1, "{r}");
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Curves");
 }
 
 #[test]

@@ -64,6 +64,12 @@ pub struct Dialog {
     /// Show Clipping while an end-point pin is dragged: the preview shows
     /// what clips to black (false) or white (true).
     pub clipping: Option<bool>,
+    /// The targeted adjustment hand is on: a drag on the image moves the
+    /// curve at the pressed pixel's value (`target_press`).
+    pub targeting: bool,
+    /// The hand's point (index in the current channel) and its output when
+    /// pressed.
+    target: Option<(usize, f32)>,
     /// Auto or Options... was clicked (`AdjustDialog` runs them).
     pub wants_auto: bool,
     pub wants_options: bool,
@@ -105,6 +111,8 @@ impl Dialog {
             output_text: String::new(),
             shown_point: None,
             clipping: None,
+            targeting: false,
+            target: None,
             wants_auto: false,
             wants_options: false,
         }
@@ -252,6 +260,45 @@ impl Dialog {
             }
         }
         self.selected = None;
+    }
+
+    /// The hand pressed on a pixel of color `rgb`: the current channel's
+    /// value there (the mean of the three on RGB) gets a point on the curve
+    /// (or the point already within 4 levels), which the drag then moves.
+    pub fn target_press(&mut self, rgb: [u8; 3]) {
+        self.set_pencil(false);
+        let v = if self.channel == 0 {
+            (rgb.iter().map(|&v| v as f32).sum::<f32>() / 3.0).round()
+        } else {
+            rgb[self.channel - 1] as f32
+        };
+        let table = curve_table(&self.rounded(self.channel));
+        let points = &mut self.points[self.channel];
+        let i = match points.iter().position(|p| (p.0 - v).abs() <= 4.0) {
+            Some(i) => i,
+            None if points.len() < 16 => {
+                let i = points.iter().position(|p| p.0 > v).unwrap_or(points.len());
+                points.insert(i, (v, table[v as usize] as f32));
+                i
+            }
+            None => return,
+        };
+        self.selected = Some(i);
+        self.target = Some((i, points[i].1));
+    }
+
+    /// The hand dragged `dy` points down from where it was pressed: the
+    /// point's output goes up a level per point dragged up.
+    pub fn target_drag(&mut self, dy: f32) {
+        if let Some((i, start)) = self.target
+            && let Some(p) = self.points[self.channel].get_mut(i)
+        {
+            p.1 = (start - dy).round().clamp(0.0, 255.0);
+        }
+    }
+
+    pub fn target_release(&mut self) {
+        self.target = None;
     }
 
     /// Auto (computed by `op_core::auto` with the Auto Color Correction
@@ -474,14 +521,35 @@ impl Dialog {
                 appkit::label(ui, at(89.5, 410.25), &self.shown(x));
             }
         }
+        // The targeted adjustment hand: a toggle, pressed while on
+        let hand = Rect::from_center_size(at(34.0, 412.0), vec2(pt(30.0), pt(26.0)));
+        let fill = if self.targeting {
+            painter.rect(
+                hand,
+                pt(3.0),
+                Color32::from_gray(0x38),
+                Stroke::new(pt(1.0), Color32::from_gray(0x63)),
+                StrokeKind::Inside,
+            );
+            Color32::from_gray(0x38)
+        } else {
+            color::PANEL
+        };
         ps_icons::paint_scaled(
             &painter,
             at(34.0, 412.0),
             Icon::TargetedHandVertical,
             appkit::TEXT,
-            color::PANEL,
+            fill,
             1.4,
         );
+        if ui
+            .interact(hand, ui.id().with("curves-hand"), Sense::click())
+            .clicked()
+        {
+            self.targeting = !self.targeting;
+            self.eyedropper = None;
+        }
         for (k, (x, icon)) in [
             (158.0, Icon::EyedropperBlack),
             (188.0, Icon::EyedropperGray),
@@ -493,6 +561,7 @@ impl Dialog {
             let chosen = self.eyedropper == Some(k);
             if appkit::eyedropper(ui, at(x, 411.5), icon, chosen, 1.1) {
                 self.eyedropper = (!chosen).then_some(k);
+                self.targeting = false;
             }
         }
         appkit::checkbox(
@@ -974,6 +1043,25 @@ mod tests {
             (d.shown(255.0), d.shown(0.0)),
             ("0".to_string(), "100".to_string())
         );
+    }
+
+    #[test]
+    fn the_hand_adds_and_moves_a_point() {
+        let mut d = Dialog::new([[0; 256]; 3]);
+        d.target_press([90, 100, 110]);
+        assert_eq!(
+            d.points[0],
+            vec![(0.0, 0.0), (100.0, 100.0), (255.0, 255.0)]
+        );
+        d.target_drag(-30.0);
+        assert_eq!(d.points[0][1], (100.0, 130.0));
+        d.target_release();
+        // On a channel, that channel's value; a point within 4 is reused
+        d.channel = 1;
+        d.target_press([52, 0, 0]);
+        d.target_drag(20.0);
+        d.target_press([50, 0, 0]);
+        assert_eq!(d.points[1], vec![(0.0, 0.0), (52.0, 32.0), (255.0, 255.0)]);
     }
 
     #[test]

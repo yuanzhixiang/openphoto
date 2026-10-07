@@ -304,23 +304,24 @@ impl OpenPhotoApp {
                 if dialog.targeting() {
                     let hue = ctx.input(|i| i.modifiers.command);
                     dialog.target_press(rgb, hue);
-                    dialog.target_from = Some(p.x);
+                    dialog.target_from = Some(p);
                 } else {
                     dialog.sample(rgb);
                 }
             }
         }
-        // The hand's drag: sideways changes the range's saturation (hue)
+        // The hand's drag: sideways changes Hue/Saturation's range
+        // (saturation, or hue), up and down Curves' point
         if let Some(from) = dialog.target_from {
-            let (down, x, hue) = ctx.input(|i| {
+            let (down, pos, hue) = ctx.input(|i| {
                 (
                     i.pointer.primary_down(),
-                    i.pointer.interact_pos().map(|p| p.x),
+                    i.pointer.interact_pos(),
                     i.modifiers.command,
                 )
             });
-            if let Some(x) = x {
-                dialog.target_drag((x - from) / theme::pt(1.0), hue);
+            if let Some(pos) = pos {
+                dialog.target_drag((pos - from) / theme::pt(1.0), hue);
             }
             if !down {
                 dialog.target_from = None;
