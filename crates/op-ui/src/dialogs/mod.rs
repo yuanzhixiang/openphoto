@@ -26,6 +26,7 @@ mod filter_layout;
 pub(crate) mod gradient_editor;
 mod gradient_map;
 pub(crate) mod grid_size;
+pub(crate) mod guide_layout;
 mod hue_saturation;
 pub(crate) mod image_size;
 mod levels;

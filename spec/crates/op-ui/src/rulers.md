@@ -39,7 +39,7 @@ Measured on Photoshop 2026 (probe document at nine zoom levels and in every unit
 
 ## Known limitations
 
-- No smart guides, artboard guides, guide layouts, or guide color and grid settings (Preferences).
+- No artboard guides, guide colors or grid settings (Preferences). Smart guides are in `smart_guides.md`, guide layouts in `dialogs/guide_layout.md`.
 - The only ruler unit is pixels; double-clicking a ruler does not change the unit, and the origin cannot be changed by dragging the top-left corner.
 
 ## Test coverage

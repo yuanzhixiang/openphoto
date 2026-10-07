@@ -6796,6 +6796,38 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn new_guide_layout_previews_and_applies() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // Cancel leaves the guides as they were
+    run_command(&mut h, Command::NewGuideLayout);
+    h.run_steps(2);
+    // Previewed: 8 columns with gutters, 16 guides
+    assert_eq!(active(&h).doc.guides.len(), 16);
+    shot(&mut h, "guide_layout");
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert!(active(&h).doc.guides.is_empty());
+    // OK keeps them and records it
+    run_command(&mut h, Command::NewGuideLayout);
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert!(h.state().state.guide_layout.is_none());
+    assert_eq!(active(&h).doc.guides.len(), 16);
+    assert_eq!(last_history(&h), "New Guide Layout");
+    let first = active(&h)
+        .doc
+        .guides
+        .iter()
+        .filter(|g| g.vertical)
+        .map(|g| g.position)
+        .fold(f32::MAX, f32::min);
+    assert_eq!(first, 0.0);
+}
+
+#[test]
 fn guides_transforms_and_crops_snap() {
     use crate::commands::Command;
     use op_tools::Tool;

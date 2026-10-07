@@ -785,6 +785,40 @@ impl OpenPhotoApp {
         }
     }
 
+    /// New Guide Layout: the guides show on the canvas as they are set
+    /// (with Preview); OK records "New Guide Layout", Cancel puts the
+    /// guides back.
+    fn guide_layout_dialog(&mut self, ctx: &egui::Context) {
+        use dialogs::guide_layout::Outcome;
+        let Some((mut dialog, before)) = self.state.guide_layout.take() else {
+            return;
+        };
+        let outcome = dialog.show(ctx);
+        let Some(state) = self.state.active() else {
+            return;
+        };
+        let (w, h) = (state.doc.width as f32, state.doc.height as f32);
+        let with = |layout: &op_core::guide_layout::GuideLayout, clear: bool| {
+            let mut guides = if clear { Vec::new() } else { before.clone() };
+            guides.extend(layout.guides(w, h));
+            guides
+        };
+        match outcome {
+            Outcome::Open => {
+                state.doc.guides = match dialog.layout() {
+                    Some(layout) if dialog.preview => with(&layout, dialog.clear),
+                    _ => before.clone(),
+                };
+                self.state.guide_layout = Some((dialog, before));
+            }
+            Outcome::Cancel => state.doc.guides = before,
+            Outcome::Ok(layout, clear) => {
+                state.doc.guides = with(&layout, clear);
+                state.record("New Guide Layout");
+            }
+        }
+    }
+
     fn new_guide_dialog(&mut self, ctx: &egui::Context) {
         let Some(mut dialog) = self.state.new_guide_dialog.take() else {
             return;
@@ -1125,6 +1159,7 @@ impl eframe::App for OpenPhotoApp {
         self.auto_options_dialog(&ctx);
         self.warp_grid_dialog(&ctx);
         self.save_options_dialog(&ctx);
+        self.guide_layout_dialog(&ctx);
         self.new_guide_dialog(&ctx);
         self.new_layer_dialog(&ctx);
         self.duplicate_dialog(&ctx);

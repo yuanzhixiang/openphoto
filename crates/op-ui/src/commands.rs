@@ -300,6 +300,8 @@ pub enum Command {
     ClearGuides,
     /// View > Guides > New Guide... (opens the dialog).
     NewGuide,
+    /// View > Guides > New Guide Layout... (opens the dialog).
+    NewGuideLayout,
     /// Hide OpenPhoto (Ctrl+Cmd+H, as Photoshop: Cmd+H is Extras).
     HideApp,
     ToggleHistory,
@@ -669,7 +671,8 @@ impl Command {
             | Self::PrintSize
             | Self::ActualSize
             | Self::ClearGuides
-            | Self::NewGuide => {
+            | Self::NewGuide
+            | Self::NewGuideLayout => {
                 return None;
             }
             Self::DeleteLayer
@@ -1036,6 +1039,7 @@ impl Command {
             | Self::PrintSize
             | Self::ActualSize
             | Self::NewGuide
+            | Self::NewGuideLayout
             | Self::QuickMask => doc.is_some(),
             Self::Fade => doc.is_some_and(|d| d.can_fade()),
             Self::OpenRecent(i) => (i as usize) < app.recent.files().len(),
@@ -1757,6 +1761,12 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
             (v.snap_slices, v.snap_bounds) = (on, on);
         }
         Command::NewGuide => app.new_guide_dialog = Some(Default::default()),
+        Command::NewGuideLayout => {
+            if let Some(state) = app.active() {
+                let guides = state.doc.guides.clone();
+                app.guide_layout = Some((Default::default(), guides));
+            }
+        }
         Command::HideApp => {
             #[cfg(target_os = "macos")]
             crate::app_kit::hide_app();

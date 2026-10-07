@@ -1381,6 +1381,12 @@ pub struct AppState {
         op_core::TiledImage,
     )>,
     pub save_options: Option<crate::actions::PendingSave>,
+    /// View › Guides › New Guide Layout..., while open, and the active
+    /// document's guides before it (put back on Cancel).
+    pub guide_layout: Option<(
+        crate::dialogs::guide_layout::GuideLayoutDialog,
+        Vec<op_core::Guide>,
+    )>,
     pub export_options: op_io::ExportOptions,
     pub gradient_editor: Option<(
         crate::dialogs::gradient_editor::GradientEditor,
@@ -1555,6 +1561,7 @@ impl Default for AppState {
             auto_options_dialog: None,
             auto_saved: None,
             save_options: None,
+            guide_layout: None,
             pen_pressure: None,
             patterns: vec![Pattern {
                 name: "Default Pattern".into(),
@@ -1756,6 +1763,7 @@ impl AppState {
             || self.gradient_editor.is_some()
             || self.auto_options_dialog.is_some()
             || self.save_options.is_some()
+            || self.guide_layout.is_some()
             || self.delete_crop_preset.is_some()
             || self.new_guide_dialog.is_some()
             || self.new_layer_dialog.is_some()

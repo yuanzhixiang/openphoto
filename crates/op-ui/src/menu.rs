@@ -268,6 +268,7 @@ const ALL_COMMANDS: &[Command] = &[
     Command::LockGuides,
     Command::ClearGuides,
     Command::NewGuide,
+    Command::NewGuideLayout,
     Command::HideApp,
     Command::ToggleHistory,
     Command::ToggleInfo,
@@ -1139,7 +1140,7 @@ impl NativeMenu {
                         &todo("Clear Selected Artboard Guides", None),
                         &todo("Clear Canvas Guides", None),
                         &item("New Guide...", Command::NewGuide),
-                        &todo("New Guide Layout...", None),
+                        &item("New Guide Layout...", Command::NewGuideLayout),
                         &todo("New Guides From Shape", None),
                     ],
                 )

@@ -34,6 +34,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `art_history`: the Art History Brush's `PaintOptions` (10 px, hard; returned by `paint_options`).
 - `mixer`, `mixer_load`, `mixer_paint`: the Mixer Brush's `PaintOptions` (returned by `paint_options`), the load color sampled with Option-click (None: the foreground color), and the paint the brush keeps between strokes when it isn't cleaned.
 - `pen_pressure`: the pen's last pressure while a tablet is used (`app_kit::pen_pressure`, read by `lib.rs` before each frame in the real app); None with a mouse. `DocState::paint_smooth`: where a smoothed stroke has got to.
+- `guide_layout`: New Guide Layout while open, with the active document's guides from before it (`dialogs/guide_layout.md`; counted by `modal_open`).
 - `save_options`: a JPEG or PNG save waiting for its options (`actions::PendingSave`, counted by `modal_open`); `export_options`: the options last used.
 - `auto_options_dialog`: Auto Color Correction Options while open (counted by `modal_open`); `auto_saved`: options saved with its "Save as defaults" this session; `auto_defaults()`: those, else `op_core::auto::Options::default()`. Levels and Curves open with them, and Image › Auto Tone / Auto Contrast / Auto Color use their clipping and target colors.
 - `PickerTarget::AutoTarget(k, rgb)`: the Color Picker for a target color, titled "Select target shadow color:", "Select target midtone color:" or "Select target highlight color:".

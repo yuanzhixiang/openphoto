@@ -15,6 +15,7 @@ pub mod fade;
 pub mod fill;
 pub mod filter;
 pub mod gradient;
+pub mod guide_layout;
 pub mod heal;
 pub mod history;
 pub mod image_ops;
