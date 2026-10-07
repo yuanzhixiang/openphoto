@@ -227,6 +227,173 @@ const WIND: &[Param] = &[
     choice("Method", &["Wind", "Blast", "Stagger"], 0),
     choice("Direction", &["From the Right", "From the Left"], 0),
 ];
+const RADIAL_BLUR: &[Param] = &[
+    param("Amount:", 1.0, 100.0, 10.0, 0),
+    choice("Blur Method", &["Spin", "Zoom"], 0),
+    choice("Quality", &["Draft", "Good", "Best"], 1),
+];
+
+const SMART_BLUR: &[Param] = &[
+    param("Radius:", 0.1, 100.0, 3.0, 1),
+    param("Threshold:", 0.1, 100.0, 25.0, 1),
+    choice("Quality:", &["Low", "Medium", "High"], 2),
+    choice("Mode:", &["Normal", "Edge Only", "Overlay Edge"], 0),
+];
+
+const SHAPE_BLUR: &[Param] = &[
+    param("Radius:", 5.0, 1000.0, 10.0, 0),
+    choice(
+        "Shape:",
+        &["Circle", "Square", "Star", "Heart", "Diamond"],
+        0,
+    ),
+];
+
+const LENS_BLUR: &[Param] = &[
+    param("Radius:", 0.0, 100.0, 15.0, 0),
+    choice(
+        "Shape:",
+        &[
+            "Triangle (3)",
+            "Square (4)",
+            "Pentagon (5)",
+            "Hexagon (6)",
+            "Heptagon (7)",
+            "Octagon (8)",
+        ],
+        3,
+    ),
+    param("Brightness:", 0.0, 100.0, 0.0, 0),
+    param("Threshold:", 0.0, 255.0, 255.0, 0),
+    param("Noise Amount:", 0.0, 100.0, 0.0, 0),
+];
+
+const REDUCE_NOISE: &[Param] = &[
+    param("Strength:", 0.0, 10.0, 6.0, 0),
+    param("Preserve Details:", 0.0, 100.0, 60.0, 0),
+    param("Reduce Color Noise:", 0.0, 100.0, 45.0, 0),
+    param("Sharpen Details:", 0.0, 100.0, 25.0, 0),
+    check("Remove JPEG Artifact", false),
+];
+
+const SMART_SHARPEN: &[Param] = &[
+    param("Amount:", 1.0, 500.0, 200.0, 0),
+    param("Radius:", 0.1, 64.0, 1.0, 1),
+    param("Reduce Noise:", 0.0, 100.0, 10.0, 0),
+    choice("Remove:", &["Gaussian Blur", "Lens Blur", "Motion Blur"], 1),
+    param("Angle:", -180.0, 180.0, 0.0, 0),
+];
+
+const FIBERS: &[Param] = &[
+    param("Variance:", 1.0, 64.0, 16.0, 0),
+    param("Strength:", 1.0, 64.0, 4.0, 0),
+];
+
+const LENS_FLARE: &[Param] = &[
+    param("Brightness:", 10.0, 300.0, 100.0, 0),
+    choice(
+        "Lens Type",
+        &["50-300mm Zoom", "35mm Prime", "105mm Prime", "Movie Prime"],
+        0,
+    ),
+];
+
+const EXTRUDE: &[Param] = &[
+    choice("Type", &["Blocks", "Pyramids"], 0),
+    param("Size:", 2.0, 255.0, 30.0, 0),
+    param("Depth:", 1.0, 255.0, 30.0, 0),
+    choice("Depth Based On", &["Random", "Level-based"], 1),
+    check("Solid Front Faces", false),
+    check("Mask Incomplete Blocks", false),
+];
+
+const OIL_PAINT: &[Param] = &[
+    param("Stylization:", 0.1, 10.0, 1.5, 1),
+    param("Cleanliness:", 0.0, 10.0, 5.0, 1),
+    param("Scale:", 0.1, 10.0, 1.0, 1),
+    param("Bristle Detail:", 0.0, 10.0, 0.0, 1),
+    param("Angle:", -180.0, 180.0, -60.0, 0),
+    param("Shine:", 0.0, 10.0, 1.0, 1),
+];
+
+const WAVE: &[Param] = &[
+    param("Number of Generators:", 1.0, 999.0, 5.0, 0),
+    param("Wavelength Min.:", 1.0, 998.0, 10.0, 0),
+    param("Wavelength Max.:", 2.0, 999.0, 120.0, 0),
+    param("Amplitude Min.:", 1.0, 998.0, 5.0, 0),
+    param("Amplitude Max.:", 1.0, 999.0, 35.0, 0),
+    param("Scale Horiz.:", 1.0, 100.0, 100.0, 0),
+    param("Scale Vert.:", 1.0, 100.0, 100.0, 0),
+    choice("Type", &["Sine", "Triangle", "Square"], 0),
+    choice("Undefined Areas", &["Wrap Around", "Repeat Edge Pixels"], 1),
+];
+
+const SHEAR: &[Param] = &[
+    param("Top:", -100.0, 100.0, 0.0, 0),
+    param("Middle:", -100.0, 100.0, 0.0, 0),
+    param("Bottom:", -100.0, 100.0, 0.0, 0),
+    choice("Undefined Areas", &["Wrap Around", "Repeat Edge Pixels"], 1),
+];
+
+const DISPLACE: &[Param] = &[
+    param("Horizontal Scale:", -999.0, 999.0, 10.0, 0),
+    param("Vertical Scale:", -999.0, 999.0, 10.0, 0),
+    choice("Displacement Map", &["Stretch to Fit", "Tile"], 0),
+    choice("Undefined Areas", &["Wrap Around", "Repeat Edge Pixels"], 1),
+];
+
+const SHADOWS_HIGHLIGHTS: &[Param] = &[
+    param("Shadows Amount:", 0.0, 100.0, 35.0, 0),
+    param("Shadows Tone:", 0.0, 100.0, 50.0, 0),
+    param("Shadows Radius:", 0.0, 2500.0, 30.0, 0),
+    param("Highlights Amount:", 0.0, 100.0, 0.0, 0),
+    param("Highlights Tone:", 0.0, 100.0, 50.0, 0),
+    param("Highlights Radius:", 0.0, 2500.0, 30.0, 0),
+    param("Color:", -100.0, 100.0, 20.0, 0),
+    param("Midtone:", -100.0, 100.0, 0.0, 0),
+    param("Black Clip:", 0.0, 50.0, 0.01, 2),
+    param("White Clip:", 0.0, 50.0, 0.01, 2),
+];
+
+const HDR_TONING: &[Param] = &[
+    choice(
+        "Method:",
+        &[
+            "Exposure and Gamma",
+            "Highlight Compression",
+            "Equalize Histogram",
+            "Local Adaptation",
+        ],
+        3,
+    ),
+    param("Radius:", 1.0, 500.0, 15.0, 0),
+    param("Strength:", 0.1, 4.0, 0.52, 2),
+    param("Gamma:", 0.1, 2.0, 1.0, 2),
+    param("Exposure:", -5.0, 5.0, 0.0, 2),
+    param("Detail:", -100.0, 300.0, 30.0, 0),
+    param("Shadow:", -100.0, 100.0, 0.0, 0),
+    param("Highlight:", -100.0, 100.0, 0.0, 0),
+    param("Vibrance:", -100.0, 100.0, 0.0, 0),
+    param("Saturation:", -100.0, 100.0, 20.0, 0),
+];
+
+const REPLACE_COLOR: &[Param] = &[
+    param("Fuzziness:", 0.0, 200.0, 40.0, 0),
+    param("Hue:", -180.0, 180.0, 0.0, 0),
+    param("Saturation:", -100.0, 100.0, 0.0, 0),
+    param("Lightness:", -100.0, 100.0, 0.0, 0),
+];
+
+const MATCH_COLOR: &[Param] = &[
+    param("Luminance:", 1.0, 200.0, 100.0, 0),
+    param("Color Intensity:", 1.0, 200.0, 100.0, 0),
+    param("Fade:", 0.0, 100.0, 0.0, 0),
+    check("Neutralize", false),
+    choice("Source:", &["None"], 0),
+];
+
+const COLOR_LOOKUP: &[Param] = &[choice("3DLUT File:", &["Load 3D LUT..."], 0)];
+
 const DUST_AND_SCRATCHES: &[Param] = &[
     param("Radius (pixels):", 1.0, 500.0, 1.0, 0),
     param("Threshold (levels):", 0.0, 255.0, 0.0, 0),
@@ -279,6 +446,24 @@ pub enum Kind {
     Custom,
     TraceContour,
     Wind,
+    RadialBlur,
+    SmartBlur,
+    ShapeBlur,
+    LensBlur,
+    ReduceNoise,
+    SmartSharpen,
+    Fibers,
+    LensFlare,
+    Extrude,
+    OilPaint,
+    Wave,
+    Shear,
+    Displace,
+    ShadowsHighlights,
+    HdrToning,
+    ReplaceColor,
+    MatchColor,
+    ColorLookup,
 }
 
 impl Kind {
@@ -328,6 +513,24 @@ impl Kind {
             Self::Custom => "Custom",
             Self::TraceContour => "Trace Contour",
             Self::Wind => "Wind",
+            Self::RadialBlur => "Radial Blur",
+            Self::SmartBlur => "Smart Blur",
+            Self::ShapeBlur => "Shape Blur",
+            Self::LensBlur => "Lens Blur",
+            Self::ReduceNoise => "Reduce Noise",
+            Self::SmartSharpen => "Smart Sharpen",
+            Self::Fibers => "Fibers",
+            Self::LensFlare => "Lens Flare",
+            Self::Extrude => "Extrude",
+            Self::OilPaint => "Oil Paint",
+            Self::Wave => "Wave",
+            Self::Shear => "Shear",
+            Self::Displace => "Displace",
+            Self::ShadowsHighlights => "Shadows/Highlights",
+            Self::HdrToning => "HDR Toning",
+            Self::ReplaceColor => "Replace Color",
+            Self::MatchColor => "Match Color",
+            Self::ColorLookup => "Color Lookup",
         }
     }
 
@@ -377,6 +580,24 @@ impl Kind {
             Self::DustAndScratches => DUST_AND_SCRATCHES,
             Self::TraceContour => TRACE_CONTOUR,
             Self::Wind => WIND,
+            Self::RadialBlur => RADIAL_BLUR,
+            Self::SmartBlur => SMART_BLUR,
+            Self::ShapeBlur => SHAPE_BLUR,
+            Self::LensBlur => LENS_BLUR,
+            Self::ReduceNoise => REDUCE_NOISE,
+            Self::SmartSharpen => SMART_SHARPEN,
+            Self::Fibers => FIBERS,
+            Self::LensFlare => LENS_FLARE,
+            Self::Extrude => EXTRUDE,
+            Self::OilPaint => OIL_PAINT,
+            Self::Wave => WAVE,
+            Self::Shear => SHEAR,
+            Self::Displace => DISPLACE,
+            Self::ShadowsHighlights => SHADOWS_HIGHLIGHTS,
+            Self::HdrToning => HDR_TONING,
+            Self::ReplaceColor => REPLACE_COLOR,
+            Self::MatchColor => MATCH_COLOR,
+            Self::ColorLookup => COLOR_LOOKUP,
         }
     }
 
@@ -400,6 +621,24 @@ impl Kind {
             Self::Offset => l::OFFSET,
             Self::TraceContour => l::TRACE_CONTOUR,
             Self::Diffuse => l::DIFFUSE,
+            Self::RadialBlur => l::RADIAL_BLUR,
+            Self::SmartBlur => l::SMART_BLUR,
+            Self::ShapeBlur => l::SHAPE_BLUR,
+            Self::LensBlur => l::LENS_BLUR,
+            Self::ReduceNoise => l::REDUCE_NOISE,
+            Self::SmartSharpen => l::SMART_SHARPEN,
+            Self::Fibers => l::FIBERS,
+            Self::LensFlare => l::LENS_FLARE,
+            Self::Extrude => l::EXTRUDE,
+            Self::OilPaint => l::OIL_PAINT,
+            Self::Wave => l::WAVE,
+            Self::Shear => l::SHEAR,
+            Self::Displace => l::DISPLACE,
+            Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
+            Self::HdrToning => l::HDR_TONING,
+            Self::ReplaceColor => l::REPLACE_COLOR,
+            Self::MatchColor => l::MATCH_COLOR,
+            Self::ColorLookup => l::COLOR_LOOKUP,
             _ => return None,
         })
     }
@@ -537,6 +776,99 @@ pub struct AdjustDialog {
     pub blocked: bool,
     /// Where a targeted adjustment drag started (screen x).
     pub target_from: Option<f32>,
+    /// What some dialogs need besides their fields.
+    pub extra: Extra,
+}
+
+/// What some filter and adjustment dialogs need besides their fields.
+#[derive(Clone, Debug, Default)]
+pub struct Extra {
+    /// The random pattern (Fibers, Wave, Extrude): a new one each opening.
+    pub seed: u32,
+    /// The foreground and background colors (Fibers).
+    pub colors: ([u8; 3], [u8; 3]),
+    /// Replace Color's color (the foreground at first; the eyedropper
+    /// picks from the image).
+    pub sample: [u8; 3],
+    /// Match Color: the layer's Lab statistics and each source's.
+    pub target: Option<[f32; 6]>,
+    pub sources: Vec<(String, [f32; 6])>,
+    /// Color Lookup's cube files (name, path) and the ones loaded.
+    pub luts: Vec<(String, std::path::PathBuf)>,
+    pub lut_ids: std::collections::HashMap<usize, u32>,
+    /// Displace's map, once chosen (after OK).
+    pub displace_map: Option<u32>,
+}
+
+impl Extra {
+    /// The popup labels a dialog fills in itself (Match Color's sources,
+    /// Color Lookup's files), for the field at `i`.
+    fn labels(&self, kind: Kind, i: usize) -> Option<Vec<String>> {
+        match (kind, i) {
+            (Kind::MatchColor, 4) => Some(
+                std::iter::once("None".to_owned())
+                    .chain(self.sources.iter().map(|(n, _)| n.clone()))
+                    .collect(),
+            ),
+            (Kind::ColorLookup, 0) => Some(
+                std::iter::once("Load 3D LUT...".to_owned())
+                    .chain(self.luts.iter().map(|(n, _)| n.clone()))
+                    .collect(),
+            ),
+            _ => None,
+        }
+    }
+}
+
+/// The cube files Color Lookup lists: Photoshop's own (when installed) and
+/// any in OpenPhoto's folder, `.cube` and `.3dl`.
+pub fn lut_files() -> Vec<(String, std::path::PathBuf)> {
+    let mut dirs = vec![std::path::PathBuf::from(
+        "/Applications/Adobe Photoshop 2026/Presets/3DLUTs",
+    )];
+    if let Some(home) = std::env::var_os("HOME") {
+        dirs.push(
+            std::path::PathBuf::from(home).join("Library/Application Support/OpenPhoto/3DLUTs"),
+        );
+    }
+    let mut out: Vec<(String, std::path::PathBuf)> = dirs
+        .iter()
+        .filter_map(|d| std::fs::read_dir(d).ok())
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| e.eq_ignore_ascii_case("cube") || e.eq_ignore_ascii_case("3dl"))
+        })
+        .map(|p| {
+            (
+                p.file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned(),
+                p,
+            )
+        })
+        .collect();
+    out.sort_by_key(|a| a.0.to_lowercase());
+    out
+}
+
+/// Reads a `.cube` or `.3dl` file into the lookup registry.
+pub fn load_lut(path: &std::path::Path) -> Option<u32> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let is_3dl = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("3dl"));
+    let lut = if is_3dl {
+        op_core::color_match::Lut::parse_3dl(&text)?
+    } else {
+        op_core::color_match::Lut::parse_cube(&text)?
+    };
+    Some(op_core::color_match::register(lut))
 }
 
 /// An adjustment dialog's settings kept from its last OK.
@@ -595,6 +927,17 @@ impl AdjustDialog {
             rect: Rect::NOTHING,
             blocked: false,
             target_from: None,
+            extra: Extra {
+                seed: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(1, |d| d.subsec_nanos()),
+                luts: if kind == Kind::ColorLookup {
+                    lut_files()
+                } else {
+                    Vec::new()
+                },
+                ..Default::default()
+            },
             custom: match kind {
                 Kind::BrightnessContrast => Some(Custom::BrightnessContrast(Default::default())),
                 Kind::ColorBalance => Some(Custom::ColorBalance(Default::default())),
@@ -648,9 +991,60 @@ impl AdjustDialog {
         }
     }
 
+    /// A popup's choice `k` for the field at `i`. Color Lookup's "Load 3D
+    /// LUT..." opens a file and adds it to the list.
+    fn pick(&mut self, i: usize, k: usize) {
+        if self.kind == Kind::ColorLookup && k == 0 {
+            let path = rfd::FileDialog::new()
+                .add_filter("3D LUT", &["cube", "3dl", "CUBE", "3DL"])
+                .pick_file();
+            if let Some(path) = path
+                && let Some(id) = load_lut(&path)
+            {
+                let name = path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned();
+                self.extra.luts.push((name, path));
+                let index = self.extra.luts.len();
+                self.extra.lut_ids.insert(index, id);
+                self.values[i] = index.to_string();
+            }
+            return;
+        }
+        if self.kind == Kind::ColorLookup
+            && !self.extra.lut_ids.contains_key(&k)
+            && let Some(id) = self
+                .extra
+                .luts
+                .get(k - 1)
+                .and_then(|(_, path)| load_lut(path))
+        {
+            self.extra.lut_ids.insert(k, id);
+        }
+        self.values[i] = k.to_string();
+    }
+
+    /// Fibers' colors, and Replace Color's first color (the foreground).
+    pub fn set_colors(&mut self, colors: ([u8; 3], [u8; 3])) {
+        self.extra.colors = colors;
+        self.extra.sample = colors.0;
+    }
+
+    /// Match Color's statistics: the layer's and the other documents'.
+    pub fn set_match_sources(&mut self, target: [f32; 6], sources: Vec<(String, [f32; 6])>) {
+        self.extra.target = Some(target);
+        self.extra.sources = sources;
+    }
+
     /// Whether an eyedropper is chosen (Levels, Curves): a click on the
     /// image then samples.
     pub fn sampling(&self) -> bool {
+        // Replace Color samples its color from the image
+        if self.kind == Kind::ReplaceColor {
+            return true;
+        }
         match &self.custom {
             Some(Custom::Levels(d)) => d.eyedropper.is_some(),
             Some(Custom::Curves(d)) => d.eyedropper.is_some(),
@@ -687,6 +1081,10 @@ impl AdjustDialog {
 
     /// The chosen eyedropper's click on a pixel of color `rgb`.
     pub fn sample(&mut self, rgb: [u8; 3]) {
+        if self.kind == Kind::ReplaceColor {
+            self.extra.sample = rgb;
+            return;
+        }
         match &mut self.custom {
             Some(Custom::Levels(d)) => d.sample(rgb),
             Some(Custom::Curves(d)) => d.sample(rgb),
@@ -718,6 +1116,12 @@ impl AdjustDialog {
             Some(Custom::Exposure(d)) => d.values[0].clone(),
             _ => String::new(),
         }
+    }
+
+    /// Types `text` into the field at `i` (tests).
+    #[cfg(test)]
+    pub fn test_set_value(&mut self, i: usize, text: &str) {
+        self.values[i] = text.into();
     }
 
     /// Photo Filter's Color choice and color (tests).
@@ -780,6 +1184,10 @@ impl AdjustDialog {
     fn value(&self, i: usize) -> Option<f32> {
         let p = &self.kind.params()[i];
         let v: f32 = self.values[i].trim().parse().ok()?;
+        // Popups whose choices the dialog fills in itself
+        if let Some(labels) = self.extra.labels(self.kind, i) {
+            return (v >= 0.0 && (v as usize) < labels.len()).then_some(v);
+        }
         (p.min..=p.max).contains(&v).then_some(v)
     }
 
@@ -811,7 +1219,166 @@ impl AdjustDialog {
         let v: Vec<f32> = (0..self.values.len())
             .map(|i| self.value(i))
             .collect::<Option<_>>()?;
+        use op_core::more_filters as mf;
+        let pick = |k: f32| k as usize;
+        let undefined =
+            |k: f32| [mf::Undefined::WrapAround, mf::Undefined::RepeatEdge][pick(k).min(1)];
+        let e = &self.extra;
         let filter = match self.kind {
+            Kind::RadialBlur => Filter::RadialBlur {
+                amount: v[0],
+                method: [mf::RadialMethod::Spin, mf::RadialMethod::Zoom][pick(v[1])],
+                quality: v[2] as u8,
+                center: (0.5, 0.5),
+            },
+            Kind::SmartBlur => Filter::SmartBlur {
+                radius: v[0],
+                threshold: v[1],
+                mode: [
+                    mf::SmartBlurMode::Normal,
+                    mf::SmartBlurMode::EdgeOnly,
+                    mf::SmartBlurMode::OverlayEdge,
+                ][pick(v[3])],
+            },
+            Kind::ShapeBlur => Filter::ShapeBlur {
+                radius: v[0],
+                shape: mf::BlurShape::ALL[pick(v[1])],
+            },
+            Kind::LensBlur => Filter::LensBlur {
+                radius: v[0],
+                blades: v[1] as u32 + 3,
+                brightness: v[2],
+                threshold: v[3] as u8,
+                noise: v[4],
+            },
+            Kind::ReduceNoise => Filter::ReduceNoise {
+                strength: v[0],
+                preserve: v[1],
+                color: v[2],
+                sharpen: v[3],
+            },
+            Kind::SmartSharpen => Filter::SmartSharpen {
+                amount: v[0],
+                radius: v[1],
+                noise: v[2],
+                remove: [
+                    mf::SharpenRemove::GaussianBlur,
+                    mf::SharpenRemove::LensBlur,
+                    mf::SharpenRemove::MotionBlur,
+                ][pick(v[3])],
+                angle: v[4],
+                fade: (0.0, 0.0),
+            },
+            Kind::Fibers => Filter::Fibers {
+                variance: v[0],
+                strength: v[1],
+                foreground: e.colors.0,
+                background: e.colors.1,
+                seed: e.seed,
+            },
+            Kind::LensFlare => Filter::LensFlare {
+                center: (0.5, 0.5),
+                brightness: v[0],
+                lens: mf::LensType::ALL[pick(v[1])],
+            },
+            Kind::Extrude => Filter::Extrude {
+                kind: [mf::ExtrudeType::Blocks, mf::ExtrudeType::Pyramids][pick(v[0])],
+                size: v[1] as u32,
+                depth: v[2],
+                level_based: v[3] == 1.0,
+                solid: v[4] == 1.0,
+                seed: e.seed,
+            },
+            Kind::OilPaint => Filter::OilPaint {
+                stylization: v[0],
+                cleanliness: v[1],
+                scale: v[2],
+                angle: v[4],
+                shine: v[5],
+            },
+            Kind::Wave => Filter::Wave(mf::Wave {
+                generators: v[0] as u32,
+                wavelength: (v[1], v[2].max(v[1] + 1.0)),
+                amplitude: (v[3], v[4].max(v[3])),
+                scale: (v[5], v[6]),
+                kind: [
+                    mf::WaveType::Sine,
+                    mf::WaveType::Triangle,
+                    mf::WaveType::Square,
+                ][pick(v[7])],
+                undefined: undefined(v[8]),
+                seed: e.seed,
+            }),
+            Kind::Shear => {
+                let mut points = [(0.0, 0.0); 8];
+                points[..3].copy_from_slice(&[
+                    (0.0, v[0] / 200.0),
+                    (0.5, v[1] / 200.0),
+                    (1.0, v[2] / 200.0),
+                ]);
+                Filter::Shear {
+                    points,
+                    count: 3,
+                    undefined: undefined(v[3]),
+                }
+            }
+            Kind::Displace => Filter::Displace {
+                map: e.displace_map.unwrap_or(u32::MAX),
+                scale: (v[0], v[1]),
+                stretch: v[2] == 0.0,
+                undefined: undefined(v[3]),
+            },
+            Kind::ShadowsHighlights => {
+                Filter::ShadowsHighlights(op_core::tone::ShadowsHighlights {
+                    shadows: [v[0], v[1], v[2]],
+                    highlights: [v[3], v[4], v[5]],
+                    color: v[6],
+                    midtone: v[7],
+                    clip: [v[8], v[9]],
+                })
+            }
+            Kind::HdrToning => Filter::HdrToning(op_core::tone::HdrToning {
+                method: op_core::tone::HdrMethod::ALL[pick(v[0])],
+                radius: v[1],
+                strength: v[2],
+                gamma: v[3],
+                exposure: v[4],
+                detail: v[5],
+                shadow: v[6],
+                highlight: v[7],
+                vibrance: v[8],
+                saturation: v[9],
+            }),
+            Kind::ReplaceColor => {
+                return Some(Effect::Adjustment(Adjustment::ReplaceColor {
+                    color: e.sample,
+                    fuzziness: v[0] as u8,
+                    shift: [v[1] as i32, v[2] as i32, v[3] as i32],
+                }));
+            }
+            Kind::MatchColor => {
+                let target = e.target?;
+                let mut source = match pick(v[4]) {
+                    0 => target,
+                    k => e.sources.get(k - 1)?.1,
+                };
+                if v[3] == 1.0 {
+                    // Neutralize: the color cast's mean taken out
+                    source[1] = 0.0;
+                    source[2] = 0.0;
+                }
+                return Some(Effect::Adjustment(Adjustment::MatchColor {
+                    target,
+                    source,
+                    luminance: v[0],
+                    intensity: v[1],
+                    fade: v[2],
+                }));
+            }
+            Kind::ColorLookup => {
+                let id = *e.lut_ids.get(&pick(v[0]))?;
+                return Some(Effect::Adjustment(Adjustment::ColorLookup(id)));
+            }
             Kind::GaussianBlur => Filter::GaussianBlur { radius: v[0] },
             Kind::BoxBlur => Filter::BoxBlur {
                 radius: v[0] as u32,
@@ -1125,15 +1692,20 @@ impl AdjustDialog {
                         appkit::TEXT,
                     );
                     if let ParamKind::Choice(options) = p.kind {
-                        let chosen = (self.value(i).unwrap_or(0.0) as usize).min(options.len() - 1);
+                        let labels: Vec<String> = self
+                            .extra
+                            .labels(self.kind, i)
+                            .unwrap_or_else(|| options.iter().map(|o| o.to_string()).collect());
+                        let chosen = (self.value(i).unwrap_or(0.0) as usize).min(labels.len() - 1);
+                        let id = format!("filter-popup-{i}");
                         if let Some(k) = appkit::popup(
                             ui,
                             rect,
-                            "filter-popup",
-                            options[chosen],
-                            &appkit::choices(options.iter().copied(), chosen),
+                            &id,
+                            &labels[chosen],
+                            &appkit::choices(labels.iter().map(String::as_str), chosen),
                         ) {
-                            self.values[i] = k.to_string();
+                            self.pick(i, k);
                         }
                     }
                 }

@@ -84,6 +84,10 @@ When the dialog returns OK, if the new size differs from the current size, `resi
 
 While an adjustment dialog samples (`AdjustDialog::sampling`/`targeting`, see `dialogs/adjust.md`), a primary press on the document view outside the dialog removes the preview, reads the merged pixel under it (`composite_rgba8`) and hands it to the dialog; the targeted adjustment hand's drag is followed until the button is released. Photo Filter's Color Picker request opens `PickerTarget::PhotoFilter`; the dialog is `blocked` while any Color Picker is open.
 
+## Displace's map
+
+When Displace's OK comes, the open panel asks for the map ("Choose a displacement map.", Photoshop documents or images); the chosen file is opened with `op_io::open`, its merged pixels registered (`more_filters::register_map`) and the filter applied with that map. Cancelling the panel cancels the filter.
+
 ## Wiring the Image Size dialog
 
 Every frame the dialog's window size is copied to `AppState::image_size_extra`, so it reopens at that size. On OK: when Resample is on and the pixel size changed, resamples with the chosen method and Reduce Noise (`image_ops::resize_reducing_noise`); when the resolution changed, updates the document resolution; if anything changed, records "Image Size".

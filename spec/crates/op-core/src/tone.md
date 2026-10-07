@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-The pixel work of Image › Adjustments › Shadows/Highlights and HDR Toning. Both look at a pixel's surroundings (a blurred luminosity), so they run as filters (`Filter::ShadowsHighlights`, `Filter::HdrToning` in `filter.md`) on the active layer. Their dialogs are not built yet: the Image › Adjustments menu items are still placeholders.
+The pixel work of Image › Adjustments › Shadows/Highlights and HDR Toning. Both look at a pixel's surroundings (a blurred luminosity), so they run as filters (`Filter::ShadowsHighlights`, `Filter::HdrToning` in `filter.md`) on the active layer. Their dialogs are in `op-ui` (`dialogs/adjust.md`).
 
 ## Shadows/Highlights (`ShadowsHighlights`, `shadows_highlights`)
 

@@ -6892,6 +6892,107 @@ fn screenshot_pixelate_and_diffuse_dialogs() {
 }
 
 #[test]
+fn more_filters_and_adjustments_apply() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.layers[0].id;
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 0..300 {
+            for x in 0..300 {
+                let c = if (x / 12 + y / 12) % 2 == 0 { 40 } else { 210 };
+                image.set_pixel(x, y, [c, (x / 2) as u8, (255 - y / 2) as u8, 255]);
+            }
+        }
+        doc.mark_dirty();
+    }
+    // Each opens its dialog; Enter applies its defaults and records it
+    for (command, name, filter) in [
+        (Command::RadialBlur, "Radial Blur", true),
+        (Command::SmartBlur, "Smart Blur", true),
+        (Command::ShapeBlur, "Shape Blur", true),
+        (Command::LensBlur, "Lens Blur", true),
+        (Command::ReduceNoise, "Reduce Noise", true),
+        (Command::SmartSharpen, "Smart Sharpen", true),
+        (Command::Fibers, "Fibers", true),
+        (Command::LensFlare, "Lens Flare", true),
+        (Command::Extrude, "Extrude", true),
+        (Command::OilPaint, "Oil Paint", true),
+        (Command::Wave, "Wave", true),
+        (Command::ShadowsHighlights, "Shadows/Highlights", true),
+        (Command::HdrToning, "HDR Toning", true),
+        (Command::ReplaceColor, "Replace Color", false),
+    ] {
+        let entries = active(&h).history.states().len();
+        run_command(&mut h, command);
+        assert!(h.state().state.adjust_dialog.is_some(), "{name}");
+        if command == Command::ReplaceColor {
+            // Its color comes from a click on the image; then a hue shift
+            let p = doc_point(&h, 6.0, 6.0);
+            let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
+            if !rect.contains(p) {
+                click(&mut h, p);
+            }
+            h.state_mut()
+                .state
+                .adjust_dialog
+                .as_mut()
+                .unwrap()
+                .test_set_value(1, "90");
+            h.run_steps(2);
+        }
+        if matches!(command, Command::ShadowsHighlights | Command::Wave) {
+            shot(&mut h, &format!("dialog_{}", name.replace('/', "_")));
+        }
+        h.key_press(egui::Key::Enter);
+        h.run_steps(3);
+        assert!(h.state().state.adjust_dialog.is_none(), "{name}");
+        assert_eq!(last_history(&h), name, "{name}");
+        assert_eq!(active(&h).history.states().len(), entries + 1, "{name}");
+        if filter {
+            assert_eq!(h.state().state.last_filter.map(|f| f.name()), Some(name));
+        }
+    }
+    // Shear with a top offset moves the rows sideways
+    run_command(&mut h, Command::Shear);
+    h.state_mut()
+        .state
+        .adjust_dialog
+        .as_mut()
+        .unwrap()
+        .test_set_value(0, "50");
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Shear");
+    // Color Lookup starts with no cube: OK is off until one is picked
+    run_command(&mut h, Command::ColorLookup);
+    assert!(
+        h.state()
+            .state
+            .adjust_dialog
+            .as_ref()
+            .unwrap()
+            .effect()
+            .is_none()
+    );
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    // Match Color with no source and Neutralize: the cast goes
+    run_command(&mut h, Command::MatchColor);
+    h.state_mut()
+        .state
+        .adjust_dialog
+        .as_mut()
+        .unwrap()
+        .test_set_value(3, "1");
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Match Color");
+}
+
+#[test]
 fn crystallize_pointillize_and_diffuse_apply() {
     use crate::commands::Command;
     let mut h = harness(Vec::new());

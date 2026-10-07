@@ -332,6 +332,26 @@ impl OpenPhotoApp {
             dialogs::AdjustOutcome::Cancel => undo_preview(state, &mut dialog),
             dialogs::AdjustOutcome::Apply(effect) => {
                 undo_preview(state, &mut dialog);
+                // Displace asks for its map after OK, as Photoshop does
+                let effect = match effect {
+                    dialogs::Effect::Filter(op_core::filter::Filter::Displace {
+                        scale,
+                        stretch,
+                        undefined,
+                        ..
+                    }) => {
+                        let Some(map) = displacement_map() else {
+                            return;
+                        };
+                        dialogs::Effect::Filter(op_core::filter::Filter::Displace {
+                            map,
+                            scale,
+                            stretch,
+                            undefined,
+                        })
+                    }
+                    other => other,
+                };
                 if let Some(values) = dialog.settings() {
                     self.state.filter_settings.insert(dialog.kind, values);
                 }
@@ -1014,4 +1034,21 @@ fn pane_texture(ctx: &egui::Context, doc: &op_core::Document) -> egui::TextureHa
     }
     let image = egui::ColorImage::new([pw, ph], pixels);
     ctx.load_texture("filter-pane", image, egui::TextureOptions::NEAREST)
+}
+
+/// Displace's map: a PSD (or other image) chosen in the open panel,
+/// registered for the filter (`op_core::more_filters::register_map`).
+fn displacement_map() -> Option<u32> {
+    let path = rfd::FileDialog::new()
+        .set_title("Choose a displacement map.")
+        .add_filter("Photoshop", &["psd"])
+        .add_filter("Images", &["png", "jpg", "jpeg", "tif", "tiff"])
+        .pick_file()?;
+    let doc = op_io::open(&path).ok()?;
+    let pixels: Vec<[u8; 4]> = doc.composite_rgba8().as_chunks::<4>().0.to_vec();
+    Some(op_core::more_filters::register_map(
+        doc.width as usize,
+        doc.height as usize,
+        pixels,
+    ))
 }

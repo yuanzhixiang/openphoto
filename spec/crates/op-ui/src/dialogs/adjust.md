@@ -88,7 +88,21 @@ Every filter dialog has either a classic, a plugin-style or a plain layout (`Kin
 - `sampling()`: an eyedropper is chosen in Levels, Curves or Hue/Saturation; `targeting()`: Hue/Saturation's hand is on. `lib.rs` then takes a click on the image outside the dialog (`rect`, where it was last drawn): it removes the preview, reads the merged image's pixel there and passes it to `sample(rgb)` or `target_press(rgb, command)`; a hand drag follows with `target_drag(dx)` until release (`target_from`).
 - Photo Filter's swatch asks for the Color Picker with `take_color_request()`; `set_filter_color` takes its OK. While the Color Picker is open, `blocked` makes the dialog ignore keys and buttons.
 
+## The dialogs added after the measured ones
+
+Radial Blur, Smart Blur, Shape Blur, Lens Blur, Reduce Noise, Smart Sharpen, Fibers, Lens Flare, Extrude, Oil Paint, Wave, Shear and Displace (filters), and Shadows/Highlights, HDR Toning, Replace Color, Match Color and Color Lookup (adjustments) use the classic layout kit (`filter_layout.md`) with fields in the order of their settings (`Kind::params`), and build their effects from them (`op-core`'s `more_filters.md`, `tone.md`, `color_match.md`):
+
+- What they need besides their fields is in `Extra`: a seed drawn at opening (Fibers, Wave, Extrude: a new pattern each time), the foreground and background colors (`set_colors`: Fibers; Replace Color starts from the foreground), Match Color's Lab statistics of the active layer and of the other open documents (`set_match_sources`, sampled at most every 20 000th pixel), Color Lookup's cube files (`lut_files`: Photoshop's `Presets/3DLUTs` when installed and `~/Library/Application Support/OpenPhoto/3DLUTs`, `.cube` and `.3dl`), and Displace's map.
+- Popups whose choices the dialog fills in (`Extra::labels`): Match Color's Source (None, then the other documents' titles) and Color Lookup's 3DLUT File ("Load 3D LUT...", then the files). Picking a file loads it into the lookup registry (`load_lut`); "Load 3D LUT..." opens the open panel and adds the file. Color Lookup's OK stays off until a cube is chosen.
+- Replace Color always samples: a click on the image outside the dialog sets its color (`sample`). Match Color with Source None matches the layer to itself, so only Luminance, Color Intensity, Fade and Neutralize (which takes the mean color cast out) change it.
+- Displace has no preview; after OK the app asks for the map (`lib.rs`), as Photoshop does, and Cancel there cancels the filter.
+- Radial Blur's and Lens Flare's centers are the image's middle; Smart Blur's Quality, Lens Blur's iris (shape only), Reduce Noise's Remove JPEG Artifact, Smart Sharpen's Shadows/Highlights fades, Oil Paint's Bristle Detail and Extrude's Mask Incomplete Blocks are shown but have no effect; Shear is three offsets (top, middle, bottom, in percent of half the width) instead of Photoshop's curve grid.
+
+These dialogs' layouts (sizes, positions, Photoshop's own extra panes such as Shadows/Highlights' Show More Options and Replace Color's selection preview) have not been measured against Photoshop 2026 yet.
+
 ## Test coverage
+
+- `ui_tests::more_filters_and_adjustments_apply`: each new filter and adjustment opens, Enter applies its defaults (Replace Color after sampling and a hue shift), records its name and becomes the Last Filter where it is one; Shear with a top offset applies; Color Lookup's OK is off without a cube; Match Color with Neutralize applies.
 
 - `defaults_match_photoshop`: the default adjustments for Levels, Exposure and Hue/Saturation.
 - `filters_read_choices_and_checkboxes`: Add Noise's distribution and monochromatic, and Offset's undefined areas options map to the corresponding filter parameters.

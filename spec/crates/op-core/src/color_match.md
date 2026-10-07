@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-The color math of Image › Adjustments › Replace Color, Match Color and Color Lookup, used by `Adjustment::ReplaceColor`, `MatchColor` and `ColorLookup` (`adjust.md`). Their dialogs are not built yet (the menu items are placeholders).
+The color math of Image › Adjustments › Replace Color, Match Color and Color Lookup, used by `Adjustment::ReplaceColor`, `MatchColor` and `ColorLookup` (`adjust.md`). Their dialogs are in `op-ui` (`dialogs/adjust.md`).
 
 ## Lab
 

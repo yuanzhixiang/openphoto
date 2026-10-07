@@ -35,6 +35,10 @@ Most of Photoshop's sliders are not uniform. The scales were measured by enterin
 - Surface Blur's two slider scales have not been measured and are treated as linear for now.
 - There is only a single 100% zoom level, and the preview pane cannot be dragged (see `adjust.md`).
 
+## Unmeasured layouts
+
+`RADIAL_BLUR`, `SMART_BLUR`, `SHAPE_BLUR`, `LENS_BLUR`, `REDUCE_NOISE`, `SMART_SHARPEN`, `FIBERS`, `LENS_FLARE`, `EXTRUDE`, `OIL_PAINT`, `WAVE`, `SHEAR`, `DISPLACE`, `SHADOWS_HIGHLIGHTS`, `HDR_TONING`, `REPLACE_COLOR`, `MATCH_COLOR`, `COLOR_LOOKUP` are laid out by one rule, not from Photoshop: 324 pt wide; with the preview pane the rows start at y 287, without it at 38; number rows 49 pt apart (label right-aligned to 135, field 140–200.5, unit at 205.5, track from 21 to 303 with the pane or 206 without, 26 pt under the field's top); popups 33 pt apart (140 to 300 or 230); radio groups full width (no higher than y 146.5 without the pane, clear of the buttons), first radio 25 pt under the group's top and 27 pt apart; checkboxes 27 pt apart. Wave has no pane (it would not fit the window).
+
 ## Test coverage
 
 - `scales_match_photoshops_pins`: the marker positions for Gaussian Blur radius 1 and 250 differ from Photoshop's measurements by less than half a point; Add Noise 100% is at 42.5 on a 170-point track; `place` and `value` are inverses for every scale table.

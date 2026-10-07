@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-The pixel work of more of the Filter menu, on a layer's straight RGBA pixels, reached through `Filter` variants (`filter.md`, `more`). Their dialogs are not built yet: the Filter menu items are still placeholders.
+The pixel work of more of the Filter menu, on a layer's straight RGBA pixels, reached through `Filter` variants (`filter.md`, `more`). Their dialogs are in `op-ui` (`dialogs/adjust.md`); Displace's map is picked after OK (`lib.md`).
 
 ## Sampling
 

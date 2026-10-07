@@ -119,6 +119,24 @@ pub enum Command {
     SharpenEdges,
     TraceContour,
     Wind,
+    RadialBlur,
+    SmartBlur,
+    ShapeBlur,
+    LensBlur,
+    ReduceNoise,
+    SmartSharpen,
+    Fibers,
+    LensFlare,
+    Extrude,
+    OilPaint,
+    Wave,
+    Shear,
+    Displace,
+    ShadowsHighlights,
+    HdrToning,
+    ReplaceColor,
+    MatchColor,
+    ColorLookup,
     /// Layer > New > Layer... (Shift+Cmd+N): opens the New Layer dialog.
     NewLayer,
     /// Alt+Shift+Cmd+N: a new layer without the dialog.
@@ -578,7 +596,25 @@ impl Command {
             | Self::Despeckle
             | Self::SharpenEdges
             | Self::TraceContour
-            | Self::Wind => return None,
+            | Self::Wind
+            | Self::RadialBlur
+            | Self::SmartBlur
+            | Self::ShapeBlur
+            | Self::LensBlur
+            | Self::ReduceNoise
+            | Self::SmartSharpen
+            | Self::Fibers
+            | Self::LensFlare
+            | Self::Extrude
+            | Self::OilPaint
+            | Self::Wave
+            | Self::Shear
+            | Self::Displace
+            | Self::ShadowsHighlights
+            | Self::HdrToning
+            | Self::ReplaceColor
+            | Self::MatchColor
+            | Self::ColorLookup => return None,
             Self::Invert => cmd(Key::I),
             Self::Levels => cmd(Key::L),
             Self::Curves => cmd(Key::M),
@@ -923,6 +959,24 @@ impl Command {
             | Self::SharpenEdges
             | Self::TraceContour
             | Self::Wind
+            | Self::RadialBlur
+            | Self::SmartBlur
+            | Self::ShapeBlur
+            | Self::LensBlur
+            | Self::ReduceNoise
+            | Self::SmartSharpen
+            | Self::Fibers
+            | Self::LensFlare
+            | Self::Extrude
+            | Self::OilPaint
+            | Self::Wave
+            | Self::Shear
+            | Self::Displace
+            | Self::ShadowsHighlights
+            | Self::HdrToning
+            | Self::ReplaceColor
+            | Self::MatchColor
+            | Self::ColorLookup
             | Self::Twirl
             | Self::Crystallize
             | Self::Pointillize
@@ -1351,7 +1405,25 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         | Command::DustAndScratches
         | Command::CustomFilter
         | Command::TraceContour
-        | Command::Wind => {
+        | Command::Wind
+        | Command::RadialBlur
+        | Command::SmartBlur
+        | Command::ShapeBlur
+        | Command::LensBlur
+        | Command::ReduceNoise
+        | Command::SmartSharpen
+        | Command::Fibers
+        | Command::LensFlare
+        | Command::Extrude
+        | Command::OilPaint
+        | Command::Wave
+        | Command::Shear
+        | Command::Displace
+        | Command::ShadowsHighlights
+        | Command::HdrToning
+        | Command::ReplaceColor
+        | Command::MatchColor
+        | Command::ColorLookup => {
             let (kind, name) = match command {
                 Command::Threshold => (AdjustKind::Threshold, "Threshold"),
                 Command::Posterize => (AdjustKind::Posterize, "Posterize"),
@@ -1398,6 +1470,24 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 Command::CustomFilter => (AdjustKind::Custom, "Custom"),
                 Command::TraceContour => (AdjustKind::TraceContour, "Trace Contour"),
                 Command::Wind => (AdjustKind::Wind, "Wind"),
+                Command::RadialBlur => (AdjustKind::RadialBlur, "Radial Blur"),
+                Command::SmartBlur => (AdjustKind::SmartBlur, "Smart Blur"),
+                Command::ShapeBlur => (AdjustKind::ShapeBlur, "Shape Blur"),
+                Command::LensBlur => (AdjustKind::LensBlur, "Lens Blur"),
+                Command::ReduceNoise => (AdjustKind::ReduceNoise, "Reduce Noise"),
+                Command::SmartSharpen => (AdjustKind::SmartSharpen, "Smart Sharpen"),
+                Command::Fibers => (AdjustKind::Fibers, "Fibers"),
+                Command::LensFlare => (AdjustKind::LensFlare, "Lens Flare"),
+                Command::Extrude => (AdjustKind::Extrude, "Extrude"),
+                Command::OilPaint => (AdjustKind::OilPaint, "Oil Paint"),
+                Command::Wave => (AdjustKind::Wave, "Wave"),
+                Command::Shear => (AdjustKind::Shear, "Shear"),
+                Command::Displace => (AdjustKind::Displace, "Displace"),
+                Command::ShadowsHighlights => (AdjustKind::ShadowsHighlights, "Shadows/Highlights"),
+                Command::HdrToning => (AdjustKind::HdrToning, "HDR Toning"),
+                Command::ReplaceColor => (AdjustKind::ReplaceColor, "Replace Color"),
+                Command::MatchColor => (AdjustKind::MatchColor, "Match Color"),
+                Command::ColorLookup => (AdjustKind::ColorLookup, "Color Lookup"),
                 _ => (AdjustKind::Mosaic, "Mosaic"),
             };
             let rgb = |c: op_core::Color| {
@@ -1405,6 +1495,28 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 [r, g, b]
             };
             let colors = (rgb(app.foreground), rgb(app.background));
+            // Match Color's sources: the other open documents' statistics
+            let lab_stats = |px: &[u8]| {
+                let step = (px.len() / 4 / 20_000).max(1);
+                op_core::color_match::lab_stats(
+                    px.as_chunks::<4>()
+                        .0
+                        .iter()
+                        .step_by(step)
+                        .filter(|p| p[3] > 0)
+                        .map(|p| [p[0], p[1], p[2]]),
+                )
+            };
+            let match_sources: Vec<(String, [f32; 6])> = if kind == AdjustKind::MatchColor {
+                app.doc_order
+                    .iter()
+                    .filter(|&&id| Some(id) != app.active_doc)
+                    .filter_map(|id| app.docs.get(id))
+                    .map(|d| (d.doc.title.clone(), lab_stats(&d.doc.composite_rgba8())))
+                    .collect()
+            } else {
+                Vec::new()
+            };
             #[cfg(target_os = "macos")]
             let option = ctx.input(|i| i.modifiers.alt) || crate::app_kit::option_held();
             #[cfg(not(target_os = "macos"))]
@@ -1424,6 +1536,17 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                         }
                         // Gradient Map runs from the foreground to the background color
                         dialog.set_gradient_colors(colors);
+                        dialog.set_colors(colors);
+                        if kind == AdjustKind::MatchColor {
+                            let layer = state
+                                .doc
+                                .active_layer
+                                .and_then(|id| state.doc.layer(id))
+                                .and_then(|l| l.image())
+                                .map(|image| image.to_rgba8())
+                                .unwrap_or_default();
+                            dialog.set_match_sources(lab_stats(&layer), match_sources.clone());
+                        }
                         // Colorize starts from the foreground color's hue
                         dialog.set_colorize_hue(adjust::hue_of(colors.0).round() as i32);
                         // With Option held, the settings of its last OK

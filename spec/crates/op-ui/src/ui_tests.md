@@ -119,3 +119,4 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 - `classic_mode_turns_the_box`, `crop_presets_front_image_and_shield_color`: see `crop_tool.md`; `perspective_crop_straightens_a_box`: see `perspective_crop.md`. `drag_path` drags along a list of points (for turning drags).
 - `option_opens_adjustments_with_their_last_settings`: Exposure set to +1 and OK; opened again it starts at 0, opened with Option held (a `ModifiersChanged` event) it has +1.
 - `levels_and_curves_eyedroppers_sample_the_image`, `photo_filter_picks_its_color_in_the_color_picker`: see `dialogs/curves.md` and `dialogs/photo_filter.md`.
+- `more_filters_and_adjustments_apply`: see `dialogs/adjust.md` ("The dialogs added after the measured ones"); also writes `dialog_Shadows_Highlights` and `dialog_Wave` screenshots.
