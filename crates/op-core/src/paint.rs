@@ -34,6 +34,54 @@ pub struct BrushTip {
     pub spacing: f32,
 }
 
+/// The Art History Brush's Style.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum ArtStyle {
+    #[default]
+    TightShort,
+    TightMedium,
+    TightLong,
+    LooseMedium,
+    LooseLong,
+    Dab,
+    TightCurl,
+    TightCurlLong,
+    LooseCurl,
+    LooseCurlLong,
+}
+
+impl ArtStyle {
+    pub const ALL: [ArtStyle; 10] = [
+        ArtStyle::TightShort,
+        ArtStyle::TightMedium,
+        ArtStyle::TightLong,
+        ArtStyle::LooseMedium,
+        ArtStyle::LooseLong,
+        ArtStyle::Dab,
+        ArtStyle::TightCurl,
+        ArtStyle::TightCurlLong,
+        ArtStyle::LooseCurl,
+        ArtStyle::LooseCurlLong,
+    ];
+
+    /// A stroke's length in brush diameters, how far its direction strays
+    /// (0 tight – 1 loose), and whether it curls.
+    fn shape(self) -> (f32, f32, bool) {
+        match self {
+            ArtStyle::TightShort => (1.5, 0.1, false),
+            ArtStyle::TightMedium => (3.0, 0.1, false),
+            ArtStyle::TightLong => (6.0, 0.1, false),
+            ArtStyle::LooseMedium => (3.0, 0.6, false),
+            ArtStyle::LooseLong => (6.0, 0.6, false),
+            ArtStyle::Dab => (0.0, 0.0, false),
+            ArtStyle::TightCurl => (3.0, 0.1, true),
+            ArtStyle::TightCurlLong => (6.0, 0.1, true),
+            ArtStyle::LooseCurl => (3.0, 0.6, true),
+            ArtStyle::LooseCurlLong => (6.0, 0.6, true),
+        }
+    }
+}
+
 /// The retouching tools' options: Dodge's and Burn's Protect Tones, the
 /// Sponge's Vibrance, the Sharpen tool's Protect Detail.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -200,6 +248,15 @@ pub enum StrokeKind {
     /// Push the pixels along the stroke (Smudge): each dab pulls the
     /// colors under the previous dab with this strength (0–1).
     Smudge(f32),
+    /// The Art History Brush: stylized strokes in the colors of `source`
+    /// (the History panel's source state), scattered over `area` pixels
+    /// around each dab, kept off areas within `tolerance` (0–1) of it.
+    ArtHistory {
+        source: TiledImage,
+        style: ArtStyle,
+        area: f32,
+        tolerance: f32,
+    },
     /// The Mixer Brush: paint loaded into the brush (`color`; None for a
     /// clean brush) laid down while it lasts (`load`), picking up the
     /// canvas's paint (`wet`) and mixing it in (`mix`), all 0–1.
@@ -424,6 +481,11 @@ impl Stroke {
     /// Distance between dabs: the tip's spacing (Photoshop's default 25%)
     /// of the diameter at that moment.
     fn spacing(&self) -> f32 {
+        // The Art History Brush scatters a handful of strokes every half
+        // of its area
+        if let StrokeKind::ArtHistory { area, .. } = self.kind {
+            return (area * 0.5).max(1.0);
+        }
         (self.diameter() * self.tip.spacing.clamp(0.01, 10.0)).max(1.0)
     }
 
@@ -467,6 +529,10 @@ impl Stroke {
     fn dab(&mut self, doc: &mut Document, cx: f32, cy: f32) {
         if let StrokeKind::Smudge(strength) = self.kind {
             self.smudge_dab(doc, cx, cy, strength);
+            return;
+        }
+        if let StrokeKind::ArtHistory { .. } = self.kind {
+            self.art_dab(doc, cx, cy);
             return;
         }
         if let StrokeKind::Mix {
@@ -673,6 +739,7 @@ impl Stroke {
             | StrokeKind::Erase { .. }
             | StrokeKind::Smudge(_)
             | StrokeKind::Mix { .. }
+            | StrokeKind::ArtHistory { .. }
             | StrokeKind::BackgroundErase(_)
             | StrokeKind::Heal { .. }
             | StrokeKind::SpotHeal(_) => base,
@@ -865,6 +932,114 @@ impl Stroke {
         }
         for (x, y, p) in updates {
             image.set_pixel(x, y, p);
+        }
+        doc.mark_dirty();
+    }
+
+    /// An Art History Brush dab: strokes scattered over the area around
+    /// (`cx`, `cy`), each starting at a random point in the source's color
+    /// there and running along the source's edges (across its luminosity
+    /// gradient), shaped by the style.
+    fn art_dab(&mut self, doc: &mut Document, cx: f32, cy: f32) {
+        let StrokeKind::ArtHistory {
+            source,
+            style,
+            area,
+            tolerance,
+        } = &self.kind
+        else {
+            return;
+        };
+        let (style, area, tolerance) = (*style, area.max(1.0), *tolerance);
+        let source = source.clone();
+        let (w, h) = (doc.width, doc.height);
+        let tip = self.tip;
+        let d = tip.diameter.max(1.0);
+        let opacity = self.opacity;
+        let preserve = self.preserve_alpha;
+        let selection = self.selection.clone();
+        // A repeatable sequence per dab
+        let mut seed = (cx.to_bits() as u64) << 32 ^ cy.to_bits() as u64 ^ 0x9E37_79B9_7F4A_7C15;
+        let mut rand = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed >> 11) as f32 / (1u64 << 53) as f32
+        };
+        let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
+            return;
+        };
+        let lum = |p: [u8; 4]| 0.299 * p[0] as f32 + 0.587 * p[1] as f32 + 0.114 * p[2] as f32;
+        let at = |x: f32, y: f32| {
+            source.pixel(
+                (x.max(0.0) as u32).min(w.saturating_sub(1)),
+                (y.max(0.0) as u32).min(h.saturating_sub(1)),
+            )
+        };
+        let count = ((area * area) / (d * d) * 0.3).clamp(1.0, 40.0) as usize;
+        let (length, loose, curl) = style.shape();
+        for _ in 0..count {
+            // A start in the area (uniform over the disc)
+            let (r, t) = (rand().sqrt() * area, rand() * std::f32::consts::TAU);
+            let (sx, sy) = (cx + r * t.cos(), cy + r * t.sin());
+            if sx < 0.0 || sy < 0.0 || sx >= w as f32 || sy >= h as f32 {
+                continue;
+            }
+            let color = at(sx, sy);
+            // Tolerance keeps the strokes off what already matches the source
+            let now = image.pixel(sx as u32, sy as u32);
+            let differ = (0..3)
+                .map(|c| (color[c] as f32 - now[c] as f32).abs() / 255.0)
+                .fold(0.0, f32::max);
+            if tolerance > 0.0 && differ < tolerance {
+                continue;
+            }
+            // Along the edges: across the luminosity gradient
+            let gx = lum(at(sx + 1.0, sy)) - lum(at(sx - 1.0, sy));
+            let gy = lum(at(sx, sy + 1.0)) - lum(at(sx, sy - 1.0));
+            let mut dir = if gx.abs() + gy.abs() > 1.0 {
+                gx.atan2(-gy)
+            } else {
+                rand() * std::f32::consts::TAU
+            };
+            dir += (rand() - 0.5) * loose * std::f32::consts::PI;
+            let turn = if curl {
+                (rand() - 0.5).signum() * 0.35
+            } else {
+                0.0
+            };
+            let steps = ((length * 4.0) as usize).max(1);
+            let (mut x, mut y) = (sx, sy);
+            let rgb = [color[0], color[1], color[2]];
+            for _ in 0..steps {
+                let r = d / 2.0 + 1.0;
+                let x0 = (x - r).floor().max(0.0) as u32;
+                let y0 = (y - r).floor().max(0.0) as u32;
+                let x1 = ((x + r).ceil().max(0.0) as u32).min(w);
+                let y1 = ((y + r).ceil().max(0.0) as u32).min(h);
+                for py in y0..y1 {
+                    for px in x0..x1 {
+                        let a = tip.coverage(px as f32 + 0.5 - x, py as f32 + 0.5 - y);
+                        if a <= 0.0 {
+                            continue;
+                        }
+                        let selected = selection
+                            .as_ref()
+                            .map_or(1.0, |s| s.get(px, py) as f32 / 255.0);
+                        let amount = a * opacity * selected;
+                        let p = apply(
+                            image.pixel(px, py),
+                            amount,
+                            &StrokeKind::Paint(rgb),
+                            preserve,
+                        );
+                        image.set_pixel(px, py, p);
+                    }
+                }
+                x += dir.cos() * d * 0.25;
+                y += dir.sin() * d * 0.25;
+                dir += turn;
+            }
         }
         doc.mark_dirty();
     }
@@ -1535,6 +1710,43 @@ mod tests {
         s.add_point(&mut doc, 8.0, 20.0);
         s.add_point(&mut doc, 24.0, 20.0);
         assert!(pixel(&doc, id, 16, 20)[0] < 200);
+    }
+
+    #[test]
+    fn art_history_paints_the_source_in_strokes() {
+        // Source: red; the layer now white
+        let mut source = TiledImage::new(40, 40);
+        for y in 0..40 {
+            for x in 0..40 {
+                source.set_pixel(x, y, [255, 0, 0, 255]);
+            }
+        }
+        let small = BrushTip {
+            diameter: 3.0,
+            ..HARD
+        };
+        let art = |tolerance: f32| StrokeKind::ArtHistory {
+            source: source.clone(),
+            style: ArtStyle::TightMedium,
+            area: 12.0,
+            tolerance,
+        };
+        let (mut doc, id) = doc_filled([255, 255, 255, 255]);
+        let mut s = Stroke::begin(&doc, small, art(0.0), 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 20.0, 20.0);
+        let red = (10..30)
+            .flat_map(|y| (10..30).map(move |x| (x, y)))
+            .filter(|&(x, y)| pixel(&doc, id, x, y) == [255, 0, 0, 255])
+            .count();
+        assert!(red > 20, "{red}");
+        // Far from the area nothing changes
+        assert_eq!(pixel(&doc, id, 2, 2), [255, 255, 255, 255]);
+        // Already red: high tolerance keeps the strokes off
+        let (mut doc, id) = doc_filled([255, 0, 0, 255]);
+        let mut s = Stroke::begin(&doc, small, art(0.5), 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 20.0, 20.0);
+        assert_eq!(pixel(&doc, id, 20, 20), [255, 0, 0, 255]);
+        assert_eq!(ArtStyle::ALL.len(), 10);
     }
 
     #[test]

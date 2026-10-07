@@ -156,6 +156,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let dynamics = paint_dynamics(app, tool);
     // The Mixer Brush's paint and settings
     let mixer = (tool == Tool::MixerBrush).then(|| mixer_settings(app));
+    // The Art History Brush's Style, Area, Tolerance and Opacity
+    let art = (tool == Tool::ArtHistoryBrush).then(|| art_settings(app));
     // The Pattern Stamp's pattern and Impressionist
     let pattern = (tool == Tool::PatternStamp).then(|| {
         let k = app.pattern.min(app.patterns.len().saturating_sub(1));
@@ -644,7 +646,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             | Tool::ColorReplacement
             | Tool::HealingBrush
             | Tool::SpotHealingBrush
-            | Tool::MixerBrush => {
+            | Tool::MixerBrush
+            | Tool::ArtHistoryBrush => {
                 if let Some(opts) = paint {
                     let settings = StrokeSettings {
                         opts,
@@ -659,6 +662,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         dynamics,
                         pattern: pattern.clone(),
                         mixer,
+                        art,
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
                     if tool == Tool::MixerBrush {
@@ -1550,6 +1554,7 @@ fn stroke_names(tool: Tool) -> (&'static str, &'static str) {
         Tool::HealingBrush => ("healing brush", "Healing Brush"),
         Tool::SpotHealingBrush => ("spot healing brush", "Spot Healing Brush"),
         Tool::MixerBrush => ("mixer brush tool", "Mixer Brush Tool"),
+        Tool::ArtHistoryBrush => ("art history brush", "Art History Brush"),
         _ => ("brush tool", "Brush Tool"),
     }
 }
@@ -1710,6 +1715,34 @@ struct StrokeSettings {
     pattern: Option<(op_core::TiledImage, bool)>,
     /// The Mixer Brush's stroke and its Flow.
     mixer: Option<(op_core::paint::StrokeKind, f32)>,
+    /// The Art History Brush's Style, Area (px), Tolerance and Opacity.
+    art: Option<(op_core::paint::ArtStyle, f32, f32, f32)>,
+}
+
+/// The Art History Brush's options bar settings.
+fn art_settings(app: &mut crate::state::AppState) -> (op_core::paint::ArtStyle, f32, f32, f32) {
+    use op_core::paint::ArtStyle;
+    let style: usize = app.setting("arthistory.style", "0").parse().unwrap_or(0);
+    let mut number = |key: &'static str, default: &str| {
+        crate::options_bar::typed_number(app.setting(key, default))
+    };
+    let area = number("arthistory.area", "50 px")
+        .unwrap_or(50.0)
+        .clamp(0.0, 500.0);
+    let tolerance = number("arthistory.tolerance", "0%")
+        .unwrap_or(0.0)
+        .clamp(0.0, 100.0)
+        / 100.0;
+    let opacity = number("arthistory.opacity", "100%")
+        .unwrap_or(100.0)
+        .clamp(1.0, 100.0)
+        / 100.0;
+    (
+        ArtStyle::ALL[style.min(ArtStyle::ALL.len() - 1)],
+        area,
+        tolerance,
+        opacity,
+    )
 }
 
 /// The Mixer Brush's stroke: the load color when "Load the brush after
@@ -1849,6 +1882,7 @@ fn paint_input(
         dynamics,
         pattern,
         mixer,
+        art,
     } = settings;
     // The pen's pressure at this point (a mouse paints at full pressure)
     let pen = dynamics.pen.unwrap_or(1.0);
@@ -1882,8 +1916,14 @@ fn paint_input(
             .map(|p| to_doc(state, p, ppp))
             .or(pointer)
             .unwrap_or_default();
+        // The Art History Brush paints from the History Brush's source
+        let source_tool = if tool == Tool::ArtHistoryBrush {
+            Tool::HistoryBrush
+        } else {
+            tool
+        };
         let kind = match stroke_kind(
-            tool,
+            source_tool,
             state,
             start,
             colors,
@@ -1895,6 +1935,18 @@ fn paint_input(
                 op_core::paint::StrokeKind::Pattern(pattern.clone().expect("checked").0),
             ),
             _ if mixer.is_some() => Ok(mixer.clone().expect("checked").0),
+            Ok(op_core::paint::StrokeKind::Source { image, .. }) if art.is_some() => {
+                let (style, area, tolerance, _) = art.expect("checked");
+                Ok(op_core::paint::StrokeKind::ArtHistory {
+                    source: image,
+                    style,
+                    area,
+                    tolerance,
+                })
+            }
+            Err(message) if tool == Tool::ArtHistoryBrush => {
+                Err(message.replace("history brush", "art history brush"))
+            }
             other => other,
         };
         let kind = match kind {
@@ -1913,6 +1965,8 @@ fn paint_input(
         // The Smudge's Strength is its stroke's own, not an opacity
         let opacity = if block || tool == Tool::Smudge {
             1.0
+        } else if let Some((.., opacity)) = art {
+            opacity
         } else {
             opts.opacity
         };

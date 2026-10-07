@@ -1350,6 +1350,8 @@ pub struct AppState {
     /// Option-click (None: the foreground color), and the paint the brush
     /// keeps between strokes when it isn't cleaned (None: clean).
     pub mixer: PaintOptions,
+    /// The Art History Brush's brush.
+    pub art_history: PaintOptions,
     pub mixer_load: Option<[u8; 3]>,
     pub mixer_paint: Option<[u8; 3]>,
     pub pattern: usize,
@@ -1541,6 +1543,11 @@ impl Default for AppState {
             }],
             pattern: 0,
             mixer: PaintOptions::brush(),
+            art_history: PaintOptions {
+                size: 10.0,
+                hardness: 1.0,
+                ..PaintOptions::brush()
+            },
             mixer_load: None,
             mixer_paint: None,
             define_pattern: None,
@@ -1636,6 +1643,7 @@ impl AppState {
             Tool::SpotHealingBrush => Some(&mut self.spot_healing),
             Tool::SelectionBrush => Some(&mut self.selection_brush),
             Tool::MixerBrush => Some(&mut self.mixer),
+            Tool::ArtHistoryBrush => Some(&mut self.art_history),
             _ => None,
         }
     }

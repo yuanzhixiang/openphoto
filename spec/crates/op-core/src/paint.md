@@ -66,6 +66,31 @@ The Mode of the Brush and Pencil, set with `Stroke::with_mode` (default Normal):
 
 Pixels are painted source-over (`apply`). On the background layer or with locked transparency, alpha is kept. `mixer_color()` gives the brush's color when the stroke ends: the paint it keeps if it isn't cleaned.
 
+## Art History Brush (`ArtHistory { source, style, area, tolerance }`)
+
+`ArtHistory` does not go through the coverage map. Its dabs are placed every half of `area` along the drag. Each dab scatters `area² / diameter² × 0.3` strokes (1–40) over the disc of radius `area` around it, in a sequence repeatable from the dab's position. Each stroke:
+
+- **Start:** a random point in the disc, uniform over its area, inside the document.
+- **Color:** the source's color at the start. With a `tolerance` above 0, the stroke is skipped where the layer is already within that tolerance of the source, by its largest channel difference. A high tolerance therefore paints only where the image differs from the source.
+- **Direction:** along the source's edges, across its luminosity gradient. Where the source is flat, the direction is random. The direction is then turned at random by up to ± (loose / 2) × 180°.
+- **Path:** steps of a quarter diameter, as many as the style's length in diameters × 4. Curl styles turn 0.35 rad each step, left or right.
+- **Painting:** at each step the tip paints source-over at opacity × selection. On the background layer, alpha is kept.
+
+The styles (`ArtStyle`) give a length in diameters, a looseness, and whether they curl:
+
+| Style | Length | Looseness | Curls |
+| --- | --- | --- | --- |
+| Tight Short | 1.5 | 0.1 | no |
+| Tight Medium | 3 | 0.1 | no |
+| Tight Long | 6 | 0.1 | no |
+| Loose Medium | 3 | 0.6 | no |
+| Loose Long | 6 | 0.6 | no |
+| Dab | 0 (a single dab) | 0 | no |
+| Tight Curl | 3 | 0.1 | yes |
+| Tight Curl Long | 6 | 0.1 | yes |
+| Loose Curl | 3 | 0.6 | yes |
+| Loose Curl Long | 6 | 0.6 | yes |
+
 ## Healing strokes
 
 - `Heal { source, dx, dy }` (Healing Brush) and `SpotHeal(source)` (Spot Healing Brush) don't go through the coverage map. Each dab heals the pixels under the tip with `heal::heal_window` over the dab's box plus one pixel (the edge values come from the layer as it is at that moment, so dabs follow on from earlier ones), and mixes them into the layer by the tip's coverage × opacity × selection; alpha is kept (or follows `mix` when transparency isn't locked).
@@ -112,6 +137,7 @@ The options (`Stroke::with_retouch(Retouch { protect_tones, vibrance, protect_de
 
 ## Test coverage (brush shape and dynamics)
 
+- `art_history_paints_the_source_in_strokes`: a red source brings red strokes back into a white area and leaves the rest; on a layer already red, a 50% tolerance paints nothing.
 - `mixer_brush_loads_picks_up_and_runs_dry`: a dry, light load starts blue and fades; a wet blue brush on red lays a mix and keeps a mixed color; a clean wet brush smears black into white.
 - `impressionist_pattern_daubs`: a one-pixel stripe pattern comes through as stripes, and with Impressionist in blocks of one color.
 - `retouching_builds_up_and_its_options`: a second Burn pass darkens further, `build_up` darkens in place, Protect Tones keeps a 2:1 red/green ratio that plain Dodge changes, Vibrance saturates a strong red less, Protect Detail sharpens an edge less.

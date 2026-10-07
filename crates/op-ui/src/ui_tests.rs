@@ -5538,6 +5538,32 @@ fn mixer_brush_loads_mixes_and_keeps_its_paint() {
 }
 
 #[test]
+fn art_history_brush_paints_the_source_in_strokes() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let dark = composite_pixel(&mut h, 300, 300);
+    // White over everything, then the Art History Brush brings the opened
+    // state back in strokes
+    h.state_mut().state.foreground = Color::from_rgba8([255, 255, 255, 255]);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.run_steps(2);
+    h.state_mut()
+        .state
+        .select_tool(op_tools::Tool::ArtHistoryBrush);
+    h.run_steps(2);
+    let p = doc_point(&h, 300.0, 300.0);
+    click(&mut h, p);
+    h.run_steps(2);
+    assert_eq!(last_history(&h), "Art History Brush");
+    let back = (260..340)
+        .flat_map(|y| (260..340).map(move |x| (x, y)))
+        .filter(|&(x, y)| x % 4 == 0 && y % 4 == 0)
+        .filter(|&(x, y)| composite_pixel(&mut h, x, y) == dark)
+        .count();
+    assert!(back > 10, "{back}");
+}
+
+#[test]
 fn airbrush_builds_up_while_held() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);
