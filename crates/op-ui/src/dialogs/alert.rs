@@ -17,6 +17,8 @@ const CANCEL: Color32 = Color32::from_gray(0xa4);
 const OK: Color32 = Color32::from_rgb(0x34, 0x78, 0xf6);
 const CHECKBOX: Color32 = Color32::from_gray(0x9f);
 const TEXT: Color32 = Color32::from_gray(0x1c);
+/// The gray buttons' labels: black, as AppKit draws them.
+const BUTTON_TEXT: Color32 = Color32::BLACK;
 /// Message lines are this far apart, the first one's capitals from y 103.
 const LINE: f32 = pt(16.0);
 const MESSAGE_WIDTH: f32 = pt(216.0);
@@ -129,6 +131,8 @@ pub fn show(ctx: &egui::Context, alert: &mut Alert) -> Option<Answer> {
             font_id: font,
             color: TEXT,
             extra_letter_spacing: theme::system_tracking(13.0),
+            // AppKit's lines are 16 pt apart
+            line_height: Some(LINE),
             ..Default::default()
         },
     );
@@ -286,14 +290,14 @@ fn draw(
             let (fill, text) = if k == 0 {
                 (OK, Color32::WHITE)
             } else {
-                (CANCEL, TEXT)
+                (CANCEL, BUTTON_TEXT)
             };
             if button(rect, label, fill, text, label) {
                 answer = Some(Answer::Choice(k));
             }
         }
     } else if alert.cancel {
-        if button(row(16.0, 126.0), alert.cancel_label, CANCEL, TEXT, "cancel") {
+        if button(row(16.0, 126.0), alert.cancel_label, CANCEL, BUTTON_TEXT, "cancel") {
             answer = Some(Answer::Cancel);
         }
         if button(row(134.0, 244.0), alert.ok_label, OK, Color32::WHITE, "ok") {
@@ -335,23 +339,77 @@ fn app_icon(painter: &egui::Painter, rect: Rect) {
     );
 }
 
-/// macOS's caution sign: a yellow rounded triangle with an exclamation mark.
+/// macOS's caution sign: a rounded triangle shading from light to deeper
+/// yellow, edged in white (with a fine gray line outside), and a white
+/// exclamation mark.
 fn caution(painter: &egui::Painter, rect: Rect) {
-    let top = Pos2::new(rect.center().x, rect.top());
-    let points = vec![top, rect.right_bottom(), rect.left_bottom()];
-    painter.add(Shape::convex_polygon(
-        points.clone(),
-        Color32::from_rgb(0xf2, 0xc9, 0x48),
-        Stroke::new(pt(2.5), Color32::WHITE),
+    // The rounded corners pull the outline in; Photoshop's spans the box
+    let rect = rect.expand(pt(2.0));
+    let corners = [
+        Pos2::new(rect.center().x, rect.top()),
+        rect.right_bottom(),
+        rect.left_bottom(),
+    ];
+    // Each corner rounded by an arc tangent to its two edges
+    let radius = rect.width() * 0.1;
+    let mut outline = Vec::new();
+    for k in 0..3 {
+        let (p, prev, next) = (corners[k], corners[(k + 2) % 3], corners[(k + 1) % 3]);
+        let (a, b) = ((prev - p).normalized(), (next - p).normalized());
+        let half = (a.x * b.x + a.y * b.y).clamp(-1.0, 1.0).acos() / 2.0;
+        let d = radius / half.tan();
+        let center = p + (a + b).normalized() * (radius / half.sin());
+        let (from, to) = (p + a * d - center, p + b * d - center);
+        let (a0, mut a1) = (from.y.atan2(from.x), to.y.atan2(to.x));
+        while a1 < a0 {
+            a1 += std::f32::consts::TAU;
+        }
+        if a1 - a0 > std::f32::consts::PI {
+            a1 -= std::f32::consts::TAU;
+        }
+        for step in 0..=8 {
+            let t = a0 + (a1 - a0) * step as f32 / 8.0;
+            outline.push(center + vec2(t.cos(), t.sin()) * radius);
+        }
+    }
+    // The fill: a fan from the middle, colored by height
+    let (light, deep) = ([0xf7, 0xdf, 0x74], [0xe3, 0xb3, 0x3c]);
+    let color = |y: f32| {
+        let t = ((y - rect.top()) / rect.height()).clamp(0.0, 1.0);
+        let c = |k: usize| (light[k] as f32 + (deep[k] as f32 - light[k] as f32) * t) as u8;
+        Color32::from_rgb(c(0), c(1), c(2))
+    };
+    let mid = Pos2::new(rect.center().x, rect.top() + rect.height() * 0.66);
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(mid, color(mid.y));
+    for p in &outline {
+        mesh.colored_vertex(*p, color(p.y));
+    }
+    let n = outline.len() as u32;
+    for k in 0..n {
+        mesh.add_triangle(0, 1 + k, 1 + (k + 1) % n);
+    }
+    painter.add(mesh);
+    painter.add(Shape::closed_line(
+        outline.clone(),
+        Stroke::new(pt(3.0), Color32::from_gray(0xf8)),
     ));
-    let c = Pos2::new(rect.center().x, rect.top() + rect.height() * 0.62);
+    let outer: Vec<Pos2> = outline
+        .iter()
+        .map(|p| *p + (*p - mid).normalized() * pt(1.75))
+        .collect();
+    painter.add(Shape::closed_line(
+        outer,
+        Stroke::new(pt(0.5), Color32::from_gray(0xc4)),
+    ));
+    let c = Pos2::new(rect.center().x, rect.top() + rect.height() * 0.5);
     painter.rect_filled(
-        Rect::from_center_size(c, vec2(pt(4.5), rect.height() * 0.42)),
-        CornerRadius::same(pt(2.0) as u8),
+        Rect::from_center_size(c, vec2(pt(4.5), rect.height() * 0.4)),
+        CornerRadius::same(pt(2.25) as u8),
         Color32::WHITE,
     );
     painter.circle_filled(
-        Pos2::new(rect.center().x, rect.bottom() - rect.height() * 0.12),
+        Pos2::new(rect.center().x, rect.top() + rect.height() * 0.82),
         pt(2.6),
         Color32::WHITE,
     );
