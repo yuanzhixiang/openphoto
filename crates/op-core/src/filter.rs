@@ -29,6 +29,17 @@ pub enum SpherizeMode {
     VerticalOnly,
 }
 
+/// ZigZag's Style.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ZigZagStyle {
+    /// Pixels turn back and forth around the center.
+    AroundCenter,
+    /// Pixels move toward and away from the center.
+    OutFromCenter,
+    /// Both, like rings on water.
+    PondRipples,
+}
+
 /// What Tiles fills the gaps between tiles with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TilesFill {
@@ -229,6 +240,13 @@ pub enum Filter {
     /// Pixelate > Color Halftone: each of the first three channels as dots
     /// on a screen at its angle (degrees), up to `radius` pixels.
     ColorHalftone { radius: u32, angles: [i32; 4] },
+    /// Distort > ZigZag: ripples out from the center, `amount` −100–100,
+    /// `ridges` 0–20 across the radius, in `style`.
+    ZigZag {
+        amount: i32,
+        ridges: u32,
+        style: ZigZagStyle,
+    },
     /// Pixelate > Facet: similar neighboring colors clumped into flat
     /// patches.
     Facet,
@@ -290,6 +308,7 @@ impl Filter {
             Self::Ripple { .. } => "Ripple",
             Self::Tiles { .. } => "Tiles",
             Self::Facet => "Facet",
+            Self::ZigZag { .. } => "ZigZag",
             Self::ColorHalftone { .. } => "Color Halftone",
             Self::Mezzotint { .. } => "Mezzotint",
             Self::Pointillize { .. } => "Pointillize",
@@ -716,6 +735,31 @@ fn distort_source(filter: Filter, x: f32, y: f32, cx: f32, cy: f32, w: f32, h: f
             let a = amount as f32 / 100.0 * len * 0.25;
             let k = std::f32::consts::TAU / len;
             (x + a * (y * k).sin(), y + a * (x * k + 1.0).sin())
+        }
+        // Waves along the radius, fading toward the edge of the ellipse
+        Filter::ZigZag {
+            amount,
+            ridges,
+            style,
+        } => {
+            if t >= 1.0 || t <= 0.0 {
+                return (x, y);
+            }
+            // Waves fading out toward the edge; displacements also shrink
+            // toward the center (compared with Photoshop's diagram)
+            let a = amount as f32 / 100.0;
+            let wave = (t * ridges as f32 * std::f32::consts::TAU).sin() * (1.0 - t) * 2.0 * a;
+            let (turn, push) = match style {
+                ZigZagStyle::AroundCenter => (wave, 0.0),
+                ZigZagStyle::OutFromCenter => (0.0, wave * t),
+                ZigZagStyle::PondRipples => (wave * 0.5, wave * t * 0.5),
+            };
+            let s = (t + push) / t;
+            let (sin, cos) = turn.sin_cos();
+            (
+                cx + (dx * cos - dy * sin) * s * cx,
+                cy + (dx * sin + dy * cos) * s * cy,
+            )
         }
         Filter::Twirl { angle } => {
             if t >= 1.0 {
@@ -1468,6 +1512,7 @@ fn filtered(
         | Filter::Pinch { .. }
         | Filter::Spherize { .. }
         | Filter::Ripple { .. }
+        | Filter::ZigZag { .. }
         | Filter::PolarCoordinates { .. } => {
             // Each pixel takes the color at the place the distortion maps
             // it from (measured from Photoshop 2026 on a coordinate image)
@@ -2198,5 +2243,35 @@ mod tests {
         row.sort();
         row.dedup();
         assert!(row.len() <= 3, "{row:?}");
+    }
+
+    #[test]
+    fn zigzag_leaves_the_center_and_edge_and_moves_between() {
+        let f = |style| Filter::ZigZag {
+            amount: 50,
+            ridges: 4,
+            style,
+        };
+        for style in [
+            ZigZagStyle::AroundCenter,
+            ZigZagStyle::OutFromCenter,
+            ZigZagStyle::PondRipples,
+        ] {
+            assert_eq!(
+                distortion_source(f(style), 50.0, 50.0, 100.0, 100.0),
+                (50.0, 50.0)
+            );
+            assert_eq!(
+                distortion_source(f(style), 0.0, 50.0, 100.0, 100.0),
+                (0.0, 50.0)
+            );
+            let (x, y) = distortion_source(f(style), 60.0, 50.0, 100.0, 100.0);
+            assert!((x - 60.0).abs() + (y - 50.0).abs() > 0.1, "{style:?}");
+        }
+        // Around Center keeps the distance; Out From Center keeps the line
+        let (x, y) = distortion_source(f(ZigZagStyle::AroundCenter), 60.0, 50.0, 100.0, 100.0);
+        assert!((((x - 50.0).powi(2) + (y - 50.0).powi(2)).sqrt() - 10.0).abs() < 0.01);
+        let (_, y) = distortion_source(f(ZigZagStyle::OutFromCenter), 60.0, 50.0, 100.0, 100.0);
+        assert!((y - 50.0).abs() < 1e-4);
     }
 }

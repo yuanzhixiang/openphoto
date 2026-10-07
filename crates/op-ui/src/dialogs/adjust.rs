@@ -12,7 +12,8 @@
 use egui::{Align2, Color32, Key, Pos2, Rect, Sense, Stroke, Ui, vec2};
 use op_core::adjust::Adjustment;
 use op_core::filter::{
-    DiffuseMode, Filter, MezzotintType, OffsetFill, RippleSize, SpherizeMode, TilesFill, WindMethod,
+    DiffuseMode, Filter, MezzotintType, OffsetFill, RippleSize, SpherizeMode, TilesFill,
+    WindMethod, ZigZagStyle,
 };
 
 use super::{
@@ -148,6 +149,15 @@ const MEZZOTINT: &[Param] = &[choice(
     ],
     0,
 )];
+const ZIGZAG: &[Param] = &[
+    param("Amount", -100.0, 100.0, 30.0, 0),
+    param("Ridges", 0.0, 20.0, 4.0, 0),
+    choice(
+        "Style",
+        &["Around Center", "Out From Center", "Pond Ripples"],
+        0,
+    ),
+];
 const TILES: &[Param] = &[
     param("Number Of Tiles:", 1.0, 99.0, 10.0, 0),
     param("Maximum Offset (%):", 1.0, 99.0, 10.0, 0),
@@ -253,6 +263,7 @@ pub enum Kind {
     Mezzotint,
     Tiles,
     ColorHalftone,
+    ZigZag,
     Pinch,
     Spherize,
     PolarCoordinates,
@@ -301,6 +312,7 @@ impl Kind {
             Self::Mezzotint => "Mezzotint",
             Self::Tiles => "Tiles",
             Self::ColorHalftone => "Color Halftone",
+            Self::ZigZag => "ZigZag",
             Self::Pinch => "Pinch",
             Self::Spherize => "Spherize",
             Self::PolarCoordinates => "Polar Coordinates",
@@ -349,6 +361,7 @@ impl Kind {
             Self::Mezzotint => MEZZOTINT,
             Self::Tiles => TILES,
             Self::ColorHalftone => COLOR_HALFTONE,
+            Self::ZigZag => ZIGZAG,
             Self::Pinch => PINCH,
             Self::Spherize => SPHERIZE,
             Self::PolarCoordinates => POLAR,
@@ -399,6 +412,7 @@ impl Kind {
             Self::Crystallize | Self::Pointillize => &distort::CELL_SIZE,
             Self::Ripple => &distort::RIPPLE,
             Self::Mezzotint => &distort::MEZZOTINT,
+            Self::ZigZag => &distort::ZIGZAG,
             Self::Pinch => &distort::PINCH,
             Self::Spherize => &distort::SPHERIZE,
             Self::PolarCoordinates => &distort::POLAR,
@@ -713,6 +727,15 @@ impl AdjustDialog {
             Kind::Ripple => Filter::Ripple {
                 amount: v[0] as i32,
                 size: [RippleSize::Small, RippleSize::Medium, RippleSize::Large][v[1] as usize],
+            },
+            Kind::ZigZag => Filter::ZigZag {
+                amount: v[0] as i32,
+                ridges: v[1] as u32,
+                style: [
+                    ZigZagStyle::AroundCenter,
+                    ZigZagStyle::OutFromCenter,
+                    ZigZagStyle::PondRipples,
+                ][v[2] as usize],
             },
             Kind::Tiles => Filter::Tiles {
                 count: v[0] as u32,
@@ -1035,6 +1058,69 @@ impl AdjustDialog {
         Outcome::Open
     }
 
+    /// The plug-in style dialogs' field-over-slider rows: one per setting
+    /// from the first, the first row's field at `distort::FIELD_Y` and its
+    /// track at `distort::TRACK_Y`, later rows lower by their labels'
+    /// distance from the first's.
+    fn distort_sliders(
+        &mut self,
+        ui: &mut Ui,
+        frame: Rect,
+        label_ys: &[f32],
+        field_x: f32,
+        track_x1: f32,
+    ) {
+        let params = self.kind.params();
+        for (k, &label_y) in label_ys.iter().enumerate() {
+            let dy = label_y - label_ys[0];
+            let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y + dy));
+            let p = &params[k];
+            let label = p.label.split(" (").next().unwrap_or(p.label);
+            let label = label.trim_end_matches(':');
+            distort::label(ui, at(23.5, label_ys[0]), Align2::LEFT_CENTER, label);
+            let field = Rect::from_min_max(
+                at(field_x, distort::FIELD_Y.0),
+                at(field_x + distort::FIELD_W, distort::FIELD_Y.1),
+            );
+            appkit::field(
+                ui,
+                field,
+                &mut self.values[k],
+                ("distort-field", k),
+                (p.min, p.max),
+                1.0,
+                0,
+                self.first_frame && k == 0,
+            );
+            // Crystallize's, Pointillize's and ZigZag's settings have no unit
+            let unit = match self.kind {
+                Kind::Twirl => "°",
+                Kind::Crystallize | Kind::Pointillize | Kind::ZigZag => "",
+                _ => "%",
+            };
+            appkit::text(
+                ui,
+                Pos2::new(field.right() + pt(distort::UNIT_GAP), field.center().y),
+                Align2::LEFT_CENTER,
+                unit,
+                appkit::TEXT,
+            );
+            let response = ui.interact(
+                distort::slider_rect(at, track_x1),
+                ui.id().with(("distort-slider", k)),
+                Sense::click_and_drag(),
+            );
+            if (response.dragged() || response.clicked())
+                && let Some(pointer) = response.interact_pointer_pos()
+            {
+                let t = distort::slider_place(at, track_x1, pointer.x);
+                self.set(k, (p.min + (p.max - p.min) * t).round());
+            }
+            let v = self.value(k).unwrap_or(p.default);
+            distort::slider(ui, at, track_x1, (v - p.min) / (p.max - p.min));
+        }
+    }
+
     /// A Distort filter's plug-in style dialog (see `distort`).
     fn distort_ui(&mut self, ui: &mut Ui, frame: Rect, layout: &distort::Layout) -> Outcome {
         let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
@@ -1052,53 +1138,12 @@ impl AdjustDialog {
                 label_y,
                 field_x,
                 track_x1,
-            } => {
-                let p = &params[0];
-                let label = p.label.split(" (").next().unwrap_or(p.label);
-                distort::label(ui, at(23.5, label_y), Align2::LEFT_CENTER, label);
-                let field = r(
-                    field_x,
-                    distort::FIELD_Y.0,
-                    field_x + distort::FIELD_W,
-                    distort::FIELD_Y.1,
-                );
-                appkit::field(
-                    ui,
-                    field,
-                    &mut self.values[0],
-                    "distort-field",
-                    (p.min, p.max),
-                    1.0,
-                    0,
-                    self.first_frame,
-                );
-                // Crystallize's and Pointillize's cell size has no unit
-                let unit = match self.kind {
-                    Kind::Twirl => "°",
-                    Kind::Crystallize | Kind::Pointillize => "",
-                    _ => "%",
-                };
-                appkit::text(
-                    ui,
-                    Pos2::new(field.right() + pt(distort::UNIT_GAP), field.center().y),
-                    Align2::LEFT_CENTER,
-                    unit,
-                    appkit::TEXT,
-                );
-                let response = ui.interact(
-                    distort::slider_rect(at, track_x1),
-                    ui.id().with("distort-slider"),
-                    Sense::click_and_drag(),
-                );
-                if (response.dragged() || response.clicked())
-                    && let Some(pointer) = response.interact_pointer_pos()
-                {
-                    let t = distort::slider_place(at, track_x1, pointer.x);
-                    self.set(0, (p.min + (p.max - p.min) * t).round());
-                }
-                let v = self.value(0).unwrap_or(p.default);
-                distort::slider(ui, at, track_x1, (v - p.min) / (p.max - p.min));
-            }
+            } => self.distort_sliders(ui, frame, &[label_y], field_x, track_x1),
+            distort::Control::Sliders {
+                label_ys,
+                field_x,
+                track_x1,
+            } => self.distort_sliders(ui, frame, label_ys, field_x, track_x1),
             distort::Control::None => {}
             distort::Control::Radios(groups) => {
                 for (i, group) in groups.iter().enumerate() {
@@ -1454,6 +1499,7 @@ mod tests {
             Kind::Mezzotint,
             Kind::Tiles,
             Kind::ColorHalftone,
+            Kind::ZigZag,
             Kind::Pinch,
             Kind::Spherize,
             Kind::PolarCoordinates,

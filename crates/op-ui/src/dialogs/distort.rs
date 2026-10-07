@@ -41,6 +41,13 @@ pub enum Control {
     Radios(&'static [RadioGroup]),
     /// Nothing but the pop-up (Mezzotint).
     None,
+    /// Several field-over-slider rows, one per setting (ZigZag), at these
+    /// label centers.
+    Sliders {
+        label_ys: &'static [f32],
+        field_x: f32,
+        track_x1: f32,
+    },
 }
 
 pub struct Layout {
@@ -102,6 +109,20 @@ pub const MEZZOTINT: Layout = Layout {
     control: Control::None,
     mode: Some(([55.0, 318.0, 253.0, 336.0], 21.0)),
     diagram: None,
+};
+
+/// Distort > ZigZag: Amount and Ridges over sliders, the Style pop-up and
+/// the diagram (433 × 454 pt).
+pub const ZIGZAG: Layout = Layout {
+    size: (433.0, 454.0),
+    buttons_x: 312.5,
+    control: Control::Sliders {
+        label_ys: &[327.0, 377.0],
+        field_x: 231.0,
+        track_x1: 270.5,
+    },
+    mode: Some(([56.0, 418.0, 203.5, 436.0], 18.0)),
+    diagram: Some((293.0, 314.0)),
 };
 
 pub const PINCH: Layout = Layout {
@@ -363,7 +384,7 @@ pub fn radio(ui: &mut Ui, center: Pos2, label: &str, chosen: bool) -> bool {
 /// by the distortion. Black one-pixel lines on white, as Photoshop draws
 /// them.
 pub fn diagram(filter: Filter, size: usize) -> ColorImage {
-    let cross = matches!(filter, Filter::Twirl { .. });
+    let cross = matches!(filter, Filter::Twirl { .. } | Filter::ZigZag { .. });
     let n = size as f32;
     let step = n / 16.0;
     let source = |x: usize, y: usize| filter::distortion_source(filter, x as f32, y as f32, n, n);

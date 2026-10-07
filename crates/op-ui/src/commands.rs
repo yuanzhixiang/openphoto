@@ -104,6 +104,7 @@ pub enum Command {
     Mezzotint,
     Tiles,
     ColorHalftone,
+    ZigZag,
     Pinch,
     Spherize,
     PolarCoordinates,
@@ -552,6 +553,7 @@ impl Command {
             | Self::Mezzotint
             | Self::Tiles
             | Self::ColorHalftone
+            | Self::ZigZag
             | Self::Pinch
             | Self::Spherize
             | Self::PolarCoordinates
@@ -926,6 +928,7 @@ impl Command {
             | Self::Mezzotint
             | Self::Tiles
             | Self::ColorHalftone
+            | Self::ZigZag
             | Self::Pinch
             | Self::Spherize
             | Self::PolarCoordinates
@@ -1335,6 +1338,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         | Command::Mezzotint
         | Command::Tiles
         | Command::ColorHalftone
+        | Command::ZigZag
         | Command::Pinch
         | Command::Spherize
         | Command::PolarCoordinates
@@ -1378,6 +1382,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 Command::Ripple => (AdjustKind::Ripple, "Ripple"),
                 Command::Mezzotint => (AdjustKind::Mezzotint, "Mezzotint"),
                 Command::Tiles => (AdjustKind::Tiles, "Tiles"),
+                Command::ZigZag => (AdjustKind::ZigZag, "ZigZag"),
                 Command::ColorHalftone => (AdjustKind::ColorHalftone, "Color Halftone"),
                 Command::Pinch => (AdjustKind::Pinch, "Pinch"),
                 Command::Spherize => (AdjustKind::Spherize, "Spherize"),

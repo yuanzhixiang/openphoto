@@ -87,6 +87,7 @@ const ALL_COMMANDS: &[Command] = &[
     Command::Ripple,
     Command::Mezzotint,
     Command::Tiles,
+    Command::ZigZag,
     Command::ColorHalftone,
     Command::Pinch,
     Command::Spherize,
@@ -883,7 +884,7 @@ impl NativeMenu {
                         ("Spherize...", Some(Command::Spherize)),
                         ("Twirl...", Some(Command::Twirl)),
                         ("Wave...", None),
-                        ("ZigZag...", None),
+                        ("ZigZag...", Some(Command::ZigZag)),
                     ],
                 ),
                 &filter_sub(
