@@ -36,6 +36,10 @@ Millions of people have years of Photoshop in their hands: where every panel is,
 
 > OpenPhoto is in early development. What is listed here works today; [the roadmap](#roadmap) covers what is still missing.
 
+**Interface**
+- Every tool's options bar, the toolbar icons, the Properties panel and the dialogs laid out at positions measured on Photoshop 2026, most within 1 pt
+- Photoshop 2026's New Document dialog with its preset categories, recent and saved presets
+
 **Documents and files**
 - Opens and saves layered **PSD** files (layers, groups, blend modes, opacity and fill, masks, locks, links, color labels), checked field by field against files saved by Photoshop
 - Opens PNG, JPEG, WebP, TIFF, BMP and GIF; exports PNG and JPEG
@@ -72,11 +76,19 @@ Gaussian Blur · Box Blur · Surface Blur · Motion Blur · Blur / Blur More · 
     <td align="center"><sub>Hue/Saturation</sub></td>
     <td align="center"><sub>Gaussian Blur, with its live preview</sub></td>
   </tr>
+  <tr>
+    <td colspan="2"><img src="docs/images/new-document.png" alt="New Document dialog"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><sub>New Document</sub></td>
+  </tr>
 </table>
 
 ## Getting started
 
-OpenPhoto is developed and tested on macOS, where it uses the native menu bar.
+**Download** the signed and notarized app for macOS 11 or later (Apple Silicon and Intel) from [Releases](https://github.com/yuanzhixiang/openphoto/releases/latest).
+
+To build from source (OpenPhoto is developed and tested on macOS, where it uses the native menu bar):
 
 ```bash
 git clone https://github.com/yuanzhixiang/openphoto.git
@@ -130,7 +142,7 @@ About 350 tests guard both halves of the goal:
 
 Major areas that are not there yet, roughly in priority order:
 
-- Pixel calibration of the remaining option bars, panels and dialogs
+- Pixel calibration of the remaining panels and dialogs
 - More tools: brush presets and pressure, healing brushes, quick selection, magnetic lasso
 - Remaining adjustments and filters: Shadows/Highlights, Replace Color, Smart Sharpen, Render, Distort
 - Editable type and vector shapes, layer styles, adjustment and fill layers

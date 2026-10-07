@@ -36,6 +36,10 @@
 
 > OpenPhoto 处于早期开发阶段。下面列出的是现在已经可用的功能，尚缺的部分见[路线图](#路线图)。
 
+**界面**
+- 每个工具的选项栏、工具栏图标、Properties 面板与各对话框都按在 Photoshop 2026 上量取的位置排布，大多误差不超过 1 pt
+- Photoshop 2026 的 New Document 对话框，含预设分类、最近使用与已存储的预设
+
 **文档与文件**
 - 打开与保存分层的 **PSD**（图层、图层组、混合模式、不透明度与填充、蒙版、锁定、链接、颜色标签），已与 Photoshop 保存的文件逐字段核对
 - 打开 PNG、JPEG、WebP、TIFF、BMP、GIF，导出 PNG、JPEG
@@ -72,11 +76,19 @@ Gaussian Blur · Box Blur · Surface Blur · Motion Blur · Blur / Blur More · 
     <td align="center"><sub>Hue/Saturation</sub></td>
     <td align="center"><sub>Gaussian Blur 与实时预览</sub></td>
   </tr>
+  <tr>
+    <td colspan="2"><img src="docs/images/new-document.png" alt="New Document 对话框"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><sub>New Document</sub></td>
+  </tr>
 </table>
 
 ## 快速开始
 
-OpenPhoto 在 macOS 上开发和测试，并使用 macOS 原生菜单栏。
+**下载**：在 [Releases](https://github.com/yuanzhixiang/openphoto/releases/latest) 下载已签名并经苹果公证的 macOS 版本（macOS 11 及以上，支持 Apple Silicon 与 Intel）。
+
+从源码构建（OpenPhoto 在 macOS 上开发和测试，并使用 macOS 原生菜单栏）：
 
 ```bash
 git clone https://github.com/yuanzhixiang/openphoto.git
@@ -130,7 +142,7 @@ cargo test --workspace
 
 尚未完成的主要方向，大致按优先级排列：
 
-- 其余选项栏、面板与对话框的像素级校准
+- 其余面板与对话框的像素级校准
 - 更多工具：画笔预设与压感、修复画笔、快速选择、磁性套索
 - 其余调整与滤镜：Shadows/Highlights、Replace Color、Smart Sharpen、Render、Distort
 - 可再编辑的文字与矢量形状、图层样式、调整图层与填充图层
