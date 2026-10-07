@@ -7104,6 +7104,42 @@ fn shadows_highlights_more_options_and_replace_color_preview() {
 }
 
 #[test]
+fn offset_on_the_background_says_set_to_background() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, Command::Offset);
+    h.run_steps(2);
+    assert!(
+        h.state()
+            .state
+            .adjust_dialog
+            .as_ref()
+            .unwrap()
+            .extra
+            .on_background
+    );
+    shot(&mut h, "offset_background");
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    // On an ordinary layer it is Set to Transparent
+    crate::panels::new_layer(h.state_mut().state.active().unwrap());
+    run_command(&mut h, Command::Offset);
+    h.run_steps(2);
+    assert!(
+        !h.state()
+            .state
+            .adjust_dialog
+            .as_ref()
+            .unwrap()
+            .extra
+            .on_background
+    );
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+}
+
+#[test]
 fn filter_preview_zooms_and_pans() {
     use crate::commands::Command;
     use crate::theme::pt;

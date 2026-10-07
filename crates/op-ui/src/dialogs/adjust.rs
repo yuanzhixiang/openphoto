@@ -856,6 +856,9 @@ pub struct Extra {
     /// the texture with what it was made from.
     pub thumb: Option<(usize, usize, Vec<[u8; 3]>)>,
     pub show_image: bool,
+    /// The active layer is the Background layer (Offset's first choice
+    /// reads "Set to Background").
+    pub on_background: bool,
     pub preview_texture: Option<(PreviewKey, egui::TextureHandle)>,
 }
 
@@ -1987,6 +1990,16 @@ impl AdjustDialog {
                     if let ParamKind::Choice(options) = p.kind {
                         let chosen = self.value(i).unwrap_or(0.0) as usize;
                         for (k, (&y, option)) in ys.iter().zip(options.iter()).enumerate() {
+                            // Offset on the Background layer fills with the
+                            // background color, and says so
+                            let option = if self.kind == Kind::Offset
+                                && k == 0
+                                && self.extra.on_background
+                            {
+                                "Set to Background"
+                            } else {
+                                option
+                            };
                             if appkit::radio(ui, at(27.0, y), option, chosen == k) {
                                 self.values[i] = k.to_string();
                             }

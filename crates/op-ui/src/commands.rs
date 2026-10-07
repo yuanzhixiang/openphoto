@@ -1538,6 +1538,11 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                         // Gradient Map runs from the foreground to the background color
                         dialog.set_gradient_colors(colors);
                         dialog.set_colors(colors);
+                        dialog.extra.on_background = state
+                            .doc
+                            .active_layer
+                            .and_then(|id| state.doc.layer(id))
+                            .is_some_and(|l| l.is_background);
                         if kind == AdjustKind::ReplaceColor {
                             dialog.extra.thumb =
                                 crate::dialogs::adjust_thumbnail(&state.doc, (370, 280));

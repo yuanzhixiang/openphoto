@@ -65,7 +65,7 @@ Gaussian Blur, Box Blur, Surface Blur, Motion Blur, Unsharp Mask, Add Noise, Dus
     - The effect is computed on the whole document, not just the visible part.
 - Numeric rows: a label right-aligned to the input box, a 19 pt tall input box (`appkit::field`; on open the first input box takes focus with its contents selected), unit text (the angle's "°" sits right against the input box); below, a 3 pt gray track, with the tip of a white triangle marker 0.5 pt below the track; the marker travels from 2.25 pt left of the track start to 0.75 pt right of the track end, its position converted by the row's `Scale` (most of Photoshop's sliders are non-uniform).
 - The angle in Motion Blur and Emboss has an angle dial to the right of the input box: a line inside the circle pointing from the center toward the angle (Motion Blur's line passes through the center to both ends).
-- Choices: Preserve in Minimum and Maximum is a dropdown; Add Noise's Distribution, Offset's Undefined Areas, Trace Contour's Edge and Diffuse's Mode are titled group boxes with radio buttons; Add Noise's Monochromatic is a checkbox.
+- Choices: Preserve in Minimum and Maximum is a dropdown; Add Noise's Distribution, Offset's Undefined Areas, Trace Contour's Edge and Diffuse's Mode are titled group boxes with radio buttons; Add Noise's Monochromatic is a checkbox. On the Background layer (`Extra::on_background`, set on open) Offset's first choice reads "Set to Background" instead of "Set to Transparent", as in Photoshop (the filter fills with the background color there either way).
 
 ### Plugin-style distort dialogs
 
@@ -112,6 +112,7 @@ These dialogs' layouts (sizes and positions, including Shadows/Highlights' two l
 
 ## Test coverage
 
+- `ui_tests::offset_on_the_background_says_set_to_background`: the Background layer marks the dialog, a new layer doesn't; screenshot `offset_background.png`.
 - `ui_tests::filter_preview_zooms_and_pans`: Gaussian Blur's zoom in gives 200%, two zoom outs 66.67%; at 200% a 20 pt drag moves the center 20 pixels; a click on the document centers the preview there.
 - `ui_tests::shadows_highlights_more_options_and_replace_color_preview`: Shadows/Highlights is 170 pt tall until Show More Options makes it 560; Replace Color has a thumbnail and a selection picture, and its Image radio switches the box. Screenshots `shadows_highlights_more.png`, `replace_color_preview.png`.
 - `ui_tests::more_filters_and_adjustments_apply`: each new filter and adjustment opens, Enter applies its defaults (Replace Color after sampling and a hue shift), records its name and becomes the Last Filter where it is one; Shear with a top offset applies; Color Lookup's OK is off without a cube; Match Color with Neutralize applies.
