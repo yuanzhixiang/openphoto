@@ -88,7 +88,12 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
                 group_marker(ui, r.rect);
             }
             let r = r.on_hover_text(tool_tip(shown));
-            if r.clicked() {
+            // A click picks the tool; the release ending a hold doesn't
+            let was_held = ui
+                .ctx()
+                .data(|d| d.get_temp::<bool>(r.id.with("held")))
+                .unwrap_or(false);
+            if r.clicked() && !was_held {
                 app.select_tool(shown);
             }
             if group.len() > 1 {
@@ -401,11 +406,36 @@ pub fn flyout_size(painter: &egui::Painter, group: &[Tool]) -> Vec2 {
     )
 }
 
+/// How long a toolbar button must be held down to open its flyout.
+pub const HOLD_SECONDS: f64 = 0.4;
+
 fn flyout(button: &egui::Response, group: &[Tool], shown: Tool, app: &mut AppState) {
     use crate::theme::pt;
     use flyout_metrics::*;
-    let open = button
-        .secondary_clicked()
+    // Right-clicking, or holding the button down (Photoshop's press and
+    // hold), opens it
+    let held = button.is_pointer_button_down_on()
+        && button.ctx.input(|i| {
+            i.pointer.primary_down()
+                && i
+                    .pointer
+                    .press_start_time()
+                    .is_some_and(|t| i.time - t >= HOLD_SECONDS)
+        });
+    // The release ending a hold keeps the flyout open (it isn't a click)
+    let held_id = button.id.with("held");
+    if held {
+        button.ctx.data_mut(|d| d.insert_temp(held_id, true));
+    }
+    let released_hold = !button.is_pointer_button_down_on()
+        && button.ctx.data_mut(|d| d.remove_temp::<bool>(held_id)).unwrap_or(false);
+    if button.is_pointer_button_down_on() && !held {
+        // Wake up when the hold is long enough
+        button
+            .ctx
+            .request_repaint_after(std::time::Duration::from_secs_f64(0.05));
+    }
+    let open = (button.secondary_clicked() || held || released_hold)
         .then_some(egui::SetOpenCommand::Bool(true));
     let size = flyout_size(&button.ctx.layer_painter(button.layer_id), group);
     let corner = button.rect.right_top() + Vec2::new(pt(OFFSET.0), pt(OFFSET.1));
@@ -414,7 +444,11 @@ fn flyout(button: &egui::Response, group: &[Tool], shown: Tool, app: &mut AppSta
         .align(egui::RectAlign::RIGHT_START)
         .gap(0.0)
         .open_memory(open)
-        .close_behavior(egui::PopupCloseBehavior::CloseOnClick)
+        .close_behavior(if released_hold {
+            egui::PopupCloseBehavior::IgnoreClicks
+        } else {
+            egui::PopupCloseBehavior::CloseOnClick
+        })
         .frame(
             egui::Frame::new()
                 .fill(color::PANEL)

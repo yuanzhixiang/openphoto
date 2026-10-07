@@ -4935,3 +4935,40 @@ fn brush_modes_and_eraser_block() {
     let outside = (300.0 + half + 2.0) as u32;
     assert_eq!(composite_pixel(&mut h, outside, 600), [0x14, 0x14, 0x14, 255]);
 }
+
+#[test]
+fn holding_a_toolbar_button_opens_its_flyout() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let before = h.state().state.tool;
+    let p = at_pt(19.5, 105.5);
+    h.hover_at(p);
+    h.event(egui::Event::PointerButton {
+        pos: p,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    // A short press doesn't open it
+    h.run_steps(3);
+    assert!(flyout_frame(&h.render().unwrap()).0.is_empty());
+    // Held past 0.4 s it does, and stays open once released
+    let start = h.ctx.input(|i| i.time);
+    while h.ctx.input(|i| i.time) - start < 0.5 {
+        h.step();
+    }
+    assert!(!flyout_frame(&h.render().unwrap()).0.is_empty(), "open while held");
+    h.event(egui::Event::PointerButton {
+        pos: p,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(2);
+    assert!(!flyout_frame(&h.render().unwrap()).0.is_empty());
+    // The hold didn't pick a tool; a row does, and closes the flyout
+    assert_eq!(h.state().state.tool, before);
+    click(&mut h, at_pt(80.0, 92.0 + 1.0 + 19.0 + 9.5));
+    assert_eq!(h.state().state.tool, op_tools::Tool::Artboard);
+    assert!(flyout_frame(&h.render().unwrap()).0.is_empty());
+}

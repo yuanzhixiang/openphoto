@@ -1042,8 +1042,13 @@ fn pill(ui: &mut Ui, rect: Rect, label: &str, primary: bool, enabled: bool) -> e
     resp
 }
 
-/// The Adobe Stock search under the list: it searches a service this app
-/// doesn't use, so it only shows.
+/// The search field's placeholder. Photoshop's names Adobe Stock; the app
+/// uses no Adobe service and shows no Adobe brand, so it says only what
+/// the field is for.
+const SEARCH_PLACEHOLDER: &str = "Search for an image or template";
+
+/// The template search under the list, where Photoshop searches Adobe
+/// Stock: this app has no template service, so it only shows.
 fn search_bar(ui: &mut Ui, frame: Rect) {
     let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
     let painter = ui.painter();
@@ -1061,7 +1066,7 @@ fn search_bar(ui: &mut Ui, frame: Rect) {
     painter.text(
         at(70.5, 679.0),
         Align2::LEFT_CENTER,
-        "Search for an image or template from Adobe Stock",
+        SEARCH_PLACEHOLDER,
         theme::uxp(pt(14.0)),
         DIM,
     );
@@ -1164,6 +1169,13 @@ fn orientation(painter: &egui::Painter, rect: Rect, portrait: bool, on: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn search_shows_no_adobe_brand() {
+        // The app shows no Adobe brand, even where Photoshop names Adobe Stock
+        assert!(!SEARCH_PLACEHOLDER.contains("Adobe"));
+        assert!(!SEARCH_PLACEHOLDER.contains("Stock"));
+    }
 
     #[test]
     fn defaults_units_and_validation() {
