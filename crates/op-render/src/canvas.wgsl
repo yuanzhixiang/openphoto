@@ -15,6 +15,8 @@ struct Uniforms {
     shield_params: vec4<f32>,
     // The image turned: pivot (document px), angle (clockwise radians), on
     rotation: vec4<f32>,
+    // The view mirrored left to right: x: axis (document px), y: on
+    mirror: vec4<f32>,
 };
 
 fn to_linear(c: vec3<f32>) -> vec3<f32> {
@@ -41,7 +43,10 @@ fn fs_main(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let local = frag.xy - u.origin_zoom.xy;
     let zoom = u.origin_zoom.z;
     // The view's (upright) point, then the image point shown there
-    let b = local / zoom;
+    var b = local / zoom;
+    if u.mirror.y > 0.5 {
+        b.x = 2.0 * u.mirror.x - b.x;
+    }
     var d = b;
     if u.rotation.w > 0.5 {
         let a = u.rotation.z;
@@ -82,9 +87,11 @@ fn fs_main(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     }
 
     if u.doc.w > 0.5 && zoom >= 6.0 {
-        let f = fract(d);
-        let edge = min(f, vec2<f32>(1.0) - f) * zoom;
-        if min(edge.x, edge.y) < 0.5 {
+        // The screen pixel whose left (top) edge lies within one screen
+        // pixel after an image pixel's edge draws the line: one pixel wide
+        // whether or not the image is aligned to screen pixels
+        let f = fract(d - vec2<f32>(0.5 / zoom)) * zoom;
+        if min(f.x, f.y) < 1.0 {
             rgb = mix(rgb, vec3<f32>(0.55), 0.35);
         }
     }

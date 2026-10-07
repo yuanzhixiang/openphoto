@@ -32,6 +32,9 @@ pub struct CanvasView {
     /// A screen point maps to the document point turned by the angle about
     /// the pivot.
     pub rotation: Option<([f32; 2], f32)>,
+    /// View › Flip Horizontal: the view mirrored about this vertical line
+    /// (document x), before the rotation is applied.
+    pub mirror: Option<f32>,
 }
 
 /// The crop shield: everything outside a (possibly turned) box is mixed
@@ -58,6 +61,7 @@ struct Uniforms {
     shield_color: [f32; 4],
     shield_params: [f32; 4],
     rotation: [f32; 4],
+    mirror: [f32; 4],
 }
 
 struct Slot {
@@ -251,6 +255,7 @@ impl CallbackTrait for CanvasCallback {
                 .view
                 .rotation
                 .map_or([0.0; 4], |(p, a)| [p[0], p[1], a, 1.0]),
+            mirror: self.view.mirror.map_or([0.0; 4], |x| [x, 1.0, 0.0, 0.0]),
         };
         queue.write_buffer(&slot.uniforms, 0, bytemuck::bytes_of(&u));
         Vec::new()

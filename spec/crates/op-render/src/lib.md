@@ -7,7 +7,7 @@
 `lib.rs` itself contains no logic; it only declares the private module `canvas` and re-exports four symbols:
 
 - `CanvasImage`: the composite to display (tightly packed, non-premultiplied RGBA8), with its texture slot key and content version number.
-- `CanvasView`: the view transform (screen position of the document's top-left corner, zoom factor, whether the pixel grid is allowed).
+- `CanvasView`: the view transform (screen position of the document's top-left corner, zoom factor, whether the pixel grid is allowed, the crop shield, rotation, and horizontal mirroring).
 - `install`: creates the render pipeline and registers it in egui-wgpu's callback resources; called once at startup.
 - `paint_callback`: produces an egui paint command that draws the canvas within a given rectangle.
 

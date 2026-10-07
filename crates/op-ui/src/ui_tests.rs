@@ -5462,3 +5462,108 @@ fn rotate_view_turns_the_canvas() {
     h.run_steps(1);
     assert_eq!(active(&h).view.rotation, 0.0);
 }
+
+#[test]
+fn flip_view_and_show_items() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A red square at (50, 50)–(100, 100) on the background
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.layers[0].id;
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 50..100 {
+            for x in 50..100 {
+                image.set_pixel(x, y, [255, 0, 0, 255]);
+            }
+        }
+        doc.mark_dirty();
+    }
+    h.run_steps(2);
+    let k = 2.0 * UI_SCALE;
+    let px =
+        |image: &image::RgbaImage, q: Pos2| image.get_pixel((q.x * k) as u32, (q.y * k) as u32).0;
+    let before = doc_point(&h, 75.0, 75.0);
+    // Flip Horizontal mirrors the view, not the pixels
+    run_command(&mut h, Command::FlipView);
+    assert!(Command::FlipView.checked(&h.state().state).unwrap());
+    let after = doc_point(&h, 75.0, 75.0);
+    assert!(after.x > before.x + 100.0 && (after.y - before.y).abs() < 0.5);
+    let image = h.render().unwrap();
+    assert_eq!(px(&image, after)[..3], [255, 0, 0]);
+    assert_eq!(px(&image, before)[..3], [0x14, 0x14, 0x14]);
+    let ppp = 2.0 * UI_SCALE;
+    let back = crate::document_view::to_doc(active(&h), after, ppp);
+    assert!((back - Pos2::new(75.0, 75.0)).length() < 0.5, "{back:?}");
+    // A marquee drawn in the flipped view selects the same document pixels
+    let (a, b) = (doc_point(&h, 100.0, 120.0), doc_point(&h, 300.0, 220.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let got = active(&h).doc.selection().unwrap().bounds().unwrap();
+    assert!(
+        got.0.abs_diff(100) <= 1 && got.1.abs_diff(120) <= 1 && got.2.abs_diff(300) <= 1,
+        "{got:?}"
+    );
+    run_command(&mut h, Command::FlipView);
+    assert_eq!(doc_point(&h, 75.0, 75.0), before);
+
+    // Show › Selection Edges, Layer Edges, Pixel Grid, All, None
+    run_command(&mut h, Command::ToggleSelectionEdges);
+    assert!(!h.state().state.view.selection_edges);
+    // The selection itself stays
+    assert!(active(&h).doc.selection().is_some());
+    run_command(&mut h, Command::ToggleLayerEdges);
+    assert!(h.state().state.view.layer_edges);
+    // A layer whose pixels are (200, 200)–(300, 300): its edge is blue
+    run_command(&mut h, Command::Deselect);
+    run_command(&mut h, Command::NewLayerNoDialog);
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.active_layer.unwrap();
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 200..300 {
+            for x in 200..300 {
+                image.set_pixel(x, y, [0x14, 0x14, 0x14, 255]);
+            }
+        }
+        doc.mark_dirty();
+    }
+    h.run_steps(2);
+    let image = h.render().unwrap();
+    let edge = doc_point(&h, 200.0, 250.0);
+    let blue = (-2..=2).any(|dx| {
+        let p = image
+            .get_pixel(((edge.x * k) as i32 + dx) as u32, (edge.y * k) as u32)
+            .0;
+        p[2] > 0xa0 && p[0] < 0x60
+    });
+    assert!(blue, "no blue edge near {edge:?}");
+    // Pixel Grid: at 1600% the line between pixels shows only with it on
+    let doc = h.state_mut().state.active().unwrap();
+    doc.view.zoom = 16.0;
+    crate::document_view::center_on(doc, Pos2::new(250.0, 250.0), 2.0 * UI_SCALE);
+    h.run_steps(2);
+    let line = doc_point(&h, 250.0, 250.5);
+    // The screen pixels around the line between image pixels 249 and 250
+    let near = |image: &image::RgbaImage| -> Vec<u8> {
+        (-1..=1)
+            .map(|d| {
+                image
+                    .get_pixel(((line.x * k) as i32 + d) as u32, (line.y * k) as u32)
+                    .0[0]
+            })
+            .collect()
+    };
+    let image = h.render().unwrap();
+    assert!(near(&image).iter().any(|&v| v > 0x30), "{:?}", near(&image));
+    run_command(&mut h, Command::TogglePixelGrid);
+    let image = h.render().unwrap();
+    assert_eq!(near(&image), [0x14; 3]);
+    // All turns every Show item on; None turns them off
+    run_command(&mut h, Command::ShowAllExtras);
+    let v = h.state().state.view;
+    assert!(v.pixel_grid && v.selection_edges && v.layer_edges && v.grid && v.guides);
+    run_command(&mut h, Command::ShowNoExtras);
+    let v = h.state().state.view;
+    assert!(!v.pixel_grid && !v.selection_edges && !v.layer_edges && !v.grid && !v.guides);
+}

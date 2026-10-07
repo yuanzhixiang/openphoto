@@ -21,6 +21,9 @@ pub struct View {
     /// The Rotate View tool's angle: the canvas turned clockwise by this
     /// many degrees about the document's center (−180 to 180).
     pub rotation: f32,
+    /// View › Flip Horizontal: the canvas shown mirrored left to right
+    /// (the pixels stay as they are).
+    pub flip: bool,
 }
 
 impl Default for View {
@@ -31,6 +34,7 @@ impl Default for View {
             initialized: false,
             viewport: egui::Rect::NOTHING,
             rotation: 0.0,
+            flip: false,
         }
     }
 }
@@ -649,6 +653,13 @@ pub struct ViewOptions {
     /// View > Show > Smart Guides (on in Photoshop by default); nothing
     /// draws them yet.
     pub smart_guides: bool,
+    /// View > Show > Pixel Grid (on by default): the grid between image
+    /// pixels from 600% up.
+    pub pixel_grid: bool,
+    /// View > Show > Selection Edges (on by default).
+    pub selection_edges: bool,
+    /// View > Show > Layer Edges (off by default).
+    pub layer_edges: bool,
 }
 
 impl Default for ViewOptions {
@@ -660,6 +671,9 @@ impl Default for ViewOptions {
             grid: false,
             lock_guides: false,
             smart_guides: true,
+            pixel_grid: true,
+            selection_edges: true,
+            layer_edges: false,
         }
     }
 }

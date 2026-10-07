@@ -222,6 +222,14 @@ pub enum Command {
     ToggleGuides,
     /// View > Show > Grid.
     ToggleGrid,
+    /// View > Flip Horizontal (the view only).
+    FlipView,
+    /// View > Show > Pixel Grid, Selection Edges, Layer Edges, All, None.
+    TogglePixelGrid,
+    ToggleSelectionEdges,
+    ToggleLayerEdges,
+    ShowAllExtras,
+    ShowNoExtras,
     /// View > Guides > Lock Guides.
     LockGuides,
     ClearGuides,
@@ -421,7 +429,14 @@ impl Command {
                 ctrl: false,
                 key: Key::F8,
             },
-            Self::ToggleNavigator | Self::ToggleHistogram => return None,
+            Self::ToggleNavigator
+            | Self::ToggleHistogram
+            | Self::FlipView
+            | Self::TogglePixelGrid
+            | Self::ToggleSelectionEdges
+            | Self::ToggleLayerEdges
+            | Self::ShowAllExtras
+            | Self::ShowNoExtras => return None,
             Self::ToggleRulers => cmd(Key::R),
             Self::ToggleExtras => cmd(Key::H),
             Self::ToggleGuides => cmd(Key::Semicolon),
@@ -574,6 +589,13 @@ impl Command {
             Self::ToggleExtras => v.extras,
             Self::ToggleGuides => v.guides,
             Self::ToggleGrid => v.grid,
+            Self::TogglePixelGrid => v.pixel_grid,
+            Self::ToggleSelectionEdges => v.selection_edges,
+            Self::ToggleLayerEdges => v.layer_edges,
+            Self::FlipView => app
+                .active_doc
+                .and_then(|id| app.docs.get(&id))
+                .is_some_and(|d| d.view.flip),
             Self::LockGuides => v.lock_guides,
             Self::ToggleHistory => app.history_open,
             Self::ToggleInfo => app.floating.info,
@@ -620,7 +642,13 @@ impl Command {
             | Self::ToggleExtras
             | Self::ToggleGuides
             | Self::ToggleGrid
+            | Self::TogglePixelGrid
+            | Self::ToggleSelectionEdges
+            | Self::ToggleLayerEdges
+            | Self::ShowAllExtras
+            | Self::ShowNoExtras
             | Self::LockGuides => true,
+            Self::FlipView => doc.is_some(),
             Self::ClearGuides => doc.is_some_and(|d| !d.doc.guides.is_empty()),
             Self::Revert => doc.is_some_and(|d| d.path.is_some() && d.is_dirty()),
             Self::Undo | Self::ToggleLastState => doc.is_some_and(|d| d.history.can_undo()),
@@ -1330,6 +1358,21 @@ pub fn run(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::ToggleExtras => app.view.extras = !app.view.extras,
         Command::ToggleGuides => app.view.guides = !app.view.guides,
         Command::ToggleGrid => app.view.grid = !app.view.grid,
+        Command::TogglePixelGrid => app.view.pixel_grid = !app.view.pixel_grid,
+        Command::ToggleSelectionEdges => app.view.selection_edges = !app.view.selection_edges,
+        Command::ToggleLayerEdges => app.view.layer_edges = !app.view.layer_edges,
+        Command::ShowAllExtras | Command::ShowNoExtras => {
+            // Every Show item OpenPhoto has, on or off together
+            let on = command == Command::ShowAllExtras;
+            let v = &mut app.view;
+            (v.layer_edges, v.selection_edges, v.grid, v.guides) = (on, on, on, on);
+            (v.smart_guides, v.pixel_grid) = (on, on);
+        }
+        Command::FlipView => {
+            if let Some(doc) = app.active() {
+                doc.view.flip = !doc.view.flip;
+            }
+        }
         Command::LockGuides => app.view.lock_guides = !app.view.lock_guides,
         Command::NewGuide => app.new_guide_dialog = Some(Default::default()),
         Command::HideApp => {

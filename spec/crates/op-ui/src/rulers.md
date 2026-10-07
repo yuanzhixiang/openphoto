@@ -27,7 +27,7 @@ The rulers (View › Rulers, ⌘R), guides (dragging out, moving, deleting, draw
 
 ## Display toggles
 
-`AppState::view` (`ViewOptions`): `rulers` (off by default), `extras` (on by default), `guides` (on by default), `grid` (off by default), `lock_guides` (off by default). Guides are shown when both Extras and Guides are on (`guides_visible`), and the grid is shown when both Extras and Grid are on (`grid_visible`); when Extras is off, the selection's marching ants are not shown either (the selection remains in effect).
+`AppState::view` (`ViewOptions`): `rulers` (off by default), `extras` (on by default), `guides` (on by default), `grid` (off by default), `lock_guides` (off by default), `smart_guides` (on by default), `pixel_grid` (on by default), `selection_edges` (on by default), `layer_edges` (off by default). Guides are shown when both Extras and Guides are on (`guides_visible`), and the grid is shown when both Extras and Grid are on (`grid_visible`); when Extras is off, the selection's marching ants, the layer edges and the pixel grid are not shown either (the selection remains in effect). Show › Selection Edges, Layer Edges and Pixel Grid each hide their own item the same way.
 
 ## Known limitations
 

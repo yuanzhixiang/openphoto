@@ -146,6 +146,12 @@ Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's men
 | ToggleExtras | View › Extras | ⌘H |
 | ToggleGrid | View › Show › Grid | ⌘' |
 | ToggleGuides | View › Show › Guides | ⌘; |
+| FlipView | View › Flip Horizontal | — |
+| TogglePixelGrid | View › Show › Pixel Grid | — |
+| ToggleSelectionEdges | View › Show › Selection Edges | — |
+| ToggleLayerEdges | View › Show › Layer Edges | — |
+| ShowAllExtras | View › Show › All | — |
+| ShowNoExtras | View › Show › None | — |
 | ToggleRulers | View › Rulers | ⌘R |
 | LockGuides | View › Guides › Lock Guides | ⌥⌘; |
 | ClearGuides | View › Guides › Clear Guides | None |
@@ -162,7 +168,7 @@ Determines both whether a command can execute and whether its menu item is graye
 
 - When an input box has keyboard focus (`AppState::typing`), Cut, Copy, CopyMerged, Paste and PasteInPlace are always available (including input boxes in modal dialogs), and act on the input box's text when executed (see "Clipboard" below).
 - Apart from that, all commands are unavailable while a modal dialog is open.
-- New, Open, ToggleHistory, ToggleInfo, ToggleNavigator, ToggleHistogram, Quit, HideApp and the five view toggles (Rulers, Extras, Guides, Grid, Lock Guides) are always available (except when a modal dialog is open); ClearGuides is available when the current document has guides; FitLayers, Zoom200, PrintSize and NewGuide are available when there is a current document.
+- New, Open, ToggleHistory, ToggleInfo, ToggleNavigator, ToggleHistogram, Quit, HideApp and the view toggles (Rulers, Extras, Guides, Grid, Lock Guides, Pixel Grid, Selection Edges, Layer Edges, Show › All / None) are always available (except when a modal dialog is open); ClearGuides is available when the current document has guides; FitLayers, Zoom200, PrintSize, NewGuide and FlipView are available when there is a current document.
 - Revert: available when the current document has a file and unsaved changes. Save, Save As, Save a Copy: available when there is a current document.
 - Undo, ToggleLastState: available when the current document can undo; Redo: available when it can redo.
 - DeleteLayer: available when the current document has more than 1 layer.

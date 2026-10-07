@@ -93,6 +93,9 @@ pub fn zoom_to(state: &mut DocState, zoom: f32, ppp: f32) {
 /// Navigator).
 pub fn center_on(state: &mut DocState, p: Pos2, ppp: f32) {
     let zoom = state.view.zoom;
+    // Where p shows in the (turned, flipped) view, relative to the
+    // document's center, which both leave in place
+    let p = mirror(state, turn(state, p, view_angle(state)));
     state.view.offset = doc_size_pt(state, zoom, ppp) / 2.0 - p.to_vec2() * zoom / ppp;
 }
 
@@ -657,7 +660,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 )
             })
         }),
-        pixel_grid: true,
+        mirror: view_flipped(state).then_some(state.doc.width as f32 / 2.0),
+        pixel_grid: view_options.extras && view_options.pixel_grid,
     };
     ui.painter()
         .with_clip_rect(canvas_rect)
@@ -666,8 +670,12 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     if view_options.grid_visible() {
         crate::rulers::draw_grid(ui, state, canvas_rect, ppp);
     }
-    // Extras off hides the selection edges (the selection stays)
-    if view_options.extras {
+    if view_options.extras && view_options.layer_edges {
+        draw_layer_edges(ui, state, canvas_rect, ppp);
+    }
+    // Extras or Show › Selection Edges off hides the selection edges (the
+    // selection stays)
+    if view_options.extras && view_options.selection_edges {
         draw_selection(ui, state, canvas_rect, ppp, tool, shape_options);
     }
     if view_options.guides_visible() || state.guide_drag.is_some() {
@@ -704,7 +712,27 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
 /// Screen point → document pixel coordinates (not clamped).
 pub(crate) fn to_doc(state: &DocState, p: Pos2, ppp: f32) -> Pos2 {
     let d = (p - origin(state, ppp)) * ppp / state.view.zoom;
-    turn(state, Pos2::new(d.x, d.y), -view_angle(state))
+    turn(
+        state,
+        mirror(state, Pos2::new(d.x, d.y)),
+        -view_angle(state),
+    )
+}
+
+/// Whether the view is flipped left to right (not while cropping, like
+/// the rotation).
+pub(crate) fn view_flipped(state: &DocState) -> bool {
+    state.view.flip && state.crop.is_none()
+}
+
+/// `p` mirrored about the document's vertical center line when the view
+/// is flipped.
+fn mirror(state: &DocState, p: Pos2) -> Pos2 {
+    if view_flipped(state) {
+        Pos2::new(state.doc.width as f32 - p.x, p.y)
+    } else {
+        p
+    }
 }
 
 /// The view's rotation in radians (clockwise), none while cropping (the
@@ -734,8 +762,13 @@ fn turn(state: &DocState, p: Pos2, angle: f32) -> Pos2 {
 pub fn visible_rect(state: &DocState, ppp: f32) -> [f32; 4] {
     // With the view rotated, the bounds of all four corners
     let v = state.view.viewport;
-    let corners = [v.left_top(), v.right_top(), v.left_bottom(), v.right_bottom()]
-        .map(|p| to_doc(state, p, ppp));
+    let corners = [
+        v.left_top(),
+        v.right_top(),
+        v.left_bottom(),
+        v.right_bottom(),
+    ]
+    .map(|p| to_doc(state, p, ppp));
     let (xs, ys) = (corners.map(|p| p.x), corners.map(|p| p.y));
     let min = |a: [f32; 4]| a.into_iter().fold(f32::INFINITY, f32::min);
     let max = |a: [f32; 4]| a.into_iter().fold(f32::NEG_INFINITY, f32::max);
@@ -744,7 +777,7 @@ pub fn visible_rect(state: &DocState, ppp: f32) -> [f32; 4] {
 
 /// Document pixel → screen point.
 pub(crate) fn to_screen(state: &DocState, d: Pos2, ppp: f32) -> Pos2 {
-    let d = turn(state, d, view_angle(state));
+    let d = mirror(state, turn(state, d, view_angle(state)));
     origin(state, ppp) + d.to_vec2() * state.view.zoom / ppp
 }
 
@@ -2286,4 +2319,27 @@ fn rotate_view_input(ui: &Ui, response: &egui::Response, state: &mut DocState, p
         egui::Stroke::new(3.0, Color32::from_rgb(0xe0, 0x30, 0x30)),
     );
     ui.ctx().request_repaint();
+}
+
+/// View › Show › Layer Edges: a thin blue outline around the pixels of
+/// each selected layer.
+fn draw_layer_edges(ui: &Ui, state: &DocState, clip: Rect, ppp: f32) {
+    let painter = ui.painter().with_clip_rect(clip);
+    let stroke = egui::Stroke::new(1.0, Color32::from_rgb(0x2c, 0x8b, 0xe8));
+    for id in state.doc.selected_layers() {
+        let Some((x0, y0, x1, y1)) = state
+            .doc
+            .layer(id)
+            .and_then(|l| l.image())
+            .and_then(|i| i.content_bounds())
+        else {
+            continue;
+        };
+        let (x0, y0, x1, y1) = (x0 as f32, y0 as f32, x1 as f32, y1 as f32);
+        let corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+            .map(|(x, y)| to_screen(state, Pos2::new(x, y), ppp));
+        for i in 0..4 {
+            painter.line_segment([corners[i], corners[(i + 1) % 4]], stroke);
+        }
+    }
 }

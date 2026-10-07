@@ -19,7 +19,7 @@ Sizes are measured 1:1 against Photoshop (pt):
 - The canvas area is filled with the pasteboard color `#282828`.
 - On the right is the vertical scrollbar column, 17 wide: on the left, a 1 pt `#2e2e2e` line followed by a 1 pt `#464646` line; on the right, a 1 pt `#454545` line; the track in between is `#4a4a4a`. The thumb is a 12-wide rounded bar, color `#696969`.
 - At the bottom is the 16-high status bar (see below).
-- The canvas is drawn on the pasteboard according to the view transform; transparent areas show a checkerboard, and a pixel grid appears above 600% (implemented by `op-render`).
+- The canvas is drawn on the pasteboard according to the view transform; transparent areas show a checkerboard, and a pixel grid appears from 600% up when View › Show › Pixel Grid and Extras are on (implemented by `op-render`).
 - The screen position of the document's top-left corner is snapped to physical pixels so pixels are crisp at 100%.
 
 ## Zoom
@@ -37,6 +37,7 @@ Sizes are measured 1:1 against Photoshop (pt):
 
 - `View::rotation` (degrees, clockwise, within ±180°) turns the canvas about the document's center, as Photoshop's Rotate View does; the pixels stay unchanged. The shader gets it as the canvas rotation (`CanvasView::rotation`, pivot at the document's center); while a crop is in progress the crop's own rotation is used and the view is drawn upright (`view_angle` returns 0).
 - `to_doc` / `to_screen` include the rotation, so every tool works in document space in a turned view: the marquee, Object Selection rectangle, and shape previews are computed as document-space shapes and mapped corner by corner (they show turned on screen). `visible_rect` is the bounding box of the four viewport corners.
+- View › Flip Horizontal (`View::flip`) mirrors the view left to right about the document's center, after the rotation; `to_doc` / `to_screen` include it, so tools keep working in document space. It is ignored while cropping, like the rotation. `center_on` places a document point at the window's center through the rotation and flip.
 - Rotate View tool: dragging turns the view by the angle the pointer sweeps around the document center's screen position, starting from the rotation at the press; Shift snaps to multiples of 15°. While dragging, a compass is drawn at the center (a 60 pt translucent dark disc with a light ring; a needle whose red half points to the image's top). Esc returns the view to 0°. The options bar's angle field, dial, and Reset View act on the same value (see `options_tools.md`).
 
 ## Initial view
@@ -76,7 +77,7 @@ When the current tool is the Horizontal Type tool, canvas input is handed to `ty
 - When rulers are on, the canvas area shrinks and the rulers are drawn along the top and left of the window; pressing and dragging on a ruler starts dragging out a guide (see `rulers.md`).
 - While a guide is being dragged, canvas input goes only to the guide drag, not to the tool.
 - When the current tool is the Move tool or ⌘ is held, pressing on a guide starts moving the guide (taking precedence over the Move tool moving the layer); hovering over a guide shows a resize cursor.
-- Drawing order: image, grid, selection marching ants (when Extras is on), guides, rulers, transform box, crop box.
+- Drawing order: image, grid, layer edges (Show › Layer Edges, with Extras on: a 1 pt blue `#2c8be8` outline around the non-transparent pixels of each selected layer, following the view's rotation and flip), selection marching ants (when Extras and Show › Selection Edges are on), guides, rulers, transform box, crop box.
 
 ## Crop tool
 

@@ -69,7 +69,7 @@ Two `vec4<f32>` (Rust side `Uniforms`, `#[repr(C)]` + `Pod`):
 ### Pixel grid
 
 - Drawn when `pixel_grid` is true and `zoom >= 6.0` (600%).
-- Takes the fractional part of the fragment's document coordinate and computes the distance to the nearest pixel edge (multiplied by zoom to convert to physical pixels); when the distance in either direction is < 0.5 physical pixels, the color is mixed 35% toward gray `0.55`. The effect is a semi-transparent gray line about 1 physical pixel wide on every pixel boundary.
+- A screen pixel draws the line when its left (top) edge lies less than one physical pixel after an image pixel's edge: `fract(d − 0.5 / zoom) × zoom < 1` in either direction, where `d` is the document coordinate of the fragment's center. Its color is mixed 35% toward gray `0.55`. The effect is a semi-transparent gray line exactly 1 physical pixel wide just right of (below) every pixel boundary, whether or not the image is aligned to screen pixels. (An earlier rule, "within 0.5 physical pixels of a boundary", drew nothing when the boundary fell exactly between two screen pixels, which is the usual case since the origin is aligned.)
 
 ### Outside the document
 
@@ -83,7 +83,7 @@ Two `vec4<f32>` (Rust side `Uniforms`, `#[repr(C)]` + `Pod`):
 - No matching slot found during `paint` (does not happen in the normal flow, since `prepare` always creates the slot first): returns immediately without drawing.
 - Downscaling odd sizes: `w/2` rounds down, so for levels with an odd width (height) the last column (row) does not take part in the next level's average; clamping only matters when the source size is 1.
 - When the same key is submitted multiple times in one frame (e.g. two views of the same document), they share one uniform buffer; the uniform written later in `prepare` overwrites the earlier one, and all draws use the last view parameters.
-- The pixel grid also shows a half line just inside the document's outer edges (the distance to a pixel boundary at the edge is likewise < 0.5 physical pixels).
+- The pixel grid also draws a line along the first column and row inside the document's left and top edges; the lines after the right and bottom edges fall outside the document and are discarded.
 - The length of `pixels` must be exactly `width * height * 4`. A trailing remainder of fewer than 4 extra bytes is ignored by the premultiply step; a shorter length makes the data size of the later texture write mismatch.
 
 ## Relationship with other modules
@@ -91,7 +91,7 @@ Two `vec4<f32>` (Rust side `Uniforms`, `#[repr(C)]` + `Pod`):
 - `crates/op-render/src/lib.rs` re-exports `CanvasImage`, `CanvasView`, `install` and `paint_callback`.
 - `op-ui/src/lib.rs`: calls `install` in `OpenPhotoApp::new`, which requires eframe to use the wgpu renderer.
 - `op-ui/src/state.rs`: `DocState::canvas_image` uses `doc.id.0` as the key and `doc.revision()` as the revision, calls `Document::composite_rgba8()` on the CPU to produce the pixels, and caches the `Arc<CanvasImage>` by revision.
-- `op-ui/src/document_view.rs`: computes the origin snapped to physical pixels, builds the `CanvasView` (`pixel_grid` is always `true`, zoom is limited to 0.01–128), and adds it through `paint_callback` to a painter with a clip rectangle.
+- `op-ui/src/document_view.rs`: computes the origin snapped to physical pixels, builds the `CanvasView` (`pixel_grid` follows View › Extras and View › Show › Pixel Grid, zoom is limited to 0.01–128), and adds it through `paint_callback` to a painter with a clip rectangle.
 
 ## Known limitations
 
@@ -108,7 +108,11 @@ When `CanvasView::shield` is `Some`, the fragment shader transforms the document
 
 ## Image rotation (`rotation`)
 
-When `CanvasView::rotation` is `Some((pivot, angle))`, a screen point is first converted by the view into a "box space" point b, then rotated clockwise by `angle` about `pivot` to get the image point d to sample (`d = pivot + R(angle)(b − pivot)`), so the image appears rotated by −angle. The shield box is evaluated in box space. Used by the Crop tool when rotating the image.
+When `CanvasView::rotation` is `Some((pivot, angle))`, a screen point is first converted by the view into a "box space" point b, then rotated clockwise by `angle` about `pivot` to get the image point d to sample (`d = pivot + R(angle)(b − pivot)`), so the image appears rotated by −angle. The shield box is evaluated in box space. Used by the Crop tool when rotating the image, and by Rotate View (pivot at the document's center, the negated view angle).
+
+## Mirroring (`mirror`)
+
+When `CanvasView::mirror` is `Some(x)` (View › Flip Horizontal), the view point b is first mirrored about the vertical line at document x (`b.x = 2x − b.x`), before the rotation. `op-ui` passes the document's center, so the flipped canvas stays in place. The uniform gains `mirror` (axis x, enabled).
 
 ## Test coverage
 
