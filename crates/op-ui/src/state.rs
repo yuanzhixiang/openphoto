@@ -1441,6 +1441,10 @@ pub struct AppState {
     pub hide_tools: bool,
     /// Tab or Shift+Tab: the panels and the icon column hidden.
     pub hide_panels: bool,
+    /// Hidden panels (tools) shown for the moment, the pointer having
+    /// come to the window's right (left) side.
+    pub reveal_panels: bool,
+    pub reveal_tools: bool,
     /// Entering Full Screen Mode: Photoshop's warning, while asked.
     pub full_screen_prompt: Option<crate::dialogs::alert::Alert>,
     /// "Don't show again" was ticked in that warning.
@@ -1627,6 +1631,8 @@ impl Default for AppState {
             screen_mode: ScreenMode::Standard,
             hide_tools: false,
             hide_panels: false,
+            reveal_panels: false,
+            reveal_tools: false,
             full_screen_prompt: None,
             skip_full_screen_prompt: false,
             seed_override: None,

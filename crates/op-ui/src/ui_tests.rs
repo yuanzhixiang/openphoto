@@ -6796,6 +6796,36 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn hidden_panels_show_at_the_window_sides() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // Tab hides everything
+    h.key_press(egui::Key::Tab);
+    h.run_steps(2);
+    assert!(h.state().state.hide_panels && h.state().state.hide_tools);
+    let screen = h.ctx.content_rect();
+    // The right side brings the panels over the canvas
+    h.hover_at(egui::pos2(screen.right() - 2.0, screen.center().y));
+    h.run_steps(2);
+    assert!(h.state().state.reveal_panels);
+    shot(&mut h, "revealed_panels");
+    // Over them they stay; back on the canvas they go
+    h.hover_at(egui::pos2(screen.right() - 200.0, screen.center().y));
+    h.run_steps(2);
+    assert!(h.state().state.reveal_panels);
+    h.hover_at(screen.center());
+    h.run_steps(2);
+    assert!(!h.state().state.reveal_panels);
+    // The left side brings the tools
+    h.hover_at(egui::pos2(screen.left() + 2.0, screen.center().y));
+    h.run_steps(2);
+    assert!(h.state().state.reveal_tools);
+    h.hover_at(screen.center());
+    h.run_steps(2);
+    assert!(!h.state().state.reveal_tools);
+}
+
+#[test]
 fn guides_select_edit_and_clear() {
     use crate::commands::Command;
     let mut h = harness(Vec::new());

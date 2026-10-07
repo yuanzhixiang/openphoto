@@ -532,6 +532,82 @@ impl OpenPhotoApp {
         }
     }
 
+    /// Hidden panels and tools (Tab, Full Screen Mode) show over the canvas
+    /// while the pointer is at the window's right or left side, as in
+    /// Photoshop, and hide again when it leaves them.
+    fn reveal_hidden(&mut self, ctx: &egui::Context, hide_tools: bool, hide_panels: bool) {
+        let screen = ctx.content_rect();
+        let pointer = ctx.input(|i| i.pointer.latest_pos());
+        let edge = theme::pt(6.0);
+        let column = size::PANEL_COLUMN + size::ICON_STRIP;
+        // Revealed at the edge, kept while the pointer is over them
+        let reveal = |on: &mut bool, hidden: bool, at_edge: bool, over: bool| {
+            *on = hidden && (at_edge || (*on && over));
+        };
+        if let Some(p) = pointer {
+            reveal(
+                &mut self.state.reveal_panels,
+                hide_panels,
+                p.x >= screen.right() - edge,
+                p.x >= screen.right() - column,
+            );
+            reveal(
+                &mut self.state.reveal_tools,
+                hide_tools,
+                p.x <= screen.left() + edge,
+                p.x <= screen.left() + size::TOOLBAR,
+            );
+        }
+        if self.state.reveal_panels {
+            let rect = egui::Rect::from_min_max(
+                egui::pos2(screen.right() - column, screen.top()),
+                screen.max,
+            );
+            egui::Area::new(egui::Id::new("revealed-panels"))
+                .fixed_pos(rect.min)
+                .order(egui::Order::Foreground)
+                .show(ctx, |ui| {
+                    // (clicks between the panels stay off the canvas)
+                    ui.interact(
+                        rect,
+                        ui.id().with("revealed-panels-back"),
+                        egui::Sense::click_and_drag(),
+                    );
+                    ui.painter().rect_filled(rect, 0, color::PANEL);
+                    let strip = egui::Rect::from_min_size(
+                        rect.min,
+                        egui::vec2(size::ICON_STRIP, rect.height()),
+                    );
+                    let column =
+                        egui::Rect::from_min_max(egui::pos2(strip.right(), rect.top()), rect.max);
+                    ui.scope_builder(egui::UiBuilder::new().max_rect(strip), |ui| {
+                        panels::icon_strip(ui, &mut self.state)
+                    });
+                    ui.scope_builder(egui::UiBuilder::new().max_rect(column), |ui| {
+                        self.panels.show(ui, &mut self.state)
+                    });
+                });
+        }
+        if self.state.reveal_tools {
+            let rect =
+                egui::Rect::from_min_size(screen.min, egui::vec2(size::TOOLBAR, screen.height()));
+            egui::Area::new(egui::Id::new("revealed-tools"))
+                .fixed_pos(rect.min)
+                .order(egui::Order::Foreground)
+                .show(ctx, |ui| {
+                    ui.interact(
+                        rect,
+                        ui.id().with("revealed-tools-back"),
+                        egui::Sense::click_and_drag(),
+                    );
+                    ui.painter().rect_filled(rect, 0, color::PANEL);
+                    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                        toolbar::show(ui, &mut self.state)
+                    });
+                });
+        }
+    }
+
     /// Warp's Custom Grid Size: OK regrids the warp.
     fn warp_grid_dialog(&mut self, ctx: &egui::Context) {
         use dialogs::grid_size::Outcome;
@@ -1156,6 +1232,7 @@ impl eframe::App for OpenPhotoApp {
             }
             panels::floating::show(&ctx, &mut self.state, strip_rect.left(), strip_rect.top());
         }
+        self.reveal_hidden(&ctx, hide_tools, hide_panels);
 
         self.canvas_size_dialog(&ctx);
         self.fill_dialog(&ctx);
