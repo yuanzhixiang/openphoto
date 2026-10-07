@@ -2314,21 +2314,21 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "op-color"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "op-core",
 ]
 
 [[package]]
 name = "op-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "skrifa",
 ]
 
 [[package]]
 name = "op-io"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "image",
  "op-core",
@@ -2337,7 +2337,7 @@ dependencies = [
 
 [[package]]
 name = "op-mcp"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "op-core",
  "op-io",
@@ -2346,7 +2346,7 @@ dependencies = [
 
 [[package]]
 name = "op-render"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bytemuck",
  "egui",
@@ -2356,11 +2356,11 @@ dependencies = [
 
 [[package]]
 name = "op-tools"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "op-ui"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "arboard",
  "eframe",
@@ -2396,7 +2396,7 @@ dependencies = [
 
 [[package]]
 name = "openphoto"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "eframe",
  "env_logger",
