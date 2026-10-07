@@ -22,13 +22,14 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
 
 ## 各工具的选项
 
-- **四种选框工具、三种套索工具**：
-  - 四个选区运算按钮（New / Add to / Subtract from / Intersect with selection），可切换，选中的有深色底。
-  - Feather：数值框，0–1000 px，最多 1 位小数，显示为 `0 px`。
-  - Anti-alias：复选框，矩形、单行、单列选框时置灰（它们没有曲线边缘），与 Photoshop 一致；默认勾选。
-  - 仅选框工具：Style（Normal / Fixed Ratio / Fixed Size）；Width / Height 只有 Style 不是 Normal 时才可用，中间是交换宽高的图标。套索工具没有这两项，与 Photoshop 一致。
-  - 「Select and Mask...」按钮。
-  这些值保存在 `AppState::marquee`，选框与套索共用。组合方式、Feather、Anti-alias 在创建选区时生效（见 `document_view.md`）；Style、Width/Height 和「Select and Mask...」目前没有效果。
+- **按实测布局的工具**（`measured_bar`，用 `options_kit` 按 Photoshop 2026 截图量出的「栏坐标」绝对定位，见 `options_kit.md`；坐标为 pt）：
+  - **四种选框工具**：选区运算四按钮（110 起，每个 26）；分隔线 222；「Feather:」(233) 与输入框 (276–330，如 `0 px`，0–1000)；Anti-alias 复选框 (338，只在椭圆选框可用，不可用时显示为未勾选)；分隔线 412；「Style:」(421.5) 与下拉 (453.5–531，Normal / Fixed Ratio / Fixed Size)；「Width:」(541) 与输入框 (574–615.5)、交换图标 (中心 638.5)、「Height:」(663.5) 与输入框 (699.5–741)，Style 为 Normal 时都不可用；分隔线 749；「Select and Mask...」(760.5–870.5，有选区时可用)。单行、单列选框的 Style 不可用，Feather 输入框起的元素左移 2 pt（与 Photoshop 一致）。
+  - **套索、多边形套索**：同上到分隔线 412，之后是「Select and Mask...」(423.5–533.5)。
+  - **磁性套索**：分隔线 412 后是「Width:」(422.5) 与输入框 (457.5–500.5，10 px)、「Contrast:」(509) 与输入框 (557.5–600.5，10%)、「Frequency:」(609.5) 与输入框 (666–693，57)；分隔线 701；压感按钮 (712–738，可切换)；分隔线 748；「Select and Mask...」(759.5–869.5)。
+  - **魔棒**：运算按钮 (110)；分隔线 222；「Sample Size:」(231.5) 与下拉 (298–413.5，Point Sample 到 101 by 101 Average)；「Tolerance:」(422.5) 与输入框 (476.5–524.5，0–255)；Anti-alias (532.5)、Contiguous (606.5)、Sample All Layers (690)；分隔线 803.5；Select Subject (815–906，不可用) 与其菜单按钮 (907–926)；「Select and Mask...」(945–1055)。
+  - **对象选择**：运算按钮 (104 起)；分隔线 212；「Select people」菜单按钮 (217.5–305.5，右下角小三角)；刷新 (中心 323)、显示全部对象开关 (353)、齿轮 (383)；分隔线 400；模式下拉 (405–483，Rectangle / Lasso)；分隔线 487；Sample All Layers (492)、Hard Edge (602，默认勾选)；分隔线 677；反馈 (696)；分隔线 712；Select Subject (717.5–808.5) 与菜单按钮 (813.5–832.5)；「Select and Mask...」(837.5–947.5)。
+  - **快速选择**：三个模式按钮（新选区 / 添加 / 减去，中心 129、157、185）；分隔线 202；笔刷选择器 (中心 221.5，大小 30)；分隔线 253；角度图标 (266) 与输入框 (277–318.5，0°)；分隔线 322.5；Sample All Layers (327.5)、Enhance Edge (437)；分隔线 530；Select Subject (543.5–634.5) 与菜单按钮；「Select and Mask...」(669.5–779.5)。
+  - 选区运算、Feather、Anti-alias（`AppState::marquee`，选框与套索共用；对象选择也用它的运算方式）与魔棒的 Tolerance、Anti-alias、Contiguous、Sample All Layers（`AppState::wand`）生效；其余设置（选框的固定宽高、磁性套索的参数与压感、魔棒的 Sample Size、对象选择与快速选择的各项）保存在 `AppState::tool_settings`，可以修改并保留，但还没有效果。Select Subject 不可用；Select and Mask 有选区时可点但还没有效果。
 - **吸管**：
   - 「Sample Size:」下拉：Point Sample、3 by 3 Average、5 by 5 Average、11 by 11 Average、31 by 31 Average、51 by 51 Average、101 by 101 Average，默认 Point Sample。
   - 「Sample:」下拉：Current Layer / All Layers，默认 All Layers。
@@ -37,7 +38,6 @@ Home、工具预设、右侧图标都只有外观和悬停提示，点击没有�
 - **渐变工具**（经典渐变）：渐变色样（110 × 26，当前前景色到背景色，勾选 Reverse 时反过来）与下拉箭头（没有效果）；五个类型按钮（Linear、Radial、Angle、Reflected、Diamond，悬停提示为「Linear Gradient」等）；「Mode:」全部混合模式；「Opacity:」百分比；Reverse 复选框。值保存在 `AppState::gradient`。
 - **横排文字工具**：字体下拉（只有 Source Sans 3）、样式下拉（Regular / Semibold）、字号图标与字号（0.5–1296 pt，默认 12 pt）、置灰的消除锯齿下拉（Sharp）、三个对齐按钮（只有左对齐可用且为按下状态）、颜色色块（当前前景色）。输入文字期间右侧显示取消（⦸）与确认（✓）按钮。值保存在 `AppState::type_options`。
 - **形状工具**：置灰的模式下拉（Shape）、「Fill:」色块（当前前景色）、「Stroke:」色块（白底红斜线，表示无描边）；多边形还有多边形图标与边数（3–100，默认 5），直线还有「Weight:」粗细（1–1000 px，默认 1 px）。边数与粗细保存在 `AppState::shape`。
-- **魔棒**：四个选区运算按钮、Tolerance（0–255，默认 32）、Anti-alias（默认开）、Contiguous（默认开）、Sample All Layers（默认关）、「Select and Mask...」按钮（没有效果）。值保存在 `AppState::wand`。
 - **画笔、铅笔、橡皮擦**：
   - 笔刷预设按钮：白色圆点，下方是当前大小数字，旁边一个下拉箭头。点击弹出 Size 滑块（1–5000 px，对数刻度）和 Hardness 滑块（铅笔没有）。
   - 分隔线后是「Mode:」下拉（画笔、铅笔显示 Normal，橡皮擦显示 Brush），目前置灰。

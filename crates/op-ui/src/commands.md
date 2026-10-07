@@ -264,3 +264,4 @@ Cut、Copy、CopyMerged、Paste、PasteInPlace 由 `actions::clipboard` 执行�
 - Filter › Distort › Twirl...、Pinch...、Spherize...、Polar Coordinates... 打开滤镜对话框。
 - Filter › Blur › Surface Blur...、Noise › Dust & Scratches... 打开滤镜对话框；Pixelate › Fragment 直接执行（同 Blur），记录「Fragment」并成为 Last Filter。Other › Custom... 打开 Custom 滤镜对话框（`dialogs/custom_filter.md`），记录「Custom」。Noise › Despeckle、Sharpen › Sharpen Edges 直接执行（同 Blur）；Stylize › Trace Contour...、Wind... 打开滤镜对话框。
 - 打开滤镜对话框时，若 `AppState::filter_settings` 里有该对话框上次按 OK 时的设置，先用 `restore` 放回（Photoshop 的滤镜对话框记住上次的值；见 `dialogs/adjust.md`）。
+- 文字输入框获得焦点时，Select All（⌘A）全选输入框里的文字，而不是全选画布（快捷键交给输入框；macOS 原生菜单先收到 ⌘A 时，转成按键事件交给输入框）。
