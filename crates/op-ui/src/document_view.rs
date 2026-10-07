@@ -344,6 +344,21 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
         crate::rulers::start_move(state, i);
         crate::snap::begin(state, &view_options, false);
     }
+    // ⌘ over the canvas with the Move tool: the distances to the layer
+    // under the pointer (or the canvas), with the smart guides on
+    state.measure = match response.hover_pos() {
+        Some(p)
+            if tool == Tool::Move
+                && cmd
+                && view_options.extras
+                && view_options.smart_guides
+                && state.smart_guides.is_none()
+                && !ui.input(|i| i.pointer.primary_down()) =>
+        {
+            crate::smart_guides::measure(state, to_doc(state, p, ppp))
+        }
+        _ => Vec::new(),
+    };
     // A click on a guide selects it (Shift adds or removes it); with the
     // Move tool, a click elsewhere drops the guide selection
     if guides_live

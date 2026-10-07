@@ -34,6 +34,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `art_history`: the Art History Brush's `PaintOptions` (10 px, hard; returned by `paint_options`).
 - `mixer`, `mixer_load`, `mixer_paint`: the Mixer Brush's `PaintOptions` (returned by `paint_options`), the load color sampled with Option-click (None: the foreground color), and the paint the brush keeps between strokes when it isn't cleaned.
 - `pen_pressure`: the pen's last pressure while a tablet is used (`app_kit::pen_pressure`, read by `lib.rs` before each frame in the real app); None with a mouse. `DocState::paint_smooth`: where a smoothed stroke has got to.
+- `DocState::measure`: the Move tool's ⌘-hover distance labels (`smart_guides.md`).
 - `DocState::selected_guides` / `guide_selection()`: the guides selected with the Move tool. `ViewOptions::canvas_guides`: View › Show › Canvas Guides.
 - `guide_layout`: New Guide Layout while open, with the active document's guides from before it (`dialogs/guide_layout.md`; counted by `modal_open`).
 - `save_options`: a JPEG or PNG save waiting for its options (`actions::PendingSave`, counted by `modal_open`); `export_options`: the options last used.

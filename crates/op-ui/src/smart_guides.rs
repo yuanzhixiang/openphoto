@@ -120,7 +120,21 @@ impl SmartGuides {
             }
             best.map_or(d, |p| d + p)
         };
-        let out = Vec2::new(pull(mine_x, &theirs_x, d.x), pull(mine_y, &theirs_y, d.y));
+        let mut out = Vec2::new(pull(mine_x, &theirs_x, d.x), pull(mine_y, &theirs_y, d.y));
+        // Equal spacing: between two other boxes, the place leaving the
+        // same gap on both sides, if nearer than the other pulls
+        let nearer =
+            |eq: f32, edge: f32, raw: f32| edge == raw || (eq - raw).abs() < (edge - raw).abs();
+        if let Some(x) = self.equal_spacing(d, tolerance, true)
+            && nearer(x, out.x, d.x)
+        {
+            out.x = x;
+        }
+        if let Some(y) = self.equal_spacing(d, tolerance, false)
+            && nearer(y, out.y, d.y)
+        {
+            out.y = y;
+        }
         // Every line that now matches, spanning both boxes
         let moved = (x0 + out.x, y0 + out.y, x1 + out.x, y1 + out.y);
         let mut lines = Vec::new();
@@ -147,6 +161,46 @@ impl SmartGuides {
         self.lines = lines;
         self.labels = self.gaps(moved);
         out
+    }
+
+    /// The offset along x (`horizontal`) or y that puts the moved box
+    /// midway between a box on each side overlapping it across, if within
+    /// `tolerance` of `d`.
+    fn equal_spacing(&self, d: Vec2, tolerance: f32, horizontal: bool) -> Option<f32> {
+        let (x0, y0, x1, y1) = self.moving;
+        if x1 - x0 < 1e-3 && y1 - y0 < 1e-3 {
+            return None;
+        }
+        let m = (x0 + d.x, y0 + d.y, x1 + d.x, y1 + d.y);
+        let neighbors = &self.others[1.min(self.others.len())..];
+        let mut best: Option<f32> = None;
+        for a in neighbors {
+            for b in neighbors {
+                let (lo, hi, size, cur, start) = if horizontal {
+                    let across = |q: &Bounds| q.1 < m.3 && q.3 > m.1;
+                    if !(across(a) && across(b)) || a.2 > b.0 {
+                        continue;
+                    }
+                    (a.2, b.0, x1 - x0, d.x, x0)
+                } else {
+                    let across = |q: &Bounds| q.0 < m.2 && q.2 > m.0;
+                    if !(across(a) && across(b)) || a.3 > b.1 {
+                        continue;
+                    }
+                    (a.3, b.1, y1 - y0, d.y, y0)
+                };
+                if hi - lo < size {
+                    continue;
+                }
+                let target = (lo + hi - size) / 2.0 - start;
+                if (target - cur).abs() <= tolerance
+                    && best.is_none_or(|q| (target - cur).abs() < (q - cur).abs())
+                {
+                    best = Some(target);
+                }
+            }
+        }
+        best
     }
 
     /// The gaps between the moved box and the nearest other box on each
@@ -198,20 +252,74 @@ impl SmartGuides {
     }
 }
 
+/// ⌘ held over the canvas with the Move tool (and nothing dragged):
+/// distances from the active layer's pixels (or the selection) to the
+/// layer under `pointer`, or to the canvas's edges when there is none.
+pub fn measure(state: &DocState, pointer: Pos2) -> Vec<([Pos2; 2], f32)> {
+    let doc = &state.doc;
+    let Ok(mine) = op_core::transform::bounds(doc) else {
+        return Vec::new();
+    };
+    let (x, y) = (pointer.x.floor(), pointer.y.floor());
+    let under = doc.layers.iter().rev().find_map(|l| {
+        if !l.visible || l.is_background || Some(l.id) == doc.active_layer {
+            return None;
+        }
+        let image = l.image()?;
+        let inside = x >= 0.0 && y >= 0.0 && x < doc.width as f32 && y < doc.height as f32;
+        (inside && image.pixel(x as u32, y as u32)[3] > 0)
+            .then(|| image.content_bounds())
+            .flatten()
+            .map(|(x0, y0, x1, y1)| (x0 as f32, y0 as f32, x1 as f32, y1 as f32))
+    });
+    let canvas = (0.0, 0.0, doc.width as f32, doc.height as f32);
+    match under {
+        Some(other) => {
+            let mut g = SmartGuides {
+                moving: mine,
+                others: vec![canvas, other],
+                lines: Vec::new(),
+                labels: Vec::new(),
+            };
+            g.align(Vec2::ZERO, 0.0);
+            g.labels
+        }
+        None => {
+            // To the canvas's four edges, from the middle of each side
+            let (x0, y0, x1, y1) = mine;
+            let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+            [
+                ([Pos2::new(0.0, cy), Pos2::new(x0, cy)], x0),
+                ([Pos2::new(x1, cy), Pos2::new(canvas.2, cy)], canvas.2 - x1),
+                ([Pos2::new(cx, 0.0), Pos2::new(cx, y0)], y0),
+                ([Pos2::new(cx, y1), Pos2::new(cx, canvas.3)], canvas.3 - y1),
+            ]
+            .into_iter()
+            .filter(|(_, d)| *d > 0.0)
+            .collect()
+        }
+    }
+}
+
 /// Draws the smart guides of the move under way: 1 pt magenta lines.
 pub fn draw(ui: &Ui, state: &DocState, clip: Rect, ppp: f32) {
+    let painter = ui.painter().with_clip_rect(clip);
+    draw_labels(&painter, state, &state.measure, ppp);
     let Some(smart) = &state.smart_guides else {
         return;
     };
-    let painter = ui.painter().with_clip_rect(clip);
     for [a, b] in &smart.lines {
         painter.line_segment(
             [to_screen(state, *a, ppp), to_screen(state, *b, ppp)],
             Stroke::new(crate::theme::pt(1.0), COLOR),
         );
     }
-    // Distances: the gap's line and its length in a magenta tag
-    for ([a, b], length) in &smart.labels {
+    draw_labels(&painter, state, &smart.labels, ppp);
+}
+
+/// Distances: each gap's line and its length in a magenta tag.
+fn draw_labels(painter: &egui::Painter, state: &DocState, labels: &[([Pos2; 2], f32)], ppp: f32) {
+    for ([a, b], length) in labels {
         let (a, b) = (to_screen(state, *a, ppp), to_screen(state, *b, ppp));
         painter.line_segment([a, b], Stroke::new(crate::theme::pt(1.0), COLOR));
         let text = format!("{} px", length.round());
@@ -264,6 +372,26 @@ mod tests {
         let d = g.align(Vec2::new(5.0, 5.5), 1.0);
         assert_eq!(d, Vec2::new(5.0, 5.5));
         assert!(g.lines.is_empty());
+    }
+
+    #[test]
+    fn equal_spacing_between_two_boxes() {
+        // Boxes at 0–20 and 80–100 (rows 0–10); a 20 wide box from 10
+        let mut g = SmartGuides {
+            moving: (10.0, 0.0, 30.0, 10.0),
+            others: vec![
+                (0.0, 0.0, 200.0, 200.0),
+                (0.0, 0.0, 20.0, 10.0),
+                (80.0, 0.0, 100.0, 10.0),
+            ],
+            lines: Vec::new(),
+            labels: Vec::new(),
+        };
+        // Moved 28: 2 short of the middle (40–60), it goes there
+        let d = g.align(Vec2::new(28.0, 0.0), 4.0);
+        assert_eq!(d.x, 30.0);
+        let gaps: Vec<f32> = g.labels.iter().map(|l| l.1).collect();
+        assert_eq!(gaps, vec![20.0, 20.0]);
     }
 
     #[test]

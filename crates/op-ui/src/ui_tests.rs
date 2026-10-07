@@ -8036,6 +8036,47 @@ fn smart_guides_for_marquees_and_distance_labels() {
 }
 
 #[test]
+fn command_hover_measures_to_another_layer() {
+    use crate::commands::Command;
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // Two squares: (50, 50)–(150, 150), active, and (300, 60)–(380, 140)
+    for (x0, x1, y0, y1) in [(300, 380, 60, 140), (50, 150, 50, 150)] {
+        run_command(&mut h, Command::NewLayerNoDialog);
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.active_layer.unwrap();
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in y0..y1 {
+            for x in x0..x1 {
+                image.set_pixel(x, y, [255, 255, 255, 255]);
+            }
+        }
+        doc.mark_dirty();
+    }
+    h.state_mut().state.select_tool(Tool::Move);
+    h.run_steps(2);
+    // ⌘ over the other square: the 150 px gap
+    let p = doc_point(&h, 340.0, 100.0);
+    h.event(egui::Event::ModifiersChanged(Modifiers::COMMAND));
+    h.hover_at(p);
+    h.run_steps(2);
+    let gaps: Vec<f32> = active(&h).measure.iter().map(|l| l.1).collect();
+    assert_eq!(gaps, vec![150.0]);
+    shot(&mut h, "command_measure");
+    // ⌘ over nothing: the four distances to the canvas's edges
+    let p = doc_point(&h, 600.0, 600.0);
+    h.hover_at(p);
+    h.hover_at(p);
+    h.run_steps(2);
+    assert_eq!(active(&h).measure.len(), 4);
+    // Without ⌘: nothing
+    h.event(egui::Event::ModifiersChanged(Modifiers::NONE));
+    h.run_steps(2);
+    assert!(active(&h).measure.is_empty());
+}
+
+#[test]
 fn smart_guides_line_up_a_moved_layer() {
     use crate::commands::Command;
     use op_tools::Tool;

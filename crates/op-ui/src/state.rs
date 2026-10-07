@@ -133,6 +133,8 @@ pub struct DocState {
     pub clone_slot: usize,
     /// The guides selected with the Move tool (by index).
     pub selected_guides: Vec<usize>,
+    /// The Move tool's ⌘-hover distances (`smart_guides::measure`).
+    pub measure: Vec<([egui::Pos2; 2], f32)>,
     /// The Crop tool's box, while the Crop tool is in use.
     pub crop: Option<CropBox>,
     /// The Perspective Crop tool's box, while it is in use.
@@ -266,6 +268,7 @@ impl DocState {
             clone_slots: [(None, None); 5],
             clone_slot: 0,
             selected_guides: Vec::new(),
+            measure: Vec::new(),
             gradient_drag: None,
             shape_drag: None,
             text_edit: None,
