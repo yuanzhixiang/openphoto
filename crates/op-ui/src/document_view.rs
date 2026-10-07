@@ -178,7 +178,13 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     };
     let ppp = ui.ctx().pixels_per_point();
     let full = ui.max_rect();
-    ui.painter().rect_filled(full, 0, color::PASTEBOARD);
+    // Full Screen Mode's pasteboard is black, as in Photoshop
+    let pasteboard = if app.screen_mode == crate::state::ScreenMode::Full {
+        Color32::BLACK
+    } else {
+        color::PASTEBOARD
+    };
+    ui.painter().rect_filled(full, 0, pasteboard);
 
     // Photoshop's document window: canvas, a vertical scrollbar column on
     // the right, and the status bar (with the horizontal scrollbar) below

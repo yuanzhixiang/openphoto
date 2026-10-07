@@ -49,6 +49,10 @@ pub struct OpenPhotoApp {
     /// The native menu bar; `None` in headless tests.
     #[cfg(target_os = "macos")]
     menu: Option<menu::NativeMenu>,
+    /// The screen mode the window was last set up for, and whether it was
+    /// maximized (zoomed) before Full Screen Mode With Menu Bar zoomed it.
+    screen_applied: state::ScreenMode,
+    was_maximized: bool,
 }
 
 impl OpenPhotoApp {
@@ -82,6 +86,8 @@ impl OpenPhotoApp {
             panels: panels::Panels::default(),
             #[cfg(target_os = "macos")]
             menu: None,
+            screen_applied: state::ScreenMode::Standard,
+            was_maximized: false,
         };
         if files.is_empty() {
             actions::new_document(&mut app.state);
@@ -89,6 +95,35 @@ impl OpenPhotoApp {
             actions::open_paths(&mut app.state, files);
         }
         app
+    }
+}
+
+impl OpenPhotoApp {
+    /// Sets the window up for a new screen mode: Full Screen Mode With
+    /// Menu Bar zooms the window to fill the screen, Full Screen Mode makes
+    /// it full screen; Standard undoes what the others did.
+    fn apply_screen_mode(&mut self, ctx: &egui::Context) {
+        use state::ScreenMode::*;
+        let mode = self.state.screen_mode;
+        if mode == self.screen_applied {
+            return;
+        }
+        let from = std::mem::replace(&mut self.screen_applied, mode);
+        if from == Standard {
+            self.was_maximized = ctx.input(|i| i.viewport().maximized.unwrap_or(false));
+        }
+        if from == Full {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(false));
+        }
+        match mode {
+            Full => ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true)),
+            FullWithMenus => ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(true)),
+            Standard => {
+                if !self.was_maximized {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(false));
+                }
+            }
+        }
     }
 }
 
@@ -574,10 +609,13 @@ impl eframe::App for OpenPhotoApp {
         }
         self.run_commands(&ctx);
         actions::handle_tool_keys(&ctx, &mut self.state);
+        self.apply_screen_mode(&ctx);
 
         let bar_frame = Frame::NONE.fill(color::PANEL);
+        let mode = self.state.screen_mode;
+        let (hide_tools, hide_panels) = (self.state.hide_tools, self.state.hide_panels);
 
-        if cfg!(target_os = "macos") {
+        if cfg!(target_os = "macos") && mode == state::ScreenMode::Standard {
             egui::Panel::top("titlebar")
                 .show_separator_line(false)
                 .exact_size(size::TITLE_BAR)
@@ -585,42 +623,62 @@ impl eframe::App for OpenPhotoApp {
                 .frame(bar_frame)
                 .show(ui, titlebar::show);
         }
-        egui::Panel::top("options-bar")
-            .show_separator_line(false)
-            .exact_size(size::OPTIONS_BAR)
-            .resizable(false)
-            .frame(bar_frame)
-            .show(ui, |ui| options_bar::show(ui, &mut self.state));
-        egui::Panel::left("toolbar")
-            .show_separator_line(false)
-            .exact_size(size::TOOLBAR)
-            .resizable(false)
-            .frame(bar_frame)
-            .show(ui, |ui| toolbar::show(ui, &mut self.state));
-        egui::Panel::right("panels")
-            .show_separator_line(false)
-            .exact_size(size::PANEL_COLUMN)
-            .resizable(false)
-            .frame(bar_frame)
-            .show(ui, |ui| self.panels.show(ui, &mut self.state));
-        let strip = egui::Panel::right("icon-strip")
-            .show_separator_line(false)
-            .exact_size(size::ICON_STRIP)
-            .resizable(false)
-            .frame(bar_frame)
-            .show(ui, |ui| panels::icon_strip(ui, &mut self.state));
-        let (strip_rect, history_button) = (strip.response.rect, strip.inner);
+        if !hide_tools {
+            egui::Panel::top("options-bar")
+                .show_separator_line(false)
+                .exact_size(size::OPTIONS_BAR)
+                .resizable(false)
+                .frame(bar_frame)
+                .show(ui, |ui| options_bar::show(ui, &mut self.state));
+            egui::Panel::left("toolbar")
+                .show_separator_line(false)
+                .exact_size(size::TOOLBAR)
+                .resizable(false)
+                .frame(bar_frame)
+                .show(ui, |ui| toolbar::show(ui, &mut self.state));
+        }
+        let (strip_rect, history_button) = if hide_panels {
+            (egui::Rect::NOTHING, egui::Rect::NOTHING)
+        } else {
+            egui::Panel::right("panels")
+                .show_separator_line(false)
+                .exact_size(size::PANEL_COLUMN)
+                .resizable(false)
+                .frame(bar_frame)
+                .show(ui, |ui| self.panels.show(ui, &mut self.state));
+            let strip = egui::Panel::right("icon-strip")
+                .show_separator_line(false)
+                .exact_size(size::ICON_STRIP)
+                .resizable(false)
+                .frame(bar_frame)
+                .show(ui, |ui| panels::icon_strip(ui, &mut self.state));
+            (strip.response.rect, strip.inner)
+        };
 
+        // Full Screen Mode's pasteboard is black, as in Photoshop
+        let pasteboard = if mode == state::ScreenMode::Full {
+            egui::Color32::BLACK
+        } else {
+            color::PASTEBOARD
+        };
         egui::CentralPanel::no_frame()
-            .frame(Frame::NONE.fill(color::PASTEBOARD))
+            .frame(Frame::NONE.fill(pasteboard))
             .show(ui, |ui| {
                 let area = ui.max_rect();
                 if self.state.doc_order.is_empty() {
                     return;
                 }
+                // The full screen modes show only the active document
+                let tabs_height = if mode == state::ScreenMode::Standard {
+                    doc_tabs::HEIGHT
+                } else {
+                    0.0
+                };
                 let tabs =
-                    egui::Rect::from_min_size(area.min, egui::vec2(area.width(), doc_tabs::HEIGHT));
-                doc_tabs::show(ui, &mut self.state, tabs);
+                    egui::Rect::from_min_size(area.min, egui::vec2(area.width(), tabs_height));
+                if tabs_height > 0.0 {
+                    doc_tabs::show(ui, &mut self.state, tabs);
+                }
                 doc_tabs::ensure_active(&mut self.state);
                 let view =
                     egui::Rect::from_min_max(egui::pos2(area.left(), tabs.bottom()), area.max);
@@ -633,10 +691,12 @@ impl eframe::App for OpenPhotoApp {
             });
         doc_tabs::ensure_active(&mut self.state);
 
-        if self.state.history_open {
-            self.history_popout(&ctx, strip_rect, history_button);
+        if !hide_panels {
+            if self.state.history_open {
+                self.history_popout(&ctx, strip_rect, history_button);
+            }
+            panels::floating::show(&ctx, &mut self.state, strip_rect.left(), strip_rect.top());
         }
-        panels::floating::show(&ctx, &mut self.state, strip_rect.left(), strip_rect.top());
 
         self.canvas_size_dialog(&ctx);
         self.fill_dialog(&ctx);
@@ -680,6 +740,16 @@ impl eframe::App for OpenPhotoApp {
                     {
                         state.record("Delete Layer");
                     }
+                }
+                Some(_) => {}
+            }
+        }
+        if let Some(mut prompt) = self.state.full_screen_prompt.take() {
+            match dialogs::alert::show(&ctx, &mut prompt) {
+                None => self.state.full_screen_prompt = Some(prompt),
+                Some(dialogs::alert::Answer::Ok { dont_show_again }) => {
+                    self.state.skip_full_screen_prompt |= dont_show_again;
+                    self.state.enter_screen_mode(state::ScreenMode::Full);
                 }
                 Some(_) => {}
             }

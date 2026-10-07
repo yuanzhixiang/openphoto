@@ -173,6 +173,9 @@ const ALL_COMMANDS: &[Command] = &[
     Command::ShowAllExtras,
     Command::ShowNoExtras,
     Command::ToggleSnap,
+    Command::ScreenMode(crate::state::ScreenMode::Standard),
+    Command::ScreenMode(crate::state::ScreenMode::FullWithMenus),
+    Command::ScreenMode(crate::state::ScreenMode::Full),
     Command::SnapToGuides,
     Command::SnapToGrid,
     Command::SnapToLayers,
@@ -912,7 +915,25 @@ impl NativeMenu {
                 &check_item("Flip Horizontal", Command::FlipView),
                 &todo("Pattern Preview", None),
                 &sep(),
-                &todo_sub("Screen Mode"),
+                &Submenu::with_items(
+                    "Screen Mode",
+                    true,
+                    &[
+                        &check_item(
+                            "Standard Screen Mode",
+                            Command::ScreenMode(crate::state::ScreenMode::Standard),
+                        ) as &dyn IsMenuItem,
+                        &check_item(
+                            "Full Screen Mode With Menu Bar",
+                            Command::ScreenMode(crate::state::ScreenMode::FullWithMenus),
+                        ),
+                        &check_item(
+                            "Full Screen Mode",
+                            Command::ScreenMode(crate::state::ScreenMode::Full),
+                        ),
+                    ],
+                )
+                .expect("static menu definition is valid"),
                 &sep(),
                 &check_item("Extras", Command::ToggleExtras),
                 &Submenu::with_items(

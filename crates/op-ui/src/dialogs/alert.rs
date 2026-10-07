@@ -41,6 +41,9 @@ pub struct Alert {
     /// Buttons stacked full width instead of OK/Cancel, the first one the
     /// default (blue), the last one taken by Escape.
     pub choices: Vec<String>,
+    /// The default button's label ("OK" unless renamed, e.g. "Full
+    /// Screen").
+    pub ok_label: &'static str,
 }
 
 impl Alert {
@@ -52,6 +55,7 @@ impl Alert {
             cancel: false,
             dont_show_again: None,
             choices: Vec::new(),
+            ok_label: "OK",
         }
     }
 
@@ -63,6 +67,7 @@ impl Alert {
             cancel: true,
             dont_show_again: Some(false),
             choices: Vec::new(),
+            ok_label: "OK",
         }
     }
 
@@ -75,6 +80,7 @@ impl Alert {
             cancel: true,
             dont_show_again: None,
             choices: choices.iter().map(|c| c.to_string()).collect(),
+            ok_label: "OK",
         }
     }
 }
@@ -272,7 +278,7 @@ fn draw(
         if button(row(16.0, 126.0), "Cancel", CANCEL, TEXT, "cancel") {
             answer = Some(Answer::Cancel);
         }
-        if button(row(134.0, 244.0), "OK", OK, Color32::WHITE, "ok") {
+        if button(row(134.0, 244.0), alert.ok_label, OK, Color32::WHITE, "ok") {
             answer = Some(ok);
         }
     } else if button(row(16.0, 244.0), "OK", OK, Color32::WHITE, "ok") {

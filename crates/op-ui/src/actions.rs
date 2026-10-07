@@ -409,6 +409,26 @@ pub fn handle_tool_keys(ctx: &egui::Context, app: &mut AppState) {
                 }
             }
             Key::X if !shift => crate::toolbar::swap_colors(app),
+            // Screen modes: F cycles, Shift+F backwards; Esc leaves Full
+            // Screen Mode unless a tool is using it
+            Key::F => {
+                let mode = app.screen_mode.cycle(shift);
+                app.set_screen_mode(mode);
+            }
+            Key::Escape
+                if !shift
+                    && app.screen_mode == crate::state::ScreenMode::Full
+                    && !app.active().is_some_and(|d| d.busy()) =>
+            {
+                app.enter_screen_mode(crate::state::ScreenMode::Standard);
+            }
+            // Tab hides (or shows) the toolbar, options bar and panels,
+            // Shift+Tab only the panels
+            Key::Tab => {
+                app.toggle_hidden(shift);
+                // Not egui's move to the next text field
+                ctx.memory_mut(|m| m.move_focus(egui::FocusDirection::None));
+            }
             _ => {
                 let name = key.name();
                 if name.len() == 1 {

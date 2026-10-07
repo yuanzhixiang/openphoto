@@ -52,6 +52,8 @@ Runs Cut, Copy, Copy Merged, Paste, Paste in Place; when a text field has focus,
   - Number keys 1–9, 0: set opacity to 10%–90%, 100%; Shift+number sets flow (the Pencil has no flow).
 - When the current tool is the Move tool, arrow keys move the current layer (or the selected pixels) by 1 pixel and Shift+arrow by 10 pixels, recording one "Nudge" each time, matching Photoshop. When moving is not possible, an alert appears.
 - D: restores the default colors (black foreground, white background); X: swaps the foreground and background colors.
+- F: the next screen mode (Standard → Full Screen Mode With Menu Bar → Full Screen Mode → Standard); Shift+F: the previous one. Entering Full Screen Mode shows Photoshop's warning first (see `lib.md`) unless "Don’t show again" was ticked. Esc in Full Screen Mode returns to Standard, unless the document is busy with something Esc cancels (`DocState::busy`: crop, Free Transform, a lasso, typing, a marquee, shape or move drag).
+- Tab: hides the toolbar, options bar and panels, or shows them all when they are all hidden; Shift+Tab does the same for the panels (and the icon column) only. egui's own Tab focus move is cancelled, so the next Tab is not swallowed by a text field.
 - Other letters: select a tool via `op_tools::tool_for_key` (rules in `crates/op-tools/src/lib.md`) and make that toolbar slot show the selected tool. Shift+letter cycles through the tools in the same group, matching Photoshop.
 
 ## Duplicating a layer to another document (`duplicate_layer`)
@@ -60,4 +62,4 @@ Called after the Duplicate Layer dialog is confirmed; handled in three cases dep
 
 ## Known limitations
 
-- Shortcuts for features not yet implemented, such as F (screen mode), are not handled.
+- In Full Screen Mode, hidden panels cannot be revealed by moving the pointer to the screen's sides, as Photoshop allows; Tab shows them.

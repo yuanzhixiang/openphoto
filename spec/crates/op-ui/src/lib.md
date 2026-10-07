@@ -21,17 +21,15 @@ Defines `OpenPhotoApp` (implements `eframe::App`), which:
 
 1. Files dropped into the window are opened one by one.
 2. Runs commands: first records whether an input field has focus (`AppState::typing`). On macOS with the native menu, takes the menu events and the ⌘= that egui additionally captures; without a native menu (other platforms, windowless tests), egui handles all shortcuts (see `commands.md`).
-3. Handles single-key shortcuts (tools, D, X).
+3. Handles single-key shortcuts (tools, D, X, F, Tab), then sets the window up for a changed screen mode (`apply_screen_mode`: Full Screen Mode With Menu Bar maximizes (zooms) the window, Full Screen Mode makes it full screen, Standard undoes it; a window that was already maximized stays so).
 4. Lays out the regions in order (egui panels added first are on the outside), with sizes measured 1:1 from Photoshop (pt):
-   - Title bar (macOS only, height 29, including a 1 pt separator at the bottom)
-   - Options bar (height 33)
-   - Left toolbar (width 42, including a 3 pt dark edge on the right)
-   - Right panel column (width 322)
-   - Icon column to the left of the panel column (width 43, including a 3 pt divider bar on each side)
-   - Center: with a document, the document tab bar on top and the current document's view below; without a document, only the pasteboard background.
+   - Title bar (macOS only, height 29, including a 1 pt separator at the bottom; Standard Screen Mode only)
+   - Options bar (height 33) and left toolbar (width 42, including a 3 pt dark edge on the right); left out while `hide_tools` (Tab)
+   - Right panel column (width 322) and the icon column to its left (width 43, including a 3 pt divider bar on each side); left out while `hide_panels` (Tab, Shift+Tab), together with the History popup and the floating panels
+   - Center: with a document, the document tab bar on top (Standard Screen Mode only; the full screen modes show only the active document) and the current document's view below; without a document, only the pasteboard background (black in Full Screen Mode).
    None of these panels use egui's built-in separators; each region draws its own borders as in Photoshop.
 5. Determines the current document: if the current document no longer exists, switches to the last tab (see `ensure_active` in `doc_tabs.rs`).
-6. Overlays: the History popup panel (when `history_open`), floating panels (Info, Navigator, Histogram, see `panels/floating.md`), the Canvas Size dialog, the Image Size dialog, the Fill dialog, the Trim dialog, adjustment dialogs, the "Save changes?" confirmation, the Color Picker (drawn above the previous two), macOS menu state sync, and the error alert dialog.
+6. Overlays: the History popup panel (when `history_open`), floating panels (Info, Navigator, Histogram, see `panels/floating.md`), the Canvas Size dialog, the Image Size dialog, the Fill dialog, the Trim dialog, adjustment dialogs, the "Save changes?" confirmation, the Color Picker (drawn above the previous two), macOS menu state sync, the error alert dialog, and Full Screen Mode's warning (`full_screen_prompt`: Photoshop's text, the app icon, "Don’t show again", Cancel and "Full Screen"; Full Screen enters the mode and remembers the checkbox in `skip_full_screen_prompt`).
 
 ## Frame time log
 

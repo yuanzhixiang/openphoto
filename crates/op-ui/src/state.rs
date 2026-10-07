@@ -134,6 +134,19 @@ pub struct DocState {
 impl DocState {
     /// The box Show Transform Controls draws around the active layer's
     /// pixels (or the selection), as Free Transform would start with it.
+    /// Whether a tool is in the middle of something Escape would cancel
+    /// (so Escape is not taken to leave Full Screen Mode).
+    pub fn busy(&self) -> bool {
+        self.crop.is_some()
+            || self.free_transform.is_some()
+            || self.lasso.is_some()
+            || self.magnetic.is_some()
+            || self.text_edit.is_some()
+            || self.marquee_drag.is_some()
+            || self.shape_drag.is_some()
+            || self.move_drag.is_some()
+    }
+
     pub fn transform_controls_bounds(&mut self) -> Option<Bounds> {
         let key = (
             self.doc.revision(),
@@ -1156,6 +1169,16 @@ pub struct AppState {
     pub untitled_counter: u32,
     /// Error message to show to the user.
     pub alert: Option<String>,
+    /// View › Screen Mode.
+    pub screen_mode: ScreenMode,
+    /// Tab: the toolbar and options bar hidden (with the panels).
+    pub hide_tools: bool,
+    /// Tab or Shift+Tab: the panels and the icon column hidden.
+    pub hide_panels: bool,
+    /// Entering Full Screen Mode: Photoshop's warning, while asked.
+    pub full_screen_prompt: Option<crate::dialogs::alert::Alert>,
+    /// "Don't show again" was ticked in that warning.
+    pub skip_full_screen_prompt: bool,
     /// Layer > Flatten Image's "Discard hidden layers?" while asked.
     pub flatten_prompt: Option<crate::dialogs::alert::Alert>,
     /// "Don't show again" was ticked in that prompt.
@@ -1282,6 +1305,11 @@ impl Default for AppState {
             image_size_dialog: None,
             new_guide_dialog: None,
             new_layer_dialog: None,
+            screen_mode: ScreenMode::Standard,
+            hide_tools: false,
+            hide_panels: false,
+            full_screen_prompt: None,
+            skip_full_screen_prompt: false,
             flatten_prompt: None,
             skip_flatten_prompt: false,
             delete_group_prompt: None,
@@ -1415,6 +1443,7 @@ impl AppState {
             || self.new_guide_dialog.is_some()
             || self.new_layer_dialog.is_some()
             || self.flatten_prompt.is_some()
+            || self.full_screen_prompt.is_some()
             || self.delete_group_prompt.is_some()
             || self.duplicate_dialog.is_some()
             || self.lock_dialog.is_some()
@@ -1509,4 +1538,72 @@ pub fn default_pattern() -> op_core::TiledImage {
         }
     }
     image
+}
+
+/// View › Screen Mode.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum ScreenMode {
+    /// The window with its title bar and document tabs.
+    #[default]
+    Standard,
+    /// The window filling the screen below the menu bar, without its
+    /// title bar or document tabs.
+    FullWithMenus,
+    /// The whole screen: no menu bar, no panels, a black pasteboard.
+    Full,
+}
+
+impl ScreenMode {
+    /// The next mode (F), or the previous one (Shift+F).
+    pub fn cycle(self, back: bool) -> Self {
+        use ScreenMode::*;
+        match (self, back) {
+            (Standard, false) | (Full, true) => FullWithMenus,
+            (FullWithMenus, false) | (Standard, true) => Full,
+            (Full, false) | (FullWithMenus, true) => Standard,
+        }
+    }
+}
+
+/// Photoshop's warning on entering Full Screen Mode.
+pub const FULL_SCREEN_WARNING: &str = "In Full Screen Mode, panels are hidden. They can be accessed on the sides of the screen, or revealed by pressing Tab.\n\nWhile in Full Screen Mode, you can return to Standard Screen Mode by pressing 'F' or Esc.";
+
+impl AppState {
+    /// Switches to `mode`; Full Screen Mode asks first, unless told not to.
+    pub fn set_screen_mode(&mut self, mode: ScreenMode) {
+        if mode == ScreenMode::Full && !self.skip_full_screen_prompt {
+            let mut alert = crate::dialogs::alert::Alert::caution(FULL_SCREEN_WARNING);
+            alert.icon = crate::dialogs::alert::Icon::App;
+            alert.ok_label = "Full Screen";
+            self.full_screen_prompt = Some(alert);
+            return;
+        }
+        self.enter_screen_mode(mode);
+    }
+
+    /// Switches to `mode` without asking. Full Screen Mode hides the panels
+    /// and tools (Tab shows them); leaving it shows them again.
+    pub fn enter_screen_mode(&mut self, mode: ScreenMode) {
+        let was = self.screen_mode;
+        self.screen_mode = mode;
+        if mode == ScreenMode::Full {
+            self.hide_tools = true;
+            self.hide_panels = true;
+        } else if was == ScreenMode::Full {
+            self.hide_tools = false;
+            self.hide_panels = false;
+        }
+    }
+
+    /// Tab: hides the toolbar, options bar and panels, or shows them all
+    /// when they are all hidden. Shift+Tab: the same for the panels only.
+    pub fn toggle_hidden(&mut self, panels_only: bool) {
+        if panels_only {
+            self.hide_panels = !self.hide_panels;
+        } else {
+            let all = self.hide_tools && self.hide_panels;
+            self.hide_tools = !all;
+            self.hide_panels = !all;
+        }
+    }
 }

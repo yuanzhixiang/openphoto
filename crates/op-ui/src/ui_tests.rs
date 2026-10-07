@@ -5655,3 +5655,92 @@ fn snapping_to_guides_layers_and_bounds() {
     drag(&mut h, a, b, Modifiers::NONE);
     assert_eq!(bounds(&h), (250, 300, 320, 330));
 }
+
+#[test]
+fn screen_modes_and_hiding_panels() {
+    use crate::commands::Command;
+    use crate::state::ScreenMode;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let viewport = |h: &Harness<'_, OpenPhotoApp>| active(h).view.viewport;
+    let standard = viewport(&h);
+    // Tab hides the toolbar, options bar and panels; the canvas takes the room
+    h.key_press(egui::Key::Tab);
+    h.run_steps(2);
+    assert!(h.state().state.hide_tools && h.state().state.hide_panels);
+    let bare = viewport(&h);
+    assert!(bare.width() > standard.width() + 200.0, "{bare:?}");
+    assert!(bare.top() < standard.top());
+    // Tab again shows them; Shift+Tab hides only the panels
+    h.key_press(egui::Key::Tab);
+    h.run_steps(2);
+    assert_eq!(viewport(&h), standard);
+    h.key_press_modifiers(Modifiers::SHIFT, egui::Key::Tab);
+    h.run_steps(2);
+    let s = &h.state().state;
+    assert!(!s.hide_tools && s.hide_panels);
+    assert_eq!(viewport(&h).left(), standard.left());
+    assert!(viewport(&h).right() > standard.right());
+    h.key_press_modifiers(Modifiers::SHIFT, egui::Key::Tab);
+    h.run_steps(2);
+
+    // F: Full Screen Mode With Menu Bar drops the title bar and tabs
+    h.key_press(egui::Key::F);
+    h.run_steps(2);
+    assert_eq!(h.state().state.screen_mode, ScreenMode::FullWithMenus);
+    assert!(
+        Command::ScreenMode(ScreenMode::FullWithMenus)
+            .checked(&h.state().state)
+            .unwrap()
+    );
+    assert!(viewport(&h).top() < standard.top());
+    assert_eq!(viewport(&h).width(), standard.width());
+    // F again: Photoshop's warning first; Full Screen enters it
+    h.key_press(egui::Key::F);
+    h.run_steps(2);
+    assert!(h.state().state.full_screen_prompt.is_some());
+    assert_eq!(h.state().state.screen_mode, ScreenMode::FullWithMenus);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    let s = &h.state().state;
+    assert_eq!(s.screen_mode, ScreenMode::Full);
+    assert!(s.hide_tools && s.hide_panels);
+    // The pasteboard is black
+    let image = h.render().unwrap();
+    let k = 2.0 * UI_SCALE;
+    let corner = viewport(&h).min + egui::vec2(4.0, 4.0);
+    assert_eq!(
+        image
+            .get_pixel((corner.x * k) as u32, (corner.y * k) as u32)
+            .0,
+        [0, 0, 0, 255]
+    );
+    // Esc returns to Standard with everything shown
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    let s = &h.state().state;
+    assert_eq!(s.screen_mode, ScreenMode::Standard);
+    assert!(!s.hide_tools && !s.hide_panels);
+    assert_eq!(viewport(&h), standard);
+    // Cancel keeps the mode; "Don't show again" skips the warning next time
+    run_command(&mut h, Command::ScreenMode(ScreenMode::Full));
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert_eq!(h.state().state.screen_mode, ScreenMode::Standard);
+    run_command(&mut h, Command::ScreenMode(ScreenMode::Full));
+    h.state_mut()
+        .state
+        .full_screen_prompt
+        .as_mut()
+        .unwrap()
+        .dont_show_again = Some(true);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(h.state().state.screen_mode, ScreenMode::Full);
+    h.key_press(egui::Key::F);
+    h.run_steps(2);
+    assert_eq!(h.state().state.screen_mode, ScreenMode::Standard);
+    run_command(&mut h, Command::ScreenMode(ScreenMode::Full));
+    assert!(h.state().state.full_screen_prompt.is_none());
+    assert_eq!(h.state().state.screen_mode, ScreenMode::Full);
+}

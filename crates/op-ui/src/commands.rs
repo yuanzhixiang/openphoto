@@ -230,6 +230,8 @@ pub enum Command {
     ToggleLayerEdges,
     ShowAllExtras,
     ShowNoExtras,
+    /// View > Screen Mode.
+    ScreenMode(crate::state::ScreenMode),
     /// View > Snap and View > Snap To.
     ToggleSnap,
     SnapToGuides,
@@ -452,7 +454,8 @@ impl Command {
             | Self::SnapToSlices
             | Self::SnapToBounds
             | Self::SnapToAll
-            | Self::SnapToNone => return None,
+            | Self::SnapToNone
+            | Self::ScreenMode(_) => return None,
             Self::ToggleRulers => cmd(Key::R),
             Self::ToggleExtras => cmd(Key::H),
             Self::ToggleGuides => cmd(Key::Semicolon),
@@ -610,6 +613,7 @@ impl Command {
             Self::ToggleSelectionEdges => v.selection_edges,
             Self::ToggleLayerEdges => v.layer_edges,
             Self::ToggleSnap => v.snap,
+            Self::ScreenMode(mode) => app.screen_mode == mode,
             Self::SnapToGuides => v.snap_guides,
             Self::SnapToGrid => v.snap_grid,
             Self::SnapToLayers => v.snap_layers,
@@ -678,6 +682,7 @@ impl Command {
             | Self::SnapToBounds
             | Self::SnapToAll
             | Self::SnapToNone
+            | Self::ScreenMode(_)
             | Self::LockGuides => true,
             Self::FlipView => doc.is_some(),
             Self::ClearGuides => doc.is_some_and(|d| !d.doc.guides.is_empty()),
@@ -1407,6 +1412,7 @@ pub fn run(command: Command, ctx: &egui::Context, app: &mut AppState) {
         }
         Command::LockGuides => app.view.lock_guides = !app.view.lock_guides,
         Command::ToggleSnap => app.view.snap = !app.view.snap,
+        Command::ScreenMode(mode) => app.set_screen_mode(mode),
         Command::SnapToGuides => app.view.snap_guides = !app.view.snap_guides,
         Command::SnapToGrid => app.view.snap_grid = !app.view.snap_grid,
         Command::SnapToLayers => app.view.snap_layers = !app.view.snap_layers,

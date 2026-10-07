@@ -6,7 +6,7 @@ Photoshop's error messages and confirmation questions are native macOS alerts (N
 
 ## Data
 
-- `Alert { message, icon, cancel, dont_show_again }`: the message; the icon (`App`, the app icon, or `Caution`, a warning triangle plus a small app icon); whether there is a Cancel; the "Don’t show again" checkbox and whether it is checked (`None` means there is none).
+- `Alert { message, icon, cancel, dont_show_again, choices, ok_label }`: the message (a blank line in it shows as a blank line); the icon (`App`, the app icon, or `Caution`, a warning triangle plus a small app icon); whether there is a Cancel; the "Don’t show again" checkbox and whether it is checked (`None` means there is none); the stacked choices; the default button's label (`"OK"` unless renamed, e.g. "Full Screen" for Full Screen Mode's warning).
 - `Alert::error(message)`: app icon, OK only. `Alert::caution(message)`: warning icon, Cancel and OK, with the checkbox.
 - `Alert::choose(message, choices)`: warning icon, with the buttons as a column of full-width choices (the first is the blue default button), see below.
 - `show(ctx, alert)` returns `Option<Answer>`: `Ok { dont_show_again }`, `Cancel` or `Choice(index)`; `None` while not yet answered.

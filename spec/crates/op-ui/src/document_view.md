@@ -44,6 +44,10 @@ Sizes are measured 1:1 against Photoshop (pt):
 
 When a drag starts with the Rectangular or Elliptical Marquee, the Move tool, or a shape tool, `snap::begin` gathers what it can snap to (View › Snap; rules in `snap.md`). The marquee's start and dragged points and the shape's two points go through `snap::point`; the Move tool's offset goes through `snap::offset` before it is rounded to whole pixels. Control held: no snapping.
 
+## Screen modes
+
+The pasteboard is black in Full Screen Mode (Photoshop's default) and `PASTEBOARD` gray otherwise. The document tabs above the view and the hidden tools and panels are laid out by `lib.rs`; the view just gets a larger area.
+
 ## Initial view
 
 - The layout may not be stable in the first few frames (the viewport size reported on the first frame is unreliable), so the initial zoom is decided only after the viewport size is the same for two consecutive frames; while waiting, a repaint is actively requested.
