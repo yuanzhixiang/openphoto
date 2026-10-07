@@ -4,6 +4,7 @@
 //! The three groups are fixed for now; a full docking system with drag-to-dock
 //! and collapse-to-icons comes later.
 
+pub(crate) mod brushes;
 pub(crate) mod channels;
 pub(crate) mod clone_source;
 mod color_panel;

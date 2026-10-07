@@ -6796,6 +6796,33 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn brushes_and_brush_settings_panels() {
+    use crate::commands::Command;
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.select_tool(op_tools::Tool::Brush);
+    h.run_steps(2);
+    // The options bar's Brush Settings toggle opens that panel
+    click(&mut h, at_pt(171.0, 45.25));
+    assert!(h.state().state.floating.brush_settings);
+    shot(&mut h, "brush_settings_panel");
+    // Its pen pressure switch reaches the brush
+    h.get_by_label("Shape Dynamics: Size Jitter — Pen Pressure")
+        .click();
+    h.run_steps(2);
+    assert!(h.state().state.brush.pressure.size);
+    // Window › Brushes: Hard Round
+    run_command(&mut h, Command::ToggleBrushes);
+    h.run_steps(2);
+    h.get_by_label("Hard Round").click();
+    h.run_steps(2);
+    let brush = h.state().state.brush;
+    assert_eq!((brush.hardness, brush.preset), (1.0, Some(1)));
+    assert!(!brush.pressure.size);
+}
+
+#[test]
 fn histogram_expands_and_navigator_zooms() {
     use crate::commands::Command;
     let mut h = harness(Vec::new());

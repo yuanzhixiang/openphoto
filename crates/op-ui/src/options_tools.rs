@@ -1803,6 +1803,11 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                     app.floating
                         .toggle(crate::panels::floating::Floating::CloneSource);
                 }
+                // The Brush Settings panel's toggle
+                if icon == Icon::BrushPanel && response.clicked() {
+                    app.floating
+                        .toggle(crate::panels::floating::Floating::BrushSettings);
+                }
             }
             OverlayGear(x) => {
                 let response = b.icon(x, Icon::GearMenu, "Set additional options", false, true);

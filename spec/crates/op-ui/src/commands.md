@@ -181,6 +181,8 @@ Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's men
 | ToggleHistory | Window › History | None |
 | ToggleHistogram | Window › Histogram | None |
 | ToggleCloneSource | Window › Clone Source (also the Clone Stamp's options bar toggle) | None |
+| ToggleBrushes | Window › Brushes | None |
+| ToggleBrushSettings | Window › Brush Settings (also the options bar's Brush Settings toggle) | F5 |
 | ToggleInfo | Window › Info | F8 |
 | ToggleNavigator | Window › Navigator | None |
 

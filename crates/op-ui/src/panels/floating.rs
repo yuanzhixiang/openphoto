@@ -14,14 +14,18 @@ pub enum Floating {
     Navigator,
     Histogram,
     CloneSource,
+    Brushes,
+    BrushSettings,
 }
 
 impl Floating {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 6] = [
         Self::Navigator,
         Self::Histogram,
         Self::Info,
         Self::CloneSource,
+        Self::Brushes,
+        Self::BrushSettings,
     ];
 
     pub fn title(self) -> &'static str {
@@ -30,6 +34,8 @@ impl Floating {
             Self::Navigator => "Navigator",
             Self::Histogram => "Histogram",
             Self::CloneSource => "Clone Source",
+            Self::Brushes => "Brushes",
+            Self::BrushSettings => "Brush Settings",
         }
     }
 
@@ -49,6 +55,8 @@ impl Floating {
             }
             Self::Histogram => Vec2::new(pt(250.0), pt(150.0)),
             Self::CloneSource => Vec2::new(pt(250.0), pt(250.0)),
+            Self::Brushes => Vec2::new(pt(250.0), pt(260.0)),
+            Self::BrushSettings => Vec2::new(pt(300.0), pt(240.0)),
         }
     }
 }
@@ -60,6 +68,8 @@ pub struct FloatingPanels {
     pub navigator: bool,
     pub histogram: bool,
     pub clone_source: bool,
+    pub brushes: bool,
+    pub brush_settings: bool,
 }
 
 impl FloatingPanels {
@@ -69,6 +79,8 @@ impl FloatingPanels {
             Floating::Navigator => self.navigator,
             Floating::Histogram => self.histogram,
             Floating::CloneSource => self.clone_source,
+            Floating::Brushes => self.brushes,
+            Floating::BrushSettings => self.brush_settings,
         }
     }
 
@@ -78,6 +90,8 @@ impl FloatingPanels {
             Floating::Navigator => &mut self.navigator,
             Floating::Histogram => &mut self.histogram,
             Floating::CloneSource => &mut self.clone_source,
+            Floating::Brushes => &mut self.brushes,
+            Floating::BrushSettings => &mut self.brush_settings,
         };
         *open = !*open;
     }
@@ -162,6 +176,8 @@ pub fn show(ctx: &egui::Context, app: &mut AppState, panel_column_left: f32, top
                     Floating::Navigator => super::navigator::show(&mut child, app),
                     Floating::Histogram => super::histogram::show(&mut child, app),
                     Floating::CloneSource => super::clone_source::show(&mut child, app),
+                    Floating::Brushes => super::brushes::brushes(&mut child, app),
+                    Floating::BrushSettings => super::brushes::brush_settings(&mut child, app),
                 }
             });
         if close {

@@ -321,6 +321,9 @@ pub enum Command {
     ToggleHistogram,
     /// Window > Clone Source.
     ToggleCloneSource,
+    /// Window > Brushes, Brush Settings (F5).
+    ToggleBrushes,
+    ToggleBrushSettings,
 }
 
 /// A keyboard shortcut. `cmd` is Command on macOS and Ctrl elsewhere.
@@ -513,9 +516,17 @@ impl Command {
                 ctrl: false,
                 key: Key::F8,
             },
+            Self::ToggleBrushSettings => Shortcut {
+                cmd: false,
+                shift: false,
+                alt: false,
+                ctrl: false,
+                key: Key::F5,
+            },
             Self::ToggleNavigator
             | Self::ToggleHistogram
             | Self::ToggleCloneSource
+            | Self::ToggleBrushes
             | Self::FlipView
             | Self::TogglePixelGrid
             | Self::ToggleSmartGuides
@@ -754,6 +765,8 @@ impl Command {
             Self::ToggleNavigator => app.floating.navigator,
             Self::ToggleHistogram => app.floating.histogram,
             Self::ToggleCloneSource => app.floating.clone_source,
+            Self::ToggleBrushes => app.floating.brushes,
+            Self::ToggleBrushSettings => app.floating.brush_settings,
             Self::QuickMask => app
                 .active_doc
                 .and_then(|id| app.docs.get(&id))
@@ -792,6 +805,8 @@ impl Command {
             | Self::ToggleNavigator
             | Self::ToggleHistogram
             | Self::ToggleCloneSource
+            | Self::ToggleBrushes
+            | Self::ToggleBrushSettings
             | Self::ToggleRulers
             | Self::ToggleExtras
             | Self::ToggleGuides
@@ -1730,6 +1745,12 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::ToggleCloneSource => app
             .floating
             .toggle(crate::panels::floating::Floating::CloneSource),
+        Command::ToggleBrushes => app
+            .floating
+            .toggle(crate::panels::floating::Floating::Brushes),
+        Command::ToggleBrushSettings => app
+            .floating
+            .toggle(crate::panels::floating::Floating::BrushSettings),
         Command::ToggleRulers => app.view.rulers = !app.view.rulers,
         Command::ToggleExtras => app.view.extras = !app.view.extras,
         Command::ToggleGuides => app.view.guides = !app.view.guides,
