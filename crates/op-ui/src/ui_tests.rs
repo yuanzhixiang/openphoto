@@ -5779,3 +5779,73 @@ fn status_bar_zoom_box_takes_a_percentage() {
     assert_eq!(active(&h).view.zoom, 128.0);
     assert_ne!(before, 128.0);
 }
+
+#[test]
+#[ignore]
+fn screenshot_status_bar() {
+    let mut h = harness(Vec::new());
+    probe_document(&mut h);
+    shot(&mut h, "status_bar_probe");
+}
+
+#[test]
+fn status_bar_menu_picks_what_it_shows() {
+    use crate::commands::Command;
+    use crate::status_info::StatusInfo;
+    let mut h = harness(Vec::new());
+    probe_document(&mut h);
+    let text = |h: &Harness<'_, OpenPhotoApp>, info: StatusInfo| {
+        let app = &h.state().state;
+        info.text(app, app.docs.get(&app.active_doc.unwrap()).unwrap())
+    };
+    // Photoshop's readings for the same 64 × 72 transparent document
+    assert_eq!(
+        text(&h, StatusInfo::DocumentDimensions),
+        "64 px x 72 px (72 ppi)"
+    );
+    assert_eq!(text(&h, StatusInfo::DocumentSizes), "Doc: 13.5K/13.5K");
+    assert_eq!(text(&h, StatusInfo::DocumentProfile), "Untagged RGB (8bpc)");
+    assert_eq!(text(&h, StatusInfo::GpuMode), "Metal");
+    assert_eq!(text(&h, StatusInfo::CompositingMode), "Classic");
+    assert_eq!(
+        text(&h, StatusInfo::MeasurementScale),
+        "1 pixel(s) = 1.0000 pixels"
+    );
+    assert_eq!(text(&h, StatusInfo::Efficiency), "Efficiency: 100%");
+    assert_eq!(
+        text(&h, StatusInfo::Exposure32),
+        "Exposure works in 32-bit only"
+    );
+    assert_eq!(
+        text(&h, StatusInfo::SmartObjects),
+        "Missing: 0 / Changed: 0"
+    );
+    assert_eq!(text(&h, StatusInfo::LayerCount), "1 Layer");
+    h.state_mut().state.select_tool(op_tools::Tool::Move);
+    assert_eq!(text(&h, StatusInfo::CurrentTool), "Move");
+    assert!(text(&h, StatusInfo::ScratchSizes).starts_with("Scratch: 13.5K/"));
+    // More layers and a group
+    run_command(&mut h, Command::NewLayerNoDialog);
+    run_command(&mut h, Command::NewLayerNoDialog);
+    run_command(&mut h, Command::GroupLayers);
+    assert_eq!(text(&h, StatusInfo::LayerCount), "3 Layers, 1 Group");
+    // Timing: how long the last command that changed the document took
+    assert!(text(&h, StatusInfo::Timing).ends_with("s (100%)"));
+
+    // Clicking the arrow asks for the menu (native, after the frame)
+    let vp = active(&h).view.viewport;
+    let arrow = Pos2::new(
+        vp.left() + crate::theme::pt(236.0),
+        vp.bottom() + crate::theme::pt(8.5),
+    );
+    click(&mut h, arrow);
+    assert!(h.state().state.status_menu);
+    // A pick changes what the bar shows, checked in the menu
+    run_command(&mut h, Command::StatusInfo(StatusInfo::LayerCount));
+    assert_eq!(h.state().state.status_info, StatusInfo::LayerCount);
+    assert!(
+        Command::StatusInfo(StatusInfo::LayerCount)
+            .checked(&h.state().state)
+            .unwrap()
+    );
+}

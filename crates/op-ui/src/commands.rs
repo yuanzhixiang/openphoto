@@ -232,6 +232,8 @@ pub enum Command {
     ShowNoExtras,
     /// View > Screen Mode.
     ScreenMode(crate::state::ScreenMode),
+    /// The status bar's menu: what it shows.
+    StatusInfo(crate::status_info::StatusInfo),
     /// View > Snap and View > Snap To.
     ToggleSnap,
     SnapToGuides,
@@ -455,7 +457,8 @@ impl Command {
             | Self::SnapToBounds
             | Self::SnapToAll
             | Self::SnapToNone
-            | Self::ScreenMode(_) => return None,
+            | Self::ScreenMode(_)
+            | Self::StatusInfo(_) => return None,
             Self::ToggleRulers => cmd(Key::R),
             Self::ToggleExtras => cmd(Key::H),
             Self::ToggleGuides => cmd(Key::Semicolon),
@@ -614,6 +617,7 @@ impl Command {
             Self::ToggleLayerEdges => v.layer_edges,
             Self::ToggleSnap => v.snap,
             Self::ScreenMode(mode) => app.screen_mode == mode,
+            Self::StatusInfo(info) => app.status_info == info,
             Self::SnapToGuides => v.snap_guides,
             Self::SnapToGrid => v.snap_grid,
             Self::SnapToLayers => v.snap_layers,
@@ -683,6 +687,7 @@ impl Command {
             | Self::SnapToAll
             | Self::SnapToNone
             | Self::ScreenMode(_)
+            | Self::StatusInfo(_)
             | Self::LockGuides => true,
             Self::FlipView => doc.is_some(),
             Self::ClearGuides => doc.is_some_and(|d| !d.doc.guides.is_empty()),
@@ -1054,6 +1059,17 @@ pub fn run(command: Command, ctx: &egui::Context, app: &mut AppState) {
     if !command.enabled(app) {
         return;
     }
+    // The status bar's Timing: how long a command that changed the
+    // document took
+    let revision = |app: &mut AppState| app.active().map(|d| d.doc.revision());
+    let (start, before) = (std::time::Instant::now(), revision(app));
+    run_command(command, ctx, app);
+    if revision(app) != before {
+        app.last_timing = start.elapsed().as_secs_f32();
+    }
+}
+
+fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
     let ppp = ctx.pixels_per_point();
     // With a text field focused, Select All selects its text (the native
     // menu takes Cmd+A before the field sees it)
@@ -1413,6 +1429,7 @@ pub fn run(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::LockGuides => app.view.lock_guides = !app.view.lock_guides,
         Command::ToggleSnap => app.view.snap = !app.view.snap,
         Command::ScreenMode(mode) => app.set_screen_mode(mode),
+        Command::StatusInfo(info) => app.status_info = info,
         Command::SnapToGuides => app.view.snap_guides = !app.view.snap_guides,
         Command::SnapToGrid => app.view.snap_grid = !app.view.snap_grid,
         Command::SnapToLayers => app.view.snap_layers = !app.view.snap_layers,

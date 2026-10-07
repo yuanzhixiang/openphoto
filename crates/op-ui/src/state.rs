@@ -1169,6 +1169,13 @@ pub struct AppState {
     pub untitled_counter: u32,
     /// Error message to show to the user.
     pub alert: Option<String>,
+    /// What the status bar shows beside the zoom box.
+    pub status_info: crate::status_info::StatusInfo,
+    /// The status bar's arrow was clicked: its menu opens after the frame.
+    pub status_menu: bool,
+    /// How long the last command that changed a document took, in seconds
+    /// (the status bar's Timing).
+    pub last_timing: f32,
     /// View › Screen Mode.
     pub screen_mode: ScreenMode,
     /// Tab: the toolbar and options bar hidden (with the panels).
@@ -1305,6 +1312,9 @@ impl Default for AppState {
             image_size_dialog: None,
             new_guide_dialog: None,
             new_layer_dialog: None,
+            status_info: Default::default(),
+            status_menu: false,
+            last_timing: 0.0,
             screen_mode: ScreenMode::Standard,
             hide_tools: false,
             hide_panels: false,

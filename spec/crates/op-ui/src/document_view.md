@@ -176,11 +176,15 @@ Applies to the Brush, Pencil, Eraser, and retouching tools (Dodge, Burn, Sponge,
 
 ## Status bar
 
-- Height 16, with a 1 pt `#444444` line at the top, background in the panel color.
-- From left to right: zoom percentage (a 60-wide `#414141` box, text centered), document size and resolution starting at 89 from the left (e.g. `734 px x 811 px (96 ppi)`), and a right-pointing arrow at 237 from the left.
-- From 243 from the left up to the vertical scrollbar column is the horizontal scrollbar: track `#4a4a4a`, thumb 10 high, color `#696969`. The corner below the vertical scrollbar column stays the panel color.
+Measured against Photoshop 2026's status bar (pt from the document area's left edge and the bar's top):
+
+- Height 16, background in the panel color. A 1 pt top line: `#424242` over 0–230, `#3e3e3e` over the arrow's cell (230–243); none over the scrollbar.
+- Zoom box 0–59: `#454545` with a 0.5 pt `#4a4a4a` top edge; the percentage centered (x 29.5, y 8) in Source Sans 3 13.5 pt, `#f0f0f0`. Then a 1 pt `#424242` divider (59–60).
+- Info cell 60–230: the text of the item picked in the arrow's menu (`status_info.md`), centered (y 8.75) in 12.25 pt, `#d6d6d6`. Photoshop sets both texts in Adobe Clean; these sizes give the same widths. For Save and Download Progress the cell is an empty `#383838` track instead; Download Progress adds its cancel button (an 11 pt `#b7b7b7` disc at x 219, y 8.5, with a dark `#111111` ×).
+- The arrow's cell 230–243: a thin chevron (1 pt `#e0e0e0` line from (234.5, 4.75) to (237.5, 8.75) to (234.5, 12.75)). Clicking the cell opens the menu (`AppState::status_menu`; `lib.rs` shows it after the frame through `NativeMenu::popup_status`): a native macOS menu as in Photoshop, listing the items with the current one checked, opening down from the pointer; a pick runs `Command::StatusInfo`.
+- A 1 pt `#424242` divider (243–244) the full height, then from 244 up to the vertical scrollbar column the horizontal scrollbar: track `#4a4a4a` (also over the top line), thumb 10 high, color `#696969`. The corner below the vertical scrollbar column stays the panel color.
 - The zoom box (`zoom_box`) is a text field: clicking it selects the whole percentage; a typed value (with or without "%", e.g. `200` or `50%`) zooms around the window's center when Enter is pressed or the box loses focus, clamped to 1%–12800%; Esc or text that is not a positive number leaves the zoom unchanged, and the box shows the current zoom again. While it has focus, single-key shortcuts are off (digits go into the box). Until it is edited, the percentage is painted as a label rather than by the text edit, so it stays exactly where it was (the text edit would place it a fraction of a pixel off). The selection highlight color while editing (`#2c5fb8`) has not been measured against Photoshop.
-- The arrow has no menu.
+- The native menu's rows are taller than Photoshop's (24 pt against 18 pt): macOS lays out menus by the SDK an app is built with, and Photoshop's is older.
 
 ## Visible area
 

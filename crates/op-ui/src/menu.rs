@@ -6,12 +6,13 @@ use std::sync::mpsc::{Receiver, channel};
 
 use muda::accelerator::{Accelerator, KeyAccelerator};
 use muda::{
-    AboutMetadata, CheckMenuItem, IsMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem,
-    Submenu,
+    AboutMetadata, CheckMenuItem, ContextMenu, IsMenuItem, Menu, MenuEvent, MenuItem,
+    PredefinedMenuItem, Submenu,
 };
 
 use crate::commands::Command;
 use crate::state::AppState;
+use crate::status_info::StatusInfo;
 use op_core::align::{Align, Distribute};
 
 const ALL_COMMANDS: &[Command] = &[
@@ -173,6 +174,21 @@ const ALL_COMMANDS: &[Command] = &[
     Command::ShowAllExtras,
     Command::ShowNoExtras,
     Command::ToggleSnap,
+    Command::StatusInfo(StatusInfo::DocumentSizes),
+    Command::StatusInfo(StatusInfo::DocumentProfile),
+    Command::StatusInfo(StatusInfo::DocumentDimensions),
+    Command::StatusInfo(StatusInfo::GpuMode),
+    Command::StatusInfo(StatusInfo::CompositingMode),
+    Command::StatusInfo(StatusInfo::MeasurementScale),
+    Command::StatusInfo(StatusInfo::ScratchSizes),
+    Command::StatusInfo(StatusInfo::Efficiency),
+    Command::StatusInfo(StatusInfo::Timing),
+    Command::StatusInfo(StatusInfo::CurrentTool),
+    Command::StatusInfo(StatusInfo::Exposure32),
+    Command::StatusInfo(StatusInfo::SaveProgress),
+    Command::StatusInfo(StatusInfo::DownloadProgress),
+    Command::StatusInfo(StatusInfo::SmartObjects),
+    Command::StatusInfo(StatusInfo::LayerCount),
     Command::ScreenMode(crate::state::ScreenMode::Standard),
     Command::ScreenMode(crate::state::ScreenMode::FullWithMenus),
     Command::ScreenMode(crate::state::ScreenMode::Full),
@@ -245,6 +261,8 @@ pub struct NativeMenu {
     /// Last applied (enabled, dynamic label) per item, to avoid redundant
     /// native calls.
     applied: Vec<(bool, Option<String>)>,
+    /// The window's NSView, for menus that pop up in it.
+    view: Option<usize>,
 }
 
 impl NativeMenu {
@@ -1099,6 +1117,38 @@ impl NativeMenu {
             checks: checks.into_inner(),
             events,
             applied,
+            view: None,
+        }
+    }
+
+    /// The window's NSView (from its raw window handle), where pop-up menus
+    /// open.
+    pub fn set_view(&mut self, view: *mut std::ffi::c_void) {
+        self.view = Some(view as usize);
+    }
+
+    /// The status bar's menu, as Photoshop's native one: what the bar
+    /// shows, the current item checked, opening down from the pointer. A
+    /// pick arrives as a command like the menu bar's.
+    pub fn popup_status(&self, app: &AppState) {
+        let Some(view) = self.view else {
+            return;
+        };
+        let menu = Menu::new();
+        for info in StatusInfo::ALL {
+            let command = Command::StatusInfo(info);
+            let item = CheckMenuItem::with_id(
+                id(command),
+                info.label(),
+                true,
+                app.status_info == info,
+                None,
+            );
+            let _ = menu.append(&item);
+        }
+        // SAFETY: the window's live content view, on the main thread
+        unsafe {
+            menu.show_context_menu_for_nsview(view as *const std::ffi::c_void, None);
         }
     }
 

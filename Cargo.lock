@@ -2368,6 +2368,7 @@ dependencies = [
  "egui-phosphor",
  "egui_kittest",
  "image",
+ "libc",
  "log",
  "muda",
  "objc2 0.6.5",

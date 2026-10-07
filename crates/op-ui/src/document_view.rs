@@ -5,7 +5,7 @@ use op_core::DocId;
 use op_tools::Tool;
 
 use crate::state::{AppState, DocState};
-use crate::theme::{self, color, pt, size};
+use crate::theme::{color, pt, size};
 
 /// Photoshop's preset zoom levels, in percent.
 const ZOOM_STEPS: &[f32] = &[
@@ -173,6 +173,12 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
     let mut straightened = false;
     let mut paint_error = None;
+    let status_info = app.status_info;
+    let status_text = app
+        .docs
+        .get(&id)
+        .map(|d| status_info.text(app, d))
+        .unwrap_or_default();
     let Some(state) = app.docs.get_mut(&id) else {
         return;
     };
@@ -730,7 +736,9 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     if let (Some(opts), Some(p), false) = (paint, response.hover_pos(), transforming) {
         brush_cursor(ui, canvas_rect, p, opts.size * state.view.zoom / ppp);
     }
-    status_bar(ui, state, status_rect, ppp);
+    if status_bar(ui, state, status_rect, (status_info, &status_text), ppp) {
+        app.status_menu = true;
+    }
     vertical_scrollbar(ui, state, vscroll_rect, ppp);
 }
 
@@ -1874,10 +1882,15 @@ fn draw_selection(
 
 /// Width of the vertical scrollbar column, and the status bar's layout.
 const VSCROLL_W: f32 = pt(17.0);
-const ZOOM_BOX_W: f32 = pt(60.0);
-const INFO_X: f32 = pt(89.0);
-const CARET_X: f32 = pt(237.0);
-const HSCROLL_X: f32 = pt(243.0);
+const ZOOM_BOX_W: f32 = pt(59.0);
+/// The info's cell (its text centered in it) and the arrow's after it.
+const INFO_X: f32 = pt(60.0);
+const INFO_END: f32 = pt(230.0);
+const HSCROLL_X: f32 = pt(244.0);
+/// Photoshop sets the zoom and the info in Adobe Clean; Source Sans 3 at
+/// these sizes covers the same widths.
+const ZOOM_FONT: f32 = pt(13.5);
+const INFO_FONT: f32 = pt(12.25);
 const TRACK: Color32 = Color32::from_gray(0x4a);
 const THUMB: Color32 = Color32::from_gray(0x69);
 const THUMB_THICKNESS: f32 = pt(10.0);
@@ -1981,11 +1994,11 @@ fn zoom_box(ui: &mut Ui, state: &mut DocState, rect: Rect, ppp: f32) {
     let output = egui::TextEdit::singleline(&mut text)
         .id(edit_id)
         .frame(egui::Frame::NONE)
-        .font(theme::body())
+        .font(egui::FontId::proportional(ZOOM_FONT))
         // Until it's being edited, the percentage is painted as a label
         // (the text edit would put it a fraction of a pixel off)
         .text_color(if focused {
-            color::TEXT
+            Color32::from_gray(0xf0)
         } else {
             Color32::TRANSPARENT
         })
@@ -1997,11 +2010,11 @@ fn zoom_box(ui: &mut Ui, state: &mut DocState, rect: Rect, ppp: f32) {
     let response = output.response.response;
     if !focused {
         ui.painter().text(
-            rect.center(),
+            Pos2::new(rect.center().x, rect.top() + pt(8.0)),
             Align2::CENTER_CENTER,
             zoom_label(state.view.zoom),
-            theme::body(),
-            color::TEXT,
+            egui::FontId::proportional(ZOOM_FONT),
+            Color32::from_gray(0xf0),
         );
     }
     if response.gained_focus() {
@@ -2026,47 +2039,91 @@ fn zoom_box(ui: &mut Ui, state: &mut DocState, rect: Rect, ppp: f32) {
 
 /// Photoshop's status bar: zoom box, document info, the info menu caret,
 /// then the horizontal scrollbar filling the rest.
-fn status_bar(ui: &mut Ui, state: &mut DocState, rect: Rect, ppp: f32) {
+fn status_bar(
+    ui: &mut Ui,
+    state: &mut DocState,
+    rect: Rect,
+    (info, text): (crate::status_info::StatusInfo, &str),
+    ppp: f32,
+) -> bool {
     let painter = ui.painter_at(rect);
+    let x = |v: f32| rect.left() + v;
+    let span = |x0: f32, x1: f32, y0: f32, y1: f32| {
+        Rect::from_min_max(
+            Pos2::new(x(x0), rect.top() + y0),
+            Pos2::new(x(x1), rect.top() + y1),
+        )
+    };
+    let (top, bottom) = (pt(1.0), rect.height());
     painter.rect_filled(rect, 0, color::PANEL);
-    let line = Rect::from_min_max(rect.min, Pos2::new(rect.right(), rect.top() + pt(1.0)));
-    painter.rect_filled(line, 0, Color32::from_gray(0x44));
-    let body = Rect::from_min_max(Pos2::new(rect.left(), line.bottom()), rect.max);
+    // The 1 pt top line: darker over the arrow's cell; the 1 pt dividers
+    // after the zoom box and before the scrollbar run the full height
+    let divider = Color32::from_gray(0x42);
+    painter.rect_filled(span(0.0, INFO_END, 0.0, top), 0, divider);
+    painter.rect_filled(
+        span(INFO_END, HSCROLL_X - pt(1.0), 0.0, top),
+        0,
+        Color32::from_gray(0x3e),
+    );
+    painter.rect_filled(span(ZOOM_BOX_W, INFO_X, top, bottom), 0, divider);
+    painter.rect_filled(
+        span(HSCROLL_X - pt(1.0), HSCROLL_X, 0.0, bottom),
+        0,
+        divider,
+    );
 
-    let zoom_rect = Rect::from_min_size(body.min, Vec2::new(ZOOM_BOX_W, body.height()));
-    painter.rect_filled(zoom_rect, 0, Color32::from_gray(0x41));
+    // The zoom box, with a half-point lighter top edge
+    let zoom_rect = span(0.0, ZOOM_BOX_W, top, bottom);
+    painter.rect_filled(zoom_rect, 0, Color32::from_gray(0x45));
+    painter.rect_filled(span(0.0, ZOOM_BOX_W, top, top + pt(0.5)), 0, TRACK);
     zoom_box(ui, state, zoom_rect, ppp);
 
-    let doc = &state.doc;
-    let info = format!(
-        "{} px x {} px ({} ppi)",
-        doc.width,
-        doc.height,
-        doc.resolution.round()
-    );
-    painter.text(
-        Pos2::new(body.left() + INFO_X, body.center().y),
-        Align2::LEFT_CENTER,
-        info,
-        theme::body(),
-        color::TEXT_DIM,
-    );
-    painter.text(
-        Pos2::new(body.left() + CARET_X, body.center().y),
-        Align2::CENTER_CENTER,
-        crate::icons::CARET_RIGHT,
-        theme::icon(pt(9.0)),
-        color::TEXT_DIM,
+    // The info, centered left of the arrow's cell; the progress items show
+    // an empty dark track instead (Download Progress with its cancel button)
+    let center_y = rect.top() + pt(8.75);
+    if info.is_progress() {
+        painter.rect_filled(span(INFO_X, INFO_END, top, bottom), 0, color::DIVIDER_DARK);
+        if info == crate::status_info::StatusInfo::DownloadProgress {
+            let c = Pos2::new(x(pt(219.0)), rect.top() + pt(8.5));
+            painter.circle_filled(c, pt(5.5), Color32::from_gray(0xb7));
+            let ink = egui::Stroke::new(pt(1.0), Color32::from_gray(0x11));
+            let r = pt(2.5);
+            painter.line_segment([c - Vec2::splat(r), c + Vec2::splat(r)], ink);
+            painter.line_segment([c + Vec2::new(-r, r), c + Vec2::new(r, -r)], ink);
+        }
+    } else {
+        painter.text(
+            Pos2::new((x(INFO_X) + x(INFO_END)) / 2.0, center_y),
+            Align2::CENTER_CENTER,
+            text,
+            egui::FontId::proportional(INFO_FONT),
+            Color32::from_gray(0xd6),
+        );
+    }
+    // The arrow: a thin chevron
+    let p = |dx: f32, dy: f32| Pos2::new(x(pt(dx)), rect.top() + pt(dy));
+    painter.add(egui::Shape::line(
+        vec![p(234.5, 4.75), p(237.5, 8.75), p(234.5, 12.75)],
+        egui::Stroke::new(pt(1.0), Color32::from_gray(0xe0)),
+    ));
+    let arrow = ui.interact(
+        span(INFO_END, HSCROLL_X - pt(1.0), 0.0, bottom),
+        ui.id().with("status-menu"),
+        egui::Sense::click(),
     );
 
     // The horizontal scrollbar stops where the vertical one's column starts;
     // the corner below that column stays panel-colored
     let track = Rect::from_min_max(
-        Pos2::new(body.left() + HSCROLL_X, body.top()),
-        Pos2::new(body.right() - VSCROLL_W, body.bottom()),
+        Pos2::new(x(HSCROLL_X), rect.top() + top),
+        Pos2::new(rect.right() - VSCROLL_W, rect.bottom()),
     );
     if track.width() > 0.0 {
-        painter.rect_filled(track, 0, TRACK);
+        painter.rect_filled(
+            Rect::from_min_max(Pos2::new(track.left(), rect.top()), track.max),
+            0,
+            TRACK,
+        );
         let doc = doc_size_pt(state, state.view.zoom, ppp);
         let fraction = scroll_fraction(doc.x, state.view.viewport.width(), state.view.offset.x);
         let extent = doc.x + state.view.viewport.width();
@@ -2074,6 +2131,7 @@ fn status_bar(ui: &mut Ui, state: &mut DocState, rect: Rect, ppp: f32) {
         state.view.offset.x -= d * extent;
         clamp_offset(state, ppp);
     }
+    arrow.clicked()
 }
 
 /// Photoshop's sampling ring around the Eyedropper while it's held: the

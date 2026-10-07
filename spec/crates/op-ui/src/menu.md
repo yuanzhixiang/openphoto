@@ -24,6 +24,10 @@ Implemented items emit a `Command`; items not yet implemented are shown grayed o
 - **Window**: listed in Photoshop 2026's complete order. Available are Histogram, History, Info (F8), Navigator (with check marks); the rest are grayed out with Photoshop's shortcuts (Arrange ›, Workspace ›, Actions ⌥F9, Brush Settings F5, Color F6, Layers F7, etc., plus Application Frame, Options, Tools, Contextual Task Bar). It is also set as the macOS Window menu, and the system lists windows at the end.
 - **Help**: OpenPhoto Help (grayed out).
 
+## Pop-up menus
+
+`NativeMenu::popup_status` shows the status bar's menu (`status_info.md`) as a native context menu in the window's view (`set_view`, the NSView from the window handle, given by `lib.rs` at startup): Photoshop's 15 items as check items with the current one checked, at the pointer. Its items carry `Command::StatusInfo` ids, so a pick arrives through the same event channel as the menu bar's.
+
 ## Dynamic content
 
 `update()` is called every frame to synchronize menu state, calling the native interface only when a value actually changes:

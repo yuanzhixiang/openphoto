@@ -26,6 +26,7 @@ mod ps_icons;
 mod rulers;
 mod snap;
 mod state;
+mod status_info;
 mod theme;
 mod titlebar;
 mod tool_icons;
@@ -61,10 +62,17 @@ impl OpenPhotoApp {
         app.state.clipboard = clipboard::Clipboard::new(true);
         #[cfg(target_os = "macos")]
         {
-            app.menu = Some(menu::NativeMenu::install(&cc.egui_ctx));
+            let mut menu = menu::NativeMenu::install(&cc.egui_ctx);
             if let Some(window) = cc.winit_window() {
                 color_management::use_srgb(window.as_ref());
+                use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+                if let Ok(handle) = window.window_handle()
+                    && let RawWindowHandle::AppKit(appkit) = handle.as_raw()
+                {
+                    menu.set_view(appkit.ns_view.as_ptr());
+                }
             }
+            app.menu = Some(menu);
         }
         app
     }
@@ -717,6 +725,14 @@ impl eframe::App for OpenPhotoApp {
         #[cfg(target_os = "macos")]
         if let Some(menu) = &mut self.menu {
             menu.update(&self.state);
+        }
+        // The status bar's arrow: its native menu (without one, as in
+        // tests, the request stays and the commands are run directly)
+        #[cfg(target_os = "macos")]
+        if let Some(menu) = &self.menu
+            && std::mem::take(&mut self.state.status_menu)
+        {
+            menu.popup_status(&self.state);
         }
 
         if let Some(msg) = self.state.alert.clone() {
