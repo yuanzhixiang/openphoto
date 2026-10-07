@@ -1375,8 +1375,8 @@ impl AdjustDialog {
     /// The classic layout as shown now: Shadows/Highlights has a short one
     /// until Show More Options is checked.
     fn layout(&self) -> Option<&'static filter_layout::Layout> {
-        if self.kind == Kind::ShadowsHighlights && self.value(10) != Some(1.0) {
-            return Some(filter_layout::SHADOWS_HIGHLIGHTS_SIMPLE);
+        if self.kind == Kind::ShadowsHighlights && self.shadows_highlights_short() {
+            return None;
         }
         self.kind.layout()
     }
@@ -1415,7 +1415,8 @@ impl AdjustDialog {
 
     fn value(&self, i: usize) -> Option<f32> {
         let p = &self.kind.params()[i];
-        let v: f32 = self.values[i].trim().parse().ok()?;
+        // (a field may show its unit, as Shadows/Highlights' "35%")
+        let v: f32 = self.values[i].trim().trim_end_matches('%').trim().parse().ok()?;
         // Popups whose choices the dialog fills in itself
         if let Some(labels) = self.extra.labels(self.kind, i) {
             return (v >= 0.0 && (v as usize) < labels.len()).then_some(v);
@@ -1807,6 +1808,11 @@ impl AdjustDialog {
                     None if self.kind == Kind::SmartSharpen => self.smart_sharpen_size(),
                     None if self.kind == Kind::OilPaint => oil_paint::SIZE,
                     None if self.kind == Kind::ShapeBlur => shape_blur::SIZE,
+                    None if self.kind == Kind::ShadowsHighlights
+                        && self.shadows_highlights_short() =>
+                    {
+                        shadows_highlights::SIZE
+                    }
                     None => self
                         .layout()
                         .map_or_else(|| self.kind.size(), |l| vec2(pt(l.size.0), pt(l.size.1))),
@@ -1827,6 +1833,8 @@ impl AdjustDialog {
                     self.oil_paint_ui(ui, rect)
                 } else if self.kind == Kind::ShapeBlur {
                     self.shape_blur_ui(ui, rect)
+                } else if self.kind == Kind::ShadowsHighlights && self.shadows_highlights_short() {
+                    self.shadows_highlights_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
                     self.classic_ui(ui, rect, layout)
                 } else if let Some(layout) = self.kind.plain() {
@@ -2140,7 +2148,6 @@ impl AdjustDialog {
                     appkit::checkbox(ui, at(min.0, min.1), label, &mut on);
                     self.values[i] = (on as u8).to_string();
                 }
-                Row::Hidden => {}
             }
         }
         if self.kind == Kind::ReplaceColor {
@@ -3068,6 +3075,7 @@ mod legacy;
 mod lens_blur;
 mod oil_paint;
 mod reduce_noise;
+mod shadows_highlights;
 mod shape_blur;
 mod smart_sharpen;
 

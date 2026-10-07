@@ -39,6 +39,12 @@ pub const EXPOSURE: Kind = Kind {
     folder: "Exposure",
     ext: "eap",
 };
+/// Shadows/Highlights' Load... and Save... (Photoshop's own `.shh`
+/// layout hasn't been compared yet; see `encode_shadows_highlights`).
+pub const SHADOWS_HIGHLIGHTS: Kind = Kind {
+    folder: "Shadows Highlights",
+    ext: "shh",
+};
 
 impl Kind {
     /// Where saved presets live:
@@ -474,6 +480,31 @@ pub fn decode_exposure(b: &[u8]) -> Option<[f32; 3]> {
         Some(f32::from_be_bytes([s[0], s[1], s[2], s[3]]))
     };
     Some([f(0)?, f(1)?, f(2)?])
+}
+
+/// Shadows/Highlights' settings file: "OPSH", version 1, then the ten
+/// settings (the amounts, tones and radii, Color, Midtone and the clips)
+/// as big-endian 32-bit floats. OpenPhoto's own layout: Photoshop's .shh
+/// hasn't been decoded.
+pub fn encode_shadows_highlights(v: [f32; 10]) -> Vec<u8> {
+    let mut out = b"OPSH".to_vec();
+    out.extend_from_slice(&1u16.to_be_bytes());
+    for x in v {
+        out.extend_from_slice(&x.to_be_bytes());
+    }
+    out
+}
+
+pub fn decode_shadows_highlights(b: &[u8]) -> Option<[f32; 10]> {
+    if b.get(0..4)? != b"OPSH" || get16(b, 4)? != 1 {
+        return None;
+    }
+    let mut v = [0f32; 10];
+    for (k, x) in v.iter_mut().enumerate() {
+        let s = b.get(6 + 4 * k..10 + 4 * k)?;
+        *x = f32::from_be_bytes([s[0], s[1], s[2], s[3]]);
+    }
+    Some(v)
 }
 
 /// Black & White (.blw): an action descriptor (version 16): the six

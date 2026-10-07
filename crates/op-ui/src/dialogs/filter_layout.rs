@@ -43,9 +43,6 @@ pub enum Row {
         /// The box's top-left corner.
         min: (f32, f32),
     },
-    /// A setting this layout doesn't show (Shadows/Highlights without
-    /// Show More Options).
-    Hidden,
 }
 
 /// Where a value sits along a slider track, 0–1. Photoshop's sliders are
@@ -623,46 +620,6 @@ pub const SHADOWS_HIGHLIGHTS: &Layout = &Layout {
         Row::Check {
             label: "Show More Options",
             min: (21.0, 530.0),
-        },
-    ],
-};
-
-/// Shadows/Highlights without Show More Options: the two amounts.
-pub const SHADOWS_HIGHLIGHTS_SIMPLE: &Layout = &Layout {
-    size: (324.0, 170.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: false,
-    rows: &[
-        number(
-            "Shadows Amount:",
-            135.0,
-            [140.0, 38.0, 200.5, 57.0],
-            "%",
-            205.5,
-            Some((21.0, 206.0, 64.0)),
-            Scale::Linear,
-        ),
-        Row::Hidden,
-        Row::Hidden,
-        number(
-            "Highlights Amount:",
-            135.0,
-            [140.0, 87.0, 200.5, 106.0],
-            "%",
-            205.5,
-            Some((21.0, 206.0, 113.0)),
-            Scale::Linear,
-        ),
-        Row::Hidden,
-        Row::Hidden,
-        Row::Hidden,
-        Row::Hidden,
-        Row::Hidden,
-        Row::Hidden,
-        Row::Check {
-            label: "Show More Options",
-            min: (21.0, 140.0),
         },
     ],
 };

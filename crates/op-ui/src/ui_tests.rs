@@ -8049,8 +8049,19 @@ fn shadows_highlights_more_options_and_replace_color_preview() {
     run_command(&mut h, Command::ShadowsHighlights);
     h.run_steps(2);
     let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
-    assert!((rect.height() - pt(170.0)).abs() < 1.0, "{rect:?}");
-    click(&mut h, rect.min + egui::vec2(pt(27.0), pt(146.0)));
+    assert!(
+        (rect.height() - pt(236.0)).abs() < 1.0 && (rect.width() - pt(449.0)).abs() < 1.0,
+        "{rect:?}"
+    );
+    shot_dialog(&mut h, "shadows_highlights", 449.0, 236.0);
+    // Dragging the Shadows thumb to the track's right end gives 100%
+    let thumb = rect.min + egui::vec2(pt(134.9), pt(59.75));
+    drag(&mut h, thumb, rect.min + egui::vec2(pt(240.0), pt(59.75)), Modifiers::NONE);
+    assert_eq!(
+        h.state().state.adjust_dialog.as_ref().unwrap().value_of(0),
+        Some(100.0)
+    );
+    click(&mut h, rect.min + egui::vec2(pt(26.0), pt(132.0)));
     h.run_steps(2);
     let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
     assert!((rect.height() - pt(560.0)).abs() < 1.0, "{rect:?}");

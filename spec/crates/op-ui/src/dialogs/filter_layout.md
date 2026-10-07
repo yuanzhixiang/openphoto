@@ -14,7 +14,6 @@ All coordinates are Photoshop points from the dialog's top-left corner (includin
   - `Row::Popup`: label and its right end, dropdown rectangle.
   - `Row::Radios`: group box title, group box rectangle (the title sits on the top border), the y of each radio button's center (x fixed at 27).
   - `Row::Check`: checkbox label and top-left corner.
-  - `Row::Hidden`: a setting the layout doesn't show (it keeps the rows aligned 1:1 with the settings).
 - `PANE` (16, 43)–(212, 239) is the preview pane, and `ZOOM_Y` 261.75 is the center line of the zoom controls.
 - Sizes: Gaussian Blur, High Pass 324 × 335; Box Blur, Median 324 × 342; Minimum, Maximum 324 × 378; Unsharp Mask 324 × 436; Add Noise 324 × 452; Mosaic 324 × 338; Diffuse 324 × 430 (the Mode group box (10.5, 295.5)–(314, 419), radio centers y 320, 347, 374, 401); Motion Blur 324 × 389; Emboss 324 × 431; Surface Blur 324 × 395; Dust & Scratches 324 × 387; Trace Contour 324 × 425 (the Edge group box is in the same position as Add Noise's Distribution); Offset 323 × 256.
 - Box Blur and Median have the same layout but different scales (1–2000 for the former, 1–500 for the latter), so they are two `Layout`s.
@@ -39,7 +38,7 @@ Most of Photoshop's sliders are not uniform. The scales were measured by enterin
 
 `SHADOWS_HIGHLIGHTS`, `HDR_TONING`, `REPLACE_COLOR`, `MATCH_COLOR`, `COLOR_LOOKUP` are laid out by one rule, not from Photoshop: 324 pt wide; with the preview pane the rows start at y 287, without it at 38; number rows 49 pt apart (label right-aligned to 135, field 140–200.5, unit at 205.5, track from 21 to 303 with the pane or 206 without, 26 pt under the field's top); popups 33 pt apart (140 to 300 or 230); radio groups full width (no higher than y 146.5 without the pane, clear of the buttons), first radio 25 pt under the group's top and 27 pt apart; checkboxes 27 pt apart.
 
-- Shadows/Highlights has two layouts. `SHADOWS_HIGHLIGHTS_SIMPLE` (324 × 170) shows Shadows Amount (field y 38) and Highlights Amount (y 87), hides the other eight settings, and has the "Show More Options" checkbox at (21, 140). `SHADOWS_HIGHLIGHTS` (324 × 560) shows all ten, with the checkbox at (21, 530). The dialog picks one by that checkbox (`adjust.md`).
+- `SHADOWS_HIGHLIGHTS` (324 × 560) is Shadows/Highlights' full layout: all ten settings, with the "Show More Options" checkbox at (21, 530). Its short layout is Photoshop's own UXP one (`adjust/shadows_highlights.md`); the dialog picks by that checkbox (`adjust.md`).
 - `REPLACE_COLOR` (324 × 410): Fuzziness (field y 38), then the selection preview box `REPLACE_PREVIEW` (21, 82)–(206, 222) with the Selection and Image radio buttons centered at (27, 238) and (117, 238) (`REPLACE_RADIOS`), then Hue (y 260), Saturation (309) and Lightness (358).
 
 ## Test coverage
