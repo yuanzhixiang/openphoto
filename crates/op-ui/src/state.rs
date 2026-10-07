@@ -135,6 +135,13 @@ pub struct DocState {
     pub selected_guides: Vec<usize>,
     /// The Move tool's ⌘-hover distances (`smart_guides::measure`).
     pub measure: Vec<([egui::Pos2; 2], f32)>,
+    /// The Channels panel: which of red, green and blue show, and which
+    /// edits reach (the rest are kept when an edit is recorded).
+    pub channels_shown: [bool; 3],
+    pub channels_targeted: [bool; 3],
+    /// The Channels panel's thumbnails (composite, red, green, blue) and
+    /// the revision they show.
+    channel_thumbs: Option<(u64, [egui::TextureHandle; 4])>,
     /// The Crop tool's box, while the Crop tool is in use.
     pub crop: Option<CropBox>,
     /// The Perspective Crop tool's box, while it is in use.
@@ -269,6 +276,9 @@ impl DocState {
             clone_slot: 0,
             selected_guides: Vec::new(),
             measure: Vec::new(),
+            channels_shown: [true; 3],
+            channels_targeted: [true; 3],
+            channel_thumbs: None,
             gradient_drag: None,
             shape_drag: None,
             text_edit: None,
@@ -292,8 +302,104 @@ impl DocState {
 
     /// Records the current document as a new history state.
     pub fn record(&mut self, name: &str) {
+        self.keep_untargeted_channels();
         self.history.record(&self.doc, name);
         self.pending_edit = false;
+    }
+
+    /// With only some channels targeted (Channels panel), an edit of the
+    /// active layer's pixels keeps the other channels as they were before
+    /// it (in the last recorded state).
+    fn keep_untargeted_channels(&mut self) {
+        let keep = self.channels_targeted.map(|t| !t);
+        if !keep.iter().any(|&k| k)
+            || keep.iter().all(|&k| k)
+            || self.doc.quick_mask.is_some()
+            || self.doc.editing_mask()
+        {
+            return;
+        }
+        let Some(id) = self.doc.active_layer else {
+            return;
+        };
+        let Some(before) = self
+            .history
+            .snapshot(self.history.current())
+            .and_then(|s| op_core::Document::snapshot_layer(s, id))
+            .and_then(|l| l.image())
+            .cloned()
+        else {
+            return;
+        };
+        let Some(image) = self.doc.layer_mut(id).and_then(|l| l.image_mut()) else {
+            return;
+        };
+        if (before.width(), before.height()) != (image.width(), image.height()) {
+            return;
+        }
+        for y in 0..image.height() {
+            for x in 0..image.width() {
+                let (mut now, was) = (image.pixel(x, y), before.pixel(x, y));
+                if now == was {
+                    continue;
+                }
+                for c in 0..3 {
+                    if keep[c] {
+                        now[c] = was[c];
+                    }
+                }
+                image.set_pixel(x, y, now);
+            }
+        }
+        self.doc.mark_dirty();
+    }
+
+    /// The Channels panel's thumbnails: the composite and each channel in
+    /// gray, at most 64 pixels on a side, cached by revision.
+    pub fn channel_thumbnails(&mut self, ctx: &egui::Context) -> Option<[egui::TextureHandle; 4]> {
+        let rev = self.doc.revision();
+        if let Some((r, t)) = &self.channel_thumbs
+            && *r == rev
+        {
+            return Some(t.clone());
+        }
+        let (w, h) = (self.doc.width as usize, self.doc.height as usize);
+        if w == 0 || h == 0 {
+            return None;
+        }
+        let k = (64.0 / w.max(h) as f32).min(1.0);
+        let (tw, th) = (
+            ((w as f32 * k) as usize).max(1),
+            ((h as f32 * k) as usize).max(1),
+        );
+        let all = self.doc.composite_rgba8();
+        let at = |x: usize, y: usize| {
+            let (sx, sy) = (
+                ((x as f32 + 0.5) / k) as usize,
+                ((y as f32 + 0.5) / k) as usize,
+            );
+            let i = (sy.min(h - 1) * w + sx.min(w - 1)) * 4;
+            [all[i], all[i + 1], all[i + 2], all[i + 3]]
+        };
+        let make = |name: &str, f: &dyn Fn([u8; 4]) -> egui::Color32| {
+            let pixels = (0..th)
+                .flat_map(|y| (0..tw).map(move |x| (x, y)))
+                .map(|(x, y)| f(at(x, y)))
+                .collect();
+            ctx.load_texture(
+                format!("channel-{name}-{}", self.doc.id.0),
+                egui::ColorImage::new([tw, th], pixels),
+                egui::TextureOptions::LINEAR,
+            )
+        };
+        let thumbs = [
+            make("rgb", &|p| egui::Color32::from_rgb(p[0], p[1], p[2])),
+            make("r", &|p| egui::Color32::from_gray(p[0])),
+            make("g", &|p| egui::Color32::from_gray(p[1])),
+            make("b", &|p| egui::Color32::from_gray(p[2])),
+        ];
+        self.channel_thumbs = Some((rev, thumbs.clone()));
+        Some(thumbs)
     }
 
     /// The document as the History Brush paints from it: its source state,
@@ -411,7 +517,13 @@ impl DocState {
 
     /// The current composite, recomputed when the document changes.
     pub fn canvas_image(&mut self) -> Arc<CanvasImage> {
-        let rev = self.doc.revision();
+        // (which channels show is part of the picture's revision)
+        let shown = self.channels_shown;
+        let bits = shown
+            .iter()
+            .enumerate()
+            .fold(0u64, |b, (i, &on)| b | ((on as u64) << i));
+        let rev = self.doc.revision().wrapping_mul(8).wrapping_add(bits);
         match &self.canvas {
             Some(img) if img.revision == rev => img.clone(),
             _ => {
@@ -434,6 +546,30 @@ impl DocState {
                                 .clamp(0.0, 255.0) as u8;
                         }
                         px[3] = 255;
+                    }
+                }
+                // Channels: one shows alone in gray; with two, the hidden
+                // one is left out
+                if shown != [true; 3] {
+                    let alone = (shown.iter().filter(|&&on| on).count() == 1)
+                        .then(|| shown.iter().position(|&on| on))
+                        .flatten();
+                    for px in pixels.chunks_mut(4) {
+                        match alone {
+                            Some(c) => {
+                                let v = px[c];
+                                px[0] = v;
+                                px[1] = v;
+                                px[2] = v;
+                            }
+                            None => {
+                                for c in 0..3 {
+                                    if !shown[c] {
+                                        px[c] = 0;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 let img = Arc::new(CanvasImage {

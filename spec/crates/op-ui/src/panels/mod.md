@@ -35,7 +35,8 @@ Dragging the divider between groups changes the heights (the cursor becomes an u
 - Properties: see `properties.md`.
 - Layers: see `layers.md`.
 - Gradients, Patterns: see `presets.md`.
-- Adjustments, Libraries, Channels, Paths: show the placeholder text "{name} — not implemented yet".
+- Channels: see `channels.md`.
+- Adjustments, Libraries, Paths: show the placeholder text "{name} — not implemented yet".
 
 ## Icon column
 

@@ -176,6 +176,7 @@ Shortcuts match the Photoshop 2026 defaults (obtained by reading Photoshop's men
 | ClearSelectedGuides | View › Guides › Clear Selected Guides (guides selected) | None |
 | ClearCanvasGuides | View › Guides › Clear Canvas Guides (guides present) | None |
 | ToggleCanvasGuides | View › Show › Canvas Guides (check mark) | None |
+| Channel(0–3) | The Channels panel's composite, Red, Green, Blue (not menu items; on macOS caught beside the menu) | ⌘2, ⌘3, ⌘4, ⌘5 |
 | HideApp | OpenPhoto › Hide OpenPhoto | ⌃⌘H |
 | ToggleHistory | Window › History | None |
 | ToggleHistogram | Window › Histogram | None |

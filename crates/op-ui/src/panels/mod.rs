@@ -4,6 +4,7 @@
 //! The three groups are fixed for now; a full docking system with drag-to-dock
 //! and collapse-to-icons comes later.
 
+pub(crate) mod channels;
 pub(crate) mod clone_source;
 mod color_panel;
 pub mod floating;
@@ -243,6 +244,7 @@ impl Panels {
             PanelKind::Properties => properties::show(&mut child, app),
             PanelKind::Layers => layers::show(&mut child, app),
             PanelKind::Gradients => presets::gradients(&mut child, app),
+            PanelKind::Channels => channels::show(&mut child, app),
             PanelKind::Patterns => presets::patterns(&mut child, app),
             other => placeholder(&mut child, other),
         }

@@ -309,6 +309,9 @@ pub enum Command {
     ClearCanvasGuides,
     /// View > Show > Canvas Guides.
     ToggleCanvasGuides,
+    /// The Channels panel's ⌘2–⌘5: the composite, red, green or blue
+    /// (0–3) targeted and shown.
+    Channel(u8),
     /// Hide OpenPhoto (Ctrl+Cmd+H, as Photoshop: Cmd+H is Extras).
     HideApp,
     ToggleHistory,
@@ -672,6 +675,9 @@ impl Command {
                 key: Key::F,
             },
             Self::Desaturate => shift_cmd(Key::U),
+            Self::Channel(k) => {
+                cmd([Key::Num2, Key::Num3, Key::Num4, Key::Num5][k.min(3) as usize])
+            }
             Self::Fade => shift_cmd(Key::F),
             Self::FitLayers
             | Self::Zoom200
@@ -1057,6 +1063,7 @@ impl Command {
             | Self::ActualSize
             | Self::NewGuide
             | Self::NewGuideLayout
+            | Self::Channel(_)
             | Self::QuickMask => doc.is_some(),
             Self::Fade => doc.is_some_and(|d| d.can_fade()),
             Self::OpenRecent(i) => (i as usize) < app.recent.files().len(),
@@ -1068,6 +1075,10 @@ impl Command {
 /// Commands that have keyboard shortcuts, most specific first: egui ignores
 /// extra Shift/Alt when matching, so Shift+Cmd+Z must be checked before Cmd+Z.
 const SHORTCUT_ORDER: &[Command] = &[
+    Command::Channel(0),
+    Command::Channel(1),
+    Command::Channel(2),
+    Command::Channel(3),
     Command::ExportAs,
     Command::LayerExportAs,
     Command::LayerQuickExportPng,
@@ -1152,6 +1163,15 @@ pub fn from_shortcuts_beside_menu(ctx: &egui::Context) -> Vec<Command> {
         let mut out = Vec::new();
         if i.consume_key(Modifiers::COMMAND, Key::Equals) {
             out.push(Command::ZoomIn);
+        }
+        // The Channels panel's Cmd+2–5 aren't menu items
+        for (k, key) in [Key::Num2, Key::Num3, Key::Num4, Key::Num5]
+            .into_iter()
+            .enumerate()
+        {
+            if i.consume_key(Modifiers::COMMAND, key) {
+                out.push(Command::Channel(k as u8));
+            }
         }
         // Cmd+/ reaches egui when Lock Layers... is disabled (only the
         // background selected); Photoshop still answers it with an alert
@@ -1714,6 +1734,11 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::ToggleExtras => app.view.extras = !app.view.extras,
         Command::ToggleGuides => app.view.guides = !app.view.guides,
         Command::ToggleCanvasGuides => app.view.canvas_guides = !app.view.canvas_guides,
+        Command::Channel(k) => {
+            if let Some(state) = app.active() {
+                crate::panels::channels::choose(state, k as usize);
+            }
+        }
         Command::ClearSelectedGuides => {
             if let Some(state) = app.active() {
                 let mut chosen = state.guide_selection();

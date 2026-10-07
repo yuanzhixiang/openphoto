@@ -6796,6 +6796,60 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn channels_panel_targets_shows_and_loads() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let before = composite_pixel(&mut h, 300, 300);
+    // The Channels tab, then the Red row: only red is targeted and shown
+    click(&mut h, at_pt(1112.0, 527.0));
+    h.run_steps(2);
+    click(&mut h, at_pt(1150.0, 597.0));
+    h.run_steps(2);
+    assert_eq!(active(&h).channels_targeted, [true, false, false]);
+    assert_eq!(active(&h).channels_shown, [true, false, false]);
+    shot(&mut h, "channels_panel");
+    // A white fill reaches only red
+    h.state_mut().state.foreground = Color::from_rgba8([255, 255, 255, 255]);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.run_steps(2);
+    // (shown alone: red in gray)
+    assert_eq!(composite_pixel(&mut h, 300, 300), [255, 255, 255, 255]);
+    // ⌘2: the composite again, where only red changed
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Num2);
+    h.run_steps(2);
+    assert_eq!(active(&h).channels_targeted, [true; 3]);
+    assert_eq!(
+        composite_pixel(&mut h, 300, 300),
+        [255, before[1], before[2], 255]
+    );
+    // ⌘-click Red: the red channel as the selection (all of it now)
+    let p = at_pt(1150.0, 597.0);
+    h.hover_at(p);
+    h.event_modifiers(
+        egui::Event::PointerButton {
+            pos: p,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers: Modifiers::COMMAND,
+        },
+        Modifiers::COMMAND,
+    );
+    h.event_modifiers(
+        egui::Event::PointerButton {
+            pos: p,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: Modifiers::COMMAND,
+        },
+        Modifiers::COMMAND,
+    );
+    h.run_steps(2);
+    assert_eq!(last_history(&h), "Load Selection");
+    let sel = active(&h).doc.selection().unwrap();
+    assert_eq!(sel.get(300, 300), 255);
+}
+
+#[test]
 fn gradients_and_patterns_panels_pick() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);
