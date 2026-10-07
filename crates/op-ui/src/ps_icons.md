@@ -28,4 +28,4 @@
 
 ## 选项栏图标（按 Photoshop 2026 截图近似重画）
 
-`PenPressure`（压感）、`Refresh`、`ObjectFinder`、`Feedback`（对象选择）、`QuickNew` / `QuickAdd` / `QuickSubtract`（快速选择的模式）、`Angle`（笔刷角度）、`BrushPanel` / `CloneSourcePanel`（面板开关：实心方块挖出画笔或图章）、`OpacityPressure`、`Airbrush`、`Symmetry`（带菜单小三角的蝴蝶）、`IgnoreAdjustments`、`SampleContinuous` / `SampleOnce` / `SampleSwatch`（取样方式）、`MixerLoad` / `MixerClean`。
+`PenPressure`（压感）、`Refresh`、`ObjectFinder`、`Feedback`（对象选择）、`QuickNew` / `QuickAdd` / `QuickSubtract`（快速选择的模式）、`Angle`（笔刷角度）、`BrushPanel` / `CloneSourcePanel`（面板开关：实心方块挖出画笔或图章）、`OpacityPressure`、`Airbrush`、`Symmetry`（带菜单小三角的蝴蝶）、`IgnoreAdjustments`、`SampleContinuous` / `SampleOnce` / `SampleSwatch`（取样方式）、`MixerLoad` / `MixerClean`、五个渐变类型（14 pt 方框里的灰度渐变：线性、径向、角度、对称、菱形）、`NotesPanel`。

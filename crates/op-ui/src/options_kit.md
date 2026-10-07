@@ -18,6 +18,9 @@
 - `slider_box(x0, x1, id, current)`：百分比输入框后面共用边框的箭头框，点击弹出 0–100% 滑块，返回拖动后的新值。
 - `swatch(x0, x1, fill, chevron_box)`：色块（y 5–30）。混合器画笔的载入颜色是无边框的白块，箭头紧跟其后；图案图章的图案块带 1 pt 边、画默认图案的叶点，箭头在单独的框里。
 
+- `segmented(edges, labels, chosen, enabled)`：分段按钮（y 5–30，`#454545` 底、`#666666` 边，所选段为 `#383838`），返回点击的段。
+- `color_box`（无边框颜色块）、`empty_pattern`（不可用的空图案框与箭头框）、`gradient_swatch`（渐变色块与箭头框）。
+
 ## 测试覆盖
 
 - `ui_tests.rs` 的 `options_bars_match_photoshops_layout`：已按实测布局的工具，其选项栏的分隔线与各种框的边缘位置（从截图中按颜色识别）与 Photoshop 测得的数值（`PS_BAR_MARKS`）逐一对应，相差不超过 1 pt。
