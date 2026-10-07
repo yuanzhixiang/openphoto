@@ -215,6 +215,22 @@ impl Selection {
     }
 
     /// Selection amount at a pixel, 0..=255 (0 outside the document).
+    /// The same selection moved by (`dx`, `dy`) pixels (what moves out of
+    /// the canvas is lost).
+    pub fn translated(&self, dx: i64, dy: i64) -> Self {
+        let mut s = Self::empty(self.width, self.height);
+        for y in 0..self.height as i64 {
+            for x in 0..self.width as i64 {
+                let (sx, sy) = (x - dx, y - dy);
+                if sx >= 0 && sy >= 0 && sx < self.width as i64 && sy < self.height as i64 {
+                    s.mask[(y * self.width as i64 + x) as usize] =
+                        self.mask[(sy * self.width as i64 + sx) as usize];
+                }
+            }
+        }
+        s
+    }
+
     pub fn get(&self, x: u32, y: u32) -> u8 {
         if x >= self.width || y >= self.height {
             return 0;

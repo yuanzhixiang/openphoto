@@ -166,6 +166,16 @@ pub enum StrokeKind {
     Smudge(f32),
     /// Erase the pixels matching a sampled color (Background Eraser).
     BackgroundErase(ColorMatch),
+    /// Heal with the texture of `source` moved by (`dx`, `dy`) (Healing
+    /// Brush: the Alt-clicked source).
+    Heal {
+        source: TiledImage,
+        dx: i64,
+        dy: i64,
+    },
+    /// Heal with texture found around each dab (Spot Healing Brush,
+    /// Proximity Match).
+    SpotHeal(TiledImage),
     /// Give the pixels matching a sampled color the hue, saturation,
     /// color or luminosity (`mode`) of `color` (Color Replacement).
     ReplaceColor {
@@ -333,6 +343,10 @@ impl Stroke {
             self.smudge_dab(doc, cx, cy, strength);
             return;
         }
+        if matches!(self.kind, StrokeKind::Heal { .. } | StrokeKind::SpotHeal(_)) {
+            self.heal_dab(doc, cx, cy);
+            return;
+        }
         let (w, h) = (doc.width, doc.height);
         let r = self.tip.diameter / 2.0 + 1.0;
         let x0 = (cx - r).floor().max(0.0) as u32;
@@ -469,7 +483,9 @@ impl Stroke {
             StrokeKind::Paint(_)
             | StrokeKind::Erase { .. }
             | StrokeKind::Smudge(_)
-            | StrokeKind::BackgroundErase(_) => base,
+            | StrokeKind::BackgroundErase(_)
+            | StrokeKind::Heal { .. }
+            | StrokeKind::SpotHeal(_) => base,
         }
     }
 
@@ -549,6 +565,69 @@ impl Stroke {
             }
         }
         Some(mask)
+    }
+
+    /// One healing dab: the pixels under the tip are healed (`heal`) with
+    /// the stroke's source, matched to their surroundings, by the tip's
+    /// coverage × opacity × selection.
+    fn heal_dab(&mut self, doc: &mut Document, cx: f32, cy: f32) {
+        let (w, h) = (doc.width, doc.height);
+        let r = self.tip.diameter / 2.0 + 1.0;
+        let x0 = ((cx - r).floor() - 1.0).max(0.0) as u32;
+        let y0 = ((cy - r).floor() - 1.0).max(0.0) as u32;
+        let x1 = (((cx + r).ceil() + 1.0).max(0.0) as u32).min(w);
+        let y1 = (((cy + r).ceil() + 1.0).max(0.0) as u32).min(h);
+        if x0 >= x1 || y0 >= y1 {
+            return;
+        }
+        let (bw, bh) = ((x1 - x0) as usize, (y1 - y0) as usize);
+        let tip = self.tip;
+        let cover: Vec<f32> = (0..bw * bh)
+            .map(|k| {
+                let (x, y) = (x0 + (k % bw) as u32, y0 + (k / bw) as u32);
+                tip.coverage(x as f32 + 0.5 - cx, y as f32 + 0.5 - cy)
+            })
+            .collect();
+        let inside: Vec<bool> = cover.iter().map(|&a| a > 0.0).collect();
+        let Some(current) = doc.layer(self.layer).and_then(|l| l.image()) else {
+            return;
+        };
+        let (source, offset) = match &self.kind {
+            StrokeKind::Heal { source, dx, dy } => (source, (*dx, *dy)),
+            StrokeKind::SpotHeal(source) => {
+                let Some(o) = crate::heal::proximity_match(source, (cx, cy), tip.diameter / 2.0)
+                else {
+                    return;
+                };
+                (source, o)
+            }
+            _ => return,
+        };
+        let Some(healed) =
+            crate::heal::heal_window(current, source, (x0, y0, bw, bh), &inside, offset)
+        else {
+            return;
+        };
+        let opacity = self.opacity;
+        let selection = self.selection.clone();
+        let preserve = self.preserve_alpha;
+        let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
+            return;
+        };
+        for k in 0..bw * bh {
+            if !inside[k] {
+                continue;
+            }
+            let (x, y) = (x0 + (k % bw) as u32, y0 + (k / bw) as u32);
+            let selected = selection
+                .as_ref()
+                .map_or(1.0, |s| s.get(x, y) as f32 / 255.0);
+            let amount = cover[k] * opacity * selected;
+            let p = image.pixel(x, y);
+            let [r, g, b] = healed[k].map(|v| v.round() as u8);
+            image.set_pixel(x, y, mix(p, [r, g, b, p[3]], amount, preserve));
+        }
+        doc.mark_dirty();
     }
 
     /// One Smudge dab: the pixels under the tip take on the colors under

@@ -12,6 +12,7 @@ pub mod document;
 pub mod fill;
 pub mod filter;
 pub mod gradient;
+pub mod heal;
 pub mod history;
 pub mod image_ops;
 pub mod layer;

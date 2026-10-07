@@ -1,51 +1,55 @@
-# selection.rs：选区
+# selection.rs: Selection
 
-## 职责
+## Responsibilities
 
-像素选区。与 Photoshop 一样，选区是一张与文档同尺寸的 8 位蒙版：255 为完全选中，0 为未选中，中间值是部分选中（抗锯齿或羽化的边缘）。文档的选区保存在 `Document` 中（见 `document.md`）。
+Pixel selection. As in Photoshop, a selection is an 8-bit mask the same size as the document: 255 is fully selected, 0 is unselected, and values in between are partially selected (anti-aliased or feathered edges). The document's selection is stored in `Document` (see `document.md`).
 
-## 对外接口
+## Public interface
 
-- `SelectionOp`：新形状与现有选区的组合方式 —— `Replace`（新建）、`Add`（添加）、`Subtract`（减去）、`Intersect`（交叉）。
-- `Rect`：文档像素坐标的矩形，构造时自动整理成左上到右下，右下边界不包含在内，可以超出文档。宽或高小于 1 像素时为空。
-- `Selection::all(w, h)`：全选。
-- `Selection::rect(w, h, rect)`：矩形选区，边界四舍五入到整像素，超出文档的部分被裁掉。
-- `expand(radius)`：Select › Modify › Expand。用精确欧氏距离变换（Felzenszwalb–Huttenlocher）求每个像素到最近选中像素（选择程度 ≥ 128）的距离 d，覆盖率为 `radius + 1 − d`（限制在 0–1）：距离不超过 radius 的像素完全选中，外面一圈部分选中，角为圆角。
-- `contract(radius, at_bounds)`：Select › Modify › Contract。到最近未选中像素的距离 d，覆盖率 `d − radius`。`at_bounds` 为真时画布外一圈视为未选中（选区从画布边缘收缩）；为假时画布边缘不使选区收缩，与 Photoshop「Apply effect at canvas bounds」不勾选时一致。
-- `border(width)`：Select › Modify › Border。以选区边缘为中心、宽 `width` 的带：选中像素用到未选中的距离、未选中像素用到选中的距离，覆盖率 `width / 2 + 1 − d`。
-- `smooth(radius)`：Select › Modify › Smooth。先二值化（≥ 128），再取 (2r + 1)² 方框平均，平均值不小于一半的像素选中，其余不选中——磨圆尖角、去掉孤立的点。
-- `Selection::polygon(w, h, points, anti_alias)`：闭合多边形（套索工具）的内部，自相交时按奇偶规则。开启抗锯齿时每个像素取 4 条采样行，按每条行上内部区间与像素的精确水平重叠累计覆盖率；关闭时像素中心在内部才选中。少于 3 个点时为空选区。
-- `Selection::ellipse(w, h, rect, anti_alias)`：`rect` 的内切椭圆。开启抗锯齿时，边缘像素按 4×4 超采样的覆盖率部分选中；关闭时，像素中心在椭圆内才选中。
-- `Selection::from_mask(w, h, mask, anti_alias)`：从 0/255 蒙版创建（油漆桶的填充区域）。开启抗锯齿时，紧邻选中区域外侧的像素按 50% 选中。
-- `get(x, y)`：某像素的选中程度（文档外为 0）。
-- `is_empty()`：没有任何像素被选中。
-- `bounds()`：选中像素（值 > 0）的外接矩形。
-- `inverse()`：反选（每个值取 255 − v）。
-- `combine(current, shape, op)`：把新形状按 `op` 并入现有选区。添加取较大值，交叉取较小值，减去为 `a × (255 − b) / 255`。没有现有选区时：新建和添加得到形状本身，减去和交叉得到空选区。
-- `feather(radius)`：羽化。用三次盒式模糊近似 sigma = radius / 2 的高斯模糊，边缘外侧按就近值延伸。
-- `with_canvas(w, h, dx, dy)`：画布尺寸变化后的选区，原选区放在 (`dx`, `dy`)，新增区域未选中。
-- `remapped(w, h, source)`：与 `TiledImage::remapped` 相同的重映射，用于旋转和翻转画布时变换选区。
-- `outline()`：蚂蚁线轮廓。以 128 为阈值区分选中与未选中，返回两者之间所有单位像素边，合并成水平和垂直的线段，每段为 `[x0, y0, x1, y1]`（文档像素）。
+- `SelectionOp`: how a new shape combines with the existing selection — `Replace` (new), `Add` (add), `Subtract` (subtract), `Intersect` (intersect).
+- `Rect`: a rectangle in document pixel coordinates, normalized on construction to top-left to bottom-right; the bottom-right boundary is exclusive, and it may extend beyond the document. It is empty when its width or height is less than 1 pixel.
+- `Selection::all(w, h)`: select all.
+- `Selection::rect(w, h, rect)`: rectangular selection; the boundaries are rounded to whole pixels and the part outside the document is clipped.
+- `expand(radius)`: Select › Modify › Expand. Uses an exact Euclidean distance transform (Felzenszwalb–Huttenlocher) to find each pixel's distance d to the nearest selected pixel (selection degree ≥ 128); coverage is `radius + 1 − d` (clamped to 0–1): pixels within radius are fully selected, a ring outside them is partially selected, and corners are rounded.
+- `contract(radius, at_bounds)`: Select › Modify › Contract. With d the distance to the nearest unselected pixel, coverage is `d − radius`. When `at_bounds` is true, a ring outside the canvas is treated as unselected (the selection contracts from the canvas edges); when false, the canvas edges do not make the selection contract, consistent with Photoshop when "Apply effect at canvas bounds" is unchecked.
+- `border(width)`: Select › Modify › Border. A band of width `width` centered on the selection edge: selected pixels use the distance to unselected, unselected pixels use the distance to selected, and coverage is `width / 2 + 1 − d`.
+- `smooth(radius)`: Select › Modify › Smooth. First binarizes (≥ 128), then takes a (2r + 1)² box average; pixels whose average is at least half are selected, the rest unselected — rounding sharp corners and removing isolated dots.
+- `Selection::polygon(w, h, points, anti_alias)`: the interior of a closed polygon (Lasso tool), using the even-odd rule when self-intersecting. With anti-aliasing on, each pixel takes 4 sample rows and accumulates coverage from the exact horizontal overlap of the interior spans on each row with the pixel; with it off, a pixel is selected only if its center is inside. With fewer than 3 points the selection is empty.
+- `Selection::ellipse(w, h, rect, anti_alias)`: the ellipse inscribed in `rect`. With anti-aliasing on, edge pixels are partially selected by 4×4 supersampled coverage; with it off, a pixel is selected only if its center is inside the ellipse.
+- `Selection::from_mask(w, h, mask, anti_alias)`: created from a 0/255 mask (the Paint Bucket's fill region). With anti-aliasing on, pixels immediately outside the selected region are selected at 50%.
+- `get(x, y)`: a pixel's selection degree (0 outside the document).
+- `is_empty()`: no pixel is selected.
+- `bounds()`: the bounding rectangle of selected pixels (value > 0).
+- `inverse()`: invert the selection (each value becomes 255 − v).
+- `combine(current, shape, op)`: merges a new shape into the existing selection according to `op`. Add takes the larger value, Intersect the smaller, and Subtract is `a × (255 − b) / 255`. With no existing selection: New and Add yield the shape itself, Subtract and Intersect yield an empty selection.
+- `feather(radius)`: feather. Approximates a Gaussian blur with sigma = radius / 2 using three box blurs, extending beyond the edges with the nearest value.
+- `with_canvas(w, h, dx, dy)`: the selection after a canvas size change; the original selection is placed at (`dx`, `dy`), and the added area is unselected.
+- `remapped(w, h, source)`: the same remapping as `TiledImage::remapped`, used to transform the selection when rotating and flipping the canvas.
+- `outline()`: the marching ants outline. Uses 128 as the threshold between selected and unselected, returns all unit pixel edges between the two, merged into horizontal and vertical segments, each as `[x0, y0, x1, y1]` (document pixels).
 
-## 边界情况
+## Edge cases
 
-- 选区尺寸始终等于文档尺寸；`combine` 假定两者尺寸相同。
-- 羽化半径小于等于 0 时原样返回。
-- 选中程度低于 128 的像素不在蚂蚁线以内（与 Photoshop 一致：羽化后很淡的边缘不显示蚂蚁线）。
+- The selection size always equals the document size; `combine` assumes both have the same size.
+- With a feather radius less than or equal to 0, the selection is returned unchanged.
+- Pixels with a selection degree below 128 are not inside the marching ants (consistent with Photoshop: very faint edges after feathering show no marching ants).
 
-## 已知限制
+## Known limitations
 
-- 选区是密集存储的，每个像素 1 字节，与文档尺寸成正比。
-- 没有 Photoshop 的 Select › Modify（扩展、收缩、平滑、边界）、Grow、Similar、Color Range 等运算。
+- The selection is stored densely, 1 byte per pixel, proportional to the document size.
+- There are none of Photoshop's Select › Modify (Expand, Contract, Smooth, Border), Grow, Similar, Color Range or similar operations.
 
-## 测试覆盖
+## Test coverage
 
-- `rect_and_bounds`：矩形边界取整与超出文档时的裁剪。
-- `combine_ops`：四种组合方式，以及没有现有选区时的减去。
-- `inverse_and_all`：反选与全选。
-- `modify_expand_contract_border_smooth`：Expand 2 的范围与圆角；Contract 1；全选的画布在 at_bounds 关闭时边缘不收缩、打开时收缩；Border 2 跨在边缘两侧；Smooth 去掉孤立像素。
-- `polygons_fill_their_inside`：直角边为 4 的三角形抗锯齿覆盖率总和约为 8 个像素；不抗锯齿时只有 0 和 255；少于 3 个点为空。
-- `ellipse_anti_aliasing`：不抗锯齿时只有 0 和 255，抗锯齿时有中间值。
-- `feather_softens_edges`：羽化后内部仍接近全选，边缘为中间值，远处接近 0。
-- `outline_of_rect`：矩形选区的轮廓正好是四条边。
-- `with_canvas_shifts`：画布扩展后选区随偏移移动。
+- `rect_and_bounds`: rounding of rectangle boundaries and clipping when extending beyond the document.
+- `combine_ops`: the four combination modes, and Subtract with no existing selection.
+- `inverse_and_all`: inverse and select all.
+- `modify_expand_contract_border_smooth`: the extent and rounded corners of Expand 2; Contract 1; a select-all canvas does not contract at the edges with at_bounds off and does contract with it on; Border 2 straddles both sides of the edge; Smooth removes isolated pixels.
+- `polygons_fill_their_inside`: the total anti-aliased coverage of a triangle with legs of 4 is about 8 pixels; without anti-aliasing there are only 0 and 255; fewer than 3 points is empty.
+- `ellipse_anti_aliasing`: without anti-aliasing there are only 0 and 255; with anti-aliasing there are intermediate values.
+- `feather_softens_edges`: after feathering, the interior is still nearly fully selected, edges have intermediate values, and far away it is close to 0.
+- `outline_of_rect`: the outline of a rectangular selection is exactly four edges.
+- `with_canvas_shifts`: after canvas expansion, the selection moves with the offset.
+
+## Moving a selection
+
+- `translated(dx, dy)`: the same selection moved by whole pixels; what moves past the canvas edge is lost (used by the Patch tool and Content-Aware Move, whose selection follows the moved pixels).

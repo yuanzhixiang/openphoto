@@ -5204,3 +5204,76 @@ fn magic_eraser_and_red_eye_tools() {
     assert_eq!(doc.layers[0].image().unwrap().pixel(50, 50)[3], 0);
     assert_eq!(last_history(&h), "Magic Eraser");
 }
+
+#[test]
+fn healing_tools() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A white spot on the dark gray
+    let spot = |h: &mut Harness<'_, OpenPhotoApp>, cx: u32, cy: u32| {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.layers[0].id;
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in cy - 3..cy + 3 {
+            for x in cx - 3..cx + 3 {
+                image.set_pixel(x, y, [255, 255, 255, 255]);
+            }
+        }
+        doc.mark_dirty();
+    };
+    let gray = |p: [u8; 4]| p[0] < 0x30;
+    // Spot Healing Brush over the spot: it's gone
+    spot(&mut h, 200, 200);
+    h.state_mut().state.select_tool(Tool::SpotHealingBrush);
+    h.state_mut().state.spot_healing.size = 20.0;
+    h.run_steps(1);
+    let p = doc_point(&h, 200.0, 200.0);
+    click(&mut h, p);
+    assert!(gray(composite_pixel(&mut h, 200, 200)), "{:?}", composite_pixel(&mut h, 200, 200));
+    assert_eq!(last_history(&h), "Spot Healing Brush");
+
+    // Healing Brush: Alt-click a clean source, then paint over a spot
+    spot(&mut h, 400, 200);
+    h.state_mut().state.select_tool(Tool::HealingBrush);
+    h.state_mut().state.healing_brush.size = 20.0;
+    h.run_steps(1);
+    let source = doc_point(&h, 400.0, 400.0);
+    alt_click(&mut h, source);
+    let p = doc_point(&h, 400.0, 200.0);
+    click(&mut h, p);
+    assert!(gray(composite_pixel(&mut h, 400, 200)));
+    assert_eq!(last_history(&h), "Healing Brush");
+
+    // Patch: select the spot, drag the selection onto clean gray
+    spot(&mut h, 600, 200);
+    h.state_mut().state.select_tool(Tool::Patch);
+    h.run_steps(1);
+    // A square drawn like the Lasso
+    let corners = [(590.0, 190.0), (610.0, 190.0), (610.0, 210.0), (590.0, 210.0)];
+    let pts: Vec<Pos2> = corners.iter().map(|&(x, y)| doc_point(&h, x, y)).collect();
+    h.hover_at(pts[0]);
+    h.event(egui::Event::PointerButton {
+        pos: pts[0],
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    for p in pts.iter().skip(1).chain(std::iter::once(&pts[0])) {
+        h.event(egui::Event::PointerMoved(*p));
+        h.step();
+    }
+    h.event(egui::Event::PointerButton {
+        pos: pts[0],
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(3);
+    assert!(active(&h).doc.selection().is_some());
+    let (c, d) = (doc_point(&h, 600.0, 200.0), doc_point(&h, 600.0, 400.0));
+    drag(&mut h, c, d, Modifiers::NONE);
+    assert!(gray(composite_pixel(&mut h, 600, 200)));
+    assert_eq!(last_history(&h), "Patch Tool");
+}

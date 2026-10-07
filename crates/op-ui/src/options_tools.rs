@@ -2298,3 +2298,29 @@ pub fn red_eye_options(app: &mut AppState) -> (f32, f32) {
     };
     (pct(app, "redeye.pupil"), pct(app, "redeye.darken"))
 }
+
+/// The healing tools' options: the Healing Brush's Aligned and Sample, the
+/// Spot Healing Brush's Sample All Layers, the Patch tool's Destination
+/// mode and Content-Aware Move's Extend.
+#[derive(Clone, Copy, Debug)]
+pub struct HealOptions {
+    pub aligned: bool,
+    pub scope: op_core::SampleScope,
+    pub spot_all_layers: bool,
+    pub patch_destination: bool,
+    pub extend: bool,
+}
+
+pub fn heal_options(app: &mut AppState) -> HealOptions {
+    HealOptions {
+        aligned: flag(app, "heal.aligned", false),
+        scope: match choice(app, "heal.sample") {
+            1 => op_core::SampleScope::CurrentAndBelow,
+            2 => op_core::SampleScope::All,
+            _ => op_core::SampleScope::Current,
+        },
+        spot_all_layers: flag(app, "spotheal.all_layers", false),
+        patch_destination: choice(app, "patch.source") == 1,
+        extend: choice(app, "cam.move") == 1,
+    }
+}

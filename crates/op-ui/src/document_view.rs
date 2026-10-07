@@ -160,6 +160,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let replace_mode = crate::options_tools::replace_mode(app);
     let magic_eraser = crate::options_tools::magic_eraser_options(app);
     let red_eye = crate::options_tools::red_eye_options(app);
+    let heal = crate::options_tools::heal_options(app);
     let sampling_ring = tool == Tool::Eyedropper && app.flag("eyedropper.ring", true);
     // The Zoom tool's Zoom Out button swaps what a click and Alt-click do
     let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
@@ -393,6 +394,14 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
+            Tool::Patch | Tool::ContentAwareMove => {
+                let lasso = (
+                    app.marquee.mode,
+                    app.marquee.feather,
+                    app.marquee.anti_alias,
+                );
+                patch_input(ui, &response, state, tool, heal, lasso, ppp);
+            }
             Tool::MagicEraser | Tool::RedEye if response.clicked() => {
                 if let Some(p) = response.interact_pointer_pos() {
                     let d = to_doc(state, p, ppp);
@@ -471,8 +480,9 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
-            // Alt-click with the Clone Stamp picks its source point
-            Tool::CloneStamp
+            // Alt-click with the Clone Stamp or Healing Brush picks its
+            // source point
+            Tool::CloneStamp | Tool::HealingBrush
                 if alt && response.is_pointer_button_down_on() && state.stroke.is_none() =>
             {
                 if ui.input(|i| i.pointer.primary_pressed())
@@ -485,7 +495,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             }
             // The press that picked the source doesn't paint, even if Alt
             // is let go first
-            Tool::CloneStamp if state.picking_clone_source => {
+            Tool::CloneStamp | Tool::HealingBrush if state.picking_clone_source => {
                 if !ui.input(|i| i.pointer.primary_down()) {
                     state.picking_clone_source = false;
                 }
@@ -503,7 +513,9 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             | Tool::Smudge
             | Tool::PatternStamp
             | Tool::BackgroundEraser
-            | Tool::ColorReplacement => {
+            | Tool::ColorReplacement
+            | Tool::HealingBrush
+            | Tool::SpotHealingBrush => {
                 if let Some(opts) = paint {
                     let settings = StrokeSettings {
                         opts,
@@ -514,6 +526,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         clone_scope,
                         matching,
                         replace_mode,
+                        heal,
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
                 }
@@ -1143,6 +1156,8 @@ fn stroke_names(tool: Tool) -> (&'static str, &'static str) {
         Tool::PatternStamp => ("pattern stamp", "Pattern Stamp"),
         Tool::BackgroundEraser => ("background eraser", "Background Eraser"),
         Tool::ColorReplacement => ("color replacement tool", "Color Replacement Tool"),
+        Tool::HealingBrush => ("healing brush", "Healing Brush"),
+        Tool::SpotHealingBrush => ("spot healing brush", "Spot Healing Brush"),
         _ => ("brush tool", "Brush Tool"),
     }
 }
@@ -1160,6 +1175,7 @@ fn stroke_kind(
         op_core::BlendMode,
         f32,
     ),
+    heal: crate::options_tools::HealOptions,
 ) -> Result<op_core::paint::StrokeKind, String> {
     use op_core::paint::StrokeKind;
     let rgb = |c: op_core::Color| {
@@ -1232,6 +1248,32 @@ fn stroke_kind(
                 dy: 0,
             }
         }
+        Tool::HealingBrush => {
+            let source = state.clone_source.ok_or_else(|| {
+                "Could not use the healing brush because the area to heal has not been defined \
+                 (option-click to define a source point)."
+                    .to_string()
+            })?;
+            let offset = match state.clone_offset {
+                Some(o) if heal.aligned => o,
+                _ => start - source,
+            };
+            state.clone_offset = Some(offset);
+            let image = state.doc.sample_source(heal.scope).ok_or("")?;
+            StrokeKind::Heal {
+                source: image,
+                dx: offset.x.round() as i64,
+                dy: offset.y.round() as i64,
+            }
+        }
+        Tool::SpotHealingBrush => {
+            let scope = if heal.spot_all_layers {
+                op_core::SampleScope::All
+            } else {
+                op_core::SampleScope::Current
+            };
+            StrokeKind::SpotHeal(state.doc.sample_source(scope).ok_or("")?)
+        }
         Tool::Smudge => StrokeKind::Smudge(strength),
         Tool::PatternStamp => StrokeKind::Pattern(crate::state::default_pattern()),
         Tool::BackgroundEraser => {
@@ -1270,6 +1312,7 @@ struct StrokeSettings {
     matching: Option<op_core::paint::ColorMatch>,
     /// The Color Replacement's Mode.
     replace_mode: op_core::BlendMode,
+    heal: crate::options_tools::HealOptions,
 }
 
 fn paint_input(
@@ -1289,6 +1332,7 @@ fn paint_input(
         clone_scope,
         matching,
         replace_mode,
+        heal,
     } = settings;
     use crate::options_tools::EraserMode;
     let eraser = (tool == Tool::Eraser).then_some(eraser_mode);
@@ -1324,6 +1368,7 @@ fn paint_input(
             colors,
             (retouch, clone_scope),
             (matching, replace_mode, opts.opacity),
+            heal,
         ) {
             Ok(kind) => kind,
             Err(message) => {
@@ -1436,11 +1481,16 @@ fn draw_selection(
         animate = true;
     };
 
+    // The Patch and Content-Aware Move tools drag the outline
+    let shift = state.patch_drag.map_or(Vec2::ZERO, |(a, b)| {
+        let d = b - a;
+        Vec2::new(d.x.round(), d.y.round())
+    });
     if let Some(segs) = state.selection_outline() {
         let visible = canvas.expand(2.0);
         for s in segs.iter() {
-            let a = to_screen(state, Pos2::new(s[0] as f32, s[1] as f32), ppp);
-            let b = to_screen(state, Pos2::new(s[2] as f32, s[3] as f32), ppp);
+            let a = to_screen(state, Pos2::new(s[0] as f32, s[1] as f32) + shift, ppp);
+            let b = to_screen(state, Pos2::new(s[2] as f32, s[3] as f32) + shift, ppp);
             if visible.intersects(Rect::from_two_pos(a, b)) {
                 ants(a, b);
             }
@@ -1751,4 +1801,89 @@ fn fill_alert(e: op_core::fill::FillError, tool: &str) -> String {
         FillError::Group => StrokeError::Group,
     }
     .message(tool)
+}
+
+/// The Patch tool and Content-Aware Move: without a selection, or pressing
+/// outside it, they draw one freehand like the Lasso; dragging the
+/// selection moves its outline, and letting go patches (or moves) it.
+fn patch_input(
+    ui: &Ui,
+    response: &egui::Response,
+    state: &mut DocState,
+    tool: Tool,
+    heal: crate::options_tools::HealOptions,
+    lasso: (crate::state::SelectionMode, f32, bool),
+    ppp: f32,
+) {
+    let pointer = ui
+        .input(|i| i.pointer.interact_pos())
+        .map(|p| to_doc(state, p, ppp));
+    if let Some((start, _)) = state.patch_drag {
+        if let Some(p) = pointer {
+            state.patch_drag = Some((start, p));
+        }
+        if ui.input(|i| i.pointer.primary_down()) {
+            ui.ctx().request_repaint();
+            return;
+        }
+        let Some((a, b)) = state.patch_drag.take() else {
+            return;
+        };
+        let (dx, dy) = ((b.x - a.x).round() as i64, (b.y - a.y).round() as i64);
+        let Some(selection) = state.doc.selection().cloned() else {
+            return;
+        };
+        if dx == 0 && dy == 0 {
+            return;
+        }
+        let (changed, name, moved) = match tool {
+            Tool::Patch if heal.patch_destination => (
+                op_core::heal::patch_to(&mut state.doc, &selection, (dx, dy)),
+                "Patch Tool",
+                true,
+            ),
+            Tool::Patch => (
+                op_core::heal::patch(&mut state.doc, &selection, (dx, dy)),
+                "Patch Tool",
+                false,
+            ),
+            _ if heal.extend => (
+                op_core::heal::patch_to(&mut state.doc, &selection, (dx, dy)),
+                "Content-Aware Move",
+                true,
+            ),
+            _ => (
+                op_core::heal::content_aware_move(&mut state.doc, &selection, (dx, dy)),
+                "Content-Aware Move",
+                true,
+            ),
+        };
+        if changed {
+            // The selection follows the pixels to their new place
+            if moved {
+                state.doc.set_selection(Some(selection.translated(dx, dy)));
+            }
+            state.record(name);
+        }
+        return;
+    }
+    let inside = ui
+        .input(|i| i.pointer.press_origin())
+        .map(|p| to_doc(state, p, ppp))
+        .is_some_and(|p| {
+            p.x >= 0.0
+                && p.y >= 0.0
+                && state
+                    .doc
+                    .selection()
+                    .is_some_and(|s| s.get(p.x as u32, p.y as u32) > 0)
+        });
+    if state.lasso.is_none() && inside && response.drag_started_by(PointerButton::Primary) {
+        if let Some(p) = ui.input(|i| i.pointer.press_origin()) {
+            let p = to_doc(state, p, ppp);
+            state.patch_drag = Some((p, p));
+        }
+        return;
+    }
+    lasso_input(ui, response, state, Tool::Lasso, lasso, ppp);
 }

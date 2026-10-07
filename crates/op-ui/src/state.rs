@@ -66,6 +66,9 @@ pub struct DocState {
     pub last_paint_point: Option<(f32, f32)>,
     /// A lasso outline being drawn.
     pub lasso: Option<LassoPath>,
+    /// The Patch or Content-Aware Move tool dragging the selection: where
+    /// the drag started and where it is (document pixels).
+    pub patch_drag: Option<(egui::Pos2, egui::Pos2)>,
     /// A guide being dragged.
     pub guide_drag: Option<GuideDrag>,
     /// Where the pointer is over the document (document pixels), for the
@@ -170,6 +173,7 @@ impl DocState {
             last_paint_point: None,
             renaming: None,
             lasso: None,
+            patch_drag: None,
             free_transform: None,
             crop: None,
             guide_drag: None,
@@ -1072,6 +1076,8 @@ pub struct AppState {
     pub pattern_stamp: PaintOptions,
     pub background_eraser: PaintOptions,
     pub color_replacement: PaintOptions,
+    pub healing_brush: PaintOptions,
+    pub spot_healing: PaintOptions,
     pub retouch: RetouchOptions,
     pub shape: ShapeOptions,
     pub move_options: MoveOptions,
@@ -1190,6 +1196,8 @@ impl Default for AppState {
             pattern_stamp: PaintOptions::small(1.0),
             background_eraser: PaintOptions::small(1.0),
             color_replacement: PaintOptions::small(1.0),
+            healing_brush: PaintOptions::small(1.0),
+            spot_healing: PaintOptions::small(1.0),
             retouch: RetouchOptions::default(),
             shape: ShapeOptions::default(),
             move_options: MoveOptions::default(),
@@ -1262,6 +1270,8 @@ impl AppState {
             Tool::PatternStamp => Some(&mut self.pattern_stamp),
             Tool::BackgroundEraser => Some(&mut self.background_eraser),
             Tool::ColorReplacement => Some(&mut self.color_replacement),
+            Tool::HealingBrush => Some(&mut self.healing_brush),
+            Tool::SpotHealingBrush => Some(&mut self.spot_healing),
             _ => None,
         }
     }

@@ -49,6 +49,11 @@
   - `contiguous` 时只取笔印范围内、从中心像素出发四连通的匹配像素（中心不匹配则这一笔印不改变任何像素）；否则笔印内所有匹配像素。
   - 背景橡皮擦把匹配像素的透明度按强度降低；颜色替换按强度把颜色移向混合结果、透明度不变。
 
+## Healing strokes
+
+- `Heal { source, dx, dy }` (Healing Brush) and `SpotHeal(source)` (Spot Healing Brush) don't go through the coverage map. Each dab heals the pixels under the tip with `heal::heal_window` over the dab's box plus one pixel (the edge values come from the layer as it is at that moment, so dabs follow on from earlier ones), and mixes them into the layer by the tip's coverage × opacity × selection; alpha is kept (or follows `mix` when transparency isn't locked).
+- The Healing Brush takes its texture at the fixed offset; the Spot Healing Brush picks an offset per dab with `heal::proximity_match` on its source image. A dab whose source would leave the image changes nothing.
+
 ## 像素规则
 
 - 画颜色（普通图层）：颜色以 `数量` 为 alpha 做 source-over，叠到原像素上。
