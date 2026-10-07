@@ -230,6 +230,7 @@ fn nudge(tool: Tool) -> (f32, f32) {
         | MagicEraser | PaintBucket | Blur | Sharpen | Smudge | Pen | FreeformPen
         | CurvaturePen | AddAnchorPoint | DeleteAnchorPoint | Polygon => (1.0, 0.0),
         Lasso => (1.0, 1.0),
+        Remove => (2.0, 2.0),
         SelectionBrush | ArtHistoryBrush | Burn | Sponge => (0.0, 1.0),
         Slice => (1.0, 0.0),
         BackgroundEraser => (2.0, 0.0),
@@ -1093,7 +1094,22 @@ fn draw(d: &Pen, tool: Tool) -> bool {
             d.ring(24.5, 23.5, 10.4, 10.4, 2.6);
             d.line(&[(32.5, 32.0), (43.0, 42.0)], 4.6);
         }
-        Remove => return false,
+        Remove => {
+            bandage(d);
+            // Two four-point stars at the top left, each cut clear of the
+            // bandage
+            let star = |pen: &self::Pen, cx: f32, cy: f32, h: f32| {
+                let w = h * 0.32;
+                pen.poly(&[(cx, cy - h), (cx + w, cy), (cx, cy + h), (cx - w, cy)]);
+                pen.poly(&[(cx - h, cy), (cx, cy - w), (cx + h, cy), (cx, cy + w)]);
+            };
+            for (cx, cy, h) in [(21.4, 13.0, 7.8), (14.5, 22.5, 5.0)] {
+                let hole = d.hole();
+                star(&hole, cx, cy, h + 2.5);
+                hole.disc(cx, cy, h * 0.55, h * 0.55);
+                star(d, cx, cy, h);
+            }
+        }
     }
     true
 }

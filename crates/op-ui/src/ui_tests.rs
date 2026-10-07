@@ -3610,6 +3610,11 @@ fn screenshot_tool_flyout() {
     reference_document(&mut h);
     right_click(&mut h, at_pt(19.5, 105.5));
     shot(&mut h, "tool_flyout");
+    // The healing tools (with the Remove Tool)
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    right_click(&mut h, at_pt(19.5, 283.0));
+    shot(&mut h, "heal_flyout");
 }
 
 /// The frame color's columns and rows along a line through the flyout.
