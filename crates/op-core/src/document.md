@@ -64,6 +64,7 @@ Canvas Size 对话框中 3×3 锚点网格的位置，决定画布尺寸变化�
   - `select_all_layers()`：Select › All Layers，选中除背景外的所有图层（没有时返回 false）。`deselect_layers()`：Select › Deselect Layers，一个都不选。
 - `layer_at(x, y)`：移动工具 Auto-Select 用。从上往下找第一个在 (x, y) 处显示出像素的图层：图层可见、不透明度与填充不为 0、像素 alpha 大于 0，且没有被启用的图层蒙版以 0 值遮住。坐标在画布外或没有这样的图层时为 `None`。
 - `composite_rgba8()`：合成为紧密排列的直通 RGBA8 缓冲区，长度为 `width * height * 4`。
+- `sample_source(scope)`：工具的「Sample:」取样来源（`SampleScope`）：`Current` 为当前图层的像素，`CurrentAndBelow` 为图层列表中到当前图层为止的合成，`All` 为全部合成；没有当前图层时为 `None`。
 - `composite_layers_rgba8(layers)`：按同样的规则只合成给定的图层列表（自底向上，尺寸与文档一致），供合并图层使用；`composite_rgba8` 就是对文档全部图层调用它。
 
 ## 行为规则

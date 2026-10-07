@@ -44,7 +44,8 @@
 - 普通滚动（触控板双指滑动、滚轮）：平移。
 - 按住空格拖动、使用抓手工具拖动、或用鼠标中键拖动：平移。
 - 缩放工具：单击放大一级，按住 ⌥ 单击缩小一级，以单击点为中心。选项栏按下 Zoom Out（设置 `zoom.out`）时两者对调：单击缩小、⌥ 单击放大，光标也随之对调。
-- 吸管工具：按下或拖动时按吸管选项取色（`DocState::sample_average`：以该点为中心的 Sample Size 方块，裁到画布内，按 alpha 加权平均；All Layers 取合成结果，Current Layer 取当前图层），设为前景色；按住 ⌥ 时设为背景色。取到的颜色总是不透明；点在文档外或取样处全透明时不变。不记录历史。
+- 吸管工具：按下或拖动时按吸管选项取色（`DocState::sample_average`：以该点为中心的 Sample Size 方块，裁到画布内，按 alpha 加权平均；Sample 选项：Current Layer 取当前图层，Current & Below 取当前图层及其下方图层的合成，All Layers 取全部合成；两个「No Adjustments」选项与对应的普通选项相同（还没有调整图层）），设为前景色；按住 ⌥ 时设为背景色。取到的颜色总是不透明；点在文档外或取样处全透明时不变。不记录历史。
+- 取样环（选项栏 Show Sampling Ring，默认勾选）：按住吸管时在指针周围画一个环（内半径 38 pt、外半径 58 pt，内外各一圈 2 pt 灰线），上半是正在取的颜色、下半是按下时原来的颜色（⌥ 时为背景色），画在前景层，盖在画布上。
 
 ## 文字工具
 
@@ -118,7 +119,7 @@
 
 - 在画布上按下开始一笔（使用当前工具的大小、硬度、不透明度、流量；铅笔的流量固定为 100%、没有柔边），拖动时继续，松开后记录一条历史：「Brush Tool」「Pencil」「Eraser」「Dodge Tool」「Burn Tool」「Sponge Tool」「Blur Tool」「Sharpen Tool」「Clone Stamp」「History Brush」。画笔和铅笔用前景色，按选项栏的 Mode（全部混合模式与 Behind、Clear，见 `paint.md`「绘画模式」）画上去；橡皮擦在背景图层上用背景色。橡皮擦的 Mode：Brush（按画笔的大小、硬度、不透明度、流量）、Pencil（硬边无抗锯齿、流量 100%）、Block（固定为屏幕上 16 像素见方的方块，不透明度与流量都是 100%，与 Photoshop 一致）。
 - 笔画类型在按下时决定（`stroke_kind`）：减淡/加深按各自的 Range，海绵按 Mode，模糊/锐化，仿制图章和历史记录画笔见下。
-- 仿制图章：按住 ⌥ 单击设定取样点（这一次按压不绘制，即使先松开 ⌥）。之后按下时，偏移为「按下位置 − 取样点」；勾选 Aligned（默认）时第一笔之后的偏移保持不变，否则每一笔都从取样点重新开始。取样来自当前图层在按下时的像素。没有取样点时弹出「Could not use the clone stamp because the area to clone has not been defined (option-click to define a source point).」。取样点按文档保存在 `DocState::clone_source` / `clone_offset`。
+- 仿制图章：按住 ⌥ 单击设定取样点（这一次按压不绘制，即使先松开 ⌥）。之后按下时，偏移为「按下位置 − 取样点」；勾选 Aligned（默认）时第一笔之后的偏移保持不变，否则每一笔都从取样点重新开始。取样按选项栏的 Sample：Current Layer（当前图层）、Current & Below（当前图层及其下方的合成，`Document::sample_source`）、All Layers（全部合成），都取按下时的像素。没有取样点时弹出「Could not use the clone stamp because the area to clone has not been defined (option-click to define a source point).」。取样点按文档保存在 `DocState::clone_source` / `clone_offset`。
 - 历史记录画笔：从文档打开（或新建）时的状态（第一条历史）中取同一图层的像素来画；该状态中没有这个图层或尺寸不同时弹出「Could not use the history brush because the history state does not contain a corresponding layer.」。
 - 按下时按住 Shift：从上一笔结束的位置画直线到按下的位置，再继续这一笔。
 - 图层不能画时（隐藏、锁定像素），在按下的那一刻弹出 Photoshop 的提示，不开始笔画。

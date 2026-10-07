@@ -73,7 +73,7 @@
 - `free_transform`：自由变换会话（见 `free_transform.md`）。
 - `lasso`：正在绘制的套索轨迹（文档像素坐标的点、组合方式、是否为多边形套索）。
 - 画布图像（`canvas_image`）：快速蒙版模式下在合成结果上叠加红色，未选中处 50%（Photoshop 默认的「被蒙版区域」显示），按灰度值线性变化；只影响显示。
-- `sample_average(x, y, size, all_layers)`：吸管取样，见 `document_view.md`。
+- `sample_average(x, y, size, scope)`：吸管取样（`SampleScope`：当前图层、当前及下方、全部），见 `document_view.md`。
 - `renaming`：Layers 面板中正在改名的图层和输入中的文字（见 `panels/layers.md`）。
 - 选框拖动：`marquee_drag` 保存拖动中的起点、当前点（文档像素）、组合方式，以及 Shift/⌥ 是否已用于选择组合方式。
 - 蚂蚁线轮廓：`selection_outline()` 按选区版本号缓存轮廓线段。

@@ -92,3 +92,4 @@
 - `brush_modes_and_eraser_block`：画笔 Mode 设为 Multiply 后在 `#141414` 上画红色得到 `#140000`；橡皮擦 Block 在背景图层上擦出屏幕 16 像素见方的白色方块。
 - `holding_a_toolbar_button_opens_its_flyout`：短按不弹出；按住 0.5 秒弹出，松开后仍打开且没有切换工具；点第二行切到 Artboard 并关闭。
 - `lasso_with_alt_draws_straight_edges`：套索拖一段后按住 ⌥ 松开鼠标没有选区，⌥ 单击加一个角，松开 ⌥ 后闭合成选区，记录「Lasso」。
+- `sampling_scopes_and_the_sampling_ring`：顶层为空、下面一层有红色方块时，吸管 Current Layer 取不到颜色，Current & Below 取到红色；按住吸管时取样环上半是红色、下半是原来的蓝色；仿制图章 Sample 为 All Layers 时把红色仿制到空图层上。
