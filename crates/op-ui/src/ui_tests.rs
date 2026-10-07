@@ -4562,3 +4562,88 @@ fn type_shape_and_view_options_bars_edit_their_settings() {
     type_in_bar(&mut h, 330.0, "100");
     assert_eq!(setting(&h, "slice.w").as_deref(), Some("100"));
 }
+
+/// The open dialog's top-left corner in Photoshop points: the extent of
+/// its title bar's fill.
+fn dialog_origin(h: &mut Harness<'_, OpenPhotoApp>) -> (f32, f32) {
+    let image = h.render().expect("render frame");
+    let (mut x0, mut y0) = (u32::MAX, u32::MAX);
+    for (x, y, p) in image.enumerate_pixels() {
+        if p.0[..3] == [0xd0, 0xd2, 0xd4] {
+            x0 = x0.min(x);
+            y0 = y0.min(y);
+        }
+    }
+    assert!(x0 != u32::MAX, "no dialog");
+    (x0 as f32 / 2.0, y0 as f32 / 2.0)
+}
+
+/// A 64 × 72 transparent document like the probe opened in Photoshop
+/// (one "Layer 0", no background).
+fn probe_document(h: &mut Harness<'_, OpenPhotoApp>) {
+    let app = &mut h.state_mut().state;
+    crate::actions::close_all(app);
+    let doc = op_core::Document::from_rgba8("probe.png", 64, 72, &vec![0; 64 * 72 * 4]);
+    app.add_document(doc, "Open");
+    h.run_steps(6);
+}
+
+#[test]
+#[ignore]
+fn screenshot_canvas_size_dialog() {
+    let mut h = harness(Vec::new());
+    probe_document(&mut h);
+    h.state_mut().state.background = Color::from_rgba8([0x52, 0x65, 0x6e, 255]);
+    run_command(&mut h, crate::commands::Command::CanvasSize);
+    h.run_steps(3);
+    let (x, y) = dialog_origin(&mut h);
+    let image = h.render().expect("render frame");
+    let crop = image::imageops::crop_imm(&image, (x * 2.0) as u32, (y * 2.0) as u32, 916, 744);
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/ui-shots");
+    std::fs::create_dir_all(&dir).unwrap();
+    crop.to_image().save(dir.join("canvas_size.png")).unwrap();
+}
+
+#[test]
+fn canvas_size_dialog_resizes_around_the_anchor() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::CanvasSize);
+    h.run_steps(3);
+    let (x, y) = dialog_origin(&mut h);
+    // The width field opens focused with its text selected
+    h.event(egui::Event::Text("800".into()));
+    h.run_steps(2);
+    // Anchor at the top left (the grid's first cell at 64, 246)
+    click(&mut h, at_pt(x + 75.5, y + 257.5));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    let doc = &active(&h).doc;
+    assert_eq!((doc.width, doc.height), (800, 811));
+    assert_eq!(last_history(&h), "Canvas Size");
+    // The image stays at the left; the background extends on the right
+    // in the background color (white)
+    assert_eq!(layer_pixel(&h, 0, 0, 0), [0x14, 0x14, 0x14, 255]);
+    assert_eq!(layer_pixel(&h, 0, 799, 0), [255, 255, 255, 255]);
+
+    // Relative: 10 more pixels of height, centered
+    run_command(&mut h, crate::commands::Command::CanvasSize);
+    h.run_steps(3);
+    let (x, y) = dialog_origin(&mut h);
+    click(&mut h, at_pt(x + 70.0, y + 222.0));
+    click(&mut h, at_pt(x + 100.0, y + 186.0));
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("10".into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    let doc = &active(&h).doc;
+    assert_eq!((doc.width, doc.height), (800, 821));
+
+    // Escape cancels
+    run_command(&mut h, crate::commands::Command::CanvasSize);
+    h.run_steps(3);
+    h.event(egui::Event::Text("5".into()));
+    h.key_press(egui::Key::Escape);
+    h.run_steps(3);
+    assert_eq!(active(&h).doc.width, 800);
+}

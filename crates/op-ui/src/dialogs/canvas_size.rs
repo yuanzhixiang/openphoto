@@ -1,39 +1,29 @@
-//! Image > Canvas Size dialog.
-//!
-//! Layout is measured from Photoshop's dialog in reference-screenshot units
-//! (scaled by `UI_SCALE` like the rest of the UI). All positions are relative
-//! to the dialog's top-left corner.
+//! Image > Canvas Size dialog, laid out at the positions measured on
+//! Photoshop 2026's dialog (458 × 372 pt, the New Layer dialog's family):
+//! sizes are in Photoshop points from the dialog's top-left corner.
 
 use egui::{
-    Align2, Color32, FontId, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2, pos2, vec2,
+    Align2, Color32, CornerRadius, FontId, Key, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2,
+    pos2, vec2,
 };
 use op_core::{Anchor, Color, Document};
 
 use super::common;
-use crate::theme::{self, color};
+use crate::theme::{self, color, pt};
 
 /// Photoshop's maximum canvas dimension for regular documents.
 pub const MAX_DIMENSION: u32 = 30_000;
 
-const SIZE: Vec2 = vec2(681.0, 553.0);
-const TITLE_BAR: f32 = 42.0;
-const PAD: f32 = 29.0;
-/// Right edge of the label column ("Width", "Height", "Anchor").
-const LABEL_RIGHT: f32 = 81.0;
-const FIELD_X: f32 = 95.0;
-const FIELD_W: f32 = 119.0;
-const UNIT_X: f32 = 228.0;
-const UNIT_W: f32 = 237.0;
-const CONTROL_H: f32 = 35.0;
-/// Right edge of the left column (section rules, extension swatch).
-const COLUMN_RIGHT: f32 = 529.0;
-const BUTTON_X: f32 = 548.0;
-const BUTTON_W: f32 = 103.0;
-const ANCHOR_CELL: f32 = 34.4;
-const FONT: f32 = 15.5;
-
+const SIZE: Vec2 = vec2(pt(458.0), pt(372.0));
+const FONT: f32 = pt(12.0);
+const TEXT: Color32 = Color32::from_gray(0xf1);
+const TEXT_OFF: Color32 = Color32::from_gray(0x8e);
+/// The section rules and the anchor grid, measured.
 const RULE: Color32 = Color32::from_gray(0x73);
 const ANCHOR_LINE: Color32 = Color32::from_gray(0x78);
+/// The rules end here; the anchor grid's cells are 23 pt.
+const RULE_END: f32 = 356.0;
+const ANCHOR_CELL: f32 = 23.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unit {
@@ -308,101 +298,101 @@ impl CanvasSizeDialog {
         background: Color,
         active: bool,
     ) -> Outcome {
-        let at = |x: f32, y: f32| frame.min + vec2(x, y);
-        let font = FontId::proportional(FONT);
-        let bold = theme::semibold(FONT);
-
+        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
+        let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
+        let font = theme::uxp(FONT);
+        let bold = theme::uxp_bold(FONT);
         let painter = ui.painter().clone();
-        common::frame(ui, frame, "Canvas Size", theme::semibold(17.0));
-
-        let body = TITLE_BAR;
+        common::frame(ui, frame, "Canvas Size", theme::dialog_bold(pt(13.0)));
+        let label = |right: f32, cy: f32, text: &str| {
+            painter.text(
+                at(right, cy),
+                Align2::RIGHT_CENTER,
+                text,
+                font.clone(),
+                TEXT,
+            );
+        };
         let new_size = self.new_size();
 
-        // Current size
+        // Current size: the readout with a rule to the right, then the
+        // original width and height
         section(
             &painter,
-            at(PAD, body + 43.0),
+            at(20.0, 57.5),
             &format!(
                 "Current Size: {}",
                 self.size_label(self.width.original, self.height.original)
             ),
             &bold,
+            at(RULE_END, 0.0).x,
         );
-        for (label, value, y) in [
-            ("Width", self.width.original, 78.0),
-            ("Height", self.height.original, 109.0),
+        for (text, value, cy) in [
+            ("Width", self.width.original, 81.0),
+            ("Height", self.height.original, 102.5),
         ] {
+            label(55.0, cy, text);
             painter.text(
-                at(LABEL_RIGHT, body + y),
-                Align2::RIGHT_CENTER,
-                label,
-                font.clone(),
-                color::TEXT,
-            );
-            painter.text(
-                at(FIELD_X, body + y),
+                at(64.0, cy),
                 Align2::LEFT_CENTER,
                 format!("{value} px"),
                 font.clone(),
-                color::TEXT,
+                TEXT,
             );
         }
 
-        // New size
         let new_label = match new_size {
             Some((w, h)) => self.size_label(w, h),
             None => "—".into(),
         };
         section(
             &painter,
-            at(PAD, body + 151.0),
+            at(20.0, 130.5),
             &format!("New Size: {new_label}"),
             &bold,
+            at(RULE_END, 0.0).x,
         );
 
         let resolution = self.resolution;
         let first_frame = self.first_frame;
-        for (i, (label, y)) in [("Width", 192.0), ("Height", 236.0)]
+        for (i, (text, y0)) in [("Width", 145.0), ("Height", 174.0)]
             .into_iter()
             .enumerate()
         {
-            painter.text(
-                at(LABEL_RIGHT, body + y),
-                Align2::RIGHT_CENTER,
-                label,
-                font.clone(),
-                color::TEXT,
-            );
+            label(55.0, y0 + 13.0, text);
             let dim = if i == 0 {
                 &mut self.width
             } else {
                 &mut self.height
             };
-            let field = Rect::from_min_size(
-                at(FIELD_X, body + y - CONTROL_H / 2.0),
-                vec2(FIELD_W, CONTROL_H),
-            );
-            common::number_field(
+            common::text_field(
                 ui,
-                field,
+                r(64.0, y0, 145.0, y0 + 24.0),
                 &mut dim.text,
                 ("canvas-size-field", i),
-                FONT,
+                font.clone(),
+                pt(10.5),
                 first_frame && i == 0,
             );
-
-            let unit_rect = Rect::from_min_size(
-                at(UNIT_X, body + y - CONTROL_H / 2.0),
-                vec2(UNIT_W, CONTROL_H),
-            );
             let mut unit = dim.unit;
-            common::dropdown(
+            let shown = unit.label();
+            common::ps_dropdown(
                 ui,
-                unit_rect,
-                ("canvas-size-unit", i),
-                unit.label(),
-                FONT,
-                true,
+                r(153.0, y0, 313.0, y0 + 24.0),
+                if i == 0 {
+                    "canvas-size-unit-w"
+                } else {
+                    "canvas-size-unit-h"
+                },
+                |painter, rect| {
+                    painter.text(
+                        rect.left_center() + vec2(pt(9.0), pt(0.75)),
+                        Align2::LEFT_CENTER,
+                        shown,
+                        theme::uxp(FONT),
+                        TEXT,
+                    );
+                },
                 |ui| {
                     for u in Unit::ALL {
                         ui.selectable_value(&mut unit, u, u.label());
@@ -414,15 +404,13 @@ impl CanvasSizeDialog {
             }
         }
 
-        // Relative checkbox
         let mut relative = self.relative;
-        let check = Rect::from_min_size(at(FIELD_X, body + 289.0 - 12.0), vec2(300.0, 24.0));
-        ui.put(
-            check,
-            egui::Checkbox::new(
-                &mut relative,
-                egui::RichText::new("Relative to current dimension").font(font.clone()),
-            ),
+        common::ps_checkbox(
+            ui,
+            at(64.0, 216.0),
+            "Relative to current dimension",
+            &mut relative,
+            true,
         );
         if relative != self.relative {
             self.width.set_relative(relative, resolution);
@@ -430,15 +418,15 @@ impl CanvasSizeDialog {
             self.relative = relative;
         }
 
-        // Anchor
+        // Anchor: its label at the left, the 3 × 3 grid under the fields
         painter.text(
-            at(LABEL_RIGHT, body + 337.0),
-            Align2::RIGHT_CENTER,
+            at(20.0, 255.0),
+            Align2::LEFT_CENTER,
             "Anchor",
             font.clone(),
-            color::TEXT,
+            TEXT,
         );
-        let grid = Rect::from_min_size(at(FIELD_X, body + 324.0), Vec2::splat(ANCHOR_CELL * 3.0));
+        let grid = Rect::from_min_size(at(64.0, 246.0), Vec2::splat(pt(ANCHOR_CELL * 3.0 + 1.0)));
         let growth = match new_size {
             Some((w, h)) => (
                 (w as i64 - self.width.original as i64).signum(),
@@ -448,87 +436,95 @@ impl CanvasSizeDialog {
         };
         self.anchor_grid(ui, grid, growth);
 
-        // Canvas extension color
-        let y = body + 463.0;
+        // Canvas extension color: only for a document with a background
+        let on = self.has_background;
         painter.text(
-            at(PAD, y),
+            at(20.5, 341.0),
             Align2::LEFT_CENTER,
             "Canvas extension color",
             font.clone(),
-            if self.has_background {
-                color::TEXT
-            } else {
-                color::TEXT_DISABLED
-            },
+            if on { TEXT } else { TEXT_OFF },
         );
-        let ext_rect = Rect::from_min_size(at(208.0, y - CONTROL_H / 2.0), vec2(237.0, CONTROL_H));
-        let mut extension = self.extension;
-        common::dropdown(
-            ui,
-            ext_rect,
-            "canvas-size-extension",
-            extension.label(),
-            FONT,
-            self.has_background,
-            |ui| {
-                for (i, e) in Extension::ALL.into_iter().enumerate() {
-                    if i == 5 {
-                        ui.separator();
-                    }
-                    ui.selectable_value(&mut extension, e, e.label());
-                }
-            },
-        );
-        if extension == Extension::Other {
-            // "Other..." opens the Color Picker; the choice only changes once
-            // a color is confirmed there, as in Photoshop
-            self.wants_color_picker = true;
-        } else {
-            self.extension = extension;
-        }
-
-        let swatch = Rect::from_min_max(
-            at(459.0, y - CONTROL_H / 2.0),
-            at(COLUMN_RIGHT, y + CONTROL_H / 2.0),
-        );
-        if self.has_background {
-            let c = self.extension_color(foreground, background);
-            let [r, g, b, _] = c.to_rgba8();
-            painter.rect(
-                swatch,
-                5,
-                Color32::from_rgb(r, g, b),
-                Stroke::new(1.5, Color32::from_gray(0xc0)),
-                StrokeKind::Inside,
+        let ext_rect = r(140.0, 328.0, 300.0, 352.0);
+        let shown = self.extension.label();
+        let content = |painter: &egui::Painter, rect: Rect, ink: Color32| {
+            painter.text(
+                rect.left_center() + vec2(pt(9.0), pt(0.75)),
+                Align2::LEFT_CENTER,
+                shown,
+                theme::uxp(FONT),
+                ink,
             );
-            if ui
-                .interact(swatch, ui.id().with("canvas-size-swatch"), Sense::click())
-                .clicked()
-            {
+        };
+        if on {
+            let mut extension = self.extension;
+            common::ps_dropdown(
+                ui,
+                ext_rect,
+                "canvas-size-extension",
+                |painter, rect| content(painter, rect, TEXT),
+                |ui| {
+                    for (i, e) in Extension::ALL.into_iter().enumerate() {
+                        if i == 5 {
+                            ui.separator();
+                        }
+                        ui.selectable_value(&mut extension, e, e.label());
+                    }
+                },
+            );
+            if extension == Extension::Other {
+                // "Other..." opens the Color Picker; the choice only changes
+                // once a color is confirmed there, as in Photoshop
                 self.wants_color_picker = true;
+            } else {
+                self.extension = extension;
             }
         } else {
-            painter.rect_stroke(
-                swatch,
-                5,
-                Stroke::new(1.0, color::SEPARATOR_LIGHT),
-                StrokeKind::Inside,
+            // Disabled: a flat #5c5c5c box, dimmed text and chevron
+            let fill = Color32::from_gray(0x5c);
+            painter.rect_filled(ext_rect, CornerRadius::same(pt(3.0) as u8), fill);
+            content(&painter, ext_rect, TEXT_OFF);
+            crate::ps_icons::paint(
+                &painter,
+                Pos2::new(ext_rect.right() - pt(13.5), ext_rect.center().y),
+                crate::ps_icons::Icon::DialogChevron,
+                TEXT_OFF,
+                fill,
             );
         }
-
-        // Buttons
-        let ok_rect = Rect::from_min_size(at(BUTTON_X, body + 29.0), vec2(BUTTON_W, CONTROL_H));
-        let cancel_rect = Rect::from_min_size(at(BUTTON_X, body + 82.0), vec2(BUTTON_W, CONTROL_H));
-        let ok = common::pill_button(
-            ui,
-            ok_rect,
-            "OK",
-            theme::semibold(FONT + 0.5),
-            new_size.is_some(),
+        let swatch = r(308.0, 328.0, 356.0, 352.0);
+        let [cr, cg, cb, _] = self.extension_color(foreground, background).to_rgba8();
+        painter.rect(
+            swatch,
+            CornerRadius::same(pt(3.0) as u8),
+            Color32::from_rgb(cr, cg, cb),
+            Stroke::new(pt(1.0), Color32::from_gray(0x8e)),
+            StrokeKind::Inside,
         );
-        let cancel =
-            common::pill_button(ui, cancel_rect, "Cancel", theme::semibold(FONT + 0.5), true);
+        if on
+            && ui
+                .interact(swatch, ui.id().with("canvas-size-swatch"), Sense::click())
+                .clicked()
+        {
+            self.wants_color_picker = true;
+        }
 
+        let ok = common::ps_button(
+            ui,
+            r(368.0, 48.0, 438.0, 72.0),
+            "OK",
+            true,
+            new_size.is_some(),
+            true,
+        );
+        let cancel = common::ps_button(
+            ui,
+            r(368.0, 84.0, 438.0, 108.0),
+            "Cancel",
+            false,
+            true,
+            true,
+        );
         let enter = active && ui.input(|i| i.key_pressed(Key::Enter));
         if cancel.clicked() {
             return Outcome::Cancel;
@@ -559,48 +555,41 @@ impl CanvasSizeDialog {
         }
     }
 
-    /// 3×3 anchor picker. Arrows point away from the anchor when the canvas
-    /// grows along that axis and toward it when it shrinks.
+    /// 3×3 anchor picker (23 pt cells in 1 pt lines). Arrows point away
+    /// from the anchor when the canvas grows along that axis and toward it
+    /// when it shrinks.
     fn anchor_grid(&mut self, ui: &mut Ui, grid: Rect, growth: (i64, i64)) {
-        let painter = ui.painter();
-        painter.rect_stroke(grid, 0, Stroke::new(1.0, ANCHOR_LINE), StrokeKind::Inside);
-        for i in 1..3 {
-            let d = i as f32 * ANCHOR_CELL;
-            painter.line_segment(
-                [
-                    pos2(grid.left() + d, grid.top()),
-                    pos2(grid.left() + d, grid.bottom()),
-                ],
-                Stroke::new(1.0, ANCHOR_LINE),
+        let cell = pt(ANCHOR_CELL);
+        let line = |painter: &egui::Painter, r: Rect| painter.rect_filled(r, 0, ANCHOR_LINE);
+        for i in 0..4 {
+            let d = i as f32 * cell;
+            line(
+                ui.painter(),
+                Rect::from_min_size(grid.min + vec2(d, 0.0), vec2(pt(1.0), grid.height())),
             );
-            painter.line_segment(
-                [
-                    pos2(grid.left(), grid.top() + d),
-                    pos2(grid.right(), grid.top() + d),
-                ],
-                Stroke::new(1.0, ANCHOR_LINE),
+            line(
+                ui.painter(),
+                Rect::from_min_size(grid.min + vec2(0.0, d), vec2(grid.width(), pt(1.0))),
             );
         }
-
         for cy in 0..3u8 {
             for cx in 0..3u8 {
-                let cell = Rect::from_min_size(
-                    grid.min + vec2(cx as f32 * ANCHOR_CELL, cy as f32 * ANCHOR_CELL),
-                    Vec2::splat(ANCHOR_CELL),
+                let rect = Rect::from_min_size(
+                    grid.min + vec2(cx as f32 * cell + pt(1.0), cy as f32 * cell + pt(1.0)),
+                    Vec2::splat(cell - pt(1.0)),
                 );
-                let response = ui.interact(cell, ui.id().with(("anchor", cx, cy)), Sense::click());
+                let response = ui.interact(rect, ui.id().with(("anchor", cx, cy)), Sense::click());
                 if response.clicked() {
                     self.anchor = Anchor { x: cx, y: cy };
                 }
                 if response.hovered() {
-                    ui.painter().rect_filled(cell.shrink(1.0), 0, color::HOVER);
+                    ui.painter().rect_filled(rect, 0, color::HOVER);
                 }
-
                 let dx = cx as i64 - self.anchor.x as i64;
                 let dy = cy as i64 - self.anchor.y as i64;
-                let c = cell.center();
+                let c = rect.center();
                 if dx == 0 && dy == 0 {
-                    ui.painter().circle_filled(c, 5.0, color::TEXT);
+                    ui.painter().circle_filled(c, pt(3.5), TEXT);
                 } else if dx.abs() <= 1 && dy.abs() <= 1 {
                     let sx = if growth.0 < 0 { -1 } else { 1 };
                     let sy = if growth.1 < 0 { -1 } else { 1 };
@@ -612,38 +601,31 @@ impl CanvasSizeDialog {
     }
 }
 
-fn section(painter: &egui::Painter, left_center: Pos2, text: &str, font: &FontId) {
-    let r = painter.text(
-        left_center,
-        Align2::LEFT_CENTER,
-        text,
-        font.clone(),
-        color::TEXT,
-    );
-    let x0 = r.right() + 14.0;
-    let x1 = left_center.x - PAD + COLUMN_RIGHT;
-    painter.line_segment(
-        [pos2(x0, left_center.y), pos2(x1, left_center.y)],
-        Stroke::new(1.0, RULE),
+/// A bold section heading at `left_center` with a 1 pt rule from 8 pt
+/// after it to `rule_end`.
+fn section(painter: &egui::Painter, left_center: Pos2, text: &str, font: &FontId, rule_end: f32) {
+    let r = painter.text(left_center, Align2::LEFT_CENTER, text, font.clone(), TEXT);
+    painter.rect_filled(
+        Rect::from_min_max(
+            pos2(r.right() + pt(8.0), left_center.y),
+            pos2(rule_end, left_center.y + pt(1.0)),
+        ),
+        0,
+        RULE,
     );
 }
 
-/// An arrow centered on `c`, pointing along `dir`.
+/// An arrow centered on `c`, pointing along `dir`, measured: 13.25 pt
+/// long, a 7.75 pt head 7.5 pt wide and a 2 pt shaft.
 fn arrow(painter: &egui::Painter, c: Pos2, dir: Vec2) {
-    let len = 16.0;
-    let tip = c + dir * len / 2.0;
-    let tail = c - dir * len / 2.0;
-    let stroke = Stroke::new(2.0, color::TEXT);
-    painter.line_segment([tail, tip - dir * 3.0], stroke);
-    let side = vec2(-dir.y, dir.x);
-    let head = 6.0;
+    let tip = c + dir * pt(6.5);
+    let base = c - dir * pt(1.25);
+    let tail = c - dir * pt(6.75);
+    painter.line_segment([tail, base], Stroke::new(pt(2.0), TEXT));
+    let side = vec2(-dir.y, dir.x) * pt(3.75);
     painter.add(egui::Shape::convex_polygon(
-        vec![
-            tip,
-            tip - dir * head + side * head * 0.6,
-            tip - dir * head - side * head * 0.6,
-        ],
-        color::TEXT,
+        vec![tip, base + side, base - side],
+        TEXT,
         Stroke::NONE,
     ));
 }
