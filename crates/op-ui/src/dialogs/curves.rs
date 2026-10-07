@@ -56,6 +56,10 @@ pub struct Dialog {
     pub tables: Option<[[u8; 256]; 4]>,
     /// The pencil stroke's last point (curve values).
     last_pencil: Option<(f32, f32)>,
+    /// The value of the image pixel under the pointer on the current
+    /// channel (the mean of the three on RGB): a circle marks it on the
+    /// curve.
+    pub probe: Option<f32>,
     /// The selected point's Input and Output as typed, and the channel and
     /// point they were filled from.
     input_text: String,
@@ -107,6 +111,7 @@ impl Dialog {
             eyedropper: None,
             tables: None,
             last_pencil: None,
+            probe: None,
             input_text: String::new(),
             output_text: String::new(),
             shown_point: None,
@@ -312,6 +317,46 @@ impl Dialog {
         };
         self.selected = Some(i);
         self.target = Some((i, points[i].1));
+    }
+
+    /// The image pixel under the pointer (None off the image): its value
+    /// on the current channel is marked on the curve.
+    pub fn set_probe(&mut self, rgb: Option<[u8; 3]>) {
+        self.probe = rgb.map(|rgb| self.value_of(rgb));
+    }
+
+    /// The current channel's value of `rgb` (the mean of the three on RGB).
+    fn value_of(&self, rgb: [u8; 3]) -> f32 {
+        if self.channel == 0 {
+            (rgb.iter().map(|&v| v as f32).sum::<f32>() / 3.0).round()
+        } else {
+            rgb[self.channel - 1] as f32
+        }
+    }
+
+    /// ⌘-click on the image: a point on the current curve at the pixel's
+    /// value, where the curve is now; with ⇧, one on each of the red,
+    /// green and blue curves at that channel's value. A channel with 16
+    /// points or a point within 4 levels gets no new one.
+    pub fn add_points_at(&mut self, rgb: [u8; 3], each_channel: bool) {
+        self.set_pencil(false);
+        let targets: Vec<(usize, f32)> = if each_channel {
+            (1..4).map(|c| (c, rgb[c - 1] as f32)).collect()
+        } else {
+            vec![(self.channel, self.value_of(rgb))]
+        };
+        for (c, v) in targets {
+            let table = curve_table(&self.rounded(c));
+            let points = &mut self.points[c];
+            if points.len() >= 16 || points.iter().any(|p| (p.0 - v).abs() <= 4.0) {
+                continue;
+            }
+            let i = points.iter().position(|p| p.0 > v).unwrap_or(points.len());
+            points.insert(i, (v, table[v as usize] as f32));
+            if c == self.channel {
+                self.selected = Some(i);
+            }
+        }
     }
 
     /// The hand dragged `dy` points down from where it was pressed: the
@@ -805,8 +850,53 @@ impl Dialog {
                 .map(|x| to_screen((x as f32, tables[c][x] as f32)))
                 .collect();
             painter.add(Shape::line(line, Stroke::new(pt(1.75), CHANNEL_COLORS[c])));
-            return;
         }
+        let pencil = self.tables.is_some();
+        if !pencil {
+            self.point_tool(
+                ui,
+                &response,
+                &painter,
+                (c, flip),
+                (&to_screen, &to_curve),
+                graph,
+            );
+        }
+        // The pixel under the pointer on the image: a circle on the curve
+        // at its value
+        if let Some(v) = self.probe {
+            let v = v.round().clamp(0.0, 255.0) as usize;
+            let out = match &self.tables {
+                Some(t) => t[c][v],
+                None => curve_table(&self.rounded(c))[v],
+            };
+            painter.circle_stroke(
+                to_screen((v as f32, out as f32)),
+                pt(4.0),
+                Stroke::new(pt(1.0), appkit::TEXT),
+            );
+        }
+        self.ramps_and_pins(
+            ui,
+            &painter,
+            frame,
+            (c, flip, pencil),
+            (&to_screen, &to_curve),
+            graph,
+        );
+    }
+
+    /// The point tool's part of the graph: adding, selecting, dragging and
+    /// deleting points, the curves and the points.
+    fn point_tool(
+        &mut self,
+        ui: &Ui,
+        response: &egui::Response,
+        painter: &egui::Painter,
+        (c, flip): (usize, bool),
+        (to_screen, to_curve): (&dyn Fn((f32, f32)) -> Pos2, &dyn Fn(Pos2) -> (f32, f32)),
+        graph: Rect,
+    ) {
         let pts = &mut self.points[c];
         if (response.drag_started() || response.clicked())
             && let Some(p) = response.interact_pointer_pos()
@@ -933,9 +1023,22 @@ impl Dialog {
                 );
             }
         }
+    }
 
-        // The ramps: output on the left (white at the top in Light), input
-        // along the bottom, with the end-point pins
+    /// The ramps: output on the left (white at the top in Light), input
+    /// along the bottom, with the end-point pins (fixed at the ends while
+    /// the pencil draws).
+    fn ramps_and_pins(
+        &mut self,
+        ui: &Ui,
+        painter: &egui::Painter,
+        frame: Rect,
+        (c, flip, pencil): (usize, bool, bool),
+        (to_screen, to_curve): (&dyn Fn((f32, f32)) -> Pos2, &dyn Fn(Pos2) -> (f32, f32)),
+        graph: Rect,
+    ) {
+        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
+        let pts = &self.points[c];
         let (light, dark) = if flip {
             (Color32::BLACK, Color32::WHITE)
         } else {
@@ -965,15 +1068,26 @@ impl Dialog {
             light,
             false,
         );
-        let first = pts.first().copied().unwrap_or((0.0, 0.0));
-        let last = pts.last().copied().unwrap_or((255.0, 255.0));
+        let (first, last) = if pencil {
+            ((0.0, 0.0), (255.0, 255.0))
+        } else {
+            (
+                pts.first().copied().unwrap_or((0.0, 0.0)),
+                pts.last().copied().unwrap_or((255.0, 255.0)),
+            )
+        };
         let pin_y = at(0.0, 369.5).y;
         let pins = [to_screen((first.0, 0.0)).x, to_screen((last.0, 0.0)).x];
         let area = Rect::from_min_max(
             Pos2::new(graph.left() - pt(6.0), pin_y),
             Pos2::new(graph.right() + pt(6.0), pin_y + pt(11.0)),
         );
-        let response = ui.interact(area, ui.id().with("curves-pins"), Sense::drag());
+        let sense = if pencil {
+            Sense::hover()
+        } else {
+            Sense::drag()
+        };
+        let response = ui.interact(area, ui.id().with("curves-pins"), sense);
         if response.drag_started()
             && let Some(p) = response.interact_pointer_pos()
         {
@@ -1014,6 +1128,29 @@ impl Dialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn command_click_adds_points() {
+        let mut d = Dialog::new([[0; 256]; 3]);
+        // ⌘-click on RGB: one point at the mean, on the curve
+        d.add_points_at([30, 60, 90], false);
+        assert_eq!(d.points[0], vec![(0.0, 0.0), (60.0, 60.0), (255.0, 255.0)]);
+        assert_eq!(d.selected, Some(1));
+        // ⌘⇧-click: each color channel at its own value
+        d.add_points_at([30, 60, 90], true);
+        assert_eq!(d.points[1][1], (30.0, 30.0));
+        assert_eq!(d.points[2][1], (60.0, 60.0));
+        assert_eq!(d.points[3][1], (90.0, 90.0));
+        // Not again within 4 levels
+        d.add_points_at([32, 60, 90], true);
+        assert_eq!(d.points[1].len(), 3);
+        // The probe follows the current channel
+        d.channel = 3;
+        d.set_probe(Some([30, 60, 90]));
+        assert_eq!(d.probe, Some(90.0));
+        d.set_probe(None);
+        assert_eq!(d.probe, None);
+    }
 
     #[test]
     fn preset_files_round_trip() {

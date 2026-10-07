@@ -15,12 +15,11 @@ The dialog for Image › Adjustments › Curves... (⌘M), rebuilt after Photosh
 
 - "Preset:" (11, 56.25), popup menu (56, 46)–(345, 67), gear (365.5, 56.5), whose menu saves, loads and deletes preset files (`preset_files.md`); saved presets are listed at the end of the Preset pop-up.
 - Left group box (11, 87.5)–(368, 434.5), "Channel:" (30.5, 86.75), popup menu (85, 76.5)–(170, 97.5).
-- Tools: point tool button (20, 107.5)–(50, 133.5) (selected, `#383838` fill), pencil (64.5, 120) (drawn only).
 - Curve graph (89, 108)–(346, 365): `#454545` fill; the current channel's histogram (`#868686`); grid lines `#383838`; diagonal baseline `#808080`; other channels' changed curves drawn 1 pt in the channel color (Channel Overlays); the current curve 1.75 pt (white for RGB, otherwise the channel color); control points are 4 pt squares, the selected one filled. While dragging a point, horizontal and vertical crosshair lines through it are drawn (Intersection Line).
 - Output gradient on the left (84, 108)–(87.5, 365), white at top and black at bottom; input gradient below (89, 366)–(346, 369.5), black on the left and white on the right; below it two end point sliders (tips at y 369.5). With Pigment, both gradients, the sliders and the coordinates are reversed.
 - "Output:" (20.5, 339.75) and its value (20.5, 355.75); "Input:" (90, 389.75) and its value (89.5, 410.25): shows the selected point, otherwise the position under the pointer; with Pigment, shown as ink percentage (`100 − v/2.55`).
 - Targeted adjustment hand at (34, 412), a 30 × 26 toggle drawn pressed (`#383838` box) while on; choosing an eyedropper turns it off and it turns the eyedropper off, three eyedroppers at (158 / 188 / 218, 411.5) (Set Black, Gray, White Point, as in Levels); "Show Clipping" checkbox (240.5, 404.5).
-- Tools at the top left: the point tool (20, 107.5)–(50, 133.5) and the pencil (49.5, 107.5)–(79.5, 133.5), the chosen one pressed (`#383838` box). The pencil turns the curves into tables (`tables`) drawn freehand: each column the pointer crosses takes its height (with straight lines between samples); the curve shows as a line without points. Smooth (enabled only with the pencil) averages the current channel's table over nine levels. Back to the point tool, each channel becomes points every 32 levels along its table (the identity's two points when straight).
+- Tools at the top left: the point tool (20, 107.5)–(50, 133.5) and the pencil (49.5, 107.5)–(79.5, 133.5), the chosen one pressed (`#383838` box). The pencil turns the curves into tables (`tables`) drawn freehand: each column the pointer crosses takes its height (with straight lines between samples); the curve shows as a line without points. The ramps stay, and the end-point pins sit at 0 and 255 and can't be dragged. Smooth (enabled only with the pencil) averages the current channel's table over nine levels. Back to the point tool, each channel becomes points every 32 levels along its table (the identity's two points when straight).
 - Eyedroppers: Black (White) Point moves each channel's black (white) end point to that channel's value, dropping points beyond it; Gray Point adds a point taking each channel's value to the color's mean; the composite curve returns to its default.
 - A selected point's Output and Input become fields, (18, 346.5)–(62, 365.5) and (87.5, 401)–(131.5, 420) (in ink percent with Pigment); typing moves the point (Input stays between its neighbours).
 - Show Clipping: while an end-point pin is dragged, the preview shows clipping instead of the result (`clipping`): with the black pin, white where no channel clips to 0 and the clipped channels' colors elsewhere (black where all do); with the white pin, black where nothing clips to 255. Releasing the pin shows the result again.
@@ -29,6 +28,8 @@ The dialog for Image › Adjustments › Curves... (⌘M), rebuilt after Photosh
 
 ## Interaction
 
+- The image under the pointer (outside the dialog, `lib.md`): the pixel's value on the current channel (the active layer as it was before the dialog, `before`; on RGB the mean of the three) is marked by a 4 pt circle on the curve (`set_probe`), with the point tool or the pencil.
+- ⌘-click on the image (`add_points_at`): a point on the current curve at the pixel's value, where the curve is now, and it is selected; ⌘⇧-click: a point on each of the red, green and blue curves at that channel's value. A curve with 16 points, or a point within 4 levels, gets no new one; the pencil turns back to points first.
 - Targeted adjustment hand (`targeting`): pressing on the image (outside the dialog; `lib.md`) switches the pencil back to points, then takes the pressed pixel's value in the current channel (on RGB the mean of the three) and selects the point within 4 levels of it, or adds one there on the curve (up to 16 points). Dragging up raises that point's output a level per point (down lowers it), clamped to 0–255; releasing ends the drag.
 
 - The Channel menu or ⌥2–⌥5 switches channels and clears the selected point.
@@ -40,10 +41,11 @@ The dialog for Image › Adjustments › Curves... (⌘M), rebuilt after Photosh
 
 ## Known limitations
 
-- The hand reads RGB's value as the mean of the three channels (Photoshop's exact composite value is not measured), only adjusts the current channel (⌘⇧-click setting points on each channel is not implemented), and draws no circle on the curve while hovering the image. With the pencil the ramps and end-point pins are not drawn.
+- The hand, the circle and ⌘-click read RGB's value as the mean of the three channels (Photoshop's exact composite value is not measured).
 
 ## Test coverage
 
+- `command_click_adds_points`: ⌘-click adds a point at the mean on RGB, ⌘⇧-click one on each channel at its value, none within 4 levels of another; the probe follows the current channel.
 - `channels_keep_their_curves`, `pigment_shows_ink_percent`, `the_hand_adds_and_moves_a_point`, `auto_moves_each_channels_end_points` (Per Channel moves each channel's end points; the default puts one curve on RGB), `photoshops_presets`, `pencil_smooth_and_show_clipping` (a drawn step becomes `CurveTables`, Smooth eases it, back to points gives nine points; Show Clipping with the black pin at 50 maps 40 to 0 and 60 to 255).
 - `ui_tests::curves_hand_drags_the_curve_at_the_pixel`: the hand dragged up 40 pt on a 100 gray patch makes it 140.
 - `ui_tests::levels_and_curves_eyedroppers_sample_the_image`: Levels' white eyedropper on an orange patch turns it white (and OK keeps it); Curves' gray eyedropper makes it neutral.

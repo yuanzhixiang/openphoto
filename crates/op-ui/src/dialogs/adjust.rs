@@ -1263,6 +1263,23 @@ impl AdjustDialog {
         }
     }
 
+    /// Curves: the image pixel under the pointer, marked on the curve.
+    pub fn curves_probe(&mut self, rgb: Option<[u8; 3]>) {
+        if let Some(Custom::Curves(d)) = &mut self.custom {
+            d.set_probe(rgb);
+        }
+    }
+
+    /// Curves: ⌘-click on the image (⇧ for every channel) adds points.
+    /// Returns whether this is the Curves dialog.
+    pub fn curves_add_points(&mut self, rgb: [u8; 3], each_channel: bool) -> bool {
+        if let Some(Custom::Curves(d)) = &mut self.custom {
+            d.add_points_at(rgb, each_channel);
+            return true;
+        }
+        false
+    }
+
     /// The chosen eyedropper's click on a pixel of color `rgb`.
     pub fn sample(&mut self, rgb: [u8; 3]) {
         if self.kind == Kind::ReplaceColor {

@@ -383,6 +383,43 @@ impl OpenPhotoApp {
                 }
             }
         }
+        // Curves: the pixel under the pointer (as it was before adjusting,
+        // on the active layer) is marked on the curve; ⌘-click adds a
+        // point there (⇧: on each color channel)
+        {
+            let ppp = ctx.pixels_per_point();
+            let (hover, command, shift) = ctx.input(|i| {
+                (
+                    i.pointer.hover_pos(),
+                    i.modifiers.command,
+                    i.modifiers.shift,
+                )
+            });
+            let rgb = hover
+                .filter(|p| !dialog.rect.contains(*p) && state.view.viewport.contains(*p))
+                .and_then(|p| {
+                    let d = document_view::to_doc(state, p, ppp);
+                    let id = state.doc.active_layer?;
+                    let layer = op_core::Document::snapshot_layer(&dialog.before, id)?;
+                    let image = layer.image()?;
+                    let (x, y) = (d.x.floor(), d.y.floor());
+                    if x < 0.0 || y < 0.0 || x >= image.width() as f32 || y >= image.height() as f32
+                    {
+                        return None;
+                    }
+                    let [r, g, b, _] = image.pixel(x as u32, y as u32);
+                    Some([r, g, b])
+                });
+            dialog.curves_probe(rgb);
+            if click.is_some()
+                && command
+                && !dialog.sampling()
+                && !dialog.targeting()
+                && let Some(rgb) = rgb
+            {
+                dialog.curves_add_points(rgb, shift);
+            }
+        }
         // Otherwise a click on the document centers a filter's preview there
         if let Some(p) = click
             && dialog.wants_pane()
