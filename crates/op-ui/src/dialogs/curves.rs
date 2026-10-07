@@ -79,6 +79,9 @@ pub struct Dialog {
     pub wants_options: bool,
 }
 
+/// The graph's mappings: curve values to the screen, and back.
+type Mapping<'a> = (&'a dyn Fn((f32, f32)) -> Pos2, &'a dyn Fn(Pos2) -> (f32, f32));
+
 fn identity() -> Vec<(f32, f32)> {
     vec![(0.0, 0.0), (255.0, 255.0)]
 }
@@ -894,7 +897,7 @@ impl Dialog {
         response: &egui::Response,
         painter: &egui::Painter,
         (c, flip): (usize, bool),
-        (to_screen, to_curve): (&dyn Fn((f32, f32)) -> Pos2, &dyn Fn(Pos2) -> (f32, f32)),
+        (to_screen, to_curve): Mapping<'_>,
         graph: Rect,
     ) {
         let pts = &mut self.points[c];
@@ -1034,7 +1037,7 @@ impl Dialog {
         painter: &egui::Painter,
         frame: Rect,
         (c, flip, pencil): (usize, bool, bool),
-        (to_screen, to_curve): (&dyn Fn((f32, f32)) -> Pos2, &dyn Fn(Pos2) -> (f32, f32)),
+        (to_screen, to_curve): Mapping<'_>,
         graph: Rect,
     ) {
         let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
