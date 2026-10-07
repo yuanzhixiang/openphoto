@@ -112,6 +112,25 @@ pub enum Adjustment {
     /// Image > Auto Color: here each channel stretched like Auto Tone
     /// (Photoshop also neutralizes the midtones).
     AutoColor,
+    /// Replace Color: pixels near `color` (by Fuzziness, 0–200) get the
+    /// hue (−180–180), saturation and lightness (−100–100) shift.
+    ReplaceColor {
+        color: [u8; 3],
+        fuzziness: u8,
+        shift: [i32; 3],
+    },
+    /// Match Color: from the target's Lab statistics to the source's,
+    /// with Luminance and Color Intensity (1–200 %) and Fade (0–100 %).
+    MatchColor {
+        target: [f32; 6],
+        source: [f32; 6],
+        luminance: f32,
+        intensity: f32,
+        fade: f32,
+    },
+    /// Color Lookup through the cube registered as this number
+    /// (`color_match::register`).
+    ColorLookup(u32),
 }
 
 impl Adjustment {
@@ -138,6 +157,9 @@ impl Adjustment {
             Self::Curves { .. } | Self::CurveTables(_) => "Curves",
             Self::ChannelMixer { .. } => "Channel Mixer",
             Self::SelectiveColor { .. } => "Selective Color",
+            Self::ReplaceColor { .. } => "Replace Color",
+            Self::MatchColor { .. } => "Match Color",
+            Self::ColorLookup(_) => "Color Lookup",
         }
     }
 
@@ -1112,6 +1134,10 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
         Adjustment::AutoContrast => Some(auto_tables(doc, false)),
         other => other.tables(),
     };
+    let lut = match adjustment {
+        Adjustment::ColorLookup(id) => crate::color_match::lut(id),
+        _ => None,
+    };
     let map = |px: [u8; 4]| -> [u8; 4] {
         let [r, g, b, a] = px;
         match adjustment {
@@ -1151,6 +1177,44 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
             | Adjustment::PhotoFilter { .. }
             | Adjustment::GradientMap { .. } => color_adjust(adjustment, px),
             Adjustment::HueSaturation(hs) => hs.apply(px),
+            Adjustment::ReplaceColor {
+                color,
+                fuzziness,
+                shift,
+            } => {
+                let w = crate::color_match::replace_weight([r, g, b], color, fuzziness as f32);
+                if w <= 0.0 {
+                    return px;
+                }
+                let hs = HueSaturation::master(shift[0], shift[1], shift[2]);
+                let to = hs.apply(px);
+                let mix = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * w).round() as u8;
+                [mix(r, to[0]), mix(g, to[1]), mix(b, to[2]), a]
+            }
+            Adjustment::MatchColor {
+                target,
+                source,
+                luminance,
+                intensity,
+                fade,
+            } => {
+                let [r, g, b] = crate::color_match::match_color(
+                    [r, g, b],
+                    target,
+                    source,
+                    luminance,
+                    intensity,
+                    fade,
+                );
+                [r, g, b, a]
+            }
+            Adjustment::ColorLookup(_) => match &lut {
+                Some(l) => {
+                    let [r, g, b] = l.apply([r, g, b]);
+                    [r, g, b, a]
+                }
+                None => px,
+            },
         }
     };
     let selection = match adjustment {

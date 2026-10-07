@@ -281,12 +281,112 @@ pub enum Filter {
         background: [u8; 3],
         seed: u32,
     },
+    /// Image > Adjustments > Shadows/Highlights (it looks at each pixel's
+    /// surroundings, so it runs as a filter; see `tone.rs`).
+    ShadowsHighlights(crate::tone::ShadowsHighlights),
+    /// Image > Adjustments > HDR Toning (see `tone.rs`).
+    HdrToning(crate::tone::HdrToning),
+    /// Distort > Wave (see `more_filters.rs` for these and the others
+    /// below).
+    Wave(crate::more_filters::Wave),
+    /// Distort > Shear: the curve's points (height, offset), the first
+    /// `count` used.
+    Shear {
+        points: [(f32, f32); 8],
+        count: u8,
+        undefined: crate::more_filters::Undefined,
+    },
+    /// Distort > Displace with the map registered as `map`.
+    Displace {
+        map: u32,
+        scale: (f32, f32),
+        stretch: bool,
+        undefined: crate::more_filters::Undefined,
+    },
+    RadialBlur {
+        amount: f32,
+        method: crate::more_filters::RadialMethod,
+        quality: u8,
+        center: (f32, f32),
+    },
+    SmartBlur {
+        radius: f32,
+        threshold: f32,
+        mode: crate::more_filters::SmartBlurMode,
+    },
+    ShapeBlur {
+        radius: f32,
+        shape: crate::more_filters::BlurShape,
+    },
+    LensBlur {
+        radius: f32,
+        blades: u32,
+        brightness: f32,
+        threshold: u8,
+        noise: f32,
+    },
+    ReduceNoise {
+        strength: f32,
+        preserve: f32,
+        color: f32,
+        sharpen: f32,
+    },
+    SmartSharpen {
+        amount: f32,
+        radius: f32,
+        noise: f32,
+        remove: crate::more_filters::SharpenRemove,
+        angle: f32,
+        fade: (f32, f32),
+    },
+    Fibers {
+        variance: f32,
+        strength: f32,
+        foreground: [u8; 3],
+        background: [u8; 3],
+        seed: u32,
+    },
+    LensFlare {
+        center: (f32, f32),
+        brightness: f32,
+        lens: crate::more_filters::LensType,
+    },
+    Extrude {
+        kind: crate::more_filters::ExtrudeType,
+        size: u32,
+        depth: f32,
+        level_based: bool,
+        solid: bool,
+        seed: u32,
+    },
+    OilPaint {
+        stylization: f32,
+        cleanliness: f32,
+        scale: f32,
+        angle: f32,
+        shine: f32,
+    },
 }
 
 impl Filter {
     /// The menu and history name.
     pub fn name(self) -> &'static str {
         match self {
+            Self::ShadowsHighlights(_) => "Shadows/Highlights",
+            Self::Wave(_) => "Wave",
+            Self::Shear { .. } => "Shear",
+            Self::Displace { .. } => "Displace",
+            Self::RadialBlur { .. } => "Radial Blur",
+            Self::SmartBlur { .. } => "Smart Blur",
+            Self::ShapeBlur { .. } => "Shape Blur",
+            Self::LensBlur { .. } => "Lens Blur",
+            Self::ReduceNoise { .. } => "Reduce Noise",
+            Self::SmartSharpen { .. } => "Smart Sharpen",
+            Self::Fibers { .. } => "Fibers",
+            Self::LensFlare { .. } => "Lens Flare",
+            Self::Extrude { .. } => "Extrude",
+            Self::OilPaint { .. } => "Oil Paint",
+            Self::HdrToning(_) => "HDR Toning",
             Self::GaussianBlur { .. } => "Gaussian Blur",
             Self::BoxBlur { .. } => "Box Blur",
             Self::Average => "Average",
@@ -1692,6 +1792,32 @@ fn filtered(
         Filter::Diffuse { mode } => diffuse(&src, mode),
         Filter::Mezzotint { kind } => mezzotint(&src, kind),
         Filter::Facet => facet(&src),
+        Filter::ShadowsHighlights(settings) => {
+            let mut px: Vec<[u8; 4]> = src.px.iter().map(|&p| Buffer::straight(p)).collect();
+            crate::tone::shadows_highlights(&mut px, w, h, settings);
+            px
+        }
+        Filter::HdrToning(settings) => {
+            let mut px: Vec<[u8; 4]> = src.px.iter().map(|&p| Buffer::straight(p)).collect();
+            crate::tone::hdr_toning(&mut px, w, h, settings);
+            px
+        }
+        Filter::Wave(_)
+        | Filter::Shear { .. }
+        | Filter::Displace { .. }
+        | Filter::RadialBlur { .. }
+        | Filter::SmartBlur { .. }
+        | Filter::ShapeBlur { .. }
+        | Filter::LensBlur { .. }
+        | Filter::ReduceNoise { .. }
+        | Filter::SmartSharpen { .. }
+        | Filter::Fibers { .. }
+        | Filter::LensFlare { .. }
+        | Filter::Extrude { .. }
+        | Filter::OilPaint { .. } => {
+            let px: Vec<[u8; 4]> = src.px.iter().map(|&p| Buffer::straight(p)).collect();
+            more(&px, w, h, filter)
+        }
         Filter::HsbHsl { input, output } => per_pixel(&|_, _, p| {
             let rgb = to_rgb(input, [p[0], p[1], p[2]]);
             let out = from_rgb(output, rgb);
@@ -1740,6 +1866,110 @@ fn filtered(
             let s = |v: u8| if v > 127 { 255 - v } else { v };
             [s(px[0]), s(px[1]), s(px[2]), px[3]]
         }),
+    }
+}
+
+/// The `more_filters` ones.
+fn more(px: &[[u8; 4]], w: usize, h: usize, filter: Filter) -> Vec<[u8; 4]> {
+    use crate::more_filters as m;
+    match filter {
+        Filter::Wave(s) => m::wave(px, w, h, s),
+        Filter::Shear {
+            points,
+            count,
+            undefined,
+        } => {
+            let offsets = m::shear_offsets(&points[..count.min(8) as usize], h);
+            m::shear(px, w, h, &offsets, undefined)
+        }
+        Filter::Displace {
+            map,
+            scale,
+            stretch,
+            undefined,
+        } => match m::map(map) {
+            Some(data) => {
+                let map = m::DisplaceMap {
+                    width: data.0,
+                    height: data.1,
+                    pixels: &data.2,
+                    stretch,
+                };
+                m::displace(px, w, h, &map, scale, undefined)
+            }
+            None => px.to_vec(),
+        },
+        Filter::RadialBlur {
+            amount,
+            method,
+            quality,
+            center,
+        } => m::radial_blur(px, w, h, amount, method, quality, center),
+        Filter::SmartBlur {
+            radius,
+            threshold,
+            mode,
+        } => m::smart_blur(px, w, h, radius, threshold, mode),
+        Filter::ShapeBlur { radius, shape } => m::shape_blur(px, w, h, radius, shape),
+        Filter::LensBlur {
+            radius,
+            blades,
+            brightness,
+            threshold,
+            noise,
+        } => m::lens_blur(px, w, h, radius, blades, brightness, threshold, noise),
+        Filter::ReduceNoise {
+            strength,
+            preserve,
+            color,
+            sharpen,
+        } => m::reduce_noise(px, w, h, strength, preserve, color, sharpen),
+        Filter::SmartSharpen {
+            amount,
+            radius,
+            noise,
+            remove,
+            angle,
+            fade,
+        } => m::smart_sharpen(px, w, h, amount, radius, noise, remove, angle, fade),
+        Filter::Fibers {
+            variance,
+            strength,
+            foreground,
+            background,
+            seed,
+        } => m::fibers(w, h, variance, strength, foreground, background, seed),
+        Filter::LensFlare {
+            center,
+            brightness,
+            lens,
+        } => m::lens_flare(px, w, h, center, brightness, lens),
+        Filter::Extrude {
+            kind,
+            size,
+            depth,
+            level_based,
+            solid,
+            seed,
+        } => m::extrude(
+            px,
+            w,
+            h,
+            kind,
+            size as usize,
+            depth,
+            level_based,
+            solid,
+            seed,
+        ),
+        Filter::OilPaint {
+            stylization,
+            cleanliness,
+            scale,
+            angle,
+            shine,
+        } => m::oil_paint(px, w, h, stylization, cleanliness, scale, angle, shine),
+        _ => px.to_vec(),
     }
 }
 

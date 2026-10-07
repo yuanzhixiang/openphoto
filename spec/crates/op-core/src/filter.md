@@ -88,3 +88,8 @@ Implements the filters in the Filter menu, acting on the active layer and limite
 - `distortions_match_photoshop`: Twirl, Pinch, Spherize (including negative values and Vertical only), and Polar Coordinates in both directions compared against Photoshop, asserting on the average difference.
 - `trace_contour_upper_matches_photoshop`: Trace Contour Level 128 Upper compared against Photoshop, with at most one channel value different.
 - `wind_streaks_downwind`: Wind and Blast in both directions: results are repeatable, bright points are kept, streaks appear only on the downwind side and only lighten, and some of the 32 rows start a streak; on a flat image all three methods change nothing.
+
+## Filters computed elsewhere
+
+- `ShadowsHighlights` and `HdrToning` (adjustments that look at surroundings) run `tone.rs` (`tone.md`).
+- `Wave`, `Shear`, `Displace`, `RadialBlur`, `SmartBlur`, `ShapeBlur`, `LensBlur`, `ReduceNoise`, `SmartSharpen`, `Fibers`, `LensFlare`, `Extrude`, `OilPaint` run `more_filters.rs` through `more` (`more_filters.md`). Fibers fills the layer from its colors; the others read the layer's pixels.
