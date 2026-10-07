@@ -59,8 +59,8 @@
 - 新建图层（底部按钮）：在当前图层上方插入一个透明图层（`Document::insert_above_active`），按 `Document::next_layer_name` 命名为「Layer N」（与 Photoshop 一致：打开带透明的图片得到「Layer 0」后，新建的是「Layer 1」），选中它，记录「New Layer」。也可以用 ⌥⇧⌘N。按住 ⌥ 单击这个按钮、按 ⇧⌘N 或 Layer › New › Layer... 则先弹出 New Layer 对话框（`dialogs/new_layer.md`），与 Photoshop 一致。
 - 删除图层：删除所有选中的图层（`layer_ops::delete_selected`），选中它下面的图层（没有则选中最底层），记录「Delete Layer」。只剩一个图层时按钮不可用。
 - Layer › Hide Layers（⌘,）也会切换当前图层的可见性，同样不记录历史。
-- 拖动图层行：拖动期间在指针最接近的两行之间画一条 2 pt 的强调色横线，表示松开后的位置；松开后移动图层（`layer_ops::move_block`），记录「Layer Order」。目标位置不允许（背景图层本身不能移动，也不能把图层放到背景图层下面，或位置没有变化）时不画横线，松开后什么也不做。
-- 双击图层名称（缩略图右侧）：在名称处打开输入框，名称全选。Enter 或点击别处确认，Esc 取消；名称改变且不为空时改名（首尾空白去掉），记录「Rename Layer」。正在输入时单键快捷键不生效。
+- 拖动图层行（Photoshop 2026 实测）：拖动期间被拖的行（眼睛列除外）变成 `#516291`；在指针最接近的行间位置画两条 `#60a4f8` 的横线表示松开后的位置——行边界下 0.5–1.5 pt 一条、2–3.5 pt 一条，横跨各行、不画进右侧滚动条轨道；松开后移动图层（`layer_ops::move_block`），记录「Layer Order」。目标位置不允许（背景图层本身不能移动，也不能把图层放到背景图层下面，或位置没有变化）时不画横线，松开后什么也不做。
+- 双击图层名称（缩略图右侧）：在名称处打开输入框，名称全选。输入框照 Photoshop 2026：无边框的 `#454545` 框，从名称前 2 pt 到名称后 5 pt（随输入变宽，不超过滚动条轨道），高 14.5 pt，以行中心为中心；选中的文字底色 `#4374b3`。Enter 或点击别处确认，Esc 取消；名称改变且不为空时改名（首尾空白去掉），记录「Rename Layer」。正在输入时单键快捷键不生效。
 - 双击背景图层名称：与 Photoshop 一样弹出 New Layer 对话框的 Layer from Background 版本（`dialogs/new_layer.md`），确认后转为普通图层。
 - 点击背景图层右侧的锁图标：不弹对话框，直接转为普通图层「Layer 0」（`layer_ops::layer_from_background`），记录「Layer From Background」，与 Photoshop 一致。
 

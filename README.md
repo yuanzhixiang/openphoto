@@ -17,7 +17,7 @@ OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、�
 
 ### P0
 
-1. **已有界面的像素级校准**：Image Size（Photoshop 左侧还有预览图）、Fill、Trim、各调整对话框与滤镜对话框已逐像素对齐，Layers 面板的改名输入框、拖动指示线是按 Photoshop 的结构排列的，尚未逐像素比对；窗口框架（标题栏、选项栏、工具栏、图标列、面板列的外框尺寸，文档标签栏、滚动条、状态栏）、History 面板和 Color Picker 已经按 Photoshop 1:1 量取。各工具的选项栏已按 Photoshop 2026 的截图逐个定位（分隔线与各种框的边缘相差不超过 1 pt；选区画笔、移除工具、调整画笔在测量用的 Photoshop 里没有，选项栏还是空的）。还没有逐像素比对的是：工具栏图标的细节（已按 Photoshop 的样式逐个重画并对齐位置，线条类图标的外形仍是近似，见 `crates/op-ui/src/tool_icons.md`）。面板列的折叠条、组高度、标签栏、Color、Properties（含 Canvas 之后的 Rulers & Grids、Guides、Quick Actions 分区）、Layers 面板、图标列、工具栏底部已逐像素对齐；Canvas Size、Fill、Trim、New Guide、Select › Modify 各对话框与「Save changes」提示框已按 Photoshop 2026 逐点重做。
+1. **已有界面的像素级校准**：Image Size（Photoshop 左侧还有预览图）、Fill、Trim、各调整对话框与滤镜对话框已逐像素对齐，Layers 面板的改名输入框与拖动指示线已按 Photoshop 2026 实测；窗口框架（标题栏、选项栏、工具栏、图标列、面板列的外框尺寸，文档标签栏、滚动条、状态栏）、History 面板和 Color Picker 已经按 Photoshop 1:1 量取。各工具的选项栏已按 Photoshop 2026 的截图逐个定位（分隔线与各种框的边缘相差不超过 1 pt；选区画笔、移除工具、调整画笔在测量用的 Photoshop 里没有，选项栏还是空的）。还没有逐像素比对的是：工具栏图标的细节（已按 Photoshop 的样式逐个重画并对齐位置，线条类图标的外形仍是近似，见 `crates/op-ui/src/tool_icons.md`）。面板列的折叠条、组高度、标签栏、Color、Properties（含 Canvas 之后的 Rulers & Grids、Guides、Quick Actions 分区）、Layers 面板、图标列、工具栏底部已逐像素对齐；Canvas Size、Fill、Trim、New Guide、Select › Modify 各对话框与「Save changes」提示框已按 Photoshop 2026 逐点重做。
 2. **界面字体**：Photoshop 面板和 UXP 对话框使用 Adobe Clean（Adobe 专有字体，不能内置，用 Source Sans 3 近似，长句会宽约 2.5%），经典对话框、提示框和窗口标题使用 AppKit 绘制的系统字体（`theme::dialog`，opsz 17 加 trak 字距，与 Photoshop 宽度一致）。New Layer、Duplicate Layer、Lock Layers、Canvas Size、Trim、New Guide、Select › Modify（UXP）与 Fill（AppKit）、提示框、调整与滤镜对话框已按这一区分校准。还没有校准的是 New Document（Photoshop 2026 默认是新版的大对话框，见 P1 第 9 项）与 Color Picker 的文字。
 
 ### P1

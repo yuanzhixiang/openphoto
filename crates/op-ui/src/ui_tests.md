@@ -86,3 +86,5 @@
 - `fill_and_sample_options_bars_edit_their_settings`：见 `options_tools.md`。
 - `type_shape_and_view_options_bars_edit_their_settings`：见 `options_tools.md`。
 - `canvas_size_dialog_resizes_around_the_anchor`：Canvas Size 打开时宽度框已全选，输入 800、点左上锚点、回车：文档变为 800 × 811，图像留在左边、右侧扩展为背景色（白），记录「Canvas Size」；勾选 Relative 后高度输入 10 得到 821；输入后按 Esc 不做修改。`dialog_origin` 从标题栏底色找出对话框左上角；`probe_document` 打开与 Photoshop 测量用的 probe.png 相同的 64 × 72 透明文档。`screenshot_canvas_size_dialog`（`#[ignore]`）把对话框截成 `canvas_size.png`，用于与 Photoshop 并排比对。
+- `screenshot_layer_drag_and_rename`（`#[ignore]`）：拖动中途（被拖行的底色与落点横线）和改名输入框的截图，用于与 Photoshop 比对。
+- `properties_sections_toggle_views_and_run_quick_actions`、`new_guide_dialog_adds_a_guide`、`type_shape_and_view_options_bars_edit_their_settings`：见各自的 spec。`shot_dialog` 把打开的对话框按 Photoshop 截图的尺寸裁下（`screenshot_fill_dialog`、`screenshot_trim_dialog`、`screenshot_feather_dialog`、`screenshot_new_guide_dialog`、`screenshot_canvas_size_dialog`）。
