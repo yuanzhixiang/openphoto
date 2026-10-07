@@ -781,6 +781,10 @@ pub struct AdjustDialog {
     pub extra: Extra,
 }
 
+/// What Replace Color's preview picture was made from: the sampled color,
+/// Fuzziness (as bits) and whether it shows the image.
+type PreviewKey = ([u8; 3], u32, bool);
+
 /// What some filter and adjustment dialogs need besides their fields.
 #[derive(Clone, Default)]
 pub struct Extra {
@@ -810,7 +814,7 @@ pub struct Extra {
     /// the texture with what it was made from.
     pub thumb: Option<(usize, usize, Vec<[u8; 3]>)>,
     pub show_image: bool,
-    pub preview_texture: Option<(([u8; 3], u32, bool), egui::TextureHandle)>,
+    pub preview_texture: Option<(PreviewKey, egui::TextureHandle)>,
 }
 
 /// The active layer made small for a preview box `max` pixels at most
