@@ -1245,6 +1245,66 @@ fn saving_reverting_and_closing_with_unsaved_changes() {
 }
 
 #[test]
+fn jpeg_and_png_saves_ask_for_their_options() {
+    use crate::theme::pt;
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    let id = h.state().state.active_doc.unwrap();
+    let dir = std::env::temp_dir().join(format!("openphoto-options-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    // A JPEG: JPEG Options first, nothing written until OK
+    let jpeg = dir.join("a.jpg");
+    assert!(!crate::actions::save_to(
+        &mut h.state_mut().state,
+        id,
+        jpeg.clone(),
+        true
+    ));
+    h.run_steps(2);
+    assert!(h.state().state.save_options.is_some());
+    assert!(!jpeg.exists());
+    shot(&mut h, "jpeg_options");
+    // The quality's name: Low gives quality 3
+    let corner = h.ctx.content_rect().center() - egui::vec2(pt(440.0), pt(318.0)) / 2.0;
+    click(&mut h, corner + egui::vec2(pt(190.0), pt(116.5)));
+    h.get_by_label("Low").click();
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert!(h.state().state.save_options.is_none());
+    assert!(jpeg.exists());
+    assert_eq!(h.state().state.export_options.jpeg_quality, 3);
+    // A PNG of the one-layer document becomes its file
+    let png = dir.join("b.png");
+    crate::actions::save_to(&mut h.state_mut().state, id, png.clone(), false);
+    h.run_steps(2);
+    shot(&mut h, "png_options");
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert!(png.exists());
+    assert_eq!(active(&h).path.as_deref(), Some(png.as_path()));
+    // Closing it changed: Save asks for the PNG options, then closes
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::W);
+    h.run_steps(2);
+    assert_eq!(h.state().state.save_prompt, Some(id));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert!(
+        h.state()
+            .state
+            .save_options
+            .as_ref()
+            .is_some_and(|p| p.closing)
+    );
+    assert!(h.state().state.docs.contains_key(&id));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert!(!h.state().state.docs.contains_key(&id));
+    std::fs::remove_dir_all(dir).ok();
+}
+
+#[test]
 #[ignore]
 fn screenshot_save_prompt() {
     let mut h = harness(Vec::new());

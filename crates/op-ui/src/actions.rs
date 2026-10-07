@@ -218,16 +218,28 @@ pub fn save(app: &mut AppState, id: DocId) -> bool {
         return save_as(app, id, false);
     }
     let path = state.path.clone().expect("checked");
-    match op_io::save(&state.doc, &path) {
-        Ok(()) => {
-            state.mark_saved();
-            app.recent.add(&path);
-            true
-        }
-        Err(e) => {
-            app.alert = Some(format!("Could not save “{}”: {e}", path.display()));
-            false
-        }
+    save_to(app, id, path, false)
+}
+
+/// A save waiting for its JPEG Options or PNG Format Options: the
+/// document, the file, whether it is a copy, and whether closing the
+/// document waits for it.
+pub struct PendingSave {
+    pub dialog: crate::dialogs::save_options::SaveOptionsDialog,
+    pub id: DocId,
+    pub path: PathBuf,
+    pub copy: bool,
+    pub closing: bool,
+}
+
+/// The options asked for before writing `path`: JPEG's or PNG's.
+fn options_format(path: &std::path::Path) -> Option<crate::dialogs::save_options::Format> {
+    use crate::dialogs::save_options::Format;
+    let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+    match ext.as_str() {
+        "jpg" | "jpeg" => Some(Format::Jpeg),
+        "png" => Some(Format::Png),
+        _ => None,
     }
 }
 
@@ -253,12 +265,41 @@ pub fn save_as(app: &mut AppState, id: DocId, copy: bool) -> bool {
 }
 
 /// Writes the document to `path` and updates its file and saved state as
-/// [`save_as`] describes.
+/// [`save_as`] describes. A JPEG or PNG first asks for its options, as
+/// Photoshop does (`PendingSave`); then nothing is written yet and this
+/// returns false.
 pub fn save_to(app: &mut AppState, id: DocId, path: PathBuf, copy: bool) -> bool {
+    if let Some(format) = options_format(&path) {
+        let colors = (app.foreground.to_rgba8(), app.background.to_rgba8());
+        let rgb = |c: [u8; 4]| [c[0], c[1], c[2]];
+        app.save_options = Some(PendingSave {
+            dialog: crate::dialogs::save_options::SaveOptionsDialog::new(
+                format,
+                app.export_options,
+                (rgb(colors.0), rgb(colors.1)),
+            ),
+            id,
+            path,
+            copy,
+            closing: false,
+        });
+        return false;
+    }
+    write_to(app, id, path, copy, &op_io::ExportOptions::default())
+}
+
+/// Writes the document to `path` with `options` (see [`save_to`]).
+pub fn write_to(
+    app: &mut AppState,
+    id: DocId,
+    path: PathBuf,
+    copy: bool,
+    options: &op_io::ExportOptions,
+) -> bool {
     let Some(state) = app.docs.get_mut(&id) else {
         return false;
     };
-    if let Err(e) = op_io::save(&state.doc, &path) {
+    if let Err(e) = op_io::save_with(&state.doc, &path, options) {
         app.alert = Some(format!("Could not save “{}”: {e}", path.display()));
         return false;
     }
@@ -335,12 +376,45 @@ pub fn answer_save_prompt(app: &mut AppState, answer: crate::dialogs::SaveChoice
         SaveChoice::DontSave => true,
         SaveChoice::Cancel => false,
     };
+    // Closing waits for the JPEG or PNG options (`finish_pending_save`)
+    if let Some(pending) = &mut app.save_options {
+        pending.closing = true;
+        return;
+    }
     if close {
         app.close_document(id);
         app.close_queue.retain(|d| *d != id);
         continue_closing(app);
     } else {
         // Cancel (or a cancelled Save As) stops closing and quitting
+        app.close_queue.clear();
+        app.quit_after_close = false;
+    }
+}
+
+/// The JPEG or PNG options' answer: OK writes the file (and goes on
+/// closing when closing waited for it), Cancel writes nothing (and stops
+/// closing and quitting).
+pub fn finish_pending_save(
+    app: &mut AppState,
+    pending: PendingSave,
+    options: Option<op_io::ExportOptions>,
+) {
+    let saved = match options {
+        Some(options) => {
+            app.export_options = options;
+            write_to(app, pending.id, pending.path, pending.copy, &options)
+        }
+        None => false,
+    };
+    if !pending.closing {
+        return;
+    }
+    if saved {
+        app.close_document(pending.id);
+        app.close_queue.retain(|d| *d != pending.id);
+        continue_closing(app);
+    } else {
         app.close_queue.clear();
         app.quit_after_close = false;
     }

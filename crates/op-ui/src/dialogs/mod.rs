@@ -39,6 +39,7 @@ mod photo_filter;
 mod plain_filter;
 mod rotate_canvas;
 pub mod save_changes;
+pub(crate) mod save_options;
 mod selective_color;
 pub(crate) mod size_presets;
 mod threshold;

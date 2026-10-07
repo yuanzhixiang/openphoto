@@ -1314,6 +1314,10 @@ pub struct AppState {
     /// with "Save as defaults" (this session).
     pub auto_options_dialog: Option<crate::dialogs::auto_options::AutoOptionsDialog>,
     pub auto_saved: Option<op_core::auto::Options>,
+    /// A JPEG or PNG save waiting for its options, and the options last
+    /// used (the next save starts from them).
+    pub save_options: Option<crate::actions::PendingSave>,
+    pub export_options: op_io::ExportOptions,
     pub gradient_editor: Option<(
         crate::dialogs::gradient_editor::GradientEditor,
         EditorTarget,
@@ -1484,6 +1488,8 @@ impl Default for AppState {
             gradient_made: Vec::new(),
             auto_options_dialog: None,
             auto_saved: None,
+            save_options: None,
+            export_options: op_io::ExportOptions::default(),
             gradient_editor: None,
             new_crop_preset: None,
             delete_crop_preset: None,
@@ -1663,6 +1669,7 @@ impl AppState {
             || self.new_crop_preset.is_some()
             || self.gradient_editor.is_some()
             || self.auto_options_dialog.is_some()
+            || self.save_options.is_some()
             || self.delete_crop_preset.is_some()
             || self.new_guide_dialog.is_some()
             || self.new_layer_dialog.is_some()

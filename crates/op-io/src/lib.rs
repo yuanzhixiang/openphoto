@@ -40,6 +40,44 @@ pub const SAVE_FORMATS: &[(&str, &[&str])] = &[
 /// alpha. White, like the default matte of Photoshop's Export As.
 const MATTE: [u8; 3] = [255, 255, 255];
 
+/// PNG Format Options' File Size: how hard the encoder compresses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum PngSize {
+    /// Large file size (fastest saving).
+    #[default]
+    Large,
+    Medium,
+    /// Smallest file size (slowest saving).
+    Smallest,
+}
+
+/// The JPEG Options and PNG Format Options of a save.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ExportOptions {
+    /// Photoshop's JPEG Quality, 0–12.
+    pub jpeg_quality: u8,
+    /// What JPEG's transparent pixels are flattened onto.
+    pub matte: [u8; 3],
+    pub png: PngSize,
+}
+
+impl Default for ExportOptions {
+    fn default() -> Self {
+        Self {
+            jpeg_quality: 12,
+            matte: MATTE,
+            png: PngSize::default(),
+        }
+    }
+}
+
+/// The encoder quality (1–100) for Photoshop's JPEG Quality 0–12 (an
+/// approximation of Photoshop's own tables).
+pub fn jpeg_quality(q: u8) -> u8 {
+    const TABLE: [u8; 13] = [30, 38, 46, 55, 62, 68, 75, 80, 85, 89, 93, 96, 98];
+    TABLE[q.min(12) as usize]
+}
+
 fn extension(path: &Path) -> String {
     path.extension()
         .and_then(|e| e.to_str())
@@ -69,11 +107,16 @@ pub fn open(path: &Path) -> Result<Document, IoError> {
 /// otherwise the composite (see [`export_composite`]). Written in one go
 /// after encoding, like the export.
 pub fn save(doc: &Document, path: &Path) -> Result<(), IoError> {
+    save_with(doc, path, &ExportOptions::default())
+}
+
+/// [`save`] with the JPEG or PNG options.
+pub fn save_with(doc: &Document, path: &Path, options: &ExportOptions) -> Result<(), IoError> {
     if extension(path) == "psd" {
         std::fs::write(path, psd::write(doc))?;
         Ok(())
     } else {
-        export_composite(doc, path)
+        export_with(doc, path, options)
     }
 }
 
@@ -83,19 +126,53 @@ pub fn save(doc: &Document, path: &Path) -> Result<(), IoError> {
 /// matte first. The file is encoded in memory and only written once encoding
 /// succeeded, so a failed export never leaves a partial file behind.
 pub fn export_composite(doc: &Document, path: &Path) -> Result<(), IoError> {
+    export_with(doc, path, &ExportOptions::default())
+}
+
+/// [`export_composite`] with JPEG's quality and matte and PNG's file size.
+pub fn export_with(doc: &Document, path: &Path, options: &ExportOptions) -> Result<(), IoError> {
+    use image::ImageEncoder;
     let format = ImageFormat::from_path(path).map_err(|_| IoError::Unsupported(extension(path)))?;
 
     let pixels = doc.composite_rgba8();
     let rgba = RgbaImage::from_raw(doc.width, doc.height, pixels)
         .expect("composite buffer size matches document");
-    let image = if format == ImageFormat::Jpeg {
-        DynamicImage::ImageRgb8(flatten(&rgba, MATTE))
-    } else {
-        DynamicImage::ImageRgba8(rgba)
-    };
-
     let mut bytes = Cursor::new(Vec::new());
-    image.write_to(&mut bytes, format).map_err(IoError::Write)?;
+    match format {
+        ImageFormat::Jpeg => {
+            let rgb = flatten(&rgba, options.matte);
+            image::codecs::jpeg::JpegEncoder::new_with_quality(
+                &mut bytes,
+                jpeg_quality(options.jpeg_quality),
+            )
+            .write_image(
+                rgb.as_raw(),
+                rgb.width(),
+                rgb.height(),
+                image::ExtendedColorType::Rgb8,
+            )
+            .map_err(IoError::Write)?;
+        }
+        ImageFormat::Png => {
+            use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+            let compression = match options.png {
+                PngSize::Large => CompressionType::Fast,
+                PngSize::Medium => CompressionType::Default,
+                PngSize::Smallest => CompressionType::Best,
+            };
+            PngEncoder::new_with_quality(&mut bytes, compression, FilterType::Adaptive)
+                .write_image(
+                    rgba.as_raw(),
+                    rgba.width(),
+                    rgba.height(),
+                    image::ExtendedColorType::Rgba8,
+                )
+                .map_err(IoError::Write)?;
+        }
+        _ => DynamicImage::ImageRgba8(rgba)
+            .write_to(&mut bytes, format)
+            .map_err(IoError::Write)?,
+    }
     std::fs::write(path, bytes.into_inner())?;
     Ok(())
 }
@@ -141,6 +218,50 @@ mod tests {
             |p: &image::Rgb<u8>, e: [u8; 3]| p.0.iter().zip(e).all(|(a, b)| a.abs_diff(b) < 40);
         assert!(near(back.get_pixel(0, 0), [255, 0, 0]));
         assert!(near(back.get_pixel(1, 0), [255, 255, 255]));
+    }
+
+    #[test]
+    fn jpeg_quality_and_matte_and_png_sizes() {
+        // A noisy picture: lower quality makes a smaller file
+        let w = 64;
+        let pixels: Vec<u8> = (0..w * w)
+            .flat_map(|i| {
+                let v = ((i * 7919) % 251) as u8;
+                [v, v.wrapping_mul(3), v.wrapping_mul(7), 255]
+            })
+            .collect();
+        let doc = Document::from_rgba8("t", w as u32, w as u32, &pixels);
+        let size = |q: u8| {
+            let path = temp_path(&format!("q{q}.jpg"));
+            let options = ExportOptions {
+                jpeg_quality: q,
+                ..Default::default()
+            };
+            export_with(&doc, &path, &options).unwrap();
+            std::fs::metadata(&path).unwrap().len()
+        };
+        assert!(size(2) < size(12));
+        // A black matte under a transparent pixel
+        let path = temp_path("black.jpg");
+        let options = ExportOptions {
+            matte: [0, 0, 0],
+            ..Default::default()
+        };
+        export_with(&half_transparent_doc(), &path, &options).unwrap();
+        let back = image::open(&path).unwrap().into_rgb8();
+        assert!(back.get_pixel(1, 0).0.iter().all(|&v| v < 40));
+        // Every PNG size reads back the same pixels
+        for png in [PngSize::Large, PngSize::Medium, PngSize::Smallest] {
+            let path = temp_path("size.png");
+            let options = ExportOptions {
+                png,
+                ..Default::default()
+            };
+            export_with(&doc, &path, &options).unwrap();
+            assert_eq!(image::open(&path).unwrap().into_rgba8().as_raw(), &pixels);
+        }
+        assert_eq!(jpeg_quality(0), 30);
+        assert_eq!(jpeg_quality(40), 98);
     }
 
     #[test]

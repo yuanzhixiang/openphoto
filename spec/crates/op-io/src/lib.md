@@ -34,15 +34,31 @@ The formats offered by the Save As dialog (name and extensions), in the same ord
 4. The document title is the file name (including the extension); when the file name cannot be obtained, it is `"Untitled"`.
 5. Bitmaps build the document through `Document::from_rgba8`, at 72 ppi, RGB, 8-bit. The layer rules match Photoshop: when the image is fully opaque, it is a locked "Background" background layer; as soon as any pixel is not fully opaque, it is a regular layer named "Layer 0" (see `crates/op-core/src/document.md`).
 
-### `save(doc, path)`
+### `save(doc, path)` and `save_with(doc, path, options)`
 
-File › Save / Save As writes the file: when the extension is `psd` (case-insensitive), the result of `psd::write` is written (keeping layers); other extensions are handed to `export_composite` (the flattened composite image). The PSD is likewise generated in memory first and then written in one go.
+File › Save / Save As writes the file:
 
-### `export_composite(doc, path)`
+- When the extension is `psd` (case-insensitive), the result of `psd::write` is written, keeping the layers.
+- Other extensions are handed to `export_with`, which writes the flattened composite image.
+- `save` uses `ExportOptions::default()`.
+- The PSD is likewise generated in memory first and then written in one go.
+
+### `ExportOptions`
+
+The JPEG Options and PNG Format Options of a save (`dialogs/save_options.md` in `op-ui`):
+
+- `jpeg_quality`: Photoshop's 0–12. It defaults to 12.
+- `matte`: what JPEG's transparent pixels are flattened onto. It defaults to white.
+- `png`: `PngSize::Large` (the default), `Medium` or `Smallest`. These map to the PNG encoder's fast, default and best compression, with adaptive filtering. The pixels are the same at every size.
+- `jpeg_quality(q)`: the encoder quality (1–100) for Photoshop's 0–12, from the table 30, 38, 46, 55, 62, 68, 75, 80, 85, 89, 93, 96, 98. This is an approximation of Photoshop's own quantization. Qualities above 12 count as 12.
+
+### `export_composite(doc, path)` and `export_with(doc, path, options)`
+
+`export_composite` is `export_with` with the default options.
 
 1. Determines the format from the extension (`ImageFormat::from_path`). When it cannot be recognized, returns `Unsupported` without creating a file.
 2. Takes the composite result of `Document::composite_rgba8`.
-3. JPEG has no transparency channel: the composite is first laid onto a white background by alpha (in the same gamma-encoded space as compositing), converted to RGB, and then encoded. White matches the default matte color when Photoshop Export As exports JPG. Other formats (PNG, WebP, TIFF, BMP, GIF) are encoded directly as RGBA, keeping transparency.
+3. JPEG has no transparency channel: the composite is first laid onto the options' matte (white by default, matching Photoshop Export As's default matte for JPG) by alpha, in the same gamma-encoded space as compositing, converted to RGB, and encoded at `jpeg_quality(options.jpeg_quality)`. PNG is encoded as RGBA with the options' compression. Other formats (WebP, TIFF, BMP, GIF) are encoded directly as RGBA, keeping transparency.
 4. Encoding is completed in memory first, and the file is written only after it succeeds. When encoding fails, the target file is not created or modified.
 
 ## Behavior rules and edge cases
@@ -62,11 +78,12 @@ File › Save / Save As writes the file: when the extension is `psd` (case-insen
 ## Known limitations
 
 - For PSD limitations see `psd.md`; TIFF does not save layers.
-- There are no export options such as quality, compression, or matte color; JPEG uses the `image` crate's default quality, and the matte color is fixed to white.
+- JPEG is always baseline (the encoder writes neither optimized nor progressive JPEGs), and the quality table is approximate.
 - No metadata (EXIF, ICC, resolution) is read or written.
 
 ## Test coverage
 
+- `jpeg_quality_and_matte_and_png_sizes`: a lower quality makes a smaller file, a black matte darkens transparent pixels, every PNG size reads back the same pixels, and the quality table's ends.
 - `jpeg_export_flattens_onto_white`: a semi-transparent document exported as JPEG can be read back; opaque pixels keep their original color and transparent pixels become white (JPEG is lossy, so comparison uses a tolerance).
 - `png_export_keeps_transparency`: exporting PNG keeps transparency.
 - `unknown_extension_writes_nothing`: an unknown extension returns `Unsupported` and creates no file.

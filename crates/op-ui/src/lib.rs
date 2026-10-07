@@ -509,6 +509,21 @@ impl OpenPhotoApp {
     }
 
     /// The Crop tool's New Crop Preset... and Delete Crop Preset... dialogs.
+    /// JPEG Options and PNG Format Options after the save panel.
+    fn save_options_dialog(&mut self, ctx: &egui::Context) {
+        use dialogs::save_options::Outcome;
+        let Some(mut pending) = self.state.save_options.take() else {
+            return;
+        };
+        match pending.dialog.show(ctx) {
+            Outcome::Open => self.state.save_options = Some(pending),
+            Outcome::Cancel => actions::finish_pending_save(&mut self.state, pending, None),
+            Outcome::Ok(options) => {
+                actions::finish_pending_save(&mut self.state, pending, Some(options))
+            }
+        }
+    }
+
     /// Warp's Custom Grid Size: OK regrids the warp.
     fn warp_grid_dialog(&mut self, ctx: &egui::Context) {
         use dialogs::grid_size::Outcome;
@@ -1060,6 +1075,7 @@ impl eframe::App for OpenPhotoApp {
         self.gradient_editor(&ctx);
         self.auto_options_dialog(&ctx);
         self.warp_grid_dialog(&ctx);
+        self.save_options_dialog(&ctx);
         self.new_guide_dialog(&ctx);
         self.new_layer_dialog(&ctx);
         self.duplicate_dialog(&ctx);
