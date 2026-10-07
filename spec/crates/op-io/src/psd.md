@@ -10,7 +10,7 @@ Produces the bytes of the whole file:
 
 1. File header: `8BPS`, version 1, channel count (3 when the composite is fully opaque, otherwise 4), height, width, bit depth 8, color mode 3 (RGB).
 2. Color mode data: empty.
-3. Image resources: only ResolutionInfo (ID 1005); horizontal and vertical resolution both take `doc.resolution` (16.16 fixed point), in pixels/inch.
+3. Image resources: ResolutionInfo (ID 1005; horizontal and vertical resolution both take `doc.resolution` (16.16 fixed point), in pixels/inch); when the document has guides, Grid and Guides Information (ID 1032: version 1, Photoshop's default grid cycles 576 and 576, the guide count, then per guide its position in 1/32 pixel (i32) and its direction byte, 0 vertical and 1 horizontal; padded to an even size); layer links (1026, below).
 4. Layer and mask information:
    - When the document has only a background layer, no layers are written, only the composite—the same way Photoshop saves a document with a single background.
    - Otherwise all layers are written (bottom to top). When the composite has transparency, the layer count is written as a negative number (meaning the composite's alpha channel is the merged transparency).
@@ -25,7 +25,7 @@ PackBits encoding: runs of 3 or more identical bytes are encoded as repeat segme
 ## Reading (`read(data, title)`)
 
 1. Verifies the `8BPS` signature and version 1 (version 2 PSB is not supported); only 8-bit RGB is accepted, otherwise `IoError::Psd` is returned.
-2. Skips the color mode data; reads ResolutionInfo's horizontal resolution from the image resources as the document resolution (72 when absent).
+2. Skips the color mode data; reads ResolutionInfo's horizontal resolution from the image resources as the document resolution (72 when absent), and the guides from Grid and Guides Information (1032), if any.
 3. Reads layers: the name prefers `luni`, then the Pascal name; `iOpa` is fill opacity; `lclr` is the color label; records with `lsct`/`lsdk` are layer groups: type 3 is the divider record at the bottom of a group (its position is noted when read), types 1/2 are the group itself (expanded/collapsed), and reading one creates a group layer into which all layers since the corresponding divider record that do not yet have a parent group are placed; nested groups are restored with a stack. Channel data supports uncompressed (0), RLE (1), ZIP (2: a zlib stream of the plane) and ZIP with prediction (3: after inflating, each row holds each byte's difference from the one before, added back up); other compressions, or a damaged or short zlib stream, are an error. When layer mask data is present, channel −2 is read and restored to a full-canvas mask using the mask rectangle and default value, and the enabled state is read; −3 (real user mask) and other channels are skipped. Layer pixels are placed on the layer according to the bounds in the record, and parts outside the canvas are kept outside the canvas (matching Photoshop); the background layer is clipped to the canvas.
 4. If the bottommost record is "transparency protected" and either has no alpha channel (Photoshop's way of writing it) or is named "Background", it is the background layer; other records take their locks from `lspf`; without `lspf`, this flag bit maps to locking transparent pixels. When `lspf` is present this flag bit is ignored: Photoshop also sets it when pixels are locked, and looking only at it would misread a transparency lock. Visibility, opacity, fill opacity, and blend mode (unknown keys become Normal) are set as recorded. The topmost layer becomes the active layer.
 5. When there are no layers, the composite is read (uncompressed, RLE, or ZIP with or without prediction, where one zlib stream holds all the channels' planes in order) and opened according to the rules of `Document::from_rgba8` (fully opaque becomes a background layer).
@@ -33,7 +33,7 @@ PackBits encoding: runs of 3 or more identical bytes are encoded as repeat segme
 ## Known Limitations
 
 - Not supported: vector masks, adjustment layers, type layers, smart objects, layer styles, clipping masks, channels and paths, and 16/32-bit, grayscale, CMYK, and other modes.
-- ICC profiles and other image resources (guides, slices, thumbnails, etc.) are not read or written.
+- ICC profiles and other image resources (slices, thumbnails, etc.) are not read or written; the grid settings in 1032 are not kept.
 - No thumbnail is written on save; PSD previews in Finder may rely on the system rendering the composite itself.
 - Verified: when Photoshop 2026 opens a PSD written by OpenPhoto, layer names, opacity, blend modes, visibility, and the background layer are all correct; when OpenPhoto reads a PSD saved by Photoshop, both the background layer and normal layers are correct. Layer masks have not yet been verified with Photoshop.
 
@@ -45,6 +45,7 @@ PackBits encoding: runs of 3 or more identical bytes are encoded as repeat segme
 
 - `pixels_outside_the_canvas_round_trip`: a layer has pixels outside the canvas to the left, outside to the bottom right, and inside the canvas; after writing and reading back, the content bounds and the three pixels are unchanged. The written file was verified by opening it in Photoshop 2026: the layer bounds are (20, −5)–(90, 30), matching what was written.
 
+- `guides_round_trip`: a vertical guide at 12.5 px and a horizontal one at 30 px come back from a written PSD.
 - `zip_channels_with_and_without_prediction`: a 4 × 3 plane stored with compression 2 and with 3 (row deltas) reads back unchanged; a damaged stream is an error.
 - `packbits_round_trip`: a row mixing a long repeat run, 256 distinct bytes, and short repeats becomes shorter when compressed and is unchanged after decompression.
 - `layers_round_trip`: a background plus one layer with a Unicode name, 50% opacity, 25% fill, Multiply, and hidden; after writing and reading back, all properties and pixels (including semi-transparent pixels and blank areas) match, resolution 300 is kept, and the topmost layer is the active layer.

@@ -287,6 +287,26 @@ pub fn write(doc: &Document) -> Vec<u8> {
         out.u32(links.len() as u32 * 2);
         links.iter().for_each(|&n| out.u16(n));
     }
+    // Guides (Grid and Guides Information, 1032): positions in 1/32 px,
+    // 0 for a vertical guide and 1 for a horizontal one
+    if !doc.guides.is_empty() {
+        out.bytes(b"8BIM");
+        out.u16(1032);
+        out.bytes(&[0, 0]);
+        let size = 16 + doc.guides.len() as u32 * 5;
+        out.u32(size);
+        out.u32(1); // version
+        out.u32(576); // grid cycles (Photoshop's defaults)
+        out.u32(576);
+        out.u32(doc.guides.len() as u32);
+        for g in &doc.guides {
+            out.u32((g.position * 32.0).round() as i32 as u32);
+            out.bytes(&[if g.vertical { 0 } else { 1 }]);
+        }
+        if size % 2 == 1 {
+            out.bytes(&[0]);
+        }
+    }
     out.close(resources, 2);
 
     // Layer and mask information
@@ -643,6 +663,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
     let resources_end = r.pos() + resources_len;
     let mut resolution = 72.0;
     let mut links: Vec<u16> = Vec::new();
+    let mut guides: Vec<op_core::Guide> = Vec::new();
     while r.pos() + 12 <= resources_end {
         if &r.take::<4>()? != b"8BIM" {
             break;
@@ -659,6 +680,19 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
         if id == 1026 {
             links = (0..size / 2).map(|_| r.u16()).collect::<Result<_, _>>()?;
         }
+        if id == 1032 && size >= 16 {
+            let _version = r.u32()?;
+            let _grid = (r.u32()?, r.u32()?);
+            let count = r.u32()? as u64;
+            for _ in 0..count.min((size - 16) / 5) {
+                let at = r.u32()? as i32 as f32 / 32.0;
+                let direction = r.u8()?;
+                guides.push(op_core::Guide {
+                    vertical: direction == 0,
+                    position: at,
+                });
+            }
+        }
         r.seek(start + size.next_multiple_of(2));
     }
     r.seek(resources_end);
@@ -670,6 +704,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
     // Its placeholder layer is replaced below
     let mut doc = Document::new_with_background(title, w, h, Color::from_rgba8([0; 4]));
     doc.resolution = resolution;
+    doc.guides = guides.clone();
     if lm_len > 0 {
         let info_len = r.u32()? as u64;
         if info_len > 0 {
@@ -917,6 +952,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
         }
         let mut doc = Document::from_rgba8(doc.title.clone(), w, h, &rgba);
         doc.resolution = resolution;
+        doc.guides = guides;
         return Ok(doc);
     }
 
@@ -929,6 +965,23 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn guides_round_trip() {
+        let mut doc = Document::new_with_background("g", 50, 40, Color::WHITE);
+        doc.guides = vec![
+            op_core::Guide {
+                vertical: true,
+                position: 12.5,
+            },
+            op_core::Guide {
+                vertical: false,
+                position: 30.0,
+            },
+        ];
+        let back = read(&write(&doc), "g".into()).unwrap();
+        assert_eq!(back.guides, doc.guides);
+    }
 
     #[test]
     fn zip_channels_with_and_without_prediction() {
