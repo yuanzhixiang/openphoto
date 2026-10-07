@@ -4705,3 +4705,54 @@ fn screenshot_feather_dialog() {
     h.run_steps(3);
     shot_dialog(&mut h, "feather", 295.0, 128.0);
 }
+
+/// Scrolls whatever is under `pos` by `dy` points (negative: down).
+fn scroll_at(h: &mut Harness<'_, OpenPhotoApp>, pos: Pos2, dy: f32) {
+    h.event(egui::Event::PointerMoved(pos));
+    h.run_steps(1);
+    h.event(egui::Event::MouseWheel {
+        unit: egui::MouseWheelUnit::Point,
+        delta: egui::vec2(0.0, dy),
+        phase: egui::TouchPhase::Move,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(4);
+}
+
+#[test]
+#[ignore]
+fn screenshot_properties_sections() {
+    let mut h = harness(Vec::new());
+    probe_document(&mut h);
+    shot(&mut h, "properties_top");
+    scroll_at(&mut h, at_pt(1150.0, 450.0), -120.0);
+    shot(&mut h, "properties_mid");
+    scroll_at(&mut h, at_pt(1150.0, 450.0), -2000.0);
+    shot(&mut h, "properties_end");
+}
+
+#[test]
+fn properties_sections_toggle_views_and_run_quick_actions() {
+    let mut h = harness(Vec::new());
+    probe_document(&mut h);
+    // The panel's content starts at (1028, 253) in the default workspace;
+    // its sections' rules are at 33 + the heights above them
+    let p = |x: f32, y: f32| at_pt(1028.0 + x, 253.0 + y);
+    // Collapse Canvas: Rulers & Grids moves up to the rule at 65
+    click(&mut h, p(40.0, 33.0 + 16.0));
+    click(&mut h, p(23.0, 65.0 + 44.5));
+    assert!(h.state().state.view.rulers);
+    click(&mut h, p(56.0, 65.0 + 44.5));
+    assert!(h.state().state.view.grid);
+    // Collapse Rulers & Grids: Guides' rule at 97; Lock Guides
+    click(&mut h, p(40.0, 65.0 + 16.0));
+    click(&mut h, p(56.0, 97.0 + 45.0));
+    assert!(h.state().state.view.lock_guides);
+    // Collapse Guides: Quick Actions' rule at 129. Crop picks the tool,
+    // Trim opens its dialog
+    click(&mut h, p(40.0, 97.0 + 16.0));
+    click(&mut h, p(150.0, 129.0 + 44.5));
+    assert_eq!(h.state().state.tool, op_tools::Tool::Crop);
+    click(&mut h, p(55.0, 129.0 + 74.5));
+    assert!(h.state().state.trim_dialog.is_some());
+}

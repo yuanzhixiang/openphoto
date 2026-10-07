@@ -616,6 +616,9 @@ pub struct ViewOptions {
     pub guides: bool,
     pub grid: bool,
     pub lock_guides: bool,
+    /// View > Show > Smart Guides (on in Photoshop by default); nothing
+    /// draws them yet.
+    pub smart_guides: bool,
 }
 
 impl Default for ViewOptions {
@@ -626,6 +629,7 @@ impl Default for ViewOptions {
             guides: true,
             grid: false,
             lock_guides: false,
+            smart_guides: true,
         }
     }
 }
