@@ -7104,6 +7104,74 @@ fn shadows_highlights_more_options_and_replace_color_preview() {
 }
 
 #[test]
+fn filter_preview_zooms_and_pans() {
+    use crate::commands::Command;
+    use crate::theme::pt;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, Command::GaussianBlur);
+    h.run_steps(3);
+    let dialog = h.state().state.adjust_dialog.as_ref().unwrap();
+    let (rect, start) = (dialog.rect, dialog.pane_center.expect("centered"));
+    assert_eq!(dialog.pane_zoom, 1.0);
+    // Zoom in: 200%, then out twice: 66.67%
+    click(&mut h, rect.min + egui::vec2(pt(171.75), pt(261.75)));
+    h.run_steps(2);
+    assert_eq!(
+        h.state().state.adjust_dialog.as_ref().unwrap().pane_zoom,
+        2.0
+    );
+    click(&mut h, rect.min + egui::vec2(pt(57.0), pt(261.75)));
+    click(&mut h, rect.min + egui::vec2(pt(57.0), pt(261.75)));
+    h.run_steps(2);
+    let dialog = h.state().state.adjust_dialog.as_ref().unwrap();
+    assert!((dialog.pane_zoom - 0.6667).abs() < 1e-3);
+    // Back to 200%: dragging the picture right shows what is left of it
+    click(&mut h, rect.min + egui::vec2(pt(171.75), pt(261.75)));
+    click(&mut h, rect.min + egui::vec2(pt(171.75), pt(261.75)));
+    h.run_steps(2);
+    let from = rect.min + egui::vec2(pt(114.0), pt(141.0));
+    drag(
+        &mut h,
+        from,
+        from + egui::vec2(pt(20.0), 0.0),
+        Modifiers::NONE,
+    );
+    h.run_steps(2);
+    let center = h
+        .state()
+        .state
+        .adjust_dialog
+        .as_ref()
+        .unwrap()
+        .pane_center
+        .unwrap();
+    assert!(
+        (center.0 - (start.0 - 20.0)).abs() < 1.0,
+        "{center:?} {start:?}"
+    );
+    // A click on the document centers the preview there
+    let (x, y) = (0..=14)
+        .map(|k| (10.0 + 50.0 * k as f32, 200.0))
+        .find(|&(x, y)| !rect.contains(doc_point(&h, x, y)))
+        .expect("part of the document is clear of the dialog");
+    let p = doc_point(&h, x, y);
+    click(&mut h, p);
+    h.run_steps(2);
+    let center = h
+        .state()
+        .state
+        .adjust_dialog
+        .as_ref()
+        .unwrap()
+        .pane_center
+        .unwrap();
+    assert!((center.1 - 200.0).abs() < 2.0, "{center:?}");
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+}
+
+#[test]
 fn more_filters_and_adjustments_apply() {
     use crate::commands::Command;
     let mut h = harness(Vec::new());

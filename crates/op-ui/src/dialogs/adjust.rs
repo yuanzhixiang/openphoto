@@ -716,20 +716,47 @@ fn save_kernel(d: &custom_filter::Dialog) {
 
 /// The zoom controls under the preview pane: zoom out (dimmed at 100%),
 /// the zoom, zoom in.
-fn zoom_controls(ui: &Ui, y: f32, left: f32) {
+/// The preview's zoom steps (Photoshop's), as fractions.
+const PANE_ZOOMS: [f32; 18] = [
+    0.0625, 0.0833, 0.125, 0.1667, 0.25, 0.3333, 0.5, 0.6667, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0,
+    8.0, 12.0, 16.0,
+];
+
+/// A zoom as the preview shows it ("33%", "6.25%").
+fn zoom_label(zoom: f32) -> String {
+    let percent = zoom * 100.0;
+    if (percent - percent.round()).abs() < 0.01 || percent >= 10.0 {
+        format!("{}%", percent.round())
+    } else {
+        format!("{percent:.2}%")
+    }
+}
+
+/// The zoom controls under the classic preview pane: zoom out and zoom
+/// in (each dimmed at its end), the zoom between them. Returns whether
+/// zoom out or zoom in was clicked.
+fn zoom_controls(ui: &Ui, y: f32, left: f32, zoom: f32) -> Option<bool> {
     let painter = ui.painter();
     let x = |v: f32| left + pt(v);
     appkit::text(
         ui,
         Pos2::new(x(113.75), y),
         Align2::CENTER_CENTER,
-        "100%",
+        &zoom_label(zoom),
         appkit::TEXT,
     );
-    for (cx, plus, tint) in [
-        (57.0, false, Color32::from_gray(0x80)),
-        (171.75, true, appkit::TEXT),
-    ] {
+    let mut clicked = None;
+    for (cx, plus) in [(57.0, false), (171.75, true)] {
+        let enabled = if plus {
+            zoom < PANE_ZOOMS[PANE_ZOOMS.len() - 1]
+        } else {
+            zoom > PANE_ZOOMS[0]
+        };
+        let tint = if enabled {
+            appkit::TEXT
+        } else {
+            Color32::from_gray(0x80)
+        };
         let c = Pos2::new(x(cx) - pt(1.5), y - pt(1.5));
         let stroke = Stroke::new(pt(1.0), tint);
         painter.circle_stroke(c, pt(4.5), stroke);
@@ -741,7 +768,16 @@ fn zoom_controls(ui: &Ui, y: f32, left: f32) {
         if plus {
             painter.line_segment([c - vec2(0.0, pt(2.2)), c + vec2(0.0, pt(2.2))], stroke);
         }
+        let hit = Rect::from_center_size(c + vec2(pt(1.5), pt(1.5)), vec2(pt(16.0), pt(16.0)));
+        if enabled
+            && ui
+                .interact(hit, ui.id().with(("pane-zoom", plus)), Sense::click())
+                .clicked()
+        {
+            clicked = Some(plus);
+        }
     }
+    clicked
 }
 
 #[allow(clippy::large_enum_variant)] // as `Adjustment`
@@ -768,6 +804,12 @@ pub struct AdjustDialog {
     /// The classic filter dialogs' preview pane image (the document as
     /// previewed), set by the app.
     pub pane: Option<egui::TextureHandle>,
+    /// The preview's zoom (1 is 100%) and the document point at its center
+    /// (None: the document's middle); changing them clears `pane`.
+    pub pane_zoom: f32,
+    pub pane_center: Option<(f32, f32)>,
+    /// Where a drag in the preview started: the pointer and the center.
+    pane_drag: Option<(Pos2, (f32, f32))>,
     /// The Distort dialogs' diagram and the settings it was drawn for.
     diagram: Option<(Vec<String>, egui::TextureHandle)>,
     /// Where the dialog was last drawn (clicks elsewhere may sample).
@@ -977,6 +1019,9 @@ impl AdjustDialog {
             previewing: None,
             before,
             pane: None,
+            pane_zoom: 1.0,
+            pane_center: None,
+            pane_drag: None,
             diagram: None,
             rect: Rect::NOTHING,
             blocked: false,
@@ -1683,7 +1728,13 @@ impl AdjustDialog {
                 ui,
                 Rect::from_min_max(at(pane[0], pane[1]), at(pane[2], pane[3])),
             );
-            zoom_controls(ui, at(0.0, filter_layout::ZOOM_Y).y, frame.left());
+            let zoom = zoom_controls(
+                ui,
+                at(0.0, filter_layout::ZOOM_Y).y,
+                frame.left(),
+                self.pane_zoom,
+            );
+            self.zoom_pane(zoom);
         }
         let button = match self.custom.as_mut() {
             Some(Custom::BrightnessContrast(d)) => {
@@ -1830,7 +1881,13 @@ impl AdjustDialog {
 
         if layout.pane {
             self.pane_ui(ui, r(filter_layout::PANE));
-            zoom_controls(ui, at(0.0, filter_layout::ZOOM_Y).y, frame.left());
+            let zoom = zoom_controls(
+                ui,
+                at(0.0, filter_layout::ZOOM_Y).y,
+                frame.left(),
+                self.pane_zoom,
+            );
+            self.zoom_pane(zoom);
         }
         let params = self.kind.params();
         for (i, row) in layout.rows.iter().enumerate() {
@@ -2052,7 +2109,10 @@ impl AdjustDialog {
         if let Some(texture) = &self.pane {
             distort::image(ui, at, texture);
         }
-        distort::zoom_bar(ui, at);
+        let view = distort::VIEW;
+        self.pane_drag(ui, r(view[0], view[1], view[2], view[3]));
+        let zoom = distort::zoom_bar(ui, at, &zoom_label(self.pane_zoom));
+        self.zoom_pane(zoom);
 
         let params = self.kind.params();
         match layout.control {
@@ -2239,7 +2299,77 @@ impl AdjustDialog {
 
     /// The preview pane: the document, as previewed, at 100% (one image
     /// pixel per screen pixel), centered.
+    /// The preview's size in pixels (the classic pane's 196 pt square,
+    /// the plug-in style dialogs' 256 pt one, at two pixels a point).
+    pub fn pane_px(&self) -> (usize, usize) {
+        if self.kind.distort().is_some() {
+            (512, 512)
+        } else {
+            (392, 392)
+        }
+    }
+
+    /// Zoom out (false) or in (true) a step.
+    fn zoom_pane(&mut self, step: Option<bool>) {
+        let Some(up) = step else {
+            return;
+        };
+        let i = PANE_ZOOMS
+            .iter()
+            .position(|&z| z >= self.pane_zoom - 1e-4)
+            .unwrap_or(PANE_ZOOMS.len() - 1);
+        let j = if up {
+            (i + 1).min(PANE_ZOOMS.len() - 1)
+        } else {
+            i.saturating_sub(1)
+        };
+        if PANE_ZOOMS[j] != self.pane_zoom {
+            self.pane_zoom = PANE_ZOOMS[j];
+            self.pane = None;
+        }
+    }
+
+    /// A click on the document while the preview shows: it centers there.
+    pub fn center_pane(&mut self, x: f32, y: f32) {
+        self.pane_center = Some((x, y));
+        self.pane = None;
+    }
+
+    /// Dragging in the preview moves the picture with the pointer.
+    fn pane_drag(&mut self, ui: &mut Ui, rect: Rect) {
+        let response = ui.interact(rect, ui.id().with("pane-drag"), Sense::drag());
+        if response.hovered() || response.dragged() {
+            ui.ctx().set_cursor_icon(if response.dragged() {
+                egui::CursorIcon::Grabbing
+            } else {
+                egui::CursorIcon::Grab
+            });
+        }
+        if response.drag_started()
+            && let Some(p) = response.interact_pointer_pos()
+        {
+            self.pane_drag = Some((p, self.pane_center.unwrap_or((f32::NAN, f32::NAN))));
+        }
+        if let Some((from, start)) = self.pane_drag
+            && let Some(p) = response.interact_pointer_pos()
+            && response.dragged()
+            && !start.0.is_nan()
+        {
+            // Two preview pixels a point
+            let d = (p - from) / pt(1.0) * 2.0 / self.pane_zoom;
+            let center = (start.0 - d.x, start.1 - d.y);
+            if Some(center) != self.pane_center {
+                self.pane_center = Some(center);
+                self.pane = None;
+            }
+        }
+        if response.drag_stopped() {
+            self.pane_drag = None;
+        }
+    }
+
     fn pane_ui(&mut self, ui: &mut Ui, rect: Rect) {
+        self.pane_drag(ui, rect);
         let Some(texture) = &self.pane else {
             return;
         };

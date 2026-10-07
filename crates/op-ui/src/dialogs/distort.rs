@@ -236,13 +236,25 @@ pub fn image(ui: &Ui, at: impl Fn(f32, f32) -> Pos2, texture: &egui::TextureHand
     painter.image(texture.id(), shown, uv, Color32::WHITE);
 }
 
-/// The zoom bar: − and + boxes, then the zoom in a combo box.
-pub fn zoom_bar(ui: &Ui, at: impl Fn(f32, f32) -> Pos2) {
+/// The zoom bar: − and + boxes, then the zoom in a combo box. Returns
+/// whether − (false) or + (true) was clicked.
+pub fn zoom_bar(ui: &Ui, at: impl Fn(f32, f32) -> Pos2, label: &str) -> Option<bool> {
     let painter = ui.painter();
     let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
     let line = Stroke::new(pt(1.0), ZOOM_LINE);
+    let mut clicked = None;
     for (x, plus) in [(15.0, false), (32.0, true)] {
         let b = r(x, 296.0, x + 11.0, 307.0);
+        if ui
+            .interact(
+                b.expand(pt(2.0)),
+                ui.id().with(("distort-zoom", plus)),
+                egui::Sense::click(),
+            )
+            .clicked()
+        {
+            clicked = Some(plus);
+        }
         painter.rect_stroke(b, 0, line, StrokeKind::Inside);
         let c = b.center();
         painter.line_segment([c - vec2(pt(3.0), 0.0), c + vec2(pt(3.0), 0.0)], line);
@@ -266,7 +278,7 @@ pub fn zoom_bar(ui: &Ui, at: impl Fn(f32, f32) -> Pos2) {
         ui,
         at(73.0, 300.25),
         egui::Align2::CENTER_CENTER,
-        "100%",
+        label,
         appkit::TEXT,
     );
     let c = at(108.0, 300.5);
@@ -278,6 +290,7 @@ pub fn zoom_bar(ui: &Ui, at: impl Fn(f32, f32) -> Pos2) {
         ],
         Stroke::new(pt(1.0), Color32::from_gray(0xcc)),
     ));
+    clicked
 }
 
 /// The slider's track and its pentagon thumb at `place` (0–1).

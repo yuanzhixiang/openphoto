@@ -34,7 +34,6 @@ Most of Photoshop's sliders are not uniform. The scales were measured by enterin
 
 - Offset's slider scale has not been measured and is treated as linear for now.
 - Surface Blur's two slider scales have not been measured and are treated as linear for now.
-- There is only a single 100% zoom level, and the preview pane cannot be dragged (see `adjust.md`).
 
 ## Unmeasured layouts
 

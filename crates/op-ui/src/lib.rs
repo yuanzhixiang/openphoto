@@ -310,6 +310,16 @@ impl OpenPhotoApp {
                 }
             }
         }
+        // Otherwise a click on the document centers a filter's preview there
+        if let Some(p) = click
+            && dialog.wants_pane()
+            && !dialog.sampling()
+            && !dialog.rect.contains(p)
+            && state.view.viewport.contains(p)
+        {
+            let d = document_view::to_doc(state, p, ctx.pixels_per_point());
+            dialog.center_pane(d.x, d.y);
+        }
         // The hand's drag: sideways changes Hue/Saturation's range
         // (saturation, or hue), up and down Curves' point
         if let Some(from) = dialog.target_from {
@@ -341,7 +351,15 @@ impl OpenPhotoApp {
                     dialog.pane = None;
                 }
                 if dialog.wants_pane() && dialog.pane.is_none() {
-                    dialog.pane = Some(pane_texture(ctx, &state.doc));
+                    let (texture, center) = pane_texture(
+                        ctx,
+                        &state.doc,
+                        dialog.pane_px(),
+                        dialog.pane_center,
+                        dialog.pane_zoom,
+                    );
+                    dialog.pane = Some(texture);
+                    dialog.pane_center = Some(center);
                 }
                 self.state.adjust_dialog = Some(dialog);
             }
@@ -1108,15 +1126,33 @@ impl eframe::App for OpenPhotoApp {
 
 /// The classic filter dialogs' preview pane: the middle of the document,
 /// as composited now, up to 392 pixels square (the pane at 100%).
-fn pane_texture(ctx: &egui::Context, doc: &op_core::Document) -> egui::TextureHandle {
+/// The filter dialogs' preview: `size` pixels (at most) of the document
+/// as previewed, at `zoom`, around `center` (the middle when None), kept
+/// inside the document. Returns the texture and the center it used.
+fn pane_texture(
+    ctx: &egui::Context,
+    doc: &op_core::Document,
+    size: (usize, usize),
+    center: Option<(f32, f32)>,
+    zoom: f32,
+) -> (egui::TextureHandle, (f32, f32)) {
     let (w, h) = (doc.width as usize, doc.height as usize);
-    let (pw, ph) = (w.min(392), h.min(392));
-    let (x0, y0) = ((w - pw) / 2, (h - ph) / 2);
+    let pw = ((w as f32 * zoom).ceil() as usize).clamp(1, size.0);
+    let ph = ((h as f32 * zoom).ceil() as usize).clamp(1, size.1);
+    // The center, so the view stays on the document
+    let (cx, cy) = center.unwrap_or((w as f32 / 2.0, h as f32 / 2.0));
+    let (hw, hh) = (pw as f32 / zoom / 2.0, ph as f32 / zoom / 2.0);
+    let cx = cx.clamp(hw.min(w as f32 / 2.0), (w as f32 - hw).max(w as f32 / 2.0));
+    let cy = cy.clamp(hh.min(h as f32 / 2.0), (h as f32 - hh).max(h as f32 / 2.0));
     let all = doc.composite_rgba8();
     let mut pixels = Vec::with_capacity(pw * ph);
-    for y in y0..y0 + ph {
-        for x in x0..x0 + pw {
-            let i = (y * w + x) * 4;
+    for y in 0..ph {
+        let sy = (cy + (y as f32 + 0.5 - ph as f32 / 2.0) / zoom).floor();
+        let sy = (sy.max(0.0) as usize).min(h - 1);
+        for x in 0..pw {
+            let sx = (cx + (x as f32 + 0.5 - pw as f32 / 2.0) / zoom).floor();
+            let sx = (sx.max(0.0) as usize).min(w - 1);
+            let i = (sy * w + sx) * 4;
             pixels.push(egui::Color32::from_rgba_unmultiplied(
                 all[i],
                 all[i + 1],
@@ -1126,7 +1162,8 @@ fn pane_texture(ctx: &egui::Context, doc: &op_core::Document) -> egui::TextureHa
         }
     }
     let image = egui::ColorImage::new([pw, ph], pixels);
-    ctx.load_texture("filter-pane", image, egui::TextureOptions::NEAREST)
+    let texture = ctx.load_texture("filter-pane", image, egui::TextureOptions::NEAREST);
+    (texture, (cx, cy))
 }
 
 /// Displace's map: a PSD (or other image) chosen in the open panel,
