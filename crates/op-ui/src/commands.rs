@@ -1405,6 +1405,10 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 [r, g, b]
             };
             let colors = (rgb(app.foreground), rgb(app.background));
+            #[cfg(target_os = "macos")]
+            let option = ctx.input(|i| i.modifiers.alt) || crate::app_kit::option_held();
+            #[cfg(not(target_os = "macos"))]
+            let option = ctx.input(|i| i.modifiers.alt);
             if let Some(state) = app.active_doc.and_then(|id| app.docs.get_mut(&id)) {
                 match adjust::check(&state.doc) {
                     Ok(()) => {
@@ -1422,6 +1426,11 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                         dialog.set_gradient_colors(colors);
                         // Colorize starts from the foreground color's hue
                         dialog.set_colorize_hue(adjust::hue_of(colors.0).round() as i32);
+                        // With Option held, the settings of its last OK
+                        // (Photoshop's "last settings")
+                        if option && let Some(last) = app.last_adjustments.get(&kind) {
+                            dialog.recall(last);
+                        }
                         dialog.set_channel_histograms(adjust::rgb_histograms(&state.doc));
                         app.adjust_dialog = Some(dialog);
                     }

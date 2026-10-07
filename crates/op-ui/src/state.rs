@@ -1349,6 +1349,10 @@ pub struct AppState {
     pub tool_settings: std::collections::HashMap<&'static str, String>,
     /// Each filter dialog's last settings, to open with next time.
     pub filter_settings: std::collections::HashMap<crate::dialogs::AdjustKind, Vec<String>>,
+    /// The adjustment dialogs' settings at their last OK, opened with when
+    /// the command is chosen with Option held.
+    pub last_adjustments:
+        std::collections::HashMap<crate::dialogs::AdjustKind, crate::dialogs::Remembered>,
     /// An adjustment or filter dialog, while open.
     pub adjust_dialog: Option<crate::dialogs::AdjustDialog>,
     /// Select > Modify > Border/Smooth/Expand/Contract/Feather, while open.
@@ -1490,6 +1494,7 @@ impl Default for AppState {
             adjust_dialog: None,
             last_filter: None,
             filter_settings: Default::default(),
+            last_adjustments: Default::default(),
             tool_settings: Default::default(),
             last_transform: None,
             bucket: Default::default(),

@@ -15,6 +15,7 @@ const HISTOGRAM: [f32; 4] = [15.0, 66.0, 270.0, 166.0];
 /// Where levels 0 and 255 sit under the histogram.
 const PIN_X: (f32, f32) = (14.25, 268.75);
 
+#[derive(Clone)]
 pub struct Dialog {
     pub level: String,
     histogram: [u64; 256],

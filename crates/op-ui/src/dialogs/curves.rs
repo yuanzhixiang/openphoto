@@ -29,6 +29,7 @@ const SHOW: [&str; 4] = [
     "Intersection Line",
 ];
 
+#[derive(Clone)]
 pub struct Dialog {
     /// RGB, Red, Green, Blue.
     pub channel: usize,
@@ -55,6 +56,11 @@ fn identity() -> Vec<(f32, f32)> {
 }
 
 impl Dialog {
+    /// New histograms, keeping the settings (opening with the last ones).
+    pub fn set_histograms(&mut self, channels: [[u64; 256]; 3]) {
+        self.histograms = Self::new(channels).histograms;
+    }
+
     pub fn new(channels: [[u64; 256]; 3]) -> Self {
         let mut composite = [0u64; 256];
         for h in &channels {
@@ -102,12 +108,20 @@ impl Dialog {
         Adjustment::curves_per_channel([&p[0], &p[1], &p[2], &p[3]])
     }
 
+    /// A preset's curves (`adjust_presets::CURVES`) as points.
+    fn preset_points(p: &[&[(u8, u8)]; 4]) -> [Vec<(f32, f32)>; 4] {
+        p.map(|c| c.iter().map(|&(i, o)| (i as f32, o as f32)).collect())
+    }
+
+    /// "Default" or the preset the curves match, else "Custom".
     fn preset(&self) -> &'static str {
         if self.points.iter().all(|p| *p == identity()) {
-            "Default"
-        } else {
-            "Custom"
+            return "Default";
         }
+        super::adjust_presets::CURVES
+            .iter()
+            .find(|(_, p)| self.points == Self::preset_points(p))
+            .map_or("Custom", |(name, _)| name)
     }
 
     /// Auto: each channel's darkest and lightest 0.1% become black and
@@ -168,19 +182,33 @@ impl Dialog {
         // Preset
         appkit::label(ui, at(11.0, 56.25), "Preset:");
         let preset = self.preset();
-        let reset = appkit::popup(
+        // Default, Custom, then Photoshop's presets
+        let mut entries = vec![
+            Entry::item("Default", preset == "Default"),
+            Entry::item("Custom", preset == "Custom").enabled(false),
+            Entry::Separator,
+        ];
+        entries.extend(
+            super::adjust_presets::CURVES
+                .iter()
+                .map(|(name, _)| Entry::item(*name, preset == *name)),
+        );
+        match appkit::popup(
             ui,
             r(56.0, 46.0, 345.0, 67.0),
             "curves-preset",
             preset,
-            &[
-                Entry::item("Default", preset == "Default"),
-                Entry::item("Custom", preset == "Custom").enabled(false),
-            ],
-        ) == Some(0);
-        if reset {
-            self.points = std::array::from_fn(|_| identity());
-            self.selected = None;
+            &entries,
+        ) {
+            Some(0) => {
+                self.points = std::array::from_fn(|_| identity());
+                self.selected = None;
+            }
+            Some(k) if k >= 3 => {
+                self.points = Self::preset_points(&super::adjust_presets::CURVES[k - 3].1);
+                self.selected = None;
+            }
+            _ => {}
         }
         ps_icons::paint_scaled(
             &painter,
@@ -643,6 +671,20 @@ impl Dialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn photoshops_presets() {
+        let mut d = Dialog::new([[0; 256]; 3]);
+        let negative = super::super::adjust_presets::CURVES
+            .iter()
+            .find(|(n, _)| *n == "Negative")
+            .unwrap();
+        d.points = Dialog::preset_points(&negative.1);
+        assert_eq!(d.preset(), "Negative");
+        assert_eq!(d.points[0], vec![(0.0, 255.0), (255.0, 0.0)]);
+        d.points[0][0].1 = 250.0;
+        assert_eq!(d.preset(), "Custom");
+    }
 
     #[test]
     fn channels_keep_their_curves() {

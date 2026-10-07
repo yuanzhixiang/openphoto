@@ -117,3 +117,4 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 - `a_group_gets_a_mask_and_shows_it`, `link_layers_from_the_panel_and_the_menu`: see `panels/layers.md`.
 - `image_size_auto_resolution`, `image_size_presets`, `image_size_reduce_noise`, `image_size_window_resizes`: see `dialogs/image_size.md`. The dropdowns there run on the egui fallback of `native_popup` (no window view in tests), so `get_by_label` picks menu entries.
 - `classic_mode_turns_the_box`, `crop_presets_front_image_and_shield_color`: see `crop_tool.md`; `perspective_crop_straightens_a_box`: see `perspective_crop.md`. `drag_path` drags along a list of points (for turning drags).
+- `option_opens_adjustments_with_their_last_settings`: Exposure set to +1 and OK; opened again it starts at 0, opened with Option held (a `ModifiersChanged` event) it has +1.

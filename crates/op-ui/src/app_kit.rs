@@ -72,3 +72,16 @@ pub fn screen_ppi() -> Option<f32> {
         Some((pixels as f64 / (mm / 25.4)) as f32)
     }
 }
+
+/// Whether Option is held right now (`NSEvent.modifierFlags`), for menu
+/// commands that change with it.
+pub fn option_held() -> bool {
+    /// `NSEventModifierFlagOption`
+    const OPTION: usize = 1 << 19;
+    let Some(class) = AnyClass::get(c"NSEvent") else {
+        return false;
+    };
+    // SAFETY: a class method reading the current modifier keys
+    let flags: usize = unsafe { msg_send![class, modifierFlags] };
+    flags & OPTION != 0
+}

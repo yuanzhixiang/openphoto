@@ -34,6 +34,7 @@ const COLORS: [[u8; 3]; 6] = [
     [234, 51, 247],
 ];
 
+#[derive(Clone)]
 pub struct Dialog {
     pub weights: [String; 6],
     pub tint: bool,
@@ -108,7 +109,20 @@ impl Dialog {
             .zip(DEFAULTS)
             .all(|(t, d)| parse(t, WEIGHT) == Some(d))
             && !self.tint;
-        if untouched { "Default" } else { "Custom" }
+        if untouched {
+            return "Default";
+        }
+        super::adjust_presets::BLACK_WHITE
+            .iter()
+            .find(|(_, w)| {
+                !self.tint
+                    && self
+                        .weights
+                        .iter()
+                        .zip(w)
+                        .all(|(t, d)| parse(t, WEIGHT) == Some(*d))
+            })
+            .map_or("Custom", |(name, _)| name)
     }
 
     pub fn ui(
@@ -125,6 +139,7 @@ impl Dialog {
         uxp::label(ui, at(20.0, 61.0), "Preset:");
         let preset = self.preset();
         let mut reset = false;
+        let mut picked = None;
         common::ps_dropdown(
             ui,
             r(59.0, 48.5, 231.0, 73.5),
@@ -143,8 +158,20 @@ impl Dialog {
                     reset = true;
                 }
                 ui.add_enabled(false, egui::Button::new("Custom"));
+                ui.separator();
+                for (k, (name, _)) in super::adjust_presets::BLACK_WHITE.iter().enumerate() {
+                    if ui.selectable_label(preset == *name, *name).clicked() {
+                        picked = Some(k);
+                    }
+                }
             },
         );
+        if let Some(k) = picked {
+            *self = Self::default();
+            self.weights = super::adjust_presets::BLACK_WHITE[k]
+                .1
+                .map(|w| w.to_string());
+        }
         if reset {
             *self = Self::default();
             self.focus = true;
@@ -316,6 +343,19 @@ impl Dialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn photoshops_presets() {
+        let mut d = Dialog {
+            weights: super::super::adjust_presets::BLACK_WHITE[0]
+                .1
+                .map(|w| w.to_string()),
+            ..Default::default()
+        };
+        assert_eq!(d.preset(), "Blue Filter");
+        d.tint = true;
+        assert_eq!(d.preset(), "Custom");
+    }
 
     #[test]
     fn weights_and_tint() {

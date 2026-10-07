@@ -26,6 +26,7 @@ const DEFAULTS: [&str; 5] = ["0", "1.00", "255", "0", "255"];
 const PIN_X: (f32, f32) = (25.75, 279.25);
 const HISTOGRAM: [f32; 4] = [25.0, 131.0, 281.0, 230.0];
 
+#[derive(Clone)]
 pub struct Dialog {
     /// RGB, Red, Green, Blue.
     pub channel: usize,
@@ -39,6 +40,11 @@ pub struct Dialog {
 }
 
 impl Dialog {
+    /// New histograms, keeping the settings (opening with the last ones).
+    pub fn set_histograms(&mut self, channels: [[u64; 256]; 3]) {
+        self.histograms = Self::new(channels).histograms;
+    }
+
     pub fn new(channels: [[u64; 256]; 3]) -> Self {
         let mut composite = [0u64; 256];
         for h in &channels {
@@ -87,17 +93,36 @@ impl Dialog {
         ]))
     }
 
-    /// "Default" until anything changes.
+    /// The values of a preset (`adjust_presets::LEVELS`) as the fields show
+    /// them.
+    fn preset_values(p: &[[i32; 5]; 4]) -> [[String; 5]; 4] {
+        p.map(|[black, gamma, white, out_black, out_white]| {
+            [
+                black.to_string(),
+                format!("{:.2}", gamma as f32 / 100.0),
+                white.to_string(),
+                out_black.to_string(),
+                out_white.to_string(),
+            ]
+        })
+    }
+
+    /// "Default" or the preset the values match, else "Custom".
     fn preset(&self) -> &'static str {
-        if self.values.iter().all(|v| {
-            v.iter()
-                .zip(DEFAULTS)
-                .all(|(a, b)| a.trim().parse::<f32>().ok() == b.parse().ok())
-        }) {
-            "Default"
-        } else {
-            "Custom"
+        let same = |want: &[[String; 5]; 4]| {
+            self.values.iter().zip(want).all(|(v, w)| {
+                v.iter()
+                    .zip(w)
+                    .all(|(a, b)| a.trim().parse::<f32>().ok() == b.parse().ok())
+            })
+        };
+        if same(&std::array::from_fn(|_| DEFAULTS.map(String::from))) {
+            return "Default";
         }
+        super::adjust_presets::LEVELS
+            .iter()
+            .find(|(_, p)| same(&Self::preset_values(p)))
+            .map_or("Custom", |(name, _)| name)
     }
 
     /// Auto: each channel's darkest and lightest 0.1% become black and
@@ -157,18 +182,29 @@ impl Dialog {
         // Preset
         appkit::label(ui, at(11.0, 50.0), "Preset:");
         let preset = self.preset();
-        let reset = appkit::popup(
+        // Default, Custom, then Photoshop's presets
+        let mut entries = vec![
+            Entry::item("Default", preset == "Default"),
+            Entry::item("Custom", preset == "Custom").enabled(false),
+            Entry::Separator,
+        ];
+        entries.extend(
+            super::adjust_presets::LEVELS
+                .iter()
+                .map(|(name, _)| Entry::item(*name, preset == *name)),
+        );
+        match appkit::popup(
             ui,
             r(59.0, 39.5, 266.0, 60.5),
             "levels-preset",
             preset,
-            &[
-                Entry::item("Default", preset == "Default"),
-                Entry::item("Custom", preset == "Custom").enabled(false),
-            ],
-        ) == Some(0);
-        if reset {
-            self.values = std::array::from_fn(|_| DEFAULTS.map(String::from));
+            &entries,
+        ) {
+            Some(0) => self.values = std::array::from_fn(|_| DEFAULTS.map(String::from)),
+            Some(k) if k >= 3 => {
+                self.values = Self::preset_values(&super::adjust_presets::LEVELS[k - 3].1);
+            }
+            _ => {}
         }
         ps_icons::paint_scaled(
             &painter,
@@ -376,6 +412,21 @@ impl Dialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn photoshops_presets() {
+        let mut d = Dialog::new([[1; 256]; 3]);
+        d.values = Dialog::preset_values(&super::super::adjust_presets::LEVELS[2].1);
+        assert_eq!(d.preset(), "Increase Contrast 2");
+        assert_eq!(d.values[0][0], "20");
+        assert_eq!(d.values[0][1], "1.00");
+        d.values[0][1] = "1.6".into();
+        d.values[0][0] = "0".into();
+        d.values[0][2] = "255".into();
+        assert_eq!(d.preset(), "Lighten Shadows");
+        d.values[1][0] = "3".into();
+        assert_eq!(d.preset(), "Custom");
+    }
 
     #[test]
     fn channels_keep_their_levels() {

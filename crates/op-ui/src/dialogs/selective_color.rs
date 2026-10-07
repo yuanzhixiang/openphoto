@@ -104,6 +104,7 @@ const BLACK_TRACK: [[u8; 3]; 17] = [
     [1, 1, 1],
 ];
 
+#[derive(Clone)]
 pub struct Dialog {
     /// Cyan, magenta, yellow and black text for each of the nine ranges.
     pub values: [[String; 4]; 9],

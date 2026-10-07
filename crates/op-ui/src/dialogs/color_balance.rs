@@ -81,6 +81,7 @@ const SWATCHES: [(f32, Color32, f32); 3] = [
     (240.0, Color32::from_gray(0xfd), 258.0),
 ];
 
+#[derive(Clone)]
 pub struct Dialog {
     /// Text of the three sliders for each tone.
     pub values: [[String; 3]; 3],

@@ -51,7 +51,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `last_transform`: the most recently applied transform mapping, used by Edit › Transform › Again; kept only for the current run and shared by all documents.
 - `transforming()`: true when the current document is in Free Transform; `modal_open()` is also true then.
 - `last_filter`: the most recently successfully applied filter and its settings, used by Filter › Last Filter; kept only for the current run and shared by all documents.
-- `filter_settings`: the settings in each filter dialog's fields the last time OK was pressed (stored by `AdjustKind`), restored the next time the same dialog opens; kept only for the current run and shared by all documents.
+- `filter_settings`: the settings in each filter dialog's fields the last time OK was pressed (stored by `AdjustKind`), restored the next time the same dialog opens; kept only for the current run and shared by all documents. `last_adjustments`: each adjustment dialog at its last OK, for opening with Option held.
 - `modal_open()`: true when Canvas Size, Image Size, New, New Guide, Modify, Fill, Trim, an adjustment dialog, the Color Picker, the "Save changes?" confirmation, or an error alert is open; commands and single-key shortcuts do not run then.
 
 ## DocState

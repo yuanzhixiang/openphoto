@@ -743,6 +743,59 @@ fn run_command(h: &mut Harness<'_, OpenPhotoApp>, command: crate::commands::Comm
 }
 
 #[test]
+fn option_opens_adjustments_with_their_last_settings() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let open = |h: &mut Harness<'_, OpenPhotoApp>, option: bool| {
+        let ctx = h.ctx.clone();
+        if option {
+            // A frame with Option down, as when the menu item is chosen
+            h.event(egui::Event::ModifiersChanged(Modifiers::ALT));
+            h.step();
+            assert!(ctx.input(|i| i.modifiers.alt));
+        }
+        crate::commands::run(Command::Exposure, &ctx, &mut h.state_mut().state);
+        h.event(egui::Event::ModifiersChanged(Modifiers::NONE));
+        h.run_steps(3);
+    };
+    // Exposure's Plus 1.0, OK
+    open(&mut h, false);
+    h.state_mut()
+        .state
+        .adjust_dialog
+        .as_mut()
+        .unwrap()
+        .test_set_exposure("+1");
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert!(h.state().state.adjust_dialog.is_none());
+    // Opened plainly it starts over; with Option it has +1 again
+    open(&mut h, false);
+    assert_eq!(
+        h.state()
+            .state
+            .adjust_dialog
+            .as_ref()
+            .unwrap()
+            .test_exposure(),
+        "0"
+    );
+    h.key_press(egui::Key::Escape);
+    h.run_steps(3);
+    open(&mut h, true);
+    assert_eq!(
+        h.state()
+            .state
+            .adjust_dialog
+            .as_ref()
+            .unwrap()
+            .test_exposure(),
+        "+1"
+    );
+}
+
+#[test]
 fn rotate_crop_and_trim() {
     use crate::commands::Command;
     let mut h = harness(Vec::new());

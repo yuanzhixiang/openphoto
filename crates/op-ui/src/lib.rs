@@ -284,6 +284,9 @@ impl OpenPhotoApp {
                 if let Some(values) = dialog.settings() {
                     self.state.filter_settings.insert(dialog.kind, values);
                 }
+                if let Some(last) = dialog.remembered() {
+                    self.state.last_adjustments.insert(dialog.kind, last);
+                }
                 // Tiles may fill with the foreground color
                 let effect = match effect {
                     dialogs::Effect::Filter(op_core::filter::Filter::Tiles {

@@ -530,7 +530,12 @@ pub struct AdjustDialog {
     diagram: Option<(Vec<String>, egui::TextureHandle)>,
 }
 
+/// An adjustment dialog's settings kept from its last OK.
+#[derive(Clone)]
+pub struct Remembered(Custom);
+
 /// A dialog with its own layout and settings.
+#[derive(Clone)]
 enum Custom {
     BrightnessContrast(brightness_contrast::Dialog),
     ColorBalance(color_balance::Dialog),
@@ -608,9 +613,41 @@ impl AdjustDialog {
     /// Levels' (and Curves') per-channel histograms.
     pub fn set_channel_histograms(&mut self, histograms: [[u64; 256]; 3]) {
         match &mut self.custom {
-            Some(Custom::Levels(d)) => **d = levels::Dialog::new(histograms),
-            Some(Custom::Curves(d)) => **d = curves::Dialog::new(histograms),
+            Some(Custom::Levels(d)) => d.set_histograms(histograms),
+            Some(Custom::Curves(d)) => d.set_histograms(histograms),
             _ => {}
+        }
+    }
+
+    /// The adjustment dialogs' settings at OK, to open with when the
+    /// command is chosen with Option held (Photoshop's "last settings").
+    pub fn remembered(&self) -> Option<Remembered> {
+        self.custom.clone().map(Remembered)
+    }
+
+    /// Opens with settings from [`remembered`](Self::remembered) (of the
+    /// same kind of dialog).
+    pub fn recall(&mut self, last: &Remembered) {
+        if let Some(c) = &self.custom
+            && std::mem::discriminant(c) == std::mem::discriminant(&last.0)
+        {
+            self.custom = Some(last.0.clone());
+        }
+    }
+
+    /// Exposure's exposure field (tests).
+    #[cfg(test)]
+    pub fn test_exposure(&self) -> String {
+        match &self.custom {
+            Some(Custom::Exposure(d)) => d.values[0].clone(),
+            _ => String::new(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn test_set_exposure(&mut self, text: &str) {
+        if let Some(Custom::Exposure(d)) = &mut self.custom {
+            d.values[0] = text.into();
         }
     }
 

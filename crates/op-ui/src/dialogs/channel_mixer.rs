@@ -78,6 +78,7 @@ const BLUE_TRACK: [[u8; 3]; 17] = [
 ];
 const CONSTANT_TRACK: [[u8; 3]; 3] = [[0, 0, 0], [128, 128, 128], [255, 255, 255]];
 
+#[derive(Clone)]
 pub struct Dialog {
     /// Red, green, blue and constant text for each output channel.
     pub rows: [[String; 4]; 3],
@@ -128,10 +129,20 @@ impl Dialog {
 
     fn preset(&self) -> &'static str {
         if self.rows == Self::default().rows && !self.monochrome {
-            "Default"
-        } else {
-            "Custom"
+            return "Default";
         }
+        super::adjust_presets::CHANNEL_MIXER
+            .iter()
+            .find(|(_, [r, g, b])| {
+                self.monochrome
+                    && self.rows == Self::default().rows
+                    && self
+                        .gray
+                        .iter()
+                        .zip([*r, *g, *b, 0])
+                        .all(|(t, v)| parse(t) == Some(v))
+            })
+            .map_or("Custom", |(name, _)| name)
     }
 
     pub fn ui(
@@ -148,6 +159,7 @@ impl Dialog {
         uxp::label(ui, at(20.0, 61.0), "Preset");
         let preset = self.preset();
         let mut reset = false;
+        let mut picked = None;
         common::ps_dropdown(
             ui,
             r(56.0, 48.5, 231.0, 73.5),
@@ -166,10 +178,22 @@ impl Dialog {
                     reset = true;
                 }
                 ui.add_enabled(false, egui::Button::new("Custom"));
+                ui.separator();
+                for (k, (name, _)) in super::adjust_presets::CHANNEL_MIXER.iter().enumerate() {
+                    if ui.selectable_label(preset == *name, *name).clicked() {
+                        picked = Some(k);
+                    }
+                }
             },
         );
         if reset {
             *self = Self::default();
+        }
+        if let Some(k) = picked {
+            *self = Self::default();
+            let [r, g, b] = super::adjust_presets::CHANNEL_MIXER[k].1;
+            self.monochrome = true;
+            self.gray = [r, g, b, 0].map(|v| v.to_string());
         }
         ps_icons::paint(
             &painter,
@@ -284,6 +308,18 @@ fn swatch(painter: &egui::Painter, center: Pos2, [r, g, b]: [u8; 3], chosen: boo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn photoshops_presets() {
+        let mut d = Dialog {
+            monochrome: true,
+            gray: ["-70", "200", "-30", "0"].map(String::from),
+            ..Default::default()
+        };
+        assert_eq!(d.preset(), "Black & White Infrared");
+        d.gray[3] = "5".into();
+        assert_eq!(d.preset(), "Custom");
+    }
 
     #[test]
     fn rows_and_monochrome() {

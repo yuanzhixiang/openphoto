@@ -101,6 +101,7 @@ const STRIP: [[u8; 3]; 25] = [
 ];
 const LIGHTNESS_TRACK: [[u8; 3]; 3] = [[10, 9, 9], [128, 128, 128], [239, 239, 239]];
 
+#[derive(Clone)]
 pub struct Dialog {
     /// Hue, saturation and lightness text for Master and the six ranges.
     pub values: [[String; 3]; 7],
@@ -211,7 +212,41 @@ impl Dialog {
                 .iter()
                 .flatten()
                 .all(|v| parse(v, HUE) == Some(0));
-        if untouched { "Default" } else { "Custom" }
+        if untouched {
+            return "Default";
+        }
+        let ranges_flat = self.bounds == HUE_RANGES
+            && self.values[1..]
+                .iter()
+                .flatten()
+                .all(|v| parse(v, HUE) == Some(0));
+        let same = |text: &[String; 3], want: [i32; 3]| {
+            text.iter().zip(want).all(|(t, w)| parse(t, HUE) == Some(w))
+        };
+        super::adjust_presets::HUE_SATURATION
+            .iter()
+            .find(|(_, master, colorize)| {
+                ranges_flat
+                    && match colorize {
+                        Some(c) => self.colorize && same(&self.colorize_values, *c),
+                        None => !self.colorize && same(&self.values[0], *master),
+                    }
+            })
+            .map_or("Custom", |(name, ..)| name)
+    }
+
+    /// Picks Photoshop's preset `k`: its Master values, or Colorize with
+    /// its values.
+    fn apply_preset(&mut self, k: usize) {
+        let (_, master, colorize) = super::adjust_presets::HUE_SATURATION[k];
+        self.reset();
+        match colorize {
+            Some(c) => {
+                self.colorize = true;
+                self.colorize_values = c.map(|v| v.to_string());
+            }
+            None => self.values[0] = master.map(|v| v.to_string()),
+        }
     }
 
     fn reset(&mut self) {
@@ -235,6 +270,7 @@ impl Dialog {
         uxp::label(ui, at(20.0, 61.0), "Preset");
         let preset = self.preset();
         let mut reset = false;
+        let mut picked = None;
         common::ps_dropdown(
             ui,
             r(56.0, 48.5, 266.0, 73.5),
@@ -253,10 +289,19 @@ impl Dialog {
                     reset = true;
                 }
                 ui.add_enabled(false, egui::Button::new("Custom"));
+                ui.separator();
+                for (k, (name, ..)) in super::adjust_presets::HUE_SATURATION.iter().enumerate() {
+                    if ui.selectable_label(preset == *name, *name).clicked() {
+                        picked = Some(k);
+                    }
+                }
             },
         );
         if reset {
             self.reset();
+        }
+        if let Some(k) = picked {
+            self.apply_preset(k);
         }
         ps_icons::paint(
             &painter,
@@ -630,6 +675,25 @@ fn swatch(painter: &egui::Painter, center: Pos2, fill: Option<[u8; 3]>, chosen: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn photoshops_presets() {
+        let mut d = Dialog::new(200);
+        let k = |name: &str| {
+            super::super::adjust_presets::HUE_SATURATION
+                .iter()
+                .position(|(n, ..)| *n == name)
+                .unwrap()
+        };
+        d.apply_preset(k("Sepia"));
+        assert!(d.colorize);
+        assert_eq!(d.colorize_values, ["35", "25", "0"].map(String::from));
+        assert_eq!(d.preset(), "Sepia");
+        d.apply_preset(k("Old Style"));
+        assert!(!d.colorize);
+        assert_eq!(d.values[0], ["0", "-40", "5"].map(String::from));
+        assert_eq!(d.preset(), "Old Style");
+    }
 
     #[test]
     fn values_ranges_and_preset() {

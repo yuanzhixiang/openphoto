@@ -14,6 +14,7 @@ const EXPOSURE: (f32, f32) = (-20.0, 20.0);
 const OFFSET: (f32, f32) = (-0.5, 0.5);
 const GAMMA: (f32, f32) = (0.01, 9.99);
 
+#[derive(Clone)]
 pub struct Dialog {
     /// Exposure, offset and gamma as typed (Photoshop shows gamma 1 as
     /// "+1").
@@ -56,12 +57,26 @@ impl Dialog {
         })
     }
 
+    /// The dialog showing Photoshop's preset `k`.
+    fn preset_dialog(k: usize) -> Self {
+        let [exposure, offset, gamma] = super::adjust_presets::EXPOSURE[k].1;
+        let signed = |v: f32| {
+            let t = trimmed(v, 2);
+            if v > 0.0 { format!("+{t}") } else { t }
+        };
+        Self {
+            values: [signed(exposure), trimmed(offset, 4), signed(gamma)],
+            ..Self::default()
+        }
+    }
+
     fn preset(&self) -> &'static str {
         if self.adjustment() == Self::default().adjustment() {
-            "Default"
-        } else {
-            "Custom"
+            return "Default";
         }
+        (0..super::adjust_presets::EXPOSURE.len())
+            .find(|&k| self.adjustment() == Self::preset_dialog(k).adjustment())
+            .map_or("Custom", |k| super::adjust_presets::EXPOSURE[k].0)
     }
 
     pub fn ui(
@@ -78,6 +93,7 @@ impl Dialog {
         uxp::label(ui, at(20.0, 61.0), "Preset");
         let preset = self.preset();
         let mut reset = false;
+        let mut picked = None;
         common::ps_dropdown(
             ui,
             r(56.0, 48.5, 231.0, 73.5),
@@ -96,10 +112,19 @@ impl Dialog {
                     reset = true;
                 }
                 ui.add_enabled(false, egui::Button::new("Custom"));
+                ui.separator();
+                for (k, (name, _)) in super::adjust_presets::EXPOSURE.iter().enumerate() {
+                    if ui.selectable_label(preset == *name, *name).clicked() {
+                        picked = Some(k);
+                    }
+                }
             },
         );
         if reset {
             *self = Self::default();
+        }
+        if let Some(k) = picked {
+            *self = Self::preset_dialog(k);
         }
         ps_icons::paint(
             &painter,
@@ -201,6 +226,14 @@ impl Dialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn photoshops_presets() {
+        let d = Dialog::preset_dialog(2);
+        assert_eq!(d.values, ["+1", "0", "+1"].map(String::from));
+        assert_eq!(d.preset(), "Plus 1.0");
+        assert_eq!(Dialog::preset_dialog(1).preset(), "Minus 2.0");
+    }
 
     #[test]
     fn defaults_and_numbers() {

@@ -9,7 +9,7 @@ The dialog for Image › Adjustments › Curves... (⌘M), rebuilt after Photosh
 - Four curves: RGB, Red, Green, Blue, each a list of points sorted by input, defaulting to the two end points (0, 0) and (255, 255), at most 16 points.
 - Display options: Show Amount of is Light (0-255) (default) or Pigment/Ink %; Grid size is quarters (default) or tenths; under Show, Channel Overlays, Histogram, Baseline and Intersection Line are all checked by default; Show Clipping is unchecked.
 - `adjustment()`: unchanged channels do not take part (empty point list).
-- Preset: "Default" when unchanged, otherwise "Custom"; the menu's Default restores the defaults.
+- Preset: "Default" when unchanged, the name of the Photoshop preset the curves match (`adjust_presets::CURVES`: Color Negative, Cross Process, Darker, Increase Contrast, Lighter, Linear Contrast, Medium Contrast, Negative, Strong Contrast), otherwise "Custom". The native menu lists Default, Custom (grayed out), a separator and the presets; picking one sets all four channels' points and clears the selected point.
 
 ## Layout (Photoshop points)
 

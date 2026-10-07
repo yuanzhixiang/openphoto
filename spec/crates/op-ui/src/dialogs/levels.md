@@ -9,7 +9,7 @@ The dialog for Image › Adjustments › Levels... (⌘L), rebuilt pixel by pixe
 - Four sets of levels: RGB (composite), Red, Green, Blue, each with input black point (0–253), gamma (0.01–9.99), input white point (2–255), output black point, and output white point (0–255), defaulting to 0 / 1.00 / 255 / 0 / 255. Defaults are restored every time the dialog opens.
 - `new(channels)`: histograms of the red, green, and blue channels (`adjust::rgb_histograms`); the composite histogram is the sum of the three.
 - `adjustment()`: returns `Adjustment::Levels` when all four sets are valid and in each set the black point is at least 2 less than the white point.
-- Preset: "Default" when unchanged, otherwise "Custom"; Default in the menu restores the defaults. Photoshop's other presets (Darker, Increase Contrast, etc.) are not available yet.
+- Preset: "Default" when unchanged, the name of the Photoshop preset the values match (`adjust_presets::LEVELS`: Darker, Increase Contrast 1–3, Lighten Shadows, Lighter, Midtones Brighter, Midtones Darker), otherwise "Custom". The native menu lists Default, Custom (grayed out), a separator and the presets, the current one checked; picking one sets all four channels' values.
 
 ## Layout (Photoshop points)
 

@@ -9,7 +9,7 @@ The dialog for Image › Adjustments › Hue/Saturation... (⌘U), rebuilt after
 - Master and the six color ranges (Reds, Yellows, Greens, Cyans, Blues, Magentas) each have three values, Hue (−180–180), Saturation and Lightness (−100–100), defaulting to 0; each range's boundaries default to Photoshop's `HUE_RANGES`.
 - Colorize has its own three values: Hue (0–360, the foreground color's hue on open), Saturation (0–100, 25), Lightness (−100–100, 0). When Colorize is checked these three values are used; when unchecked, the previous Master and range settings are restored.
 - `adjustment()`: returns `Adjustment::HueSaturation` when all current values are valid.
-- Preset: shows "Default" when nothing has been changed, otherwise "Custom"; Default in the dropdown restores all values and ranges to their defaults (the Colorize values are kept). Photoshop's other presets (Cyanotype, Sepia, etc.) are not available yet.
+- Preset: shows "Default" when nothing has been changed, otherwise "Custom"; Default in the dropdown restores all values and ranges to their defaults (the Colorize values are kept). The menu also lists Photoshop's presets (`adjust_presets::HUE_SATURATION`: Cyanotype, Increase Saturation, Increase Saturation More, Old Style, Red Boost, Sepia, Strong Saturation, Yellow Boost): Cyanotype and Sepia turn on Colorize with their values, the others set Master's values (everything else at its default); the Preset shows a preset's name while the values match it.
 
 ## Layout
 

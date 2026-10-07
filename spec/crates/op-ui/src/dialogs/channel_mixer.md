@@ -8,7 +8,7 @@ The dialog for Image › Adjustments › Channel Mixer..., rebuilt after Photosh
 
 - Each of the three output channels red, green and blue has Red, Green, Blue (−200–200%) and Constant (−200–200%), defaulting to identity (itself 100, the others 0).
 - Monochrome: when checked, a single grayscale mix is edited instead, with Photoshop's initial values 40 / 40 / 20 / 0.
-- `adjustment()`: returns `Adjustment::ChannelMixer` when all values are valid; Preset is "Default" while unchanged and "Custom" otherwise, and the menu's Default restores the defaults.
+- `adjustment()`: returns `Adjustment::ChannelMixer` when all values are valid; Preset is "Default" while unchanged, a Photoshop preset's name while the values match it, and "Custom" otherwise. The menu lists Default, Custom and Photoshop's six monochrome presets (`adjust_presets::CHANNEL_MIXER`, Black & White Infrared … with Yellow Filter); picking one turns on Monochrome with the gray's Red, Green, Blue (constant 0).
 
 ## Layout (Photoshop points)
 

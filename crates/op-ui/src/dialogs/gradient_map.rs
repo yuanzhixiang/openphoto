@@ -13,6 +13,7 @@ use crate::theme::pt;
 
 pub const SIZE: egui::Vec2 = vec2(pt(416.0), pt(230.0));
 
+#[derive(Clone)]
 pub struct Dialog {
     /// The gradient's two colors (the foreground and background colors
     /// when the dialog opens).

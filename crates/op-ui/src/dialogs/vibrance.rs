@@ -18,6 +18,7 @@ fn parse(text: &str, (min, max): (f32, f32)) -> Option<i32> {
     (min..=max).contains(&v).then_some(v.round() as i32)
 }
 
+#[derive(Clone)]
 pub struct Vibrance {
     pub vibrance: String,
     pub saturation: String,
@@ -84,6 +85,7 @@ impl Vibrance {
     }
 }
 
+#[derive(Clone)]
 pub struct Posterize {
     pub levels: String,
 }

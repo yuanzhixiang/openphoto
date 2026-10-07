@@ -36,6 +36,7 @@ pub const FILTERS: [(&str, [u8; 3]); 20] = [
     ("Underwater", [0x00, 0xc1, 0xb1]),
 ];
 
+#[derive(Clone)]
 pub struct Dialog {
     /// The preset chosen in the Filter menu.
     pub filter: usize,

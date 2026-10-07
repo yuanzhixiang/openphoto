@@ -27,6 +27,7 @@ pub enum Request {
     Save,
 }
 
+#[derive(Clone)]
 pub struct Dialog {
     /// The kernel, rows top to bottom; an empty field counts as 0.
     pub cells: [String; 25],

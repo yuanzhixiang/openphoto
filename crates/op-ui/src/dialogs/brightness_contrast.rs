@@ -12,6 +12,7 @@ pub const SIZE: egui::Vec2 = vec2(pt(401.0), pt(212.0));
 const BRIGHTNESS: (f32, f32) = (-150.0, 150.0);
 const CONTRAST: (f32, f32) = (-50.0, 100.0);
 
+#[derive(Clone)]
 pub struct Dialog {
     pub brightness: String,
     pub contrast: String,
