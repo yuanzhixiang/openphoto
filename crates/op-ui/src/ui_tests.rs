@@ -5476,6 +5476,68 @@ fn define_pattern_and_the_pattern_stamp() {
 }
 
 #[test]
+fn mixer_brush_loads_mixes_and_keeps_its_paint() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A red patch to sample from
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    select_rect(&mut h, 0.0, 0.0, 200.0, 100.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.run_steps(2);
+    h.state_mut().state.foreground = Color::from_rgba8([0, 0, 255, 255]);
+    h.state_mut().state.select_tool(op_tools::Tool::MixerBrush);
+    h.run_steps(2);
+    // Option-click on the red loads red
+    let p = doc_point(&h, 50.0, 50.0);
+    h.hover_at(p);
+    h.event_modifiers(
+        egui::Event::PointerButton {
+            pos: p,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers: Modifiers::ALT,
+        },
+        Modifiers::ALT,
+    );
+    h.run_steps(1);
+    h.event_modifiers(
+        egui::Event::PointerButton {
+            pos: p,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: Modifiers::ALT,
+        },
+        Modifiers::ALT,
+    );
+    h.run_steps(2);
+    assert_eq!(h.state().state.mixer_load, Some([255, 0, 0]));
+    // Dry: paints the load
+    click(&mut h, at_pt(354.0, 45.25));
+    h.get_by_label("Dry").click();
+    h.run_steps(2);
+    assert_eq!(
+        h.state()
+            .state
+            .tool_settings
+            .get("mixer.wet")
+            .map(String::as_str),
+        Some("0%")
+    );
+    let (a, b) = (doc_point(&h, 300.0, 400.0), doc_point(&h, 320.0, 400.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(last_history(&h), "Mixer Brush Tool");
+    let px = composite_pixel(&mut h, 300, 400);
+    assert!(px[0] > 200 && px[2] < 50, "{px:?}");
+    // Not cleaned after the stroke: the brush keeps its paint
+    *h.state_mut().state.setting("mixer.clean", "1") = "0".into();
+    let (a, b) = (doc_point(&h, 300.0, 500.0), doc_point(&h, 320.0, 500.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert!(h.state().state.mixer_paint.is_some());
+}
+
+#[test]
 fn airbrush_builds_up_while_held() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);

@@ -75,6 +75,8 @@ pub struct DocState {
     /// Smoothing: where the stroke being painted has got to (document
     /// pixels), trailing the pointer.
     pub paint_smooth: Option<(f32, f32)>,
+    /// A Mixer Brush stroke just ended with this paint on the brush.
+    pub mixer_left: Option<Option<[u8; 3]>>,
     /// A lasso outline being drawn.
     pub lasso: Option<LassoPath>,
     /// The Patch or Content-Aware Move tool dragging the selection: where
@@ -228,6 +230,7 @@ impl DocState {
             stroke: None,
             last_paint_point: None,
             paint_smooth: None,
+            mixer_left: None,
             renaming: None,
             lasso: None,
             patch_drag: None,
@@ -1343,6 +1346,12 @@ pub struct AppState {
     /// The patterns (the default, then those made with Edit › Define
     /// Pattern...) and the one the Pattern Stamp paints.
     pub patterns: Vec<Pattern>,
+    /// The Mixer Brush: its brush, the load color sampled with
+    /// Option-click (None: the foreground color), and the paint the brush
+    /// keeps between strokes when it isn't cleaned (None: clean).
+    pub mixer: PaintOptions,
+    pub mixer_load: Option<[u8; 3]>,
+    pub mixer_paint: Option<[u8; 3]>,
     pub pattern: usize,
     /// Edit › Define Pattern...'s Pattern Name dialog and the pixels it
     /// names.
@@ -1531,6 +1540,9 @@ impl Default for AppState {
                 image: default_pattern(),
             }],
             pattern: 0,
+            mixer: PaintOptions::brush(),
+            mixer_load: None,
+            mixer_paint: None,
             define_pattern: None,
             export_options: op_io::ExportOptions::default(),
             gradient_editor: None,
@@ -1623,6 +1635,7 @@ impl AppState {
             Tool::HealingBrush => Some(&mut self.healing_brush),
             Tool::SpotHealingBrush => Some(&mut self.spot_healing),
             Tool::SelectionBrush => Some(&mut self.selection_brush),
+            Tool::MixerBrush => Some(&mut self.mixer),
             _ => None,
         }
     }

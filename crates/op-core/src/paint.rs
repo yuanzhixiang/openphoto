@@ -200,6 +200,15 @@ pub enum StrokeKind {
     /// Push the pixels along the stroke (Smudge): each dab pulls the
     /// colors under the previous dab with this strength (0–1).
     Smudge(f32),
+    /// The Mixer Brush: paint loaded into the brush (`color`; None for a
+    /// clean brush) laid down while it lasts (`load`), picking up the
+    /// canvas's paint (`wet`) and mixing it in (`mix`), all 0–1.
+    Mix {
+        color: Option<[u8; 3]>,
+        wet: f32,
+        load: f32,
+        mix: f32,
+    },
     /// Erase the pixels matching a sampled color (Background Eraser).
     BackgroundErase(ColorMatch),
     /// Heal with the texture of `source` moved by (`dx`, `dy`) (Healing
@@ -282,6 +291,9 @@ pub struct Stroke {
     /// The Pattern Stamp's Impressionist, and the dab being placed.
     impressionist: bool,
     dab_center: (f32, f32),
+    /// The Mixer Brush's paint: its color (None while clean) and how much
+    /// of the load is left (0–1).
+    mixer: (Option<[f32; 3]>, f32),
 }
 
 impl Stroke {
@@ -354,7 +366,16 @@ impl Stroke {
             retouch: Retouch::default(),
             impressionist: false,
             dab_center: (0.0, 0.0),
+            mixer: (None, 1.0),
         })
+    }
+
+    /// The Mixer Brush's color at the end of the stroke (None if clean):
+    /// what the brush keeps when it isn't cleaned after the stroke.
+    pub fn mixer_color(&self) -> Option<[u8; 3]> {
+        self.mixer
+            .0
+            .map(|c| c.map(|v| (v * 255.0).round().clamp(0.0, 255.0) as u8))
     }
 
     /// The Pattern Stamp's Impressionist: each dab paints the pattern's
@@ -446,6 +467,16 @@ impl Stroke {
     fn dab(&mut self, doc: &mut Document, cx: f32, cy: f32) {
         if let StrokeKind::Smudge(strength) = self.kind {
             self.smudge_dab(doc, cx, cy, strength);
+            return;
+        }
+        if let StrokeKind::Mix {
+            color,
+            wet,
+            load,
+            mix,
+        } = self.kind
+        {
+            self.mixer_dab(doc, cx, cy, (color, wet, load, mix));
             return;
         }
         if matches!(self.kind, StrokeKind::Heal { .. } | StrokeKind::SpotHeal(_)) {
@@ -641,6 +672,7 @@ impl Stroke {
             StrokeKind::Paint(_)
             | StrokeKind::Erase { .. }
             | StrokeKind::Smudge(_)
+            | StrokeKind::Mix { .. }
             | StrokeKind::BackgroundErase(_)
             | StrokeKind::Heal { .. }
             | StrokeKind::SpotHeal(_) => base,
@@ -829,6 +861,99 @@ impl Stroke {
                 let amount = a * strength * selected;
                 let from = image.pixel(sx as u32, sy as u32);
                 updates.push((x, y, mix(image.pixel(x, y), from, amount, preserve)));
+            }
+        }
+        for (x, y, p) in updates {
+            image.set_pixel(x, y, p);
+        }
+        doc.mark_dirty();
+    }
+
+    /// A Mixer Brush dab: the brush picks up the paint under it by Wet,
+    /// lays down its own mixed with the canvas's by Mix, at a strength that
+    /// falls as the load runs out (wet paint keeps smearing).
+    fn mixer_dab(
+        &mut self,
+        doc: &mut Document,
+        cx: f32,
+        cy: f32,
+        (loaded, wet, load, mix): (Option<[u8; 3]>, f32, f32, f32),
+    ) {
+        if self.last_dab.is_none() {
+            // The stroke's first dab loads the brush
+            self.mixer.0 = loaded.map(|c| c.map(|v| v as f32 / 255.0)).or(self.mixer.0);
+            self.mixer.1 = if loaded.is_some() { 1.0 } else { 0.0 };
+        }
+        self.last_dab = Some((cx, cy));
+        let (w, h) = (doc.width, doc.height);
+        let tip = self.tip;
+        let r = tip.diameter / 2.0 + 1.0;
+        let x0 = (cx - r).floor().max(0.0) as u32;
+        let y0 = (cy - r).floor().max(0.0) as u32;
+        let x1 = ((cx + r).ceil().max(0.0) as u32).min(w);
+        let y1 = ((cy + r).ceil().max(0.0) as u32).min(h);
+        let selection = self.selection.clone();
+        let preserve = self.preserve_alpha;
+        let flow = self.flow;
+        let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
+            return;
+        };
+        // The canvas's paint under the tip
+        let (mut sum, mut weight) = ([0f32; 3], 0f32);
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let a = tip.coverage(x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+                let p = image.pixel(x, y);
+                let k = a * p[3] as f32 / 255.0;
+                for c in 0..3 {
+                    sum[c] += p[c] as f32 / 255.0 * k;
+                }
+                weight += k;
+            }
+        }
+        let canvas = (weight > 1e-3).then(|| sum.map(|v| v / weight));
+        // Pick up: the brush's paint takes on the canvas's, a tenth of Wet ×
+        // Mix each dab
+        let mut color = self.mixer.0;
+        if let Some(c) = canvas
+            && wet > 0.0
+        {
+            color = Some(match color {
+                Some(b) => [0, 1, 2].map(|i| b[i] + (c[i] - b[i]) * wet * mix * 0.1),
+                None => c,
+            });
+        }
+        self.mixer.0 = color;
+        let Some(brush) = color else {
+            return;
+        };
+        let laid = match canvas {
+            // (half of Mix: the brush's paint, which carries what it picked
+            // up, always shows)
+            Some(c) if wet > 0.0 => [0, 1, 2].map(|i| brush[i] + (c[i] - brush[i]) * mix * 0.5),
+            _ => brush,
+        };
+        // Strength: the load left, and wet paint smearing even when dry
+        let paint = self.mixer.1;
+        let strength = flow * (paint + (1.0 - paint) * wet * 0.5).min(1.0);
+        self.mixer.1 = (paint - 1.0 / (4.0 + load * 200.0)).max(0.0);
+        let rgb = laid.map(|v| (v * 255.0).round().clamp(0.0, 255.0) as u8);
+        let mut updates = Vec::new();
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let a = tip.coverage(x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+                if a <= 0.0 {
+                    continue;
+                }
+                let selected = selection
+                    .as_ref()
+                    .map_or(1.0, |s| s.get(x, y) as f32 / 255.0);
+                let amount = a * strength * selected;
+                updates.push((
+                    x,
+                    y,
+                    apply(image.pixel(x, y), amount, &StrokeKind::Paint(rgb), preserve),
+                ));
             }
         }
         for (x, y, p) in updates {
@@ -1363,6 +1488,53 @@ mod tests {
             .with_impressionist(true);
         s.add_point(&mut doc, 20.0, 20.0);
         assert_eq!(pixel(&doc, id, 18, 19), pixel(&doc, id, 19, 19));
+    }
+
+    #[test]
+    fn mixer_brush_loads_picks_up_and_runs_dry() {
+        let blue = |wet: f32, load: f32| StrokeKind::Mix {
+            color: Some([0, 0, 255]),
+            wet,
+            load,
+            mix: 0.5,
+        };
+        // Dry, light load: blue at first, fading as the paint runs out
+        let (mut doc, id) = doc_filled([255, 255, 255, 255]);
+        let mut s = Stroke::begin(&doc, HARD, blue(0.0, 0.0), 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 5.0, 20.0);
+        s.add_point(&mut doc, 35.0, 20.0);
+        let (start, end) = (pixel(&doc, id, 5, 20), pixel(&doc, id, 34, 20));
+        assert_eq!(start, [0, 0, 255, 255]);
+        assert!(end[0] > 100, "{end:?}");
+        // Wet on red: the blue mixes with the red it picks up
+        let (mut doc, id) = doc_filled([255, 0, 0, 255]);
+        let mut s = Stroke::begin(&doc, HARD, blue(1.0, 1.0), 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 5.0, 20.0);
+        s.add_point(&mut doc, 35.0, 20.0);
+        let p = pixel(&doc, id, 20, 20);
+        assert!(p[0] > 60 && p[2] > 60, "{p:?}");
+        let kept = s.mixer_color().unwrap();
+        assert!(kept[0] > 0 && kept[2] < 255, "{kept:?}");
+        // A clean, wet brush smears what it picks up
+        let (mut doc, id) = doc_filled([255, 255, 255, 255]);
+        {
+            let img = doc.layer_mut(id).unwrap().image_mut().unwrap();
+            for y in 0..40 {
+                for x in 0..12 {
+                    img.set_pixel(x, y, [0, 0, 0, 255]);
+                }
+            }
+        }
+        let clean = StrokeKind::Mix {
+            color: None,
+            wet: 1.0,
+            load: 0.5,
+            mix: 1.0,
+        };
+        let mut s = Stroke::begin(&doc, HARD, clean, 1.0, 1.0).unwrap();
+        s.add_point(&mut doc, 8.0, 20.0);
+        s.add_point(&mut doc, 24.0, 20.0);
+        assert!(pixel(&doc, id, 16, 20)[0] < 200);
     }
 
     #[test]

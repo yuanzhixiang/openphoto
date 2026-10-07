@@ -555,12 +555,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
                 "Clean the brush after each stroke",
                 "mixer.clean",
             ),
-            Popup(
-                289.0,
-                419.0,
-                "mixer.combo",
-                &["Custom", "Dry", "Moist", "Wet", "Very Wet"],
-            ),
+            Popup(289.0, 419.0, "mixer.combo", MIXER_COMBOS),
             Label(422.5, "Wet:"),
             Percent(446.0, 483.5, 498.0, "mixer.wet", "80%"),
             Label(503.0, "Load:"),
@@ -1585,6 +1580,10 @@ fn text(app: &mut AppState, key: &'static str, default: &str) -> String {
 /// Stores typed text: percentages and numbers are kept in range.
 fn set_text(app: &mut AppState, key: &'static str, default: &str, typed: String) {
     let tool = app.tool;
+    // Setting Wet, Load or Mix by hand makes the combination Custom
+    if matches!(key, "mixer.wet" | "mixer.load_amount" | "mixer.mix") {
+        *app.setting("mixer.combo", "0") = "0".into();
+    }
     let number = crate::options_bar::typed_number(&typed);
     match key {
         "paint.opacity" | "paint.flow" | "smudge.strength" | "pattern.opacity" | "pattern.flow" => {
@@ -1702,9 +1701,50 @@ fn default_choice(key: &str) -> &'static str {
     }
 }
 
+/// The Mixer Brush's useful combinations, as the options bar lists them.
+const MIXER_COMBOS: &[&str] = &[
+    "Custom",
+    "Dry",
+    "Dry, Light Load",
+    "Dry, Heavy Load",
+    "Moist",
+    "Moist, Light Load",
+    "Moist, Heavy Load",
+    "Wet",
+    "Wet, Light Load",
+    "Wet, Heavy Load",
+    "Very Wet",
+    "Very Wet, Light Load",
+    "Very Wet, Heavy Load",
+];
+
+/// Each combination's Wet, Load and Mix (percent), after Custom.
+const MIXER_SETTINGS: [(u8, u8, u8); 12] = [
+    (0, 50, 50),
+    (0, 1, 50),
+    (0, 100, 50),
+    (10, 5, 50),
+    (10, 1, 50),
+    (10, 100, 50),
+    (50, 50, 50),
+    (50, 1, 50),
+    (50, 100, 50),
+    (100, 50, 50),
+    (100, 1, 50),
+    (100, 100, 50),
+];
+
 fn set_choice(app: &mut AppState, key: &'static str, i: usize) {
     use op_core::paint::ToneRange;
     match key {
+        "mixer.combo" => {
+            *app.setting(key, "0") = i.to_string();
+            if let Some(&(wet, load, mix)) = i.checked_sub(1).and_then(|k| MIXER_SETTINGS.get(k)) {
+                *app.setting("mixer.wet", "80%") = format!("{wet}%");
+                *app.setting("mixer.load_amount", "75%") = format!("{load}%");
+                *app.setting("mixer.mix", "90%") = format!("{mix}%");
+            }
+        }
         "dodge.range" => app.retouch.dodge_range = ToneRange::ALL[i],
         "burn.range" => app.retouch.burn_range = ToneRange::ALL[i],
         "sponge.mode" => app.retouch.sponge_saturate = i == 1,
@@ -2118,7 +2158,14 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
             MenuButton(x0, x1, label) => {
                 b.menu_button(x0, x1, label);
             }
-            Swatch(x0, x1, _, true) => b.swatch(x0, x1, egui::Color32::WHITE, None),
+            // The Mixer Brush's load: the color sampled with Option-click,
+            // or the foreground color
+            Swatch(x0, x1, _, true) => {
+                let fill = app.mixer_load.map_or(to32(app.foreground), |[r, g, b]| {
+                    egui::Color32::from_rgb(r, g, b)
+                });
+                b.swatch(x0, x1, fill, None)
+            }
             // The Pattern Stamp's pattern, its chevron the pattern picker
             Swatch(x0, x1, x2, false) => {
                 let k = app.pattern.min(app.patterns.len().saturating_sub(1));

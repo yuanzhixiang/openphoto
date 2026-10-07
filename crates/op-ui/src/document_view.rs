@@ -154,6 +154,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let tool = app.tool;
     let paint = app.paint_options(tool).copied();
     let dynamics = paint_dynamics(app, tool);
+    // The Mixer Brush's paint and settings
+    let mixer = (tool == Tool::MixerBrush).then(|| mixer_settings(app));
     // The Pattern Stamp's pattern and Impressionist
     let pattern = (tool == Tool::PatternStamp).then(|| {
         let k = app.pattern.min(app.patterns.len().saturating_sub(1));
@@ -193,6 +195,10 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let quick = crate::options_tools::quick_options(app);
     let object = crate::options_tools::object_options(app);
     let mut quick_switch_to_add = false;
+    // A Mixer Brush stroke ended with this paint on the brush
+    let mut mixer_left: Option<Option<[u8; 3]>> = None;
+    // Option-click with the Mixer Brush samples its load color
+    let mut mixer_sampled: Option<[u8; 3]> = None;
     let sampling_ring = tool == Tool::Eyedropper && app.flag("eyedropper.ring", true);
     // The Zoom tool's Zoom Out button swaps what a click and Alt-click do
     let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
@@ -599,6 +605,22 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     state.picking_clone_source = true;
                 }
             }
+            // Option-click with the Mixer Brush loads the color under it
+            Tool::MixerBrush
+                if alt && response.is_pointer_button_down_on() && state.stroke.is_none() =>
+            {
+                if ui.input(|i| i.pointer.primary_pressed())
+                    && let Some(p) = response.interact_pointer_pos()
+                {
+                    let d = to_doc(state, p, ppp);
+                    let (w, h) = (state.doc.width as f32, state.doc.height as f32);
+                    if (0.0..w).contains(&d.x) && (0.0..h).contains(&d.y) {
+                        let all = state.doc.composite_rgba8();
+                        let i = (d.y as usize * state.doc.width as usize + d.x as usize) * 4;
+                        mixer_sampled = Some([all[i], all[i + 1], all[i + 2]]);
+                    }
+                }
+            }
             // The press that picked the source doesn't paint, even if Alt
             // is let go first
             Tool::CloneStamp | Tool::HealingBrush if state.picking_clone_source => {
@@ -621,7 +643,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             | Tool::BackgroundEraser
             | Tool::ColorReplacement
             | Tool::HealingBrush
-            | Tool::SpotHealingBrush => {
+            | Tool::SpotHealingBrush
+            | Tool::MixerBrush => {
                 if let Some(opts) = paint {
                     let settings = StrokeSettings {
                         opts,
@@ -635,8 +658,12 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         heal,
                         dynamics,
                         pattern: pattern.clone(),
+                        mixer,
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
+                    if tool == Tool::MixerBrush {
+                        mixer_left = state.mixer_left.take();
+                    }
                 }
             }
             Tool::RectangularMarquee
@@ -658,6 +685,17 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     // Photoshop
     if quick_switch_to_add {
         *app.setting("quick.mode", "0") = "1".into();
+    }
+    if let Some(c) = mixer_sampled {
+        app.mixer_load = Some(c);
+    }
+    // After a stroke the brush keeps its paint unless it is cleaned
+    if let Some(paint) = mixer_left {
+        app.mixer_paint = if app.flag("mixer.clean", true) {
+            None
+        } else {
+            paint
+        };
     }
     if let Some(message) = paint_error {
         app.alert = Some(message);
@@ -1511,6 +1549,7 @@ fn stroke_names(tool: Tool) -> (&'static str, &'static str) {
         Tool::ColorReplacement => ("color replacement tool", "Color Replacement Tool"),
         Tool::HealingBrush => ("healing brush", "Healing Brush"),
         Tool::SpotHealingBrush => ("spot healing brush", "Spot Healing Brush"),
+        Tool::MixerBrush => ("mixer brush tool", "Mixer Brush Tool"),
         _ => ("brush tool", "Brush Tool"),
     }
 }
@@ -1669,6 +1708,39 @@ struct StrokeSettings {
     dynamics: Dynamics,
     /// The Pattern Stamp's pattern and Impressionist.
     pattern: Option<(op_core::TiledImage, bool)>,
+    /// The Mixer Brush's stroke and its Flow.
+    mixer: Option<(op_core::paint::StrokeKind, f32)>,
+}
+
+/// The Mixer Brush's stroke: the load color when "Load the brush after
+/// each stroke" is on (else the paint the brush kept), and Wet, Load, Mix
+/// and Flow from the options bar.
+fn mixer_settings(app: &mut crate::state::AppState) -> (op_core::paint::StrokeKind, f32) {
+    let mut pct = |key: &'static str, default: &str| {
+        crate::options_bar::typed_number(app.setting(key, default))
+            .map_or(0.5, |v| (v / 100.0).clamp(0.0, 1.0))
+    };
+    let (wet, load, mix, flow) = (
+        pct("mixer.wet", "80%"),
+        pct("mixer.load_amount", "75%"),
+        pct("mixer.mix", "90%"),
+        pct("mixer.flow", "100%"),
+    );
+    let color = if app.flag("mixer.load", true) {
+        let [r, g, b, _] = app.foreground.to_rgba8();
+        Some(app.mixer_load.unwrap_or([r, g, b]))
+    } else {
+        app.mixer_paint
+    };
+    (
+        op_core::paint::StrokeKind::Mix {
+            color,
+            wet,
+            load,
+            mix,
+        },
+        flow.max(0.01),
+    )
 }
 
 /// The pen and the smoothing a stroke uses.
@@ -1776,6 +1848,7 @@ fn paint_input(
         heal,
         dynamics,
         pattern,
+        mixer,
     } = settings;
     // The pen's pressure at this point (a mouse paints at full pressure)
     let pen = dynamics.pen.unwrap_or(1.0);
@@ -1821,6 +1894,7 @@ fn paint_input(
             Ok(op_core::paint::StrokeKind::Pattern(_)) if pattern.is_some() => Ok(
                 op_core::paint::StrokeKind::Pattern(pattern.clone().expect("checked").0),
             ),
+            _ if mixer.is_some() => Ok(mixer.clone().expect("checked").0),
             other => other,
         };
         let kind = match kind {
@@ -1831,7 +1905,11 @@ fn paint_input(
             }
         };
         let hard = tool == Tool::Pencil || eraser.is_some_and(|m| m != EraserMode::Brush);
-        let flow = if hard { 1.0 } else { opts.flow };
+        let flow = match &mixer {
+            Some((_, flow)) => *flow,
+            None if hard => 1.0,
+            None => opts.flow,
+        };
         // The Smudge's Strength is its stroke's own, not an opacity
         let opacity = if block || tool == Tool::Smudge {
             1.0
@@ -1908,6 +1986,9 @@ fn paint_input(
         }
         if released {
             let (_, name) = stroke_names(*stroke_tool);
+            if *stroke_tool == Tool::MixerBrush {
+                state.mixer_left = Some(stroke.mixer_color());
+            }
             state.last_paint_point = stroke.last_point();
             state.stroke = None;
             state.record_fadeable(name);

@@ -54,6 +54,18 @@ The Mode of the Brush and Pencil, set with `Stroke::with_mode` (default Normal):
   - With `contiguous`, only matching pixels within the dab that are 4-connected from the center pixel (if the center does not match, that dab changes no pixels); otherwise all matching pixels within the dab.
   - The Background Eraser lowers the alpha of matching pixels by the strength; Color Replacement moves the color toward the blend result by the strength, with alpha unchanged.
 
+## Mixer Brush (`Mix { color, wet, load, mix }`)
+
+`Mix` does not go through the coverage map. Its paint lives on the brush as a color and the part of its load that is left (`mixer`). At each dab:
+
+1. **Loading.** The stroke's first dab loads the brush. With a load color, the brush takes it and a full load. With `None` (a clean brush, or "Load the brush after each stroke" off), the brush keeps what it had and has no load.
+2. **Pickup.** The canvas's paint under the tip is measured: its average straight color, weighted by the tip's coverage and the pixels' alpha. If the stroke is wet, the brush's color moves toward it by Wet × Mix × 0.1 per dab. A brush without paint simply takes it.
+3. **Laying down.** The color laid down is the brush's, mixed with the canvas's by half of Mix when wet.
+4. **Strength.** The color is laid at flow × (load left + (1 − load left) × Wet × 0.5). A dry brush therefore fades as it runs out, and a wet one keeps smearing.
+5. **Using up the load.** Each dab uses 1 / (4 + Load × 200) of the load.
+
+Pixels are painted source-over (`apply`). On the background layer or with locked transparency, alpha is kept. `mixer_color()` gives the brush's color when the stroke ends: the paint it keeps if it isn't cleaned.
+
 ## Healing strokes
 
 - `Heal { source, dx, dy }` (Healing Brush) and `SpotHeal(source)` (Spot Healing Brush) don't go through the coverage map. Each dab heals the pixels under the tip with `heal::heal_window` over the dab's box plus one pixel (the edge values come from the layer as it is at that moment, so dabs follow on from earlier ones), and mixes them into the layer by the tip's coverage × opacity × selection; alpha is kept (or follows `mix` when transparency isn't locked).
@@ -100,6 +112,7 @@ The options (`Stroke::with_retouch(Retouch { protect_tones, vibrance, protect_de
 
 ## Test coverage (brush shape and dynamics)
 
+- `mixer_brush_loads_picks_up_and_runs_dry`: a dry, light load starts blue and fades; a wet blue brush on red lays a mix and keeps a mixed color; a clean wet brush smears black into white.
 - `impressionist_pattern_daubs`: a one-pixel stripe pattern comes through as stripes, and with Impressionist in blocks of one color.
 - `retouching_builds_up_and_its_options`: a second Burn pass darkens further, `build_up` darkens in place, Protect Tones keeps a 2:1 red/green ratio that plain Dodge changes, Vibrance saturates a strong red less, Protect Detail sharpens an edge less.
 - `elliptical_tips_and_spacing`: a 30% round tip is wide at 0° and tall at 90°; 100% spacing places dabs a diameter apart.
