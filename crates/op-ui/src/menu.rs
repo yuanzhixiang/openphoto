@@ -85,6 +85,8 @@ const ALL_COMMANDS: &[Command] = &[
     Command::Diffuse,
     Command::Ripple,
     Command::Mezzotint,
+    Command::Tiles,
+    Command::ColorHalftone,
     Command::Pinch,
     Command::Spherize,
     Command::PolarCoordinates,
@@ -896,7 +898,7 @@ impl NativeMenu {
                 &filter_sub(
                     "Pixelate",
                     &[
-                        ("Color Halftone...", None),
+                        ("Color Halftone...", Some(Command::ColorHalftone)),
                         ("Crystallize...", Some(Command::Crystallize)),
                         ("Facet", None),
                         ("Fragment", Some(Command::Fragment)),
@@ -939,7 +941,7 @@ impl NativeMenu {
                         ("Find Edges", Some(Command::FindEdges)),
                         ("Oil Paint...", None),
                         ("Solarize", Some(Command::Solarize)),
-                        ("Tiles...", None),
+                        ("Tiles...", Some(Command::Tiles)),
                         ("Trace Contour...", Some(Command::TraceContour)),
                         ("Wind...", Some(Command::Wind)),
                     ],

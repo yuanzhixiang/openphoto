@@ -278,6 +278,24 @@ impl OpenPhotoApp {
                 if let Some(values) = dialog.settings() {
                     self.state.filter_settings.insert(dialog.kind, values);
                 }
+                // Tiles may fill with the foreground color
+                let effect = match effect {
+                    dialogs::Effect::Filter(op_core::filter::Filter::Tiles {
+                        count,
+                        offset,
+                        fill,
+                        ..
+                    }) => {
+                        let [r, g, b, _] = self.state.foreground.to_rgba8();
+                        dialogs::Effect::Filter(op_core::filter::Filter::Tiles {
+                            count,
+                            offset,
+                            fill,
+                            foreground: [r, g, b],
+                        })
+                    }
+                    other => other,
+                };
                 match effect.apply(&mut state.doc, background) {
                     Ok(()) => {
                         state.record_fadeable(effect.name());

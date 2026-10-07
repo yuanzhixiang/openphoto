@@ -30,6 +30,7 @@ mod new_document;
 mod new_guide;
 mod new_layer;
 mod photo_filter;
+mod plain_filter;
 mod rotate_canvas;
 pub mod save_changes;
 mod selective_color;

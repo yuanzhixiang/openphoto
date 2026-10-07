@@ -12,13 +12,13 @@
 use egui::{Align2, Color32, Key, Pos2, Rect, Sense, Stroke, Ui, vec2};
 use op_core::adjust::Adjustment;
 use op_core::filter::{
-    DiffuseMode, Filter, MezzotintType, OffsetFill, RippleSize, SpherizeMode, WindMethod,
+    DiffuseMode, Filter, MezzotintType, OffsetFill, RippleSize, SpherizeMode, TilesFill, WindMethod,
 };
 
 use super::{
     appkit, black_white, brightness_contrast, channel_mixer, color_balance, common, curves,
     custom_filter, distort, exposure, filter_layout, gradient_map, hue_saturation, levels,
-    photo_filter, selective_color, threshold, uxp, vibrance,
+    photo_filter, plain_filter, selective_color, threshold, uxp, vibrance,
 };
 use crate::theme::{self, pt};
 
@@ -148,6 +148,27 @@ const MEZZOTINT: &[Param] = &[choice(
     ],
     0,
 )];
+const TILES: &[Param] = &[
+    param("Number Of Tiles:", 1.0, 99.0, 10.0, 0),
+    param("Maximum Offset (%):", 1.0, 99.0, 10.0, 0),
+    choice(
+        "Fill Empty Area With",
+        &[
+            "Background Color",
+            "Foreground Color",
+            "Inverse Image",
+            "Unaltered Image",
+        ],
+        0,
+    ),
+];
+const COLOR_HALFTONE: &[Param] = &[
+    param("Max. Radius (pixels):", 4.0, 127.0, 8.0, 0),
+    param("Channel 1:", -360.0, 360.0, 108.0, 0),
+    param("Channel 2:", -360.0, 360.0, 162.0, 0),
+    param("Channel 3:", -360.0, 360.0, 90.0, 0),
+    param("Channel 4:", -360.0, 360.0, 45.0, 0),
+];
 const DIFFUSE: &[Param] = &[choice(
     "Mode",
     &["Normal", "Darken Only", "Lighten Only", "Anisotropic"],
@@ -230,6 +251,8 @@ pub enum Kind {
     Diffuse,
     Ripple,
     Mezzotint,
+    Tiles,
+    ColorHalftone,
     Pinch,
     Spherize,
     PolarCoordinates,
@@ -276,6 +299,8 @@ impl Kind {
             Self::Diffuse => "Diffuse",
             Self::Ripple => "Ripple",
             Self::Mezzotint => "Mezzotint",
+            Self::Tiles => "Tiles",
+            Self::ColorHalftone => "Color Halftone",
             Self::Pinch => "Pinch",
             Self::Spherize => "Spherize",
             Self::PolarCoordinates => "Polar Coordinates",
@@ -322,6 +347,8 @@ impl Kind {
             Self::Diffuse => DIFFUSE,
             Self::Ripple => RIPPLE,
             Self::Mezzotint => MEZZOTINT,
+            Self::Tiles => TILES,
+            Self::ColorHalftone => COLOR_HALFTONE,
             Self::Pinch => PINCH,
             Self::Spherize => SPHERIZE,
             Self::PolarCoordinates => POLAR,
@@ -356,6 +383,15 @@ impl Kind {
         })
     }
 
+    /// The small dialogs without a preview.
+    fn plain(self) -> Option<&'static plain_filter::Layout> {
+        Some(match self {
+            Self::Tiles => &plain_filter::TILES,
+            Self::ColorHalftone => &plain_filter::COLOR_HALFTONE,
+            _ => return None,
+        })
+    }
+
     /// The Distort filters' plug-in style layout.
     fn distort(self) -> Option<&'static distort::Layout> {
         Some(match self {
@@ -378,6 +414,7 @@ impl Kind {
             .layout()
             .map(|l| l.size)
             .or(self.distort().map(|l| l.size))
+            .or(self.plain().map(|l| l.size))
             .expect("every filter dialog has a layout");
         vec2(pt(w), pt(h))
     }
@@ -511,7 +548,8 @@ impl AdjustDialog {
                 .iter()
                 .map(|p| format(kind, p.default, p.decimals))
                 .collect(),
-            preview: true,
+            // The dialogs without a preview don't preview on the document
+            preview: kind.plain().is_none(),
             histogram,
             first_frame: true,
             previewing: None,
@@ -676,6 +714,22 @@ impl AdjustDialog {
                 amount: v[0] as i32,
                 size: [RippleSize::Small, RippleSize::Medium, RippleSize::Large][v[1] as usize],
             },
+            Kind::Tiles => Filter::Tiles {
+                count: v[0] as u32,
+                offset: v[1] as u32,
+                fill: [
+                    TilesFill::Background,
+                    TilesFill::Foreground,
+                    TilesFill::Inverse,
+                    TilesFill::Unaltered,
+                ][v[2] as usize],
+                // Set from the app's foreground color when applied
+                foreground: [0; 3],
+            },
+            Kind::ColorHalftone => Filter::ColorHalftone {
+                radius: v[0] as u32,
+                angles: [v[1] as i32, v[2] as i32, v[3] as i32, v[4] as i32],
+            },
             Kind::Mezzotint => Filter::Mezzotint {
                 kind: MezzotintType::ALL[(v[0] as usize).min(9)],
             },
@@ -758,6 +812,8 @@ impl AdjustDialog {
                     self.custom_ui(ui, rect)
                 } else if let Some(layout) = self.kind.layout() {
                     self.classic_ui(ui, rect, layout)
+                } else if let Some(layout) = self.kind.plain() {
+                    self.plain_ui(ui, rect, layout)
                 } else {
                     let layout = self
                         .kind
@@ -1132,6 +1188,88 @@ impl AdjustDialog {
         Outcome::Open
     }
 
+    /// A small dialog without a preview (see `plain_filter`).
+    fn plain_ui(&mut self, ui: &mut Ui, frame: Rect, layout: &plain_filter::Layout) -> Outcome {
+        use plain_filter::Item;
+        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
+        let r = |b: [f32; 4]| Rect::from_min_max(at(b[0], b[1]), at(b[2], b[3]));
+        common::frame(ui, frame, self.kind.title(), theme::dialog_bold(pt(13.0)));
+        let params = self.kind.params();
+        let mut i = 0;
+        for item in layout.items {
+            match *item {
+                Item::Text { text, at: (x, y) } => {
+                    distort::label(ui, at(x, y), Align2::LEFT_CENTER, text);
+                }
+                Item::Field { label, rect, unit } => {
+                    let field = r(rect);
+                    let cy = field.center().y;
+                    distort::label(
+                        ui,
+                        Pos2::new(at(label.1, 0.0).x, cy),
+                        Align2::LEFT_CENTER,
+                        label.0,
+                    );
+                    let p = &params[i];
+                    appkit::field(
+                        ui,
+                        field,
+                        &mut self.values[i],
+                        ("plain-field", i),
+                        (p.min, p.max),
+                        1.0,
+                        p.decimals,
+                        self.first_frame && i == 0,
+                    );
+                    if let Some((unit, x)) = unit {
+                        distort::label(ui, Pos2::new(at(x, 0.0).x, cy), Align2::LEFT_CENTER, unit);
+                    }
+                    i += 1;
+                }
+                Item::Radios { centers, gap } => {
+                    if let ParamKind::Choice(options) = params[i].kind {
+                        let chosen = self.value(i).unwrap_or(0.0) as usize;
+                        for (k, (&(x, y), option)) in centers.iter().zip(options).enumerate() {
+                            let font = distort::label_font();
+                            if appkit::radio_with(ui, at(x, y), option, chosen == k, (gap, font)) {
+                                self.values[i] = k.to_string();
+                            }
+                        }
+                    }
+                    i += 1;
+                }
+            }
+        }
+        let x0 = layout.buttons_x;
+        let valid = self.effect().is_some();
+        let ok = appkit::button_with(
+            ui,
+            Rect::from_min_max(at(x0, 41.0), at(x0 + 89.0, 67.0)),
+            "OK",
+            (true, valid),
+            13.0,
+            0.0,
+        );
+        let cancel = appkit::button_with(
+            ui,
+            Rect::from_min_max(at(x0, 77.0), at(x0 + 89.0, 103.0)),
+            "Cancel",
+            (false, true),
+            13.0,
+            0.0,
+        );
+        if cancel.clicked() {
+            return Outcome::Cancel;
+        }
+        let enter = ui.input(|i| i.key_pressed(Key::Enter));
+        if (ok.clicked() || enter)
+            && let Some(effect) = self.effect()
+        {
+            return Outcome::Apply(effect);
+        }
+        Outcome::Open
+    }
+
     /// The preview pane: the document, as previewed, at 100% (one image
     /// pixel per screen pixel), centered.
     fn pane_ui(&mut self, ui: &mut Ui, rect: Rect) {
@@ -1314,6 +1452,8 @@ mod tests {
             Kind::Diffuse,
             Kind::Ripple,
             Kind::Mezzotint,
+            Kind::Tiles,
+            Kind::ColorHalftone,
             Kind::Pinch,
             Kind::Spherize,
             Kind::PolarCoordinates,

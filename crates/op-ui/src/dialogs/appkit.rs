@@ -285,10 +285,21 @@ pub fn group(painter: &egui::Painter, rect: Rect, gap: (f32, f32)) {
 /// right: chosen, a light disc with a dark dot; otherwise a dark disc in
 /// a gray ring.
 pub fn radio(ui: &mut Ui, center: Pos2, label: &str, chosen: bool) -> bool {
-    let galley = theme::tracked_galley(ui.painter(), label, font(), TEXT);
+    radio_with(ui, center, label, chosen, (16.5, font()))
+}
+
+/// [`radio`] with its label `gap` pt after the button's center, in `font`.
+pub fn radio_with(
+    ui: &mut Ui,
+    center: Pos2,
+    label: &str,
+    chosen: bool,
+    (gap, font): (f32, egui::FontId),
+) -> bool {
+    let galley = theme::tracked_galley(ui.painter(), label, font, TEXT);
     let hit = Rect::from_min_max(
         center - vec2(pt(7.0), pt(8.0)),
-        Pos2::new(center.x + pt(16.5) + galley.size().x, center.y + pt(8.0)),
+        Pos2::new(center.x + pt(gap) + galley.size().x, center.y + pt(8.0)),
     );
     let clicked = ui
         .interact(hit, ui.id().with(("appkit-radio", label)), Sense::click())
@@ -306,7 +317,7 @@ pub fn radio(ui: &mut Ui, center: Pos2, label: &str, chosen: bool) -> bool {
         );
     }
     painter.galley(
-        Pos2::new(center.x + pt(16.5), center.y - galley.size().y / 2.0),
+        Pos2::new(center.x + pt(gap), center.y - galley.size().y / 2.0),
         galley,
         TEXT,
     );

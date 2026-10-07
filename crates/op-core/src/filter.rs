@@ -29,6 +29,15 @@ pub enum SpherizeMode {
     VerticalOnly,
 }
 
+/// What Tiles fills the gaps between tiles with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TilesFill {
+    Background,
+    Foreground,
+    Inverse,
+    Unaltered,
+}
+
 /// Ripple's Size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RippleSize {
@@ -208,6 +217,18 @@ pub enum Filter {
     /// Pixelate > Mezzotint: each channel turned to full or nothing at
     /// random, in dots, lines or strokes.
     Mezzotint { kind: MezzotintType },
+    /// Stylize > Tiles: the layer cut into square tiles, at least `count`
+    /// across its shorter side, each shifted at random up to `offset`
+    /// percent of a tile, the gaps filled as `fill` says.
+    Tiles {
+        count: u32,
+        offset: u32,
+        fill: TilesFill,
+        foreground: [u8; 3],
+    },
+    /// Pixelate > Color Halftone: each of the first three channels as dots
+    /// on a screen at its angle (degrees), up to `radius` pixels.
+    ColorHalftone { radius: u32, angles: [i32; 4] },
     /// Stylize > Diffuse: pixels swapped with random neighbors, in `mode`.
     Diffuse { mode: DiffuseMode },
     /// Render > Clouds: soft fractal noise between the foreground and
@@ -264,6 +285,8 @@ impl Filter {
             Self::PolarCoordinates { .. } => "Polar Coordinates",
             Self::Crystallize { .. } => "Crystallize",
             Self::Ripple { .. } => "Ripple",
+            Self::Tiles { .. } => "Tiles",
+            Self::ColorHalftone { .. } => "Color Halftone",
             Self::Mezzotint { .. } => "Mezzotint",
             Self::Pointillize { .. } => "Pointillize",
             Self::Diffuse { .. } => "Diffuse",
@@ -822,6 +845,88 @@ fn pointillize(src: &Buffer, cell: usize, paper: [u8; 3]) -> Vec<[u8; 4]> {
                         out[y * w + x] = [color[0], color[1], color[2], 255];
                     }
                 }
+            }
+        }
+    }
+    out
+}
+
+/// Tiles: tiles `min(w, h) / count` pixels square, each moved by a
+/// repeatable random offset up to `offset` percent of its size, drawn over
+/// the gaps' fill (the background or foreground color, the inverted
+/// image, or the image as it was); tiles are drawn in order, later ones
+/// over earlier.
+fn tiles(
+    src: &Buffer,
+    (count, offset): (u32, u32),
+    fill: TilesFill,
+    (foreground, background): ([u8; 3], [u8; 3]),
+) -> Vec<[u8; 4]> {
+    let (w, h) = (src.w, src.h);
+    let size = (w.min(h) / count as usize).max(1);
+    let reach = (size as f32 * offset as f32 / 100.0).round() as i64;
+    let mut out: Vec<[u8; 4]> = (0..w * h)
+        .map(|i| {
+            let p = Buffer::straight(src.px[i]);
+            match fill {
+                TilesFill::Background => [background[0], background[1], background[2], 255],
+                TilesFill::Foreground => [foreground[0], foreground[1], foreground[2], 255],
+                TilesFill::Inverse => [255 - p[0], 255 - p[1], 255 - p[2], p[3]],
+                TilesFill::Unaltered => p,
+            }
+        })
+        .collect();
+    for ty in 0..h.div_ceil(size) {
+        for tx in 0..w.div_ceil(size) {
+            let shift = |k: usize| {
+                if reach == 0 {
+                    0
+                } else {
+                    (noise(tx, ty, k) * (2 * reach + 1) as f32) as i64 - reach
+                }
+            };
+            let (dx, dy) = (shift(70), shift(71));
+            for y in ty * size..((ty + 1) * size).min(h) {
+                for x in tx * size..((tx + 1) * size).min(w) {
+                    let (nx, ny) = (x as i64 + dx, y as i64 + dy);
+                    if nx >= 0 && ny >= 0 && (nx as usize) < w && (ny as usize) < h {
+                        out[ny as usize * w + nx as usize] = Buffer::straight(src.px[y * w + x]);
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Color Halftone: for each of the first three channels, a screen of
+/// cells `2 × radius` pixels turned by the channel's angle; each cell
+/// holds a dot whose area follows the channel's value at the cell's
+/// center (full on at 255, none at 0), anti-aliased over a pixel. The
+/// fourth angle is for CMYK images and doesn't apply to RGB.
+fn color_halftone(src: &Buffer, radius: u32, angles: [i32; 4]) -> Vec<[u8; 4]> {
+    let (w, h) = (src.w, src.h);
+    let cell = 2.0 * radius as f32;
+    let mut out: Vec<[u8; 4]> = src.px.iter().map(|&p| Buffer::straight(p)).collect();
+    for (c, &angle) in angles.iter().take(3).enumerate() {
+        let (sin, cos) = (angle as f32).to_radians().sin_cos();
+        for y in 0..h {
+            for x in 0..w {
+                let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
+                // Into the screen's turned frame, to the cell's center
+                let (u, v) = (px * cos + py * sin, -px * sin + py * cos);
+                let (cu, cv) = (
+                    (u / cell).floor() * cell + cell / 2.0,
+                    (v / cell).floor() * cell + cell / 2.0,
+                );
+                let (sx, sy) = (cu * cos - cv * sin, cu * sin + cv * cos);
+                let sample = Buffer::straight(src.at(sx as isize, sy as isize));
+                let value = sample[c] as f32 / 255.0;
+                // A dot of this area within the cell (√2 reaches its corners)
+                let r = cell / 2.0 * std::f32::consts::SQRT_2 * value.sqrt();
+                let d = ((u - cu).powi(2) + (v - cv).powi(2)).sqrt();
+                let coverage = (r - d + 0.5).clamp(0.0, 1.0);
+                out[y * w + x][c] = (coverage * 255.0).round() as u8;
             }
         }
     }
@@ -1424,6 +1529,13 @@ fn filtered(
         Filter::Pointillize { cell } => pointillize(&src, cell.max(3) as usize, paper),
         Filter::Diffuse { mode } => diffuse(&src, mode),
         Filter::Mezzotint { kind } => mezzotint(&src, kind),
+        Filter::Tiles {
+            count,
+            offset,
+            fill,
+            foreground,
+        } => tiles(&src, (count.max(1), offset), fill, (foreground, paper)),
+        Filter::ColorHalftone { radius, angles } => color_halftone(&src, radius.max(4), angles),
         Filter::Clouds {
             foreground,
             background,
@@ -1989,5 +2101,42 @@ mod tests {
         let (x, _) = at(100);
         let (x2, _) = at(200);
         assert!((x - 20.0).abs() > 1.0 && ((x2 - 20.0) / (x - 20.0) - 2.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn tiles_cut_and_shift_the_image() {
+        let src = ramp();
+        // No offset: the image as it was
+        let same = tiles(&src, (4, 0), TilesFill::Background, ([0; 3], [255; 3]));
+        assert!((0..same.len()).all(|i| same[i] == Buffer::straight(src.px[i])));
+        // With an offset some background shows between the tiles
+        let moved = tiles(
+            &src,
+            (4, 30),
+            TilesFill::Background,
+            ([0; 3], [255, 0, 255]),
+        );
+        assert!(moved.contains(&[255, 0, 255, 255]));
+        let fg = tiles(
+            &src,
+            (4, 30),
+            TilesFill::Foreground,
+            ([0, 255, 0], [255; 3]),
+        );
+        assert!(fg.contains(&[0, 255, 0, 255]));
+    }
+
+    #[test]
+    fn halftone_dots_follow_the_values() {
+        let src = ramp();
+        let out = color_halftone(&src, 4, [108, 162, 90, 45]);
+        // Red rises across the ramp: more red ink on the right
+        let red = |x0: usize| {
+            (0..40)
+                .flat_map(|y| (x0..x0 + 8).map(move |x| (x, y)))
+                .map(|(x, y)| out[y * 40 + x][0] as u32)
+                .sum::<u32>()
+        };
+        assert!(red(32) > red(0) * 2, "{} {}", red(32), red(0));
     }
 }

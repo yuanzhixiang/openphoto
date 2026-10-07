@@ -14,3 +14,5 @@ Controls shared by the classic adjustment dialogs that Photoshop 2026 draws with
 - `radio(ui, center, label, chosen)`: a radio button; selected is a 13 pt light gray disc with a 5 pt dark dot, unselected is a `#474747` disc with a `#848484` ring; the label is 16.5 pt to the right of the center. Returns whether it was clicked.
 - `group(painter, rect, gap)`: a group box with a 1 pt `#424242` frame whose top edge is broken between the two x values of `gap` to make room for the title.
 - `pin(painter, tip, kind)`: the slider "pin" below a histogram or gradient bar: a 12 × 10.5 pt house shape (pointed top, rounded bottom corners) with a 1 pt near-black outline; `Black` is hollow, `Gray` is filled with `#a0a0a0`, `White` with `#e6e6e6`.
+
+- `radio_with(ui, center, label, chosen, (gap, font))`: `radio` with the label's gap after the center and its font chosen (the plain filter dialogs: 13 pt, 11 pt).

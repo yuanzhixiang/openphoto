@@ -36,6 +36,8 @@ A dialog's result is an `Effect`: `Adjustment(Adjustment)` or `Filter(Filter)`. 
 | Pointillize | Cell Size (3–300, 5) |
 | Diffuse | Mode (Normal / Darken Only / Lighten Only / Anisotropic, Normal) |
 | Ripple | Amount (%) (−999–999, 100), Size (Small / Medium / Large, Medium) |
+| Tiles | Number Of Tiles (1–99, 10), Maximum Offset (%) (1–99, 10), Fill Empty Area With (Background Color / Foreground Color / Inverse Image / Unaltered Image, Background Color) |
+| Color Halftone | Max. Radius (pixels) (4–127, 8), Channel 1–4 screen angles (−360–360; 108, 162, 90, 45) |
 | Mezzotint | Type (Fine Dots, Medium Dots, Grainy Dots, Coarse Dots, Short Lines, Medium Lines, Long Lines, Short Strokes, Medium Strokes, Long Strokes; Fine Dots) |
 
 - Filter dialogs remember the settings from the last time OK was pressed (Photoshop's behavior): `settings()` returns the text in the input boxes, `lib.rs` stores it by `Kind` into `AppState::filter_settings` when applying, and `commands.rs` puts it back with `restore(values)` the next time the same dialog opens (ignored when the count does not match). Cancel is not remembered. This is valid only within the current run and is not written to preferences. Adjustment dialogs (the adjustment variants of `Custom`) open with default values every time, and `settings()` returns `None`; the Custom filter (`Custom::Kernel`) is likewise remembered, see `custom_filter.md` for details.
@@ -58,7 +60,9 @@ Gaussian Blur, Box Blur, Surface Blur, Motion Blur, Unsharp Mask, Add Noise, Dus
 
 Twirl, Pinch, Spherize, Polar Coordinates, Wind, Crystallize, Pointillize, Ripple and Mezzotint are rebuilt after Photoshop 2026's plugin-style dialogs (`distort_ui`), with layout and drawing in `distort.rs` (see `distort.md`): a large preview pane (with scroll troughs and a zoom bar at bottom left), OK / Cancel at top right (89 × 26, 13 pt text), settings below the preview pane (input box + pentagon slider, or the radio groups of Polar Coordinates and Wind), and a distortion diagram at bottom right. The settings still live in this module's parameter table, so remembering, validation and preview are the same as for classic dialogs.
 
-Every filter dialog has either a classic or a plugin-style layout (`Kind::size` panics when there is no layout, and `every_filter_dialog_has_an_effect` exposes omissions); the old generic layout has been removed.
+Tiles and Color Halftone have no preview: their layouts are in `plain_filter.rs` (`plain_ui`, see `plain_filter.md`), and they don't preview on the document. Tiles' Foreground Color fill takes the app's foreground color when applied (`lib.rs` fills it in).
+
+Every filter dialog has either a classic, a plugin-style or a plain layout (`Kind::size` panics when there is no layout, and `every_filter_dialog_has_an_effect` exposes omissions); the old generic layout has been removed.
 
 ## Rebuilt dialogs (`Custom`)
 
