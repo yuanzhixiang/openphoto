@@ -84,6 +84,8 @@ pub struct DocState {
     /// The Object Selection tool's rectangle being dragged (document
     /// pixels).
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
+    /// What the drag in progress snaps to (View › Snap).
+    pub snap: Option<crate::snap::Targets>,
     /// A guide being dragged.
     pub guide_drag: Option<GuideDrag>,
     /// Where the pointer is over the document (document pixels), for the
@@ -192,6 +194,7 @@ impl DocState {
             magnetic: None,
             quick: None,
             object_drag: None,
+            snap: None,
             free_transform: None,
             crop: None,
             guide_drag: None,
@@ -660,6 +663,15 @@ pub struct ViewOptions {
     pub selection_edges: bool,
     /// View > Show > Layer Edges (off by default).
     pub layer_edges: bool,
+    /// View > Snap and the Snap To items (all on by default, as in
+    /// Photoshop 2026).
+    pub snap: bool,
+    pub snap_guides: bool,
+    pub snap_grid: bool,
+    pub snap_layers: bool,
+    /// Slices: a switch only, there are no slices yet.
+    pub snap_slices: bool,
+    pub snap_bounds: bool,
 }
 
 impl Default for ViewOptions {
@@ -674,6 +686,12 @@ impl Default for ViewOptions {
             pixel_grid: true,
             selection_edges: true,
             layer_edges: false,
+            snap: true,
+            snap_guides: true,
+            snap_grid: true,
+            snap_layers: true,
+            snap_slices: true,
+            snap_bounds: true,
         }
     }
 }

@@ -237,6 +237,25 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             }
         }
     }
+    // View › Snap: what this drag can snap to, gathered as it starts
+    if response.drag_started_by(PointerButton::Primary) {
+        let snapping = matches!(
+            tool,
+            Tool::RectangularMarquee
+                | Tool::EllipticalMarquee
+                | Tool::Move
+                | Tool::Rectangle
+                | Tool::Ellipse
+                | Tool::Triangle
+                | Tool::Polygon
+                | Tool::Line
+                | Tool::CustomShape
+        );
+        state.snap = None;
+        if snapping {
+            crate::snap::begin(state, &view_options, tool == Tool::Move);
+        }
+    }
     // With the Move tool (or Cmd held), guides can be grabbed
     let guides_live = view_options.guides_visible() && !view_options.lock_guides;
     let cmd = ui.input(|i| i.modifiers.command);
@@ -850,14 +869,15 @@ fn shape_input(
     if response.drag_started_by(PointerButton::Primary)
         && let Some(p) = ui.input(|i| i.pointer.press_origin())
     {
-        let start = to_doc(state, p, ppp);
+        let start = crate::snap::point(ui, state, to_doc(state, p, ppp), ppp);
         state.shape_drag = Some((start, start));
     }
     let Some((start, _)) = state.shape_drag else {
         return;
     };
     if let Some(p) = ui.input(|i| i.pointer.interact_pos()) {
-        state.shape_drag = Some((start, to_doc(state, p, ppp)));
+        let end = crate::snap::point(ui, state, to_doc(state, p, ppp), ppp);
+        state.shape_drag = Some((start, end));
     }
     if response.drag_stopped() || !ui.input(|i| i.pointer.primary_down()) {
         let (s, e) = state.shape_drag.take().expect("checked");
@@ -1258,7 +1278,7 @@ fn marquee_input(
         && let Some(p) = ui.input(|i| i.pointer.press_origin())
     {
         let (op, shift_for_op, alt_for_op) = op_from_mods();
-        let start = to_doc(state, p, ppp);
+        let start = crate::snap::point(ui, state, to_doc(state, p, ppp), ppp);
         state.marquee_drag = Some(crate::state::MarqueeDrag {
             start,
             current: start,
@@ -1269,7 +1289,7 @@ fn marquee_input(
     }
     let pointer = ui
         .input(|i| i.pointer.interact_pos())
-        .map(|p| to_doc(state, p, ppp));
+        .map(|p| crate::snap::point(ui, state, to_doc(state, p, ppp), ppp));
     if let Some(drag) = &mut state.marquee_drag {
         if let Some(p) = pointer {
             drag.current = p;
@@ -1334,6 +1354,7 @@ fn move_input(
         return None;
     };
     let delta = pointer.map_or(egui::Vec2::ZERO, |p| p - *start);
+    let delta = crate::snap::offset(ui, state, delta, ppp);
     let (dx, dy) = (delta.x.round() as i64, delta.y.round() as i64);
     m.apply(&mut state.doc, dx, dy);
     if !ui.input(|i| i.pointer.primary_down()) {

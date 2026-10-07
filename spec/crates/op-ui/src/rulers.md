@@ -17,21 +17,21 @@ The rulers (View › Rulers, ⌘R), guides (dragging out, moving, deleting, draw
 
 - Drag down from the top ruler to create a horizontal guide, and right from the left ruler to create a vertical guide; the cursor over a ruler is the resize cursor for the corresponding direction. While dragging, the guide follows the pointer; releasing inside the canvas area adds it to the document and records "New Guide", and releasing outside the area discards it.
 - Moving: when the current tool is the Move tool, or while holding ⌘ (in Photoshop ⌘ temporarily switches to the Move tool), the resize cursor appears when the pointer is within 4 pt of a guide, and dragging moves it; releasing inside the canvas area records "Move Guide", and releasing after dragging outside the area (e.g. back onto a ruler) deletes it and records "Delete Guide". Guides cannot be dragged when locked (View › Guides › Lock Guides) or hidden.
-- Drawing: a 1 pt cyan (`#4affff`, Photoshop's default Cyan) straight line across the entire canvas area (including the gray area outside the canvas). A guide being dragged is always drawn.
+- Drawing: a 1 pt cyan (`#4affff`, Photoshop's default Cyan) straight line across the entire canvas area (including the gray area outside the canvas). A guide being dragged is always drawn. The line is mapped from document space (`guide_line`), so it turns and flips with the view (Rotate View, Flip Horizontal); `guide_at` measures the pointer's distance in document space, scaled to screen points.
 - Guides move with canvas changes: Canvas Size offsets them by the anchor, cropping by the crop origin, Image Size scales them proportionally, and Image Rotation and canvas flips transform them geometrically (see `image_ops.md` and `document.md` in `op-core`).
 
 ## Grid
 
-- One major line per inch (document resolution in pixels), subdivided into 4 (Photoshop's default setting), drawn only within the canvas; the grid is not drawn when subdivision lines would be less than 4 pt apart on screen.
+- One major line per inch (document resolution in pixels), subdivided into 4 (Photoshop's default setting), drawn only within the canvas, each line mapped end to end from document space so the grid follows the view's rotation and flip; the grid is not drawn when subdivision lines would be less than 4 pt apart on screen.
 - The color is semi-transparent gray, with major lines somewhat brighter than subdivision lines.
 
 ## Display toggles
 
-`AppState::view` (`ViewOptions`): `rulers` (off by default), `extras` (on by default), `guides` (on by default), `grid` (off by default), `lock_guides` (off by default), `smart_guides` (on by default), `pixel_grid` (on by default), `selection_edges` (on by default), `layer_edges` (off by default). Guides are shown when both Extras and Guides are on (`guides_visible`), and the grid is shown when both Extras and Grid are on (`grid_visible`); when Extras is off, the selection's marching ants, the layer edges and the pixel grid are not shown either (the selection remains in effect). Show › Selection Edges, Layer Edges and Pixel Grid each hide their own item the same way.
+`AppState::view` (`ViewOptions`): `rulers` (off by default), `extras` (on by default), `guides` (on by default), `grid` (off by default), `lock_guides` (off by default), `smart_guides` (on by default), `pixel_grid` (on by default), `selection_edges` (on by default), `layer_edges` (off by default), and the snap switches (`snap` and the Snap To items, all on by default; see `snap.md`). Guides are shown when both Extras and Guides are on (`guides_visible`), and the grid is shown when both Extras and Grid are on (`grid_visible`); when Extras is off, the selection's marching ants, the layer edges and the pixel grid are not shown either (the selection remains in effect). Show › Selection Edges, Layer Edges and Pixel Grid each hide their own item the same way.
 
 ## Known limitations
 
-- No snapping (Snap, Snap To), no smart guides, artboard guides, guide layouts, or guide color and grid settings (Preferences).
+- No smart guides, artboard guides, guide layouts, or guide color and grid settings (Preferences).
 - The only ruler unit is pixels; double-clicking a ruler does not change the unit, and the origin cannot be changed by dragging the top-left corner.
 - Guides are not saved to PSD files.
 

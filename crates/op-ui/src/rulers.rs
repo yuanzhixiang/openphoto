@@ -165,10 +165,8 @@ pub fn draw_grid(ui: &Ui, state: &DocState, canvas: Rect, ppp: f32) {
     if step * zoom_pt < pt(4.0) {
         return;
     }
-    let image = Rect::from_two_pos(
-        to_screen(state, Pos2::ZERO, ppp),
-        to_screen(state, Pos2::new(w, h), ppp),
-    );
+    // Lines are mapped end to end, so they follow the view's rotation
+    let line = |a: Pos2, b: Pos2| [to_screen(state, a, ppp), to_screen(state, b, ppp)];
     let mut i = 0;
     loop {
         let v = i as f32 * step;
@@ -184,32 +182,25 @@ pub fn draw_grid(ui: &Ui, state: &DocState, canvas: Rect, ppp: f32) {
             },
         );
         if v <= w {
-            let x = image.left() + v * zoom_pt;
-            painter.line_segment(
-                [Pos2::new(x, image.top()), Pos2::new(x, image.bottom())],
-                stroke,
-            );
+            painter.line_segment(line(Pos2::new(v, 0.0), Pos2::new(v, h)), stroke);
         }
         if v <= h {
-            let y = image.top() + v * zoom_pt;
-            painter.line_segment(
-                [Pos2::new(image.left(), y), Pos2::new(image.right(), y)],
-                stroke,
-            );
+            painter.line_segment(line(Pos2::new(0.0, v), Pos2::new(w, v)), stroke);
         }
         i += 1;
     }
 }
 
-/// Screen position of a guide (x for vertical guides, y for horizontal).
-fn screen_pos(state: &DocState, g: Guide, ppp: f32) -> f32 {
-    let p = if g.vertical {
-        Pos2::new(g.position, 0.0)
+/// Two screen points on a guide, far apart enough to cross the canvas
+/// area whatever the view's rotation.
+fn guide_line(state: &DocState, g: Guide, ppp: f32) -> [Pos2; 2] {
+    let far = 1.0e6;
+    let (a, b) = if g.vertical {
+        (Pos2::new(g.position, -far), Pos2::new(g.position, far))
     } else {
-        Pos2::new(0.0, g.position)
+        (Pos2::new(-far, g.position), Pos2::new(far, g.position))
     };
-    let s = to_screen(state, p, ppp);
-    if g.vertical { s.x } else { s.y }
+    [to_screen(state, a, ppp), to_screen(state, b, ppp)]
 }
 
 /// Guides across the whole canvas area, plus the one being dragged.
@@ -226,22 +217,20 @@ pub fn draw_guides(ui: &Ui, state: &DocState, canvas: Rect, ppp: f32) {
         .map(|(_, g)| *g)
         .chain(dragged);
     for g in guides {
-        let s = screen_pos(state, g, ppp);
-        let line = if g.vertical {
-            [Pos2::new(s, canvas.top()), Pos2::new(s, canvas.bottom())]
-        } else {
-            [Pos2::new(canvas.left(), s), Pos2::new(canvas.right(), s)]
-        };
-        painter.line_segment(line, Stroke::new(1.0, GUIDE));
+        painter.line_segment(guide_line(state, g, ppp), Stroke::new(1.0, GUIDE));
     }
 }
 
 /// The guide under the screen point `p`, if any.
 pub fn guide_at(state: &DocState, p: Pos2, ppp: f32) -> Option<usize> {
-    state.doc.guides.iter().position(|&g| {
-        let s = screen_pos(state, g, ppp);
-        (if g.vertical { p.x } else { p.y } - s).abs() <= GRAB
-    })
+    // The distance in document pixels, scaled to screen points
+    let d = to_doc(state, p, ppp);
+    let scale = state.view.zoom / ppp;
+    state
+        .doc
+        .guides
+        .iter()
+        .position(|&g| (if g.vertical { d.x } else { d.y } - g.position).abs() * scale <= GRAB)
 }
 
 pub fn guide_cursor(state: &DocState, index: usize) -> CursorIcon {

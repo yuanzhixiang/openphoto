@@ -24,6 +24,7 @@ mod options_tools;
 mod panels;
 mod ps_icons;
 mod rulers;
+mod snap;
 mod state;
 mod theme;
 mod titlebar;

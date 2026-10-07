@@ -230,6 +230,15 @@ pub enum Command {
     ToggleLayerEdges,
     ShowAllExtras,
     ShowNoExtras,
+    /// View > Snap and View > Snap To.
+    ToggleSnap,
+    SnapToGuides,
+    SnapToGrid,
+    SnapToLayers,
+    SnapToSlices,
+    SnapToBounds,
+    SnapToAll,
+    SnapToNone,
     /// View > Guides > Lock Guides.
     LockGuides,
     ClearGuides,
@@ -436,12 +445,20 @@ impl Command {
             | Self::ToggleSelectionEdges
             | Self::ToggleLayerEdges
             | Self::ShowAllExtras
-            | Self::ShowNoExtras => return None,
+            | Self::ShowNoExtras
+            | Self::SnapToGuides
+            | Self::SnapToGrid
+            | Self::SnapToLayers
+            | Self::SnapToSlices
+            | Self::SnapToBounds
+            | Self::SnapToAll
+            | Self::SnapToNone => return None,
             Self::ToggleRulers => cmd(Key::R),
             Self::ToggleExtras => cmd(Key::H),
             Self::ToggleGuides => cmd(Key::Semicolon),
             Self::ToggleGrid => cmd(Key::Quote),
             Self::LockGuides => alt_cmd(Key::Semicolon),
+            Self::ToggleSnap => shift_cmd(Key::Semicolon),
             Self::HideApp => Shortcut {
                 ctrl: true,
                 ..cmd(Key::H)
@@ -592,6 +609,12 @@ impl Command {
             Self::TogglePixelGrid => v.pixel_grid,
             Self::ToggleSelectionEdges => v.selection_edges,
             Self::ToggleLayerEdges => v.layer_edges,
+            Self::ToggleSnap => v.snap,
+            Self::SnapToGuides => v.snap_guides,
+            Self::SnapToGrid => v.snap_grid,
+            Self::SnapToLayers => v.snap_layers,
+            Self::SnapToSlices => v.snap_slices,
+            Self::SnapToBounds => v.snap_bounds,
             Self::FlipView => app
                 .active_doc
                 .and_then(|id| app.docs.get(&id))
@@ -647,6 +670,14 @@ impl Command {
             | Self::ToggleLayerEdges
             | Self::ShowAllExtras
             | Self::ShowNoExtras
+            | Self::ToggleSnap
+            | Self::SnapToGuides
+            | Self::SnapToGrid
+            | Self::SnapToLayers
+            | Self::SnapToSlices
+            | Self::SnapToBounds
+            | Self::SnapToAll
+            | Self::SnapToNone
             | Self::LockGuides => true,
             Self::FlipView => doc.is_some(),
             Self::ClearGuides => doc.is_some_and(|d| !d.doc.guides.is_empty()),
@@ -869,6 +900,7 @@ const SHORTCUT_ORDER: &[Command] = &[
     Command::AutoContrast,
     Command::ModifyFeather,
     Command::HideApp,
+    Command::ToggleSnap,
     Command::LockGuides,
     Command::SaveAs,
     Command::SaveACopy,
@@ -1374,6 +1406,18 @@ pub fn run(command: Command, ctx: &egui::Context, app: &mut AppState) {
             }
         }
         Command::LockGuides => app.view.lock_guides = !app.view.lock_guides,
+        Command::ToggleSnap => app.view.snap = !app.view.snap,
+        Command::SnapToGuides => app.view.snap_guides = !app.view.snap_guides,
+        Command::SnapToGrid => app.view.snap_grid = !app.view.snap_grid,
+        Command::SnapToLayers => app.view.snap_layers = !app.view.snap_layers,
+        Command::SnapToSlices => app.view.snap_slices = !app.view.snap_slices,
+        Command::SnapToBounds => app.view.snap_bounds = !app.view.snap_bounds,
+        Command::SnapToAll | Command::SnapToNone => {
+            let on = command == Command::SnapToAll;
+            let v = &mut app.view;
+            (v.snap_guides, v.snap_grid, v.snap_layers) = (on, on, on);
+            (v.snap_slices, v.snap_bounds) = (on, on);
+        }
         Command::NewGuide => app.new_guide_dialog = Some(Default::default()),
         Command::HideApp => {
             #[cfg(target_os = "macos")]

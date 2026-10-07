@@ -40,6 +40,10 @@ Sizes are measured 1:1 against Photoshop (pt):
 - View › Flip Horizontal (`View::flip`) mirrors the view left to right about the document's center, after the rotation; `to_doc` / `to_screen` include it, so tools keep working in document space. It is ignored while cropping, like the rotation. `center_on` places a document point at the window's center through the rotation and flip.
 - Rotate View tool: dragging turns the view by the angle the pointer sweeps around the document center's screen position, starting from the rotation at the press; Shift snaps to multiples of 15°. While dragging, a compass is drawn at the center (a 60 pt translucent dark disc with a light ring; a needle whose red half points to the image's top). Esc returns the view to 0°. The options bar's angle field, dial, and Reset View act on the same value (see `options_tools.md`).
 
+## Snapping
+
+When a drag starts with the Rectangular or Elliptical Marquee, the Move tool, or a shape tool, `snap::begin` gathers what it can snap to (View › Snap; rules in `snap.md`). The marquee's start and dragged points and the shape's two points go through `snap::point`; the Move tool's offset goes through `snap::offset` before it is rounded to whole pixels. Control held: no snapping.
+
 ## Initial view
 
 - The layout may not be stable in the first few frames (the viewport size reported on the first frame is unreliable), so the initial zoom is decided only after the viewport size is the same for two consecutive frames; while waiting, a repaint is actively requested.

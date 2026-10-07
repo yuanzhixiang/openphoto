@@ -5567,3 +5567,91 @@ fn flip_view_and_show_items() {
     let v = h.state().state.view;
     assert!(!v.pixel_grid && !v.selection_edges && !v.layer_edges && !v.grid && !v.guides);
 }
+
+#[test]
+fn snapping_to_guides_layers_and_bounds() {
+    use crate::commands::Command;
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        doc.guides.push(op_core::Guide {
+            vertical: true,
+            position: 100.0,
+        });
+        doc.guides.push(op_core::Guide {
+            vertical: false,
+            position: 200.0,
+        });
+    }
+    let bounds =
+        |h: &Harness<'_, OpenPhotoApp>| active(h).doc.selection().unwrap().bounds().unwrap();
+    // A marquee started 3 px off a guide and ended 3 px off another starts
+    // and ends on them
+    let (a, b) = (doc_point(&h, 97.0, 120.0), doc_point(&h, 300.0, 203.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(bounds(&h), (100, 120, 300, 200));
+    // Near the document's edge it snaps to the edge
+    let (a, b) = (doc_point(&h, 3.0, 3.0), doc_point(&h, 50.0, 50.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(bounds(&h), (0, 0, 50, 50));
+    // Control held: no snapping
+    let (a, b) = (doc_point(&h, 97.0, 120.0), doc_point(&h, 300.0, 203.0));
+    drag(&mut h, a, b, Modifiers::CTRL);
+    assert_eq!(bounds(&h), (97, 120, 300, 203));
+    // View › Snap off: no snapping; Snap To › Guides off: not to guides
+    run_command(&mut h, Command::ToggleSnap);
+    assert!(!Command::ToggleSnap.checked(&h.state().state).unwrap());
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(bounds(&h), (97, 120, 300, 203));
+    run_command(&mut h, Command::ToggleSnap);
+    run_command(&mut h, Command::SnapToGuides);
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(bounds(&h), (97, 120, 300, 203));
+    run_command(&mut h, Command::SnapToAll);
+    assert!(h.state().state.view.snap_guides);
+
+    // The Move tool: a layer whose pixels are (200, 300)–(300, 400) dragged
+    // so its right edge comes 3 px short of a guide at 350 lands on it
+    run_command(&mut h, Command::Deselect);
+    run_command(&mut h, Command::NewLayerNoDialog);
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        doc.guides.push(op_core::Guide {
+            vertical: true,
+            position: 350.0,
+        });
+        let id = doc.active_layer.unwrap();
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 300..400 {
+            for x in 200..300 {
+                image.set_pixel(x, y, [255, 255, 255, 255]);
+            }
+        }
+        doc.mark_dirty();
+    }
+    h.state_mut().state.select_tool(Tool::Move);
+    h.run_steps(1);
+    let (a, b) = (doc_point(&h, 250.0, 350.0), doc_point(&h, 297.0, 350.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let layer_bounds = |h: &Harness<'_, OpenPhotoApp>| {
+        let doc = &active(h).doc;
+        let id = doc.active_layer.unwrap();
+        doc.layer(id)
+            .unwrap()
+            .image()
+            .unwrap()
+            .content_bounds()
+            .unwrap()
+    };
+    assert_eq!(layer_bounds(&h), (250, 300, 350, 400));
+
+    // A marquee snaps to that layer's edge once it is another layer's
+    run_command(&mut h, Command::NewLayerNoDialog);
+    h.state_mut().state.select_tool(Tool::RectangularMarquee);
+    h.run_steps(1);
+    let (a, b) = (doc_point(&h, 253.0, 297.0), doc_point(&h, 320.0, 330.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(bounds(&h), (250, 300, 320, 330));
+}
