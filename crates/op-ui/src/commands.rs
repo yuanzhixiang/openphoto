@@ -214,6 +214,8 @@ pub enum Command {
     ActualPixels,
     Zoom200,
     PrintSize,
+    /// View > Actual Size.
+    ActualSize,
     /// View > Rulers.
     ToggleRulers,
     /// View > Extras.
@@ -570,6 +572,7 @@ impl Command {
             Self::FitLayers
             | Self::Zoom200
             | Self::PrintSize
+            | Self::ActualSize
             | Self::ClearGuides
             | Self::NewGuide => {
                 return None;
@@ -896,6 +899,7 @@ impl Command {
             | Self::ActualPixels
             | Self::Zoom200
             | Self::PrintSize
+            | Self::ActualSize
             | Self::NewGuide
             | Self::QuickMask => doc.is_some(),
         }
@@ -1733,6 +1737,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 Command::ActualPixels => document_view::actual_pixels(state, ppp),
                 Command::Zoom200 => document_view::zoom_to(state, 2.0, ppp),
                 Command::PrintSize => document_view::print_size(state, ppp),
+                Command::ActualSize => document_view::actual_size(state, ppp),
                 Command::FitLayers => document_view::fit_layers(state, ppp),
                 Command::ClearGuides => {
                     state.doc.guides.clear();

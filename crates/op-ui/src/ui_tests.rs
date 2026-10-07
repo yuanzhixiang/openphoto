@@ -5849,3 +5849,22 @@ fn status_bar_menu_picks_what_it_shows() {
             .unwrap()
     );
 }
+
+#[test]
+fn actual_size_uses_the_displays_density() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    probe_document(&mut h);
+    run_command(&mut h, Command::ActualSize);
+    let zoom = active(&h).view.zoom;
+    // One inch of the 72 ppi image covers the display's pixels per inch
+    // (Photoshop shows 354.17% here on a 255 ppi MacBook Pro display)
+    #[cfg(target_os = "macos")]
+    {
+        let ppi = crate::app_kit::screen_ppi().expect("the display reports its size");
+        assert!((60.0..800.0).contains(&ppi), "{ppi}");
+        assert!((zoom - ppi / 72.0).abs() < 1e-4, "{zoom}");
+    }
+    #[cfg(not(target_os = "macos"))]
+    assert_eq!(zoom, 2.0 * UI_SCALE);
+}

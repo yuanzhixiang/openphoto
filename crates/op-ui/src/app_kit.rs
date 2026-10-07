@@ -40,3 +40,35 @@ pub fn handling_key_press() -> bool {
         kind == KEY_DOWN
     }
 }
+
+/// The main display's pixel density in pixels per inch: its native pixel
+/// width over its physical width (Photoshop's View › Actual Size uses the
+/// same; 255 on a 14-inch MacBook Pro). `None` when the display doesn't
+/// report a size.
+pub fn screen_ppi() -> Option<f32> {
+    #[repr(C)]
+    struct CGSize {
+        width: f64,
+        height: f64,
+    }
+    #[link(name = "CoreGraphics", kind = "framework")]
+    unsafe extern "C" {
+        fn CGMainDisplayID() -> u32;
+        fn CGDisplayScreenSize(display: u32) -> CGSize;
+        fn CGDisplayCopyDisplayMode(display: u32) -> *mut std::ffi::c_void;
+        fn CGDisplayModeGetPixelWidth(mode: *mut std::ffi::c_void) -> usize;
+        fn CGDisplayModeRelease(mode: *mut std::ffi::c_void);
+    }
+    // SAFETY: plain CoreGraphics queries; the copied mode is released
+    unsafe {
+        let display = CGMainDisplayID();
+        let mm = CGDisplayScreenSize(display).width;
+        let mode = CGDisplayCopyDisplayMode(display);
+        if mode.is_null() || mm <= 0.0 {
+            return None;
+        }
+        let pixels = CGDisplayModeGetPixelWidth(mode);
+        CGDisplayModeRelease(mode);
+        Some((pixels as f64 / (mm / 25.4)) as f32)
+    }
+}

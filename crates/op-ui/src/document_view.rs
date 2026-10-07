@@ -106,6 +106,17 @@ pub fn print_size(state: &mut DocState, ppp: f32) {
     zoom_to(state, zoom, ppp);
 }
 
+/// View > Actual Size: the image at its physical size on the display, one
+/// inch of it (at its resolution) an inch on the screen, using the display's
+/// pixel density (72 per point elsewhere than macOS).
+pub fn actual_size(state: &mut DocState, ppp: f32) {
+    #[cfg(target_os = "macos")]
+    let ppi = crate::app_kit::screen_ppi().unwrap_or(72.0 * ppp);
+    #[cfg(not(target_os = "macos"))]
+    let ppi = 72.0 * ppp;
+    zoom_to(state, ppi / state.doc.resolution, ppp);
+}
+
 /// View > Fit Layer(s) on Screen: the active layer's pixels fill the window
 /// and are centered in it. Nothing happens for an empty layer.
 pub fn fit_layers(state: &mut DocState, ppp: f32) {

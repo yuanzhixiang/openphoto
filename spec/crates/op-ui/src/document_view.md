@@ -31,7 +31,7 @@ Sizes are measured 1:1 against Photoshop (pt):
 - When zooming around a point, the document content under that point stays put; keyboard-shortcut zooms are centered on the viewport center.
 - Fit on Screen: zooms so the whole document just fits, and centers it. Fill Screen (`fill_screen`, the button on the Hand and Zoom tool options bars): zooms so the document fills the entire viewport (the larger of the width and height ratios) and centers it. 100%: zooms to 1.0 and centers.
 - `center_on(state, p)`: scrolls the view so document point `p` is at the center of the window (used by Navigator).
-- 200% (`zoom_to`): zooms to 2.0 around the viewport center. Print Size (`print_size`): zooms to `72 / resolution × pixels per point`, so one inch displays as 72 pt. Fit Layer(s) on Screen (`fit_layers`): the non-transparent pixels of the current layer fill the viewport and are centered; no change for an empty layer.
+- 200% (`zoom_to`): zooms to 2.0 around the viewport center. Print Size (`print_size`): zooms to `72 / resolution × pixels per point`, so one inch displays as 72 pt. Actual Size (`actual_size`): zooms around the viewport center to the display's pixel density over the document's resolution, so an inch of the image is an inch on the screen; the density is the main display's native pixel width over its physical width (`app_kit::screen_ppi`, 255 ppi on a 14-inch MacBook Pro, giving 354.17% for a 72 ppi image, as Photoshop shows), or 72 per point elsewhere than macOS. Fit Layer(s) on Screen (`fit_layers`): the non-transparent pixels of the current layer fill the viewport and are centered; no change for an empty layer.
 
 ## View rotation
 
