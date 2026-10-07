@@ -33,3 +33,9 @@ When a source file has no spec, say so explicitly; don't assume it has no contex
 - A backend `route.md` must cover: what the API is for, request/response, authentication and tenant boundaries, parameter validation, the core processing flow, database reads and writes, external service calls, side effects, error codes, expiry/idempotency/concurrency rules, security constraints and edge cases.
 - When a feature spans frontend and backend, frontend interaction and page/component UI/UX go in the frontend spec; the backend API, data flow, detailed logic and security constraints go in the API or service spec.
 - Don't use `Status / Decision / Alternatives / Consequences` as a spec's main template. Historical content goes in a "Previous approaches", "Deprecated wording" or "Change log" section, kept for what it explains about the current requirements.
+
+## Git
+
+- Commit messages are written in English: the subject line, the body and any notes alike, even when the conversation that produced the change was in another language. Product and UI names keep Photoshop's English wording (`Edit › Fade`, `Selection Brush`).
+- The subject says what changed in the product or code, in a short line without a trailing period; the body, when needed, explains why and what was measured or verified.
+- Branch names and tag names are English too.
