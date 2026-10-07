@@ -206,6 +206,9 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let heal = crate::options_tools::heal_options(app);
     let sample_all = crate::options_tools::samples_all_layers(app, tool);
     let pattern_aligned = app.flag("pattern.aligned", true);
+    // The Pencil's Auto Erase and the Smudge tool's Finger Painting
+    let auto_erase = tool == Tool::Pencil && app.flag("pencil.auto_erase", false);
+    let finger = tool == Tool::Smudge && app.flag("smudge.finger", false);
     let magnetic = crate::options_tools::magnetic_options(app);
     let quick = crate::options_tools::quick_options(app);
     let object = crate::options_tools::object_options(app);
@@ -217,6 +220,15 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let sampling_ring = tool == Tool::Eyedropper && app.flag("eyedropper.ring", true);
     // The Zoom tool's Zoom Out button swaps what a click and Alt-click do
     let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
+    let scrubby = app.flag("zoom.scrubby", true);
+    // Scroll / Zoom / Rotate All Windows: the view tools act on every
+    // open document
+    let all_windows = match tool {
+        Tool::Hand => app.flag("hand.scroll_all", false),
+        Tool::Zoom => app.flag("zoom.all", false),
+        Tool::RotateView => app.flag("rotate.all", false),
+        _ => false,
+    };
     let mut straightened = false;
     let mut paint_error = None;
     let status_info = app.status_info;
@@ -233,6 +245,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
         return;
     };
     let ppp = ui.ctx().pixels_per_point();
+    let view_before = state.view;
     let full = ui.max_rect();
     // Full Screen Mode's pasteboard is black, as in Photoshop
     let pasteboard = if app.screen_mode == crate::state::ScreenMode::Full {
@@ -483,6 +496,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     zoom_at(state, z, p, ppp);
                 }
             }
+            Tool::Zoom => zoom_drag(ui, &response, state, scrubby, ppp),
             Tool::ColorSampler => sampler_input(ui, &response, state, alt, ppp),
             Tool::SelectionBrush => {
                 if let Some(opts) = paint {
@@ -553,12 +567,13 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 }
             }
             Tool::Patch | Tool::ContentAwareMove => {
-                let lasso = (
-                    app.marquee.mode,
-                    app.marquee.feather,
-                    app.marquee.anti_alias,
-                );
-                patch_input(ui, &response, state, tool, heal, lasso, ppp);
+                // Their own selection buttons; no feather, anti-aliased
+                let mode = if tool == Tool::Patch {
+                    heal.patch_select
+                } else {
+                    heal.cam_select
+                };
+                patch_input(ui, &response, state, tool, heal, (mode, 0.0, true), ppp);
             }
             Tool::MagicEraser | Tool::RedEye if response.clicked() => {
                 if let Some(p) = response.interact_pointer_pos() {
@@ -727,6 +742,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                         clone_panel,
                         sample_all,
                         pattern_aligned,
+                        auto_erase,
+                        finger,
                     };
                     paint_error = paint_input(ui, &response, state, tool, settings, ppp);
                     if tool == Tool::MixerBrush {
@@ -940,6 +957,92 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
         app.status_menu = true;
     }
     vertical_scrollbar(ui, state, vscroll_rect, ppp);
+    if all_windows {
+        let after = state.view;
+        follow_view(app, id, (view_before, after), ppp);
+    }
+}
+
+/// Scroll / Zoom / Rotate All Windows: the other open documents' views
+/// move, zoom (about their centers) or turn as the active one just did.
+fn follow_view(
+    app: &mut AppState,
+    id: DocId,
+    (before, after): (crate::state::View, crate::state::View),
+    ppp: f32,
+) {
+    let pan = after.offset - before.offset;
+    let zoom = after.zoom / before.zoom;
+    let turn = after.rotation - before.rotation;
+    if pan == Vec2::ZERO && zoom == 1.0 && turn == 0.0 {
+        return;
+    }
+    for (other, state) in app.docs.iter_mut() {
+        if *other == id {
+            continue;
+        }
+        match app.tool {
+            Tool::Hand => state.view.offset += pan,
+            Tool::Zoom => {
+                let center = state.view.viewport.center();
+                zoom_at(state, state.view.zoom * zoom, center, ppp);
+            }
+            Tool::RotateView => {
+                state.view.rotation =
+                    crate::options_tools::normalize_angle(state.view.rotation + turn);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Dragging with the Zoom tool: with Scrubby Zoom, right zooms in and
+/// left out, continuously about the press (doubling every 100 pt);
+/// without it, a box is drawn and the view zooms to fit it on release.
+fn zoom_drag(ui: &Ui, response: &egui::Response, state: &mut DocState, scrubby: bool, ppp: f32) {
+    let start_id = ui.id().with("zoom-drag-start");
+    if response.drag_started_by(PointerButton::Primary)
+        && let Some(origin) = ui.input(|i| i.pointer.press_origin())
+    {
+        ui.data_mut(|d| d.insert_temp(start_id, (state.view.zoom, origin)));
+    }
+    let Some((start, origin)) = ui.data(|d| d.get_temp::<(f32, Pos2)>(start_id)) else {
+        return;
+    };
+    let Some(p) = ui.input(|i| i.pointer.interact_pos()) else {
+        return;
+    };
+    let down = ui.input(|i| i.pointer.primary_down());
+    if scrubby {
+        if down {
+            let z = start * 2f32.powf((p.x - origin.x) / 100.0);
+            zoom_at(state, z, origin, ppp);
+        } else {
+            ui.data_mut(|d| d.remove::<(f32, Pos2)>(start_id));
+        }
+        return;
+    }
+    let rect = Rect::from_two_pos(origin, p);
+    if down {
+        ui.painter().rect_stroke(
+            rect,
+            0,
+            egui::Stroke::new(1.0, Color32::WHITE),
+            egui::StrokeKind::Middle,
+        );
+        return;
+    }
+    ui.data_mut(|d| d.remove::<(f32, Pos2)>(start_id));
+    if rect.width() < 3.0 || rect.height() < 3.0 {
+        return;
+    }
+    // The box fills the window, centered
+    let fit = (state.view.viewport.width() / rect.width())
+        .min(state.view.viewport.height() / rect.height());
+    let z = state.view.zoom * fit;
+    zoom_at(state, z, rect.center(), ppp);
+    let shift = state.view.viewport.center() - rect.center();
+    state.view.offset += shift;
 }
 
 /// Screen point → document pixel coordinates (not clamped).
@@ -1850,6 +1953,9 @@ struct StrokeSettings {
     sample_all: bool,
     /// The Pattern Stamp's Aligned.
     pattern_aligned: bool,
+    /// The Pencil's Auto Erase and the Smudge tool's Finger Painting.
+    auto_erase: bool,
+    finger: bool,
 }
 
 /// The Art History Brush's options bar settings.
@@ -1919,6 +2025,8 @@ struct Dynamics {
     pressure: op_core::paint::Pressure,
     /// Smoothing, 0–1.
     smoothing: f32,
+    /// The smoothing gear's options.
+    smoothing_options: crate::options_tools::SmoothingOptions,
     /// The retouching tools' Protect Tones, Vibrance and Protect Detail.
     retouch: op_core::paint::Retouch,
     /// The airbrush: holding still keeps building up.
@@ -1927,43 +2035,79 @@ struct Dynamics {
 
 /// The current tool's pen dynamics and smoothing.
 fn paint_dynamics(app: &mut crate::state::AppState, tool: Tool) -> Dynamics {
-    let keys = match tool {
-        Tool::Brush => Some((
-            "brush.size_pressure",
-            "brush.opacity_pressure",
-            "brush.smoothing",
-            "10%",
-        )),
-        Tool::Pencil => Some((
-            "pencil.size_pressure",
-            "pencil.opacity_pressure",
-            "pencil.smoothing",
-            "10%",
-        )),
-        Tool::Eraser => Some((
-            "eraser.size_pressure",
-            "eraser.opacity_pressure",
-            "eraser.smoothing",
-            "0%",
-        )),
-        _ => None,
+    // The options bar's "Always use pressure for size / opacity" toggles
+    // and Smoothing (with its default)
+    let (size_key, opacity_key, smooth): (_, _, Option<(&'static str, &str)>) = match tool {
+        Tool::Brush => (
+            Some("brush.size_pressure"),
+            Some("brush.opacity_pressure"),
+            Some(("brush.smoothing", "10%")),
+        ),
+        Tool::Pencil => (
+            Some("pencil.size_pressure"),
+            Some("pencil.opacity_pressure"),
+            Some(("pencil.smoothing", "10%")),
+        ),
+        Tool::Eraser => (
+            Some("eraser.size_pressure"),
+            Some("eraser.opacity_pressure"),
+            Some(("eraser.smoothing", "0%")),
+        ),
+        Tool::MixerBrush => (
+            Some("mixer.size_pressure"),
+            None,
+            Some(("mixer.smoothing", "10%")),
+        ),
+        Tool::CloneStamp => (
+            Some("clone.size_pressure"),
+            Some("clone.opacity_pressure"),
+            None,
+        ),
+        Tool::PatternStamp => (
+            Some("pattern.size_pressure"),
+            Some("pattern.opacity_pressure"),
+            None,
+        ),
+        Tool::HistoryBrush => (
+            Some("historybrush.size_pressure"),
+            Some("historybrush.opacity_pressure"),
+            None,
+        ),
+        Tool::ArtHistoryBrush => (
+            Some("arthistory.size_pressure"),
+            Some("arthistory.opacity_pressure"),
+            None,
+        ),
+        Tool::BackgroundEraser => (Some("bgeraser.size_pressure"), None, None),
+        Tool::ColorReplacement => (Some("colorreplace.size_pressure"), None, None),
+        Tool::Blur => (Some("blur.size_pressure"), None, None),
+        Tool::Sharpen => (Some("sharpen.size_pressure"), None, None),
+        Tool::Smudge => (Some("smudge.size_pressure"), None, None),
+        Tool::Dodge => (Some("dodge.size_pressure"), None, None),
+        Tool::Burn => (Some("burn.size_pressure"), None, None),
+        Tool::Sponge => (Some("sponge.size_pressure"), None, None),
+        Tool::SpotHealingBrush => (Some("spotheal.size_pressure"), None, None),
+        Tool::HealingBrush => (Some("heal.size_pressure"), None, None),
+        _ => (None, None, None),
     };
     let mut pressure = app
         .paint_options(tool)
         .map(|o| o.pressure)
         .unwrap_or_default();
-    let mut smoothing = 0.0;
-    if let Some((size, opacity, smooth, default)) = keys {
-        pressure.size |= app.flag(size, false);
-        pressure.opacity |= app.flag(opacity, false);
-        smoothing = app
-            .setting(smooth, default)
+    if let Some(key) = size_key {
+        pressure.size |= app.flag(key, false);
+    }
+    if let Some(key) = opacity_key {
+        pressure.opacity |= app.flag(key, false);
+    }
+    let smoothing = smooth.map_or(0.0, |(key, default)| {
+        app.setting(key, default)
             .trim()
             .trim_end_matches('%')
             .trim()
             .parse::<f32>()
-            .map_or(0.0, |v| (v / 100.0).clamp(0.0, 1.0));
-    }
+            .map_or(0.0, |v| (v / 100.0).clamp(0.0, 1.0))
+    });
     let retouch = op_core::paint::Retouch {
         protect_tones: match tool {
             Tool::Dodge => app.flag("dodge.protect", true),
@@ -1982,6 +2126,7 @@ fn paint_dynamics(app: &mut crate::state::AppState, tool: Tool) -> Dynamics {
         Tool::Dodge => Some("dodge.airbrush"),
         Tool::Burn => Some("burn.airbrush"),
         Tool::Sponge => Some("sponge.airbrush"),
+        Tool::MixerBrush => Some("mixer.airbrush"),
         _ => None,
     };
     let airbrush = airbrush_key.is_some_and(|k| app.flag(k, false));
@@ -1989,6 +2134,7 @@ fn paint_dynamics(app: &mut crate::state::AppState, tool: Tool) -> Dynamics {
         pen: app.pen_pressure,
         pressure,
         smoothing,
+        smoothing_options: crate::options_tools::smoothing_options(app),
         retouch,
         airbrush,
     }
@@ -2019,6 +2165,8 @@ fn paint_input(
         clone_panel,
         sample_all,
         pattern_aligned,
+        auto_erase,
+        finger,
     } = settings;
     // The pen's pressure at this point (a mouse paints at full pressure)
     let pen = dynamics.pen.unwrap_or(1.0);
@@ -2085,6 +2233,35 @@ fn paint_input(
             }
             other => other,
         };
+        // Auto Erase: a Pencil stroke starting on the foreground color
+        // paints the background color
+        let kind = match kind {
+            Ok(op_core::paint::StrokeKind::Paint(fg)) if auto_erase => {
+                let [br, bg, bb, _] = colors.1.to_rgba8();
+                let on_foreground = state
+                    .doc
+                    .active_layer
+                    .and_then(|id| state.doc.layer(id))
+                    .and_then(|l| l.image())
+                    .zip(pointer)
+                    .is_some_and(|(image, p)| {
+                        p.x >= 0.0
+                            && p.y >= 0.0
+                            && (p.x as u32) < image.width()
+                            && (p.y as u32) < image.height()
+                            && {
+                                let q = image.pixel(p.x as u32, p.y as u32);
+                                q[3] > 0 && [q[0], q[1], q[2]] == fg
+                            }
+                    });
+                Ok(op_core::paint::StrokeKind::Paint(if on_foreground {
+                    [br, bg, bb]
+                } else {
+                    fg
+                }))
+            }
+            other => other,
+        };
         // The Healing Brush's Pattern source: the pattern tiled from the
         // document's corner, no source point needed
         let kind = match &pattern {
@@ -2121,11 +2298,8 @@ fn paint_input(
         let (label, _) = stroke_names(tool);
         match Stroke::begin(&state.doc, tip, kind, opacity, flow) {
             Ok(stroke) => {
-                let mut stroke = if matches!(tool, Tool::Brush | Tool::Pencil) {
-                    stroke.with_mode(mode)
-                } else {
-                    stroke
-                };
+                // The Mode menu (Normal for the tools without one)
+                let mut stroke = stroke.with_mode(mode);
                 // Pressure only matters with a pen
                 if dynamics.pen.is_some() {
                     stroke = stroke.with_pressure(dynamics.pressure);
@@ -2151,6 +2325,10 @@ fn paint_input(
                     && let Some(p) = origin
                 {
                     stroke = stroke.with_pattern_origin((p.x.max(0.0) as u32, p.y.max(0.0) as u32));
+                }
+                if finger {
+                    let [r, g, b, _] = colors.0.to_rgba8();
+                    stroke = stroke.with_finger_painting([r, g, b]);
                 }
                 if sample_all
                     && let Some(merged) = state.doc.sample_source(op_core::SampleScope::All)
@@ -2194,16 +2372,31 @@ fn paint_input(
         let released = !ui.input(|i| i.pointer.primary_down());
         if let Some(p) = pointer {
             // Smoothing: the stroke trails the pointer on a string as long
-            // as 50 screen points at full smoothing, catching up a little
-            // each frame and all the way when the button is let go
+            // as 50 screen points at full smoothing (document pixels without
+            // Adjust for Zoom), catching up a little each frame (only while
+            // the pointer moves without Stroke Catch-up, never in Pulled
+            // String Mode) and, with Catch-up on Stroke End, all the way
+            // when the button is let go
+            let o = dynamics.smoothing_options;
+            let moved = ui.input(|i| i.pointer.delta() != Vec2::ZERO);
             let (x, y) = match state.paint_smooth {
-                Some((sx, sy)) if dynamics.smoothing > 0.0 && !released => {
-                    let string = dynamics.smoothing * 50.0 / state.view.zoom.max(0.01);
+                Some(_) if released && o.catch_up_end => (p.x, p.y),
+                Some((sx, sy)) if dynamics.smoothing > 0.0 => {
+                    let scale = if o.adjust_for_zoom {
+                        1.0 / state.view.zoom.max(0.01)
+                    } else {
+                        1.0
+                    };
+                    let string = dynamics.smoothing * 50.0 * scale;
                     let (dx, dy) = (p.x - sx, p.y - sy);
                     let d = (dx * dx + dy * dy).sqrt();
                     let pull = if d > string { 1.0 - string / d } else { 0.0 };
                     let (sx, sy) = (sx + dx * pull, sy + dy * pull);
-                    let catch = 0.1;
+                    let catch = if o.pulled_string || released || (!o.catch_up && !moved) {
+                        0.0
+                    } else {
+                        0.1
+                    };
                     (sx + (p.x - sx) * catch, sy + (p.y - sy) * catch)
                 }
                 _ => (p.x, p.y),

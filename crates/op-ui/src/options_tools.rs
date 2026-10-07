@@ -93,6 +93,9 @@ pub enum Item {
     /// The Selection Brush's gear: a popup with its overlay color
     /// (`selbrush.overlay`).
     OverlayGear(f32),
+    /// The smoothing options' gear at x: a pop-up with Smoothing Options'
+    /// four checkboxes (`smoothing_options`).
+    SmoothingGear(f32),
     /// The custom shape: its box from x0 to x1, the chevron box to x2.
     ShapePicker(f32, f32, f32),
     /// A pop-up from x0 to x1 with an icon before its value.
@@ -134,6 +137,17 @@ pub fn setting_keys(tool: Tool) -> Vec<&'static str> {
         })
         .collect()
 }
+
+/// Blur's, Sharpen's and Smudge's Mode menu.
+const RETOUCH_MODES: &[&str] = &[
+    "Normal",
+    "Darken",
+    "Lighten",
+    "Hue",
+    "Saturation",
+    "Color",
+    "Luminosity",
+];
 
 const BLEND: &[&str] = &[
     "Normal",
@@ -378,7 +392,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             Sep(638.5),
             Label(645.0, "Smoothing:"),
             Percent(702.5, 740.0, 754.5, "brush.smoothing", "10%"),
-            Icon(772.5, Icon::Gear, "Set additional options for smoothing"),
+            SmoothingGear(772.5),
             Sep(789.5),
             Icon(802.5, Icon::Angle, "Set the brush angle"),
             Field(813.5, 855.0, "brush.angle", "0°"),
@@ -408,7 +422,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             Sep(493.0),
             Label(499.5, "Smoothing:"),
             Percent(557.0, 594.5, 609.0, "pencil.smoothing", "10%"),
-            Icon(627.0, Icon::Gear, "Set additional options for smoothing"),
+            SmoothingGear(627.0),
             Sep(644.0),
             Icon(657.0, Icon::Angle, "Set the brush angle"),
             Field(668.0, 709.5, "pencil.angle", "0°"),
@@ -448,7 +462,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             Sep(548.5),
             Label(555.0, "Smoothing:"),
             Percent(612.5, 650.0, 664.5, "eraser.smoothing", "0%"),
-            Icon(682.5, Icon::Gear, "Set additional options for smoothing"),
+            SmoothingGear(682.5),
             Sep(699.5),
             Icon(712.5, Icon::Angle, "Set the brush angle"),
             Field(723.5, 765.0, "eraser.angle", "0°"),
@@ -598,7 +612,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             ),
             Icon(788.0, Icon::Refresh, "Smoothing"),
             Percent(802.5, 840.0, 854.5, "mixer.smoothing", "10%"),
-            Icon(870.5, Icon::Gear, "Set additional options for smoothing"),
+            SmoothingGear(870.5),
             Icon(893.5, Icon::Angle, "Set the brush angle"),
             Field(904.5, 946.0, "mixer.angle", "0°"),
             Check(948.5, "Sample All Layers", "mixer.all_layers", false),
@@ -784,20 +798,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
                 Icon(175.0, Icon::BrushPanel, "Toggle the Brush Settings panel"),
                 Sep(198.0),
                 Label(208.0, "Mode:"),
-                Popup(
-                    242.5,
-                    342.0,
-                    "blur.mode",
-                    &[
-                        "Normal",
-                        "Darken",
-                        "Lighten",
-                        "Hue",
-                        "Saturation",
-                        "Color",
-                        "Luminosity",
-                    ],
-                ),
+                Popup(242.5, 342.0, "blur.mode", RETOUCH_MODES),
                 Label(361.5, "Strength:"),
                 Percent(410.0, 447.5, 462.0, "paint.opacity", "50%"),
                 Sep(471.0),
@@ -817,20 +818,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
                 Icon(175.0, Icon::BrushPanel, "Toggle the Brush Settings panel"),
                 Sep(198.0),
                 Label(208.0, "Mode:"),
-                Popup(
-                    242.5,
-                    342.0,
-                    "sharpen.mode",
-                    &[
-                        "Normal",
-                        "Darken",
-                        "Lighten",
-                        "Hue",
-                        "Saturation",
-                        "Color",
-                        "Luminosity",
-                    ],
-                ),
+                Popup(242.5, 342.0, "sharpen.mode", RETOUCH_MODES),
                 Label(361.5, "Strength:"),
                 Percent(410.0, 447.5, 462.0, "paint.opacity", "50%"),
                 Sep(471.0),
@@ -852,20 +840,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
                 Icon(175.0, Icon::BrushPanel, "Toggle the Brush Settings panel"),
                 Sep(198.0),
                 Label(208.0, "Mode:"),
-                Popup(
-                    242.5,
-                    342.0,
-                    "smudge.mode",
-                    &[
-                        "Normal",
-                        "Darken",
-                        "Lighten",
-                        "Hue",
-                        "Saturation",
-                        "Color",
-                        "Luminosity",
-                    ],
-                ),
+                Popup(242.5, 342.0, "smudge.mode", RETOUCH_MODES),
                 Label(361.5, "Strength:"),
                 Percent(410.0, 447.5, 462.0, "smudge.strength", "50%"),
                 Sep(471.0),
@@ -1598,14 +1573,37 @@ fn text(app: &mut AppState, key: &'static str, default: &str) -> String {
         )),
         "shape.sides" => Some(app.shape.sides.to_string()),
         "shape.weight" => Some(format!("{} px", (app.shape.weight * 10.0).round() / 10.0)),
+        // The painting tools' brush angle
+        k if is_brush_angle(k) => app
+            .paint_options(tool)
+            .map(|o| format!("{}°", o.angle.round())),
         _ => None,
     }
     .unwrap_or_else(|| app.setting(key, default).clone())
 }
 
+/// A painting tool's "Set the brush angle" field (the tip's angle in its
+/// `PaintOptions`).
+fn is_brush_angle(key: &str) -> bool {
+    key.ends_with(".angle") && key != "rotate.angle"
+}
+
 /// Stores typed text: percentages and numbers are kept in range.
 fn set_text(app: &mut AppState, key: &'static str, default: &str, typed: String) {
     let tool = app.tool;
+    if is_brush_angle(key) {
+        if let (Some(v), Some(o)) = (
+            crate::options_bar::typed_number(&typed),
+            app.paint_options(tool),
+        ) {
+            // −180° to 180°, as in Photoshop
+            o.angle = (v + 180.0).rem_euclid(360.0) - 180.0;
+            if o.angle == -180.0 {
+                o.angle = 180.0;
+            }
+        }
+        return;
+    }
     // Setting Wet, Load or Mix by hand makes the combination Custom
     if matches!(key, "mixer.wet" | "mixer.load_amount" | "mixer.mix") {
         *app.setting("mixer.combo", "0") = "0".into();
@@ -1835,6 +1833,27 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                         .toggle(crate::panels::floating::Floating::BrushSettings);
                 }
             }
+            SmoothingGear(x) => {
+                let response = b.icon(
+                    x,
+                    Icon::Gear,
+                    "Set additional options for smoothing",
+                    false,
+                    true,
+                );
+                let mut options = smoothing_options(app);
+                egui::Popup::from_response(&response)
+                    .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
+                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                    .show(|ui| {
+                        ui.label("Smoothing Options");
+                        ui.checkbox(&mut options.pulled_string, "Pulled String Mode");
+                        ui.checkbox(&mut options.catch_up, "Stroke Catch-up");
+                        ui.checkbox(&mut options.catch_up_end, "Catch-up on Stroke End");
+                        ui.checkbox(&mut options.adjust_for_zoom, "Adjust for Zoom");
+                    });
+                set_smoothing_options(app, options);
+            }
             OverlayGear(x) => {
                 let response = b.icon(x, Icon::GearMenu, "Set additional options", false, true);
                 let mut index = overlay_color(app);
@@ -1980,13 +1999,7 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 }
             }
             Modes(x, key) => {
-                use crate::state::SelectionMode;
-                const MODES: [SelectionMode; 4] = [
-                    SelectionMode::New,
-                    SelectionMode::Add,
-                    SelectionMode::Subtract,
-                    SelectionMode::Intersect,
-                ];
+                const MODES: [crate::state::SelectionMode; 4] = SELECTION_MODES;
                 let i = choice(app, key).min(3);
                 let mut mode = MODES[i];
                 b.modes(x, &mut mode);
@@ -2251,6 +2264,14 @@ fn use_pattern(app: &mut AppState) {
     }
 }
 
+/// The four selection buttons' modes, in the bar's order.
+const SELECTION_MODES: [crate::state::SelectionMode; 4] = [
+    crate::state::SelectionMode::New,
+    crate::state::SelectionMode::Add,
+    crate::state::SelectionMode::Subtract,
+    crate::state::SelectionMode::Intersect,
+];
+
 /// When a pattern box can be used.
 #[derive(Clone, Copy, Debug)]
 pub enum PatternUse {
@@ -2417,12 +2438,19 @@ pub fn eraser_mode(app: &mut AppState) -> EraserMode {
 /// The Brush's or Pencil's Mode as chosen in its bar.
 pub fn paint_mode(app: &mut AppState, tool: Tool) -> op_core::paint::PaintMode {
     use op_core::paint::PaintMode;
-    let key = match tool {
-        Tool::Brush => "brush.mode",
-        Tool::Pencil => "pencil.mode",
+    let (key, labels) = match tool {
+        Tool::Brush => ("brush.mode", BLEND),
+        Tool::Pencil => ("pencil.mode", BLEND),
+        Tool::CloneStamp => ("clone.mode", BLEND),
+        Tool::PatternStamp => ("pattern.mode", BLEND),
+        Tool::HistoryBrush => ("historybrush.mode", BLEND),
+        Tool::ArtHistoryBrush => ("arthistory.mode", BLEND),
+        Tool::Blur => ("blur.mode", RETOUCH_MODES),
+        Tool::Sharpen => ("sharpen.mode", RETOUCH_MODES),
+        Tool::Smudge => ("smudge.mode", RETOUCH_MODES),
         _ => return PaintMode::Normal,
     };
-    match BLEND.get(choice(app, key)).copied() {
+    match labels.get(choice(app, key)).copied() {
         Some("Behind") => PaintMode::Behind,
         Some("Clear") => PaintMode::Clear,
         Some("Normal") | None => PaintMode::Normal,
@@ -2489,6 +2517,7 @@ pub fn color_match(
         tolerance: tolerance.clamp(0.0, 1.0),
         contiguous: choice(app, limits) != 0,
         protect: protect.then_some(foreground),
+        anti_alias: tool == Tool::ColorReplacement && flag(app, "colorreplace.anti_alias", true),
     })
 }
 
@@ -2550,6 +2579,10 @@ pub struct HealOptions {
     pub extend: bool,
     /// Content-Aware Move's Sample All Layers.
     pub cam_all_layers: bool,
+    /// How the Patch tool's and Content-Aware Move's freehand selections
+    /// combine with the current one (their four selection buttons).
+    pub patch_select: crate::state::SelectionMode,
+    pub cam_select: crate::state::SelectionMode,
 }
 
 pub fn heal_options(app: &mut AppState) -> HealOptions {
@@ -2588,6 +2621,8 @@ pub fn heal_options(app: &mut AppState) -> HealOptions {
         },
         extend: choice(app, "cam.move") == 1,
         cam_all_layers: flag(app, "cam.all_layers", false),
+        patch_select: SELECTION_MODES[choice(app, "patch.mode").min(3)],
+        cam_select: SELECTION_MODES[choice(app, "cam.mode").min(3)],
     }
 }
 
@@ -2601,6 +2636,48 @@ pub fn samples_all_layers(app: &mut AppState, tool: Tool) -> bool {
         _ => return false,
     };
     flag(app, key, false)
+}
+
+/// The smoothing gear's Smoothing Options, shared by the painting tools.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SmoothingOptions {
+    /// The brush moves only when the string is pulled taut: no catching
+    /// up while the pointer stays within the string.
+    pub pulled_string: bool,
+    /// The brush keeps catching up with a pointer that has stopped.
+    pub catch_up: bool,
+    /// Letting go finishes the stroke at the pointer.
+    pub catch_up_end: bool,
+    /// The string's length is in screen points (else document pixels).
+    pub adjust_for_zoom: bool,
+}
+
+impl Default for SmoothingOptions {
+    /// Photoshop's: Stroke Catch-up and Adjust for Zoom on.
+    fn default() -> Self {
+        Self {
+            pulled_string: false,
+            catch_up: true,
+            catch_up_end: false,
+            adjust_for_zoom: true,
+        }
+    }
+}
+
+pub fn smoothing_options(app: &mut AppState) -> SmoothingOptions {
+    SmoothingOptions {
+        pulled_string: flag(app, "smoothing.pulled_string", false),
+        catch_up: flag(app, "smoothing.catch_up", true),
+        catch_up_end: flag(app, "smoothing.catch_up_end", false),
+        adjust_for_zoom: flag(app, "smoothing.adjust_for_zoom", true),
+    }
+}
+
+fn set_smoothing_options(app: &mut AppState, o: SmoothingOptions) {
+    set_flag(app, "smoothing.pulled_string", o.pulled_string);
+    set_flag(app, "smoothing.catch_up", o.catch_up);
+    set_flag(app, "smoothing.catch_up_end", o.catch_up_end);
+    set_flag(app, "smoothing.adjust_for_zoom", o.adjust_for_zoom);
 }
 
 /// The Paint Bucket's Source: Pattern.
@@ -2667,4 +2744,42 @@ pub fn overlay_color(app: &mut AppState) -> usize {
 /// Whether the Selection Brush is set to Subtract.
 pub fn selection_brush_subtracts(app: &mut AppState) -> bool {
     app.setting("selbrush.mode", "0") == "1"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_settings_reach_the_strokes() {
+        let mut app = AppState::default();
+        // The brush angle field is the tip's angle, wrapped to ±180°
+        app.select_tool(Tool::CloneStamp);
+        set_text(&mut app, "clone.angle", "0°", "200".into());
+        assert_eq!(app.clone_stamp.angle, -160.0);
+        assert_eq!(text(&mut app, "clone.angle", "0°"), "-160°");
+        // Mode menus of the stamps and retouching tools
+        set_choice(
+            &mut app,
+            "clone.mode",
+            BLEND.iter().position(|m| *m == "Darken").unwrap(),
+        );
+        assert_eq!(
+            paint_mode(&mut app, Tool::CloneStamp),
+            op_core::paint::PaintMode::Blend(op_core::BlendMode::Darken)
+        );
+        set_choice(&mut app, "smudge.mode", 2);
+        assert_eq!(
+            paint_mode(&mut app, Tool::Smudge),
+            op_core::paint::PaintMode::Blend(op_core::BlendMode::Lighten)
+        );
+        assert_eq!(
+            paint_mode(&mut app, Tool::Dodge),
+            op_core::paint::PaintMode::Normal
+        );
+        // Sample All Layers
+        assert!(!samples_all_layers(&mut app, Tool::Blur));
+        set_flag(&mut app, "blur.all_layers", true);
+        assert!(samples_all_layers(&mut app, Tool::Blur));
+    }
 }

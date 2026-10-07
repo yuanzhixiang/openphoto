@@ -47,7 +47,7 @@ For tools without `PaintOptions` (Selection Brush, Adjustment Brush, Art History
 ## Known limitations
 
 - The popup is drawn with egui's widgets and is not a rebuild of Photoshop's brush preset picker. It has no search field and no preset folders other than General Brushes. Photoshop's Dry Media, Wet Media and Special Effects brushes are sampled tips that aren't included.
-- Spacing has no control yet; Photoshop sets it in the Brush Settings panel.
+- Spacing isn't in the popup; it is set in the Brush Settings panel (`panels/brushes.md`), as in Photoshop.
 - New Brush Preset and preset management are not implemented.
 
 ## Test coverage
@@ -57,4 +57,4 @@ For tools without `PaintOptions` (Selection Brush, Adjustment Brush, Art History
   - picking Hard Round Pressure Size from the picker;
   - a pen at 20% pressure paints a thin line;
   - with a mouse the stroke is full size;
-  - full Smoothing still ends the stroke at the release point.
+  - full Smoothing stops short of a quick release by default, and with Catch-up on Stroke End ends the stroke at the release point.

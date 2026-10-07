@@ -128,6 +128,12 @@ The options (`Stroke::with_retouch(Retouch { protect_tones, vibrance, protect_de
 - Blur: the 3×3 premultiplied average of the current pixels; Sharpen: `v + (v − 3×3 average)`. With Protect Detail, Sharpen adds half that difference, and nothing where it is under one level (noise).
 - Source: the pixel at the corresponding position in `image` (including alpha); outside the bounds of `image` the original pixel is kept.
 
+## Modes, Finger Painting and Anti-alias
+
+- `with_mode(mode)` applies to every stroke kind that lays a color: besides the Brush's and Pencil's paint, the Clone Stamp's, Pattern Stamp's, History Brush's and Art History Brush's source colors and Blur's, Sharpen's and Smudge's results are laid down in that mode (`lay_mode`: Normal is the plain mix; otherwise `paint_mode` with the target's color, its alpha scaling the amount).
+- `with_finger_painting(color)` (Smudge's Finger Painting): the stroke's first dab lays `color` under the tip at the stroke's strength instead of only picking up; later dabs smear it as usual.
+- `ColorMatch::anti_alias` (Color Replacement's Anti-alias): the pixels just outside the matching area (with a matching 4-neighbor in the dab) take half the change, for a smooth edge; without it the edge is hard.
+
 ## Sample All Layers
 
 `with_sample(merged)` gives Blur, Sharpen, Smudge and the Mixer Brush the visible layers composited (the UI passes `Document::sample_source(All)` at the stroke's start). They read it instead of the layer: Blur and Sharpen blur or sharpen the merged pixels, Smudge drags them and the Mixer Brush picks up their paint, and the result is mixed into the active layer by the dab's amount, so an empty layer above the image takes on the retouched pixels. The stroke lays the same result into its copy of the merged image, so later dabs build on earlier ones as they do on a layer. Other stroke kinds ignore it.
@@ -143,6 +149,8 @@ The options (`Stroke::with_retouch(Retouch { protect_tones, vibrance, protect_de
 - `cloning_scaled_and_turned`: at 200% wide a one-pixel column clones two pixels wide; turned 90° it becomes a row.
 - `art_history_paints_the_source_in_strokes`: a red source brings red strokes back into a white area and leaves the rest; on a layer already red, a 50% tolerance paints nothing.
 - `mixer_brush_loads_picks_up_and_runs_dry`: a dry, light load starts blue and fades; a wet blue brush on red lays a mix and keeps a mixed color; a clean wet brush smears black into white.
+- `source_strokes_paint_in_their_mode`: cloning mid gray in Darken over a white-and-black split darkens only the white half.
+- `finger_painting_starts_with_the_foreground`: the stroke starts red where it began and smears it along; elsewhere stays white.
 - `unaligned_pattern_starts_at_the_stroke`: with the origin at the stroke's point, the pattern's first column lands there.
 - `sample_all_layers_reads_the_merged_image`: on an empty layer over black and white stripes, Blur alone changes nothing; with the merged image it lays blurred gray on the layer under the dab only.
 - `impressionist_pattern_daubs`: a one-pixel stripe pattern comes through as stripes, and with Impressionist in blocks of one color.

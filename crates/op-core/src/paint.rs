@@ -222,6 +222,9 @@ pub struct ColorMatch {
     pub tolerance: f32,
     pub contiguous: bool,
     pub protect: Option<[u8; 3]>,
+    /// Color Replacement's Anti-alias: the pixels just outside the
+    /// matching area take half the change, for a smooth edge.
+    pub anti_alias: bool,
 }
 
 /// What a stroke does to the pixels it covers.
@@ -375,6 +378,9 @@ pub struct Stroke {
     /// Aligned off: the stroke's first point; otherwise the document's
     /// corner).
     pattern_origin: (u32, u32),
+    /// The Smudge tool's Finger Painting: the foreground color the stroke
+    /// starts by laying down.
+    finger: Option<[u8; 3]>,
 }
 
 impl Stroke {
@@ -453,7 +459,15 @@ impl Stroke {
             create_texture: false,
             sample: None,
             pattern_origin: (0, 0),
+            finger: None,
         })
+    }
+
+    /// The Smudge tool's Finger Painting: the stroke's first dab lays down
+    /// `color`, which the rest of the stroke then smears.
+    pub fn with_finger_painting(mut self, color: [u8; 3]) -> Self {
+        self.finger = Some(color);
+        self
     }
 
     /// The Pattern Stamp with Aligned off: the pattern starts at `origin`
@@ -704,12 +718,21 @@ impl Stroke {
                     let target = retouch_target(&self.kind, self.retouch, cur, |dx, dy| {
                         at(x as i64 + dx, y as i64 + dy)
                     });
+                    let (mode, preserve) = (self.mode, self.preserve_alpha);
                     if let Some(m) = sampled.as_deref_mut() {
-                        m.set_pixel(x, y, mix(cur, target, amount, false));
+                        m.set_pixel(x, y, lay_mode(mode, cur, target, amount, false, (x, y)));
                         let own = image.pixel(x, y);
-                        image.set_pixel(x, y, mix(own, target, amount, self.preserve_alpha));
+                        image.set_pixel(
+                            x,
+                            y,
+                            lay_mode(mode, own, target, amount, preserve, (x, y)),
+                        );
                     } else {
-                        image.set_pixel(x, y, mix(cur, target, amount, self.preserve_alpha));
+                        image.set_pixel(
+                            x,
+                            y,
+                            lay_mode(mode, cur, target, amount, preserve, (x, y)),
+                        );
                     }
                 }
             }
@@ -719,6 +742,10 @@ impl Stroke {
         // The Background Eraser and Color Replacement change only the
         // pixels matching the sampled color
         let matched = self.match_mask(cx, cy, (x0, y0, x1, y1));
+        let anti_alias = match &self.kind {
+            StrokeKind::ReplaceColor { matching, .. } => matching.anti_alias,
+            _ => false,
+        };
         for y in y0..y1 {
             for x in x0..x1 {
                 let (px, py) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
@@ -726,10 +753,30 @@ impl Stroke {
                 if a <= 0.0 {
                     continue;
                 }
-                if let Some(m) = &matched
-                    && !m[((y - y0) * (x1 - x0) + (x - x0)) as usize]
-                {
-                    continue;
+                // The matching area; with Anti-alias, half the change on
+                // the ring just outside it
+                let mut edge = 1.0;
+                if let Some(m) = &matched {
+                    let bw = (x1 - x0) as usize;
+                    let i = (y - y0) as usize * bw + (x - x0) as usize;
+                    if !m[i] {
+                        let near = anti_alias
+                            && [(-1i64, 0i64), (1, 0), (0, -1), (0, 1)]
+                                .iter()
+                                .any(|&(dx, dy)| {
+                                    let (nx, ny) = (x as i64 + dx, y as i64 + dy);
+                                    nx >= x0 as i64
+                                        && ny >= y0 as i64
+                                        && nx < x1 as i64
+                                        && ny < y1 as i64
+                                        && m[(ny - y0 as i64) as usize * bw
+                                            + (nx - x0 as i64) as usize]
+                                });
+                        if !near {
+                            continue;
+                        }
+                        edge = 0.5;
+                    }
                 }
                 let key = (x / TILE_SIZE, y / TILE_SIZE);
                 let cov = self.coverage.entry(key).or_insert_with(|| {
@@ -744,7 +791,7 @@ impl Stroke {
                     .selection
                     .as_ref()
                     .map_or(1.0, |s| s.get(x, y) as f32 / 255.0);
-                let amount = *c * self.opacity * selected;
+                let amount = *c * self.opacity * selected * edge;
                 let base = self.base.pixel(x, y);
                 let px = match &self.kind {
                     &StrokeKind::Paint(color) if self.mode != PaintMode::Normal => {
@@ -759,13 +806,18 @@ impl Stroke {
                     }
                     other => {
                         let target = self.target(other, x, y, base);
-                        mix(base, target, amount, self.preserve_alpha)
+                        self.lay(base, target, amount, (x, y))
                     }
                 };
                 image.set_pixel(x, y, px);
             }
         }
         doc.mark_dirty();
+    }
+
+    /// `target` laid over `base` in the stroke's mode.
+    fn lay(&self, base: [u8; 4], target: [u8; 4], amount: f32, at: (u32, u32)) -> [u8; 4] {
+        lay_mode(self.mode, base, target, amount, self.preserve_alpha, at)
     }
 
     /// What the retouching tools turn the pre-stroke pixel at (`x`, `y`)
@@ -1012,6 +1064,10 @@ impl Stroke {
     /// picks up).
     fn smudge_dab(&mut self, doc: &mut Document, cx: f32, cy: f32, strength: f32) {
         let Some((px, py)) = self.last_dab.replace((cx, cy)) else {
+            // Finger Painting starts with a dab of the foreground color
+            if let Some(color) = self.finger {
+                self.finger_dab(doc, cx, cy, color, strength);
+            }
             return;
         };
         let (dx, dy) = ((cx - px).round() as i64, (cy - py).round() as i64);
@@ -1027,6 +1083,7 @@ impl Stroke {
         let selection = self.selection.clone();
         let preserve = self.preserve_alpha;
         let tip = self.tip;
+        let mode = self.mode;
         let mut sample = self.sample.as_mut();
         let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
             return;
@@ -1054,14 +1111,62 @@ impl Stroke {
                 };
                 let merged = sample
                     .as_ref()
-                    .map(|m| mix(m.pixel(x, y), from, amount, false));
-                updates.push((x, y, mix(image.pixel(x, y), from, amount, preserve), merged));
+                    .map(|m| lay_mode(mode, m.pixel(x, y), from, amount, false, (x, y)));
+                updates.push((
+                    x,
+                    y,
+                    lay_mode(mode, image.pixel(x, y), from, amount, preserve, (x, y)),
+                    merged,
+                ));
             }
         }
         for (x, y, p, merged) in updates {
             image.set_pixel(x, y, p);
             if let (Some(m), Some(q)) = (sample.as_deref_mut(), merged) {
                 m.set_pixel(x, y, q);
+            }
+        }
+        doc.mark_dirty();
+    }
+
+    /// Finger Painting's first dab: `color` laid under the tip by
+    /// `strength` × coverage.
+    fn finger_dab(&mut self, doc: &mut Document, cx: f32, cy: f32, color: [u8; 3], strength: f32) {
+        let (w, h) = (doc.width, doc.height);
+        let r = self.tip.diameter / 2.0 + 1.0;
+        let x0 = (cx - r).floor().max(0.0) as u32;
+        let y0 = (cy - r).floor().max(0.0) as u32;
+        let x1 = ((cx + r).ceil().max(0.0) as u32).min(w);
+        let y1 = ((cy + r).ceil().max(0.0) as u32).min(h);
+        let (tip, mode, preserve) = (self.tip, self.mode, self.preserve_alpha);
+        let selection = self.selection.clone();
+        let mut sample = self.sample.as_mut();
+        let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
+            return;
+        };
+        let paint = [color[0], color[1], color[2], 255];
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let a = tip.coverage(x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+                if a <= 0.0 {
+                    continue;
+                }
+                let selected = selection
+                    .as_ref()
+                    .map_or(1.0, |s| s.get(x, y) as f32 / 255.0);
+                let amount = a * strength * selected;
+                image.set_pixel(
+                    x,
+                    y,
+                    lay_mode(mode, image.pixel(x, y), paint, amount, preserve, (x, y)),
+                );
+                if let Some(m) = sample.as_deref_mut() {
+                    m.set_pixel(
+                        x,
+                        y,
+                        lay_mode(mode, m.pixel(x, y), paint, amount, false, (x, y)),
+                    );
+                }
             }
         }
         doc.mark_dirty();
@@ -1087,6 +1192,7 @@ impl Stroke {
         let tip = self.tip;
         let d = tip.diameter.max(1.0);
         let opacity = self.opacity;
+        let mode = self.mode;
         let preserve = self.preserve_alpha;
         let selection = self.selection.clone();
         // A repeatable sequence per dab
@@ -1158,12 +1264,12 @@ impl Stroke {
                             .as_ref()
                             .map_or(1.0, |s| s.get(px, py) as f32 / 255.0);
                         let amount = a * opacity * selected;
-                        let p = apply(
-                            image.pixel(px, py),
-                            amount,
-                            &StrokeKind::Paint(rgb),
-                            preserve,
-                        );
+                        let base = image.pixel(px, py);
+                        let p = if mode == PaintMode::Normal {
+                            apply(base, amount, &StrokeKind::Paint(rgb), preserve)
+                        } else {
+                            paint_mode(base, amount, rgb, mode, preserve, (px, py))
+                        };
                         image.set_pixel(px, py, p);
                     }
                 }
@@ -1329,6 +1435,32 @@ fn mix(base: [u8; 4], target: [u8; 4], amount: f32, preserve_alpha: bool) -> [u8
     }
     out[3] = (oa * 255.0).round() as u8;
     out
+}
+
+/// `target` laid over `base` by `amount` in `mode`: a plain mix for
+/// Normal, otherwise the target's color painted in that mode (its alpha
+/// scaling the amount), as the Clone Stamp, Pattern Stamp, History Brush,
+/// Blur, Sharpen and Smudge do with their Mode menus.
+fn lay_mode(
+    mode: PaintMode,
+    base: [u8; 4],
+    target: [u8; 4],
+    amount: f32,
+    preserve_alpha: bool,
+    at: (u32, u32),
+) -> [u8; 4] {
+    if mode == PaintMode::Normal {
+        return mix(base, target, amount, preserve_alpha);
+    }
+    let amount = amount * target[3] as f32 / 255.0;
+    paint_mode(
+        base,
+        amount,
+        [target[0], target[1], target[2]],
+        mode,
+        preserve_alpha,
+        at,
+    )
 }
 
 /// One pixel of a Brush or Pencil stroke in a mode other than Normal.
@@ -1698,6 +1830,55 @@ mod tests {
     fn one_dab(doc: &mut Document, kind: StrokeKind, strength: f32) {
         let mut s = Stroke::begin(doc, HARD, kind, strength, 1.0).unwrap();
         s.add_point(doc, 20.0, 20.0);
+    }
+
+    #[test]
+    fn source_strokes_paint_in_their_mode() {
+        // Cloning mid gray over a white-and-black split in Darken mode only
+        // darkens the white half
+        let mut doc = Document::new_with_background("t", 40, 40, Color::WHITE);
+        let id = doc.layers[0].id;
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 0..40 {
+            for x in 20..40 {
+                image.set_pixel(x, y, [0, 0, 0, 255]);
+            }
+        }
+        let mut gray = TiledImage::new(40, 40);
+        for y in 0..40 {
+            for x in 0..40 {
+                gray.set_pixel(x, y, [128, 128, 128, 255]);
+            }
+        }
+        let kind = StrokeKind::Source {
+            image: gray,
+            dx: 0,
+            dy: 0,
+        };
+        let mut s = Stroke::begin(&doc, HARD, kind, 1.0, 1.0)
+            .unwrap()
+            .with_mode(PaintMode::Blend(crate::BlendMode::Darken));
+        s.add_point(&mut doc, 20.0, 20.0);
+        let image = doc.layer(id).unwrap().image().unwrap();
+        assert_eq!(image.pixel(18, 20), [128, 128, 128, 255]);
+        assert_eq!(image.pixel(22, 20), [0, 0, 0, 255]);
+    }
+
+    #[test]
+    fn finger_painting_starts_with_the_foreground() {
+        let mut doc = Document::new_with_background("t", 40, 40, Color::WHITE);
+        let id = doc.layers[0].id;
+        let mut s = Stroke::begin(&doc, HARD, StrokeKind::Smudge(1.0), 1.0, 1.0)
+            .unwrap()
+            .with_finger_painting([255, 0, 0]);
+        s.add_point(&mut doc, 10.0, 20.0);
+        s.add_point(&mut doc, 20.0, 20.0);
+        let image = doc.layer(id).unwrap().image().unwrap();
+        // Red where it started, smeared along the stroke; none without it
+        let p = image.pixel(10, 20);
+        assert!(p[0] == 255 && p[1] < 160, "{p:?}");
+        assert!(image.pixel(16, 20)[1] < 200, "{:?}", image.pixel(16, 20));
+        assert_eq!(image.pixel(10, 30), [255, 255, 255, 255]);
     }
 
     #[test]
@@ -2216,6 +2397,7 @@ mod tests {
             tolerance: 0.1,
             contiguous: false,
             protect: None,
+            anti_alias: false,
         };
         let mut s =
             Stroke::begin(&doc, HARD, StrokeKind::BackgroundErase(matching), 1.0, 1.0).unwrap();

@@ -5419,8 +5419,13 @@ fn brush_presets_pressure_and_smoothing() {
     let (a, b) = (doc_point(&h, 100.0, 500.0), doc_point(&h, 300.0, 500.0));
     drag(&mut h, a, b, Modifiers::NONE);
     assert_eq!(composite_pixel(&mut h, 200, 512)[0], 255);
-    // Full smoothing still ends the stroke where the pointer was let go
+    // Full smoothing stops short of a quick release by default; with
+    // Catch-up on Stroke End it ends where the pointer was let go
     *h.state_mut().state.setting("brush.smoothing", "10%") = "100%".into();
+    let (a, b) = (doc_point(&h, 100.0, 650.0), doc_point(&h, 600.0, 650.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_ne!(composite_pixel(&mut h, 598, 650)[0], 255);
+    h.state_mut().state.set_flag("smoothing.catch_up_end", true);
     let (a, b) = (doc_point(&h, 100.0, 700.0), doc_point(&h, 600.0, 700.0));
     drag(&mut h, a, b, Modifiers::NONE);
     assert_eq!(composite_pixel(&mut h, 598, 700)[0], 255);
@@ -6562,6 +6567,53 @@ fn healing_with_patterns_and_fill_pattern() {
     assert_eq!(composite_pixel(&mut h, 10, 10), [255, 0, 0, 255]);
     assert_eq!(composite_pixel(&mut h, 11, 10), [0, 0, 255, 255]);
     assert_eq!(last_history(&h), "Fill");
+}
+
+#[test]
+fn zoom_tool_drags_and_view_tools_act_on_all_windows() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A second document, then back to the first
+    let second = op_core::Document::new_with_background("Two", 400, 300, Color::WHITE);
+    h.state_mut().state.add_document(second, "New");
+    h.run_steps(4);
+    let ids: Vec<_> = h.state().state.doc_order.clone();
+    let (first, other) = (ids[0], ids[1]);
+    h.state_mut().state.active_doc = Some(first);
+    h.run_steps(3);
+    h.state_mut().state.select_tool(Tool::Zoom);
+    h.run_steps(1);
+    // Scrubby Zoom: 100 pt right doubles the zoom
+    let z0 = active(&h).view.zoom;
+    let c = doc_point(&h, 360.0, 400.0);
+    drag(&mut h, c, c + egui::vec2(100.0, 0.0), Modifiers::NONE);
+    let z1 = active(&h).view.zoom;
+    assert!((z1 / z0 - 2.0).abs() < 0.1, "{z0} {z1}");
+    // Without it, a box zooms to fit
+    h.state_mut().state.set_flag("zoom.scrubby", false);
+    let c = doc_point(&h, 360.0, 400.0);
+    drag(&mut h, c, c + egui::vec2(40.0, 30.0), Modifiers::NONE);
+    assert!(active(&h).view.zoom > z1 * 3.0, "{}", active(&h).view.zoom);
+    // Zoom All Windows: the other document zooms by the same factor
+    h.state_mut().state.set_flag("zoom.all", true);
+    let before = (active(&h).view.zoom, h.state().state.docs[&other].view.zoom);
+    let p = doc_point(&h, 360.0, 400.0);
+    click(&mut h, p);
+    let after = (active(&h).view.zoom, h.state().state.docs[&other].view.zoom);
+    assert!(
+        ((after.0 / before.0) - (after.1 / before.1)).abs() < 0.01 && after.1 > before.1,
+        "{before:?} {after:?}"
+    );
+    // Scroll All Windows
+    h.state_mut().state.set_flag("hand.scroll_all", true);
+    h.state_mut().state.select_tool(Tool::Hand);
+    h.run_steps(1);
+    let offset = h.state().state.docs[&other].view.offset;
+    let p = doc_point(&h, 360.0, 400.0);
+    drag(&mut h, p, p + egui::vec2(30.0, 20.0), Modifiers::NONE);
+    let moved = h.state().state.docs[&other].view.offset - offset;
+    assert!((moved - egui::vec2(30.0, 20.0)).length() < 2.0, "{moved:?}");
 }
 
 #[test]
