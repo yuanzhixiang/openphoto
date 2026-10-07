@@ -324,8 +324,9 @@ pub enum Command {
     /// Window > Brushes, Brush Settings (F5).
     ToggleBrushes,
     ToggleBrushSettings,
-    /// Window > Tool Presets.
+    /// Window > Tool Presets, Layer Comps.
     ToggleToolPresets,
+    ToggleLayerComps,
 }
 
 /// A keyboard shortcut. `cmd` is Command on macOS and Ctrl elsewhere.
@@ -530,6 +531,7 @@ impl Command {
             | Self::ToggleCloneSource
             | Self::ToggleBrushes
             | Self::ToggleToolPresets
+            | Self::ToggleLayerComps
             | Self::FlipView
             | Self::TogglePixelGrid
             | Self::ToggleSmartGuides
@@ -771,6 +773,7 @@ impl Command {
             Self::ToggleBrushes => app.floating.brushes,
             Self::ToggleBrushSettings => app.floating.brush_settings,
             Self::ToggleToolPresets => app.floating.tool_presets,
+            Self::ToggleLayerComps => app.floating.layer_comps,
             Self::QuickMask => app
                 .active_doc
                 .and_then(|id| app.docs.get(&id))
@@ -812,6 +815,7 @@ impl Command {
             | Self::ToggleBrushes
             | Self::ToggleBrushSettings
             | Self::ToggleToolPresets
+            | Self::ToggleLayerComps
             | Self::ToggleRulers
             | Self::ToggleExtras
             | Self::ToggleGuides
@@ -1759,6 +1763,9 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         Command::ToggleToolPresets => app
             .floating
             .toggle(crate::panels::floating::Floating::ToolPresets),
+        Command::ToggleLayerComps => app
+            .floating
+            .toggle(crate::panels::floating::Floating::LayerComps),
         Command::ToggleRulers => app.view.rulers = !app.view.rulers,
         Command::ToggleExtras => app.view.extras = !app.view.extras,
         Command::ToggleGuides => app.view.guides = !app.view.guides,

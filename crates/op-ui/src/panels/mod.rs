@@ -17,6 +17,7 @@ mod presets;
 pub(crate) mod tool_presets;
 pub use color_panel::DEFAULT_SWATCHES;
 pub mod history;
+pub(crate) mod layer_comps;
 mod layers;
 pub use layers::{
     delete_active_layer, layer_color, layer_from_background_with, new_group_from, new_layer,

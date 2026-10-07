@@ -132,6 +132,11 @@ pub struct DocState {
     pub clone_slot: usize,
     /// The guides selected with the Move tool (by index).
     pub selected_guides: Vec<usize>,
+    /// Layer comps (Window › Layer Comps), the one applied last, and the
+    /// layers as they were before it (Last Document State).
+    pub layer_comps: Vec<op_core::layer_comps::LayerComp>,
+    pub comp_applied: Option<usize>,
+    pub last_document_state: Option<Vec<op_core::layer_comps::LayerState>>,
     /// The Move tool's ⌘-hover distances (`smart_guides::measure`).
     pub measure: Vec<([egui::Pos2; 2], f32)>,
     /// The Channels panel: which of red, green and blue show, and which
@@ -274,6 +279,9 @@ impl DocState {
             clone_slots: [(None, None); 5],
             clone_slot: 0,
             selected_guides: Vec::new(),
+            layer_comps: Vec::new(),
+            comp_applied: None,
+            last_document_state: None,
             measure: Vec::new(),
             channels_shown: [true; 3],
             channels_targeted: [true; 3],
@@ -1601,6 +1609,8 @@ pub struct AppState {
     pub tool_presets: Vec<crate::tool_presets::ToolPreset>,
     pub tool_presets_current_only: bool,
     pub new_tool_preset: Option<crate::dialogs::new_preset::NewPresetDialog>,
+    /// New Layer Comp while open.
+    pub new_layer_comp: Option<crate::panels::layer_comps::NewComp>,
     pub panel_options: Option<(
         crate::panels::floating::Floating,
         crate::panels::panel_options::InfoOptions,
@@ -1801,6 +1811,7 @@ impl Default for AppState {
             tool_presets: Vec::new(),
             tool_presets_current_only: true,
             new_tool_preset: None,
+            new_layer_comp: None,
             panel_options: None,
             full_screen_prompt: None,
             skip_full_screen_prompt: false,
@@ -1961,6 +1972,7 @@ impl AppState {
             || self.guide_layout.is_some()
             || self.panel_options.is_some()
             || self.new_tool_preset.is_some()
+            || self.new_layer_comp.is_some()
             || self.delete_crop_preset.is_some()
             || self.new_guide_dialog.is_some()
             || self.new_layer_dialog.is_some()

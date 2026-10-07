@@ -6796,6 +6796,43 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn layer_comps_record_and_apply() {
+    use crate::commands::Command;
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, Command::NewLayerNoDialog);
+    run_command(&mut h, Command::ToggleLayerComps);
+    h.run_steps(2);
+    // New... records the layers as "Layer Comp 1"
+    h.get_by_label("New...").click();
+    h.run_steps(2);
+    assert!(h.state().state.new_layer_comp.is_some());
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    assert_eq!(active(&h).layer_comps.len(), 1);
+    // Hide the new layer, then apply the comp: it shows again
+    let id = active(&h).doc.active_layer.unwrap();
+    h.state_mut()
+        .state
+        .active()
+        .unwrap()
+        .doc
+        .layer_mut(id)
+        .unwrap()
+        .visible = false;
+    h.get_by_label("Layer Comp 1").click();
+    h.run_steps(2);
+    assert!(active(&h).doc.layer(id).unwrap().visible);
+    assert_eq!(last_history(&h), "Apply Layer Comp");
+    shot(&mut h, "layer_comps_panel");
+    // Last Document State puts back the hidden layer
+    h.get_by_label("Last Document State").click();
+    h.run_steps(2);
+    assert!(!active(&h).doc.layer(id).unwrap().visible);
+}
+
+#[test]
 fn tool_presets_save_and_pick() {
     use crate::commands::Command;
     use egui_kittest::kittest::Queryable;

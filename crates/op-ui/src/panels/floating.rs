@@ -17,10 +17,11 @@ pub enum Floating {
     Brushes,
     BrushSettings,
     ToolPresets,
+    LayerComps,
 }
 
 impl Floating {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Navigator,
         Self::Histogram,
         Self::Info,
@@ -28,6 +29,7 @@ impl Floating {
         Self::Brushes,
         Self::BrushSettings,
         Self::ToolPresets,
+        Self::LayerComps,
     ];
 
     pub fn title(self) -> &'static str {
@@ -39,6 +41,7 @@ impl Floating {
             Self::Brushes => "Brushes",
             Self::BrushSettings => "Brush Settings",
             Self::ToolPresets => "Tool Presets",
+            Self::LayerComps => "Layer Comps",
         }
     }
 
@@ -61,6 +64,7 @@ impl Floating {
             Self::Brushes => Vec2::new(pt(250.0), pt(260.0)),
             Self::BrushSettings => Vec2::new(pt(300.0), pt(240.0)),
             Self::ToolPresets => Vec2::new(pt(250.0), pt(200.0)),
+            Self::LayerComps => Vec2::new(pt(280.0), pt(200.0)),
         }
     }
 }
@@ -75,6 +79,7 @@ pub struct FloatingPanels {
     pub brushes: bool,
     pub brush_settings: bool,
     pub tool_presets: bool,
+    pub layer_comps: bool,
 }
 
 impl FloatingPanels {
@@ -87,6 +92,7 @@ impl FloatingPanels {
             Floating::Brushes => self.brushes,
             Floating::BrushSettings => self.brush_settings,
             Floating::ToolPresets => self.tool_presets,
+            Floating::LayerComps => self.layer_comps,
         }
     }
 
@@ -99,6 +105,7 @@ impl FloatingPanels {
             Floating::Brushes => &mut self.brushes,
             Floating::BrushSettings => &mut self.brush_settings,
             Floating::ToolPresets => &mut self.tool_presets,
+            Floating::LayerComps => &mut self.layer_comps,
         };
         *open = !*open;
     }
@@ -217,6 +224,7 @@ pub fn show(ctx: &egui::Context, app: &mut AppState, panel_column_left: f32, top
                     Floating::Brushes => super::brushes::brushes(&mut child, app),
                     Floating::BrushSettings => super::brushes::brush_settings(&mut child, app),
                     Floating::ToolPresets => super::tool_presets::show(&mut child, app),
+                    Floating::LayerComps => super::layer_comps::show(&mut child, app),
                 }
             });
         if close {
