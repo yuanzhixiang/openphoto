@@ -2273,3 +2273,28 @@ pub fn replace_mode(app: &mut AppState) -> op_core::BlendMode {
         _ => BlendMode::Color,
     }
 }
+
+/// The Magic Eraser's options: its wand rule and opacity.
+pub fn magic_eraser_options(app: &mut AppState) -> (op_core::fill::BucketOptions, f32) {
+    let number = |app: &mut AppState, key: &'static str, default: &str| {
+        crate::options_bar::typed_number(&text(app, key, default))
+    };
+    let tolerance = number(app, "magiceraser.tolerance", "32").unwrap_or(32.0);
+    let opacity = number(app, "magiceraser.opacity", "100%").unwrap_or(100.0) / 100.0;
+    let options = op_core::fill::BucketOptions {
+        tolerance: tolerance.clamp(0.0, 255.0) as u8,
+        anti_alias: flag(app, "magiceraser.anti_alias", true),
+        contiguous: flag(app, "magiceraser.contiguous", true),
+        all_layers: flag(app, "magiceraser.all_layers", false),
+        ..Default::default()
+    };
+    (options, opacity.clamp(0.0, 1.0))
+}
+
+/// The Red Eye tool's Pupil Size and Darken Amount (0–1).
+pub fn red_eye_options(app: &mut AppState) -> (f32, f32) {
+    let pct = |app: &mut AppState, key: &'static str| {
+        crate::options_bar::typed_number(&text(app, key, "50%")).unwrap_or(50.0) / 100.0
+    };
+    (pct(app, "redeye.pupil"), pct(app, "redeye.darken"))
+}

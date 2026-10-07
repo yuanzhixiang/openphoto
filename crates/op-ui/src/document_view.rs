@@ -158,6 +158,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let matching =
         crate::options_tools::color_match(app, tool, (rgb3(app.foreground), rgb3(app.background)));
     let replace_mode = crate::options_tools::replace_mode(app);
+    let magic_eraser = crate::options_tools::magic_eraser_options(app);
+    let red_eye = crate::options_tools::red_eye_options(app);
     let sampling_ring = tool == Tool::Eyedropper && app.flag("eyedropper.ring", true);
     // The Zoom tool's Zoom Out button swaps what a click and Alt-click do
     let zoom_out = tool == Tool::Zoom && app.flag("zoom.out", false);
@@ -388,6 +390,35 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                             op_core::Selection::combine(state.doc.selection(), shape, op);
                         state.doc.set_selection(Some(combined));
                         state.record("Magic Wand");
+                    }
+                }
+            }
+            Tool::MagicEraser | Tool::RedEye if response.clicked() => {
+                if let Some(p) = response.interact_pointer_pos() {
+                    let d = to_doc(state, p, ppp);
+                    if d.x >= 0.0 && d.y >= 0.0 {
+                        let at = (d.x as u32, d.y as u32);
+                        let [r, g, b, _] = background.to_rgba8();
+                        let (result, name, label) = if tool == Tool::MagicEraser {
+                            let (options, opacity) = magic_eraser;
+                            let r = op_core::fill::magic_erase(
+                                &mut state.doc,
+                                at,
+                                &options,
+                                opacity,
+                                [r, g, b],
+                            );
+                            (r, "Magic Eraser", "magic eraser")
+                        } else {
+                            let r =
+                                op_core::fill::red_eye(&mut state.doc, at, red_eye.0, red_eye.1);
+                            (r, "Red Eye", "red eye tool")
+                        };
+                        match result {
+                            Ok(true) => state.record(name),
+                            Ok(false) => {}
+                            Err(e) => paint_error = Some(fill_alert(e, label)),
+                        }
                     }
                 }
             }
@@ -1707,4 +1738,17 @@ fn sampling_ring_shape(painter: &egui::Painter, c: Pos2, new: op_core::Color, ol
     let gray = egui::Stroke::new(crate::theme::pt(2.0), Color32::from_gray(0x80));
     painter.circle_stroke(c, inner, gray);
     painter.circle_stroke(c, outer, gray);
+}
+
+/// Photoshop's "Could not use the …" alert for a tool acting on the layer.
+fn fill_alert(e: op_core::fill::FillError, tool: &str) -> String {
+    use op_core::fill::FillError;
+    use op_core::paint::StrokeError;
+    match e {
+        FillError::NoLayer => StrokeError::NoLayer,
+        FillError::Locked => StrokeError::Locked,
+        FillError::Hidden => StrokeError::Hidden,
+        FillError::Group => StrokeError::Group,
+    }
+    .message(tool)
 }

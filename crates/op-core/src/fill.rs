@@ -545,3 +545,186 @@ mod tests {
         );
     }
 }
+
+/// The Magic Eraser: erases, on the active layer, the region a Magic Wand
+/// click at (`x`, `y`) would select (tolerance, contiguous, anti-alias,
+/// all layers), by `opacity`, within the selection if any. On the
+/// background it first becomes a regular layer, as in Photoshop (with
+/// locked transparency the region is filled with `background` instead).
+/// Returns whether anything changed.
+pub fn magic_erase(
+    doc: &mut Document,
+    (x, y): (u32, u32),
+    options: &BucketOptions,
+    opacity: f32,
+    background: [u8; 3],
+) -> Result<bool, FillError> {
+    target(doc)?;
+    let Some(region) = magic_wand(doc, x, y, options) else {
+        return Ok(false);
+    };
+    let id = doc.active_layer.ok_or(FillError::NoLayer)?;
+    if doc.layer(id).is_some_and(|l| l.is_background) {
+        crate::layer_ops::layer_from_background(doc);
+    }
+    let keep_alpha = doc.transparency_locked(id);
+    let selection = doc.selection().cloned();
+    let Some(image) = doc.layer_mut(id).and_then(|l| l.image_mut()) else {
+        return Err(FillError::Group);
+    };
+    let mut changed = false;
+    for py in 0..image.height() {
+        for px in 0..image.width() {
+            let mut a = region.get(px, py) as f32 / 255.0 * opacity;
+            if let Some(s) = &selection {
+                a *= s.get(px, py) as f32 / 255.0;
+            }
+            if a <= 0.0 {
+                continue;
+            }
+            let p = image.pixel(px, py);
+            let out = if keep_alpha {
+                let m = |c: u8, b: u8| (c as f32 + (b as f32 - c as f32) * a).round() as u8;
+                [
+                    m(p[0], background[0]),
+                    m(p[1], background[1]),
+                    m(p[2], background[2]),
+                    p[3],
+                ]
+            } else {
+                [p[0], p[1], p[2], (p[3] as f32 * (1.0 - a)).round() as u8]
+            };
+            if out != p {
+                image.set_pixel(px, py, out);
+                changed = true;
+            }
+        }
+    }
+    if changed {
+        doc.mark_dirty();
+    }
+    Ok(changed)
+}
+
+/// The Red Eye tool: around a click at (`x`, `y`), the red pixels
+/// connected to the reddest one nearby lose their red (it becomes the
+/// average of green and blue) and darken by `darken` (0–1, at most 60%).
+/// A larger `pupil` (0–1) takes in less red pixels. Returns whether
+/// anything changed (nothing when no red is found near the click).
+pub fn red_eye(
+    doc: &mut Document,
+    (x, y): (u32, u32),
+    pupil: f32,
+    darken: f32,
+) -> Result<bool, FillError> {
+    let id = target(doc)?;
+    let selection = doc.selection().cloned();
+    let Some(image) = doc.layer_mut(id).and_then(|l| l.image_mut()) else {
+        return Err(FillError::Group);
+    };
+    let (w, h) = (image.width(), image.height());
+    if x >= w || y >= h {
+        return Ok(false);
+    }
+    let redness = |p: [u8; 4]| p[0] as f32 - p[1].max(p[2]) as f32;
+    let threshold = 40.0 + (1.0 - pupil.clamp(0.0, 1.0)) * 60.0;
+    // The seed: the reddest pixel within a few percent of the image
+    let reach = ((w.min(h) as f32 * 0.03).max(8.0)) as i64;
+    let mut seed = None;
+    let mut best = threshold;
+    for sy in (y as i64 - reach).max(0)..=(y as i64 + reach).min(h as i64 - 1) {
+        for sx in (x as i64 - reach).max(0)..=(x as i64 + reach).min(w as i64 - 1) {
+            let r = redness(image.pixel(sx as u32, sy as u32));
+            if r > best {
+                best = r;
+                seed = Some((sx as u32, sy as u32));
+            }
+        }
+    }
+    let Some(seed) = seed else {
+        return Ok(false);
+    };
+    // Flood through red pixels, no farther than four times the reach
+    let limit = (reach * 4) as u32;
+    let mut seen = std::collections::HashSet::new();
+    let mut stack = vec![seed];
+    seen.insert(seed);
+    let mut region = Vec::new();
+    while let Some((px, py)) = stack.pop() {
+        region.push((px, py));
+        for (nx, ny) in [
+            (px.wrapping_sub(1), py),
+            (px + 1, py),
+            (px, py.wrapping_sub(1)),
+            (px, py + 1),
+        ] {
+            if nx >= w || ny >= h || nx.abs_diff(seed.0) > limit || ny.abs_diff(seed.1) > limit {
+                continue;
+            }
+            if !seen.contains(&(nx, ny)) && redness(image.pixel(nx, ny)) > threshold * 0.6 {
+                seen.insert((nx, ny));
+                stack.push((nx, ny));
+            }
+        }
+    }
+    let dark = 1.0 - 0.6 * darken.clamp(0.0, 1.0);
+    for (px, py) in region {
+        let amount = selection
+            .as_ref()
+            .map_or(1.0, |s| s.get(px, py) as f32 / 255.0);
+        if amount <= 0.0 {
+            continue;
+        }
+        let p = image.pixel(px, py);
+        let m = (p[1] as f32 + p[2] as f32) / 2.0;
+        let fixed = [m * dark, p[1] as f32 * dark, p[2] as f32 * dark];
+        let out =
+            [0, 1, 2].map(|c| (p[c] as f32 + (fixed[c] - p[c] as f32) * amount).round() as u8);
+        image.set_pixel(px, py, [out[0], out[1], out[2], p[3]]);
+    }
+    doc.mark_dirty();
+    Ok(true)
+}
+
+#[cfg(test)]
+mod eraser_and_red_eye_tests {
+    use super::*;
+    use crate::Color;
+
+    #[test]
+    fn magic_eraser_and_red_eye() {
+        // A white background with a red disc
+        let mut doc = Document::new_with_background("t", 60, 60, Color::WHITE);
+        let id = doc.layers[0].id;
+        {
+            let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+            for y in 0..60u32 {
+                for x in 0..60u32 {
+                    let (dx, dy) = (x as f32 - 30.0, y as f32 - 30.0);
+                    if dx * dx + dy * dy < 64.0 {
+                        image.set_pixel(x, y, [220, 30, 40, 255]);
+                    }
+                }
+            }
+        }
+        // Red Eye near (but not on) the disc: its red is gone
+        assert!(red_eye(&mut doc, (33, 33), 0.5, 0.5).unwrap());
+        let p = doc.layer(id).unwrap().image().unwrap().pixel(30, 30);
+        assert!(p[0] < 60 && p[0] <= p[1] + 20, "{p:?}");
+        assert_eq!(
+            doc.layer(id).unwrap().image().unwrap().pixel(5, 5),
+            [255, 255, 255, 255]
+        );
+        // Nothing red near a corner
+        assert!(!red_eye(&mut doc, (2, 2), 0.5, 0.5).unwrap());
+
+        // The Magic Eraser on the white: the background becomes a layer and
+        // the white goes, the disc stays
+        let options = BucketOptions::default();
+        assert!(magic_erase(&mut doc, (2, 2), &options, 1.0, [0, 0, 0]).unwrap());
+        let layer = doc.layer(id).unwrap();
+        assert!(!layer.is_background);
+        assert_eq!(layer.image().unwrap().pixel(2, 2)[3], 0);
+        assert_eq!(layer.image().unwrap().pixel(30, 30)[3], 255);
+    }
+}

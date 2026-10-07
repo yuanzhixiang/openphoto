@@ -5121,12 +5121,13 @@ fn smudge_pattern_background_eraser_and_color_replacement() {
     use op_tools::Tool;
     let mut h = harness(Vec::new());
     reference_document(&mut h);
-    let stroke = |h: &mut Harness<'_, OpenPhotoApp>, tool: Tool, from: (f32, f32), to: (f32, f32)| {
-        h.state_mut().state.select_tool(tool);
-        h.run_steps(1);
-        let (a, b) = (doc_point(h, from.0, from.1), doc_point(h, to.0, to.1));
-        drag(h, a, b, Modifiers::NONE);
-    };
+    let stroke =
+        |h: &mut Harness<'_, OpenPhotoApp>, tool: Tool, from: (f32, f32), to: (f32, f32)| {
+            h.state_mut().state.select_tool(tool);
+            h.run_steps(1);
+            let (a, b) = (doc_point(h, from.0, from.1), doc_point(h, to.0, to.1));
+            drag(h, a, b, Modifiers::NONE);
+        };
     // Pattern Stamp paints the default green pattern
     stroke(&mut h, Tool::PatternStamp, (100.0, 100.0), (200.0, 100.0));
     let p = composite_pixel(&mut h, 150, 100);
@@ -5135,7 +5136,12 @@ fn smudge_pattern_background_eraser_and_color_replacement() {
 
     // Color Replacement gives the dark gray the foreground's hue
     h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
-    stroke(&mut h, Tool::ColorReplacement, (100.0, 400.0), (200.0, 400.0));
+    stroke(
+        &mut h,
+        Tool::ColorReplacement,
+        (100.0, 400.0),
+        (200.0, 400.0),
+    );
     let p = composite_pixel(&mut h, 150, 400);
     assert!(p[0] > p[1] && p[0] > p[2], "{p:?}");
 
@@ -5145,11 +5151,56 @@ fn smudge_pattern_background_eraser_and_color_replacement() {
     assert!(p[1] > 0x14, "{p:?}");
 
     // The Background Eraser makes the background a layer and erases the gray
-    stroke(&mut h, Tool::BackgroundEraser, (400.0, 600.0), (600.0, 600.0));
+    stroke(
+        &mut h,
+        Tool::BackgroundEraser,
+        (400.0, 600.0),
+        (600.0, 600.0),
+    );
     let doc = &active(&h).doc;
     assert!(!doc.layers[0].is_background);
     assert_eq!(doc.layers[0].name, "Layer 0");
     assert_eq!(doc.layers[0].image().unwrap().pixel(500, 600)[3], 0);
     assert_eq!(doc.layers[0].image().unwrap().pixel(500, 700)[3], 255);
     assert_eq!(last_history(&h), "Background Eraser");
+}
+
+#[test]
+fn magic_eraser_and_red_eye_tools() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A red disc on the dark background
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.layers[0].id;
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 280..320u32 {
+            for x in 280..320u32 {
+                let (dx, dy) = (x as f32 - 300.0, y as f32 - 300.0);
+                if dx * dx + dy * dy < 400.0 {
+                    image.set_pixel(x, y, [230, 20, 30, 255]);
+                }
+            }
+        }
+        doc.mark_dirty();
+    }
+    h.state_mut().state.select_tool(Tool::RedEye);
+    h.run_steps(1);
+    let p = doc_point(&h, 302.0, 302.0);
+    click(&mut h, p);
+    let px = composite_pixel(&mut h, 300, 300);
+    assert!(px[0] < 40, "{px:?}");
+    assert_eq!(last_history(&h), "Red Eye");
+
+    // The Magic Eraser on the dark gray: the background becomes a layer and
+    // the gray is erased
+    h.state_mut().state.select_tool(Tool::MagicEraser);
+    h.run_steps(1);
+    let p = doc_point(&h, 50.0, 50.0);
+    click(&mut h, p);
+    let doc = &active(&h).doc;
+    assert!(!doc.layers[0].is_background);
+    assert_eq!(doc.layers[0].image().unwrap().pixel(50, 50)[3], 0);
+    assert_eq!(last_history(&h), "Magic Eraser");
 }
