@@ -796,27 +796,85 @@ pub enum SharpenRemove {
     MotionBlur,
 }
 
-/// Sharpen › Smart Sharpen: an unsharp mask of `radius` and `amount`
-/// (1–500 %) with the blur it undoes (Gaussian; Lens: a disc, finer
-/// edges; Motion: along `angle`), Reduce Noise (0–100 %) keeping small
-/// differences out, and the shadows and highlights faded by their
-/// amounts (0–100 %).
-#[allow(clippy::too_many_arguments)] // one per control in the dialog
-pub fn smart_sharpen(
-    px: &[Px],
-    w: usize,
-    h: usize,
-    amount: f32,
-    radius: f32,
-    noise: f32,
-    remove: SharpenRemove,
-    angle: f32,
-    fade: (f32, f32),
-) -> Vec<Px> {
-    let r = radius.max(0.1);
-    let taps: Vec<(i64, i64, f32)> = match remove {
+/// Smart Sharpen's Shadows or Highlights: how much the sharpening fades
+/// there (0–100 %), how far into the tones that reaches (Tonal Width,
+/// 0–100 %) and over how wide a neighbourhood a pixel's tone is judged
+/// (Radius, 1–100 pixels).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ToneFade {
+    pub fade: f32,
+    pub tonal_width: f32,
+    pub radius: f32,
+}
+
+impl Default for ToneFade {
+    /// Photoshop's: no fade, 50 % tonal width, radius 1.
+    fn default() -> Self {
+        Self {
+            fade: 0.0,
+            tonal_width: 50.0,
+            radius: 1.0,
+        }
+    }
+}
+
+/// Smart Sharpen's settings, as its dialog has them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SmartSharpen {
+    /// Amount 1–500 %, Radius 0.1–64 pixels, Reduce Noise 0–100 %.
+    pub amount: f32,
+    pub radius: f32,
+    pub noise: f32,
+    /// The blur it undoes, and Motion Blur's angle in degrees.
+    pub remove: SharpenRemove,
+    pub angle: f32,
+    pub shadows: ToneFade,
+    pub highlights: ToneFade,
+    /// Use Legacy: the older sharpening, without Reduce Noise; More
+    /// Accurate (legacy only) sharpens in two finer passes.
+    pub legacy: bool,
+    pub more_accurate: bool,
+}
+
+impl Default for SmartSharpen {
+    /// Photoshop's Default preset.
+    fn default() -> Self {
+        Self {
+            amount: 200.0,
+            radius: 1.0,
+            noise: 10.0,
+            remove: SharpenRemove::LensBlur,
+            angle: 0.0,
+            shadows: ToneFade::default(),
+            highlights: ToneFade::default(),
+            legacy: false,
+            more_accurate: false,
+        }
+    }
+}
+
+/// Sharpen › Smart Sharpen: an unsharp mask of Radius and Amount with the
+/// blur it undoes (Gaussian; Lens: a disc, finer edges; Motion: along the
+/// angle) and Reduce Noise keeping small differences out (not in Legacy).
+/// Each pixel's tone is its neighbourhood's luminance (a box of the
+/// shadows' or highlights' Radius); the sharpening fades by Fade Amount
+/// over the darkest (shadows) or brightest (highlights) Tonal Width of the
+/// tones, fully at black or white and not at all past the width. Legacy's
+/// More Accurate runs two passes of half the amount.
+pub fn smart_sharpen(px: &[Px], w: usize, h: usize, o: &SmartSharpen) -> Vec<Px> {
+    if o.legacy && o.more_accurate {
+        let half = SmartSharpen {
+            amount: o.amount / 2.0,
+            more_accurate: false,
+            ..*o
+        };
+        let once = smart_sharpen(px, w, h, &half);
+        return smart_sharpen(&once, w, h, &half);
+    }
+    let r = o.radius.max(0.1);
+    let taps: Vec<(i64, i64, f32)> = match o.remove {
         SharpenRemove::MotionBlur => {
-            let (s, c) = angle.to_radians().sin_cos();
+            let (s, c) = o.angle.to_radians().sin_cos();
             let n = r.round().max(1.0) as i64;
             (-n..=n)
                 .map(|k| {
@@ -830,7 +888,7 @@ pub fn smart_sharpen(
         }
         _ => {
             let n = (r * 2.0).ceil().max(1.0) as i64;
-            let sigma = if remove == SharpenRemove::LensBlur {
+            let sigma = if o.remove == SharpenRemove::LensBlur {
                 r * 0.6
             } else {
                 r
@@ -845,15 +903,49 @@ pub fn smart_sharpen(
         }
     };
     let blur = kernel_blur(px, w, h, &taps);
-    let floor = noise / 100.0 * 10.0;
+    let floor = if o.legacy {
+        0.0
+    } else {
+        o.noise / 100.0 * 10.0
+    };
+    // The tones the fades judge by: luminance over each one's radius
+    let tones = |fade: &ToneFade| -> Option<Vec<f32>> {
+        if fade.fade <= 0.0 {
+            return None;
+        }
+        let n = fade.radius.round().max(1.0) as i64 - 1;
+        let lum: Vec<Px> = px
+            .iter()
+            .map(|p| {
+                let l = ((p[0] as u32 + p[1] as u32 + p[2] as u32) / 3) as u8;
+                [l, l, l, 255]
+            })
+            .collect();
+        let box_taps: Vec<(i64, i64, f32)> = (-n..=n)
+            .flat_map(|dy| (-n..=n).map(move |dx| (dx, dy, 1.0)))
+            .collect();
+        Some(
+            kernel_blur(&lum, w, h, &box_taps)
+                .iter()
+                .map(|p| p[0] as f32 / 255.0)
+                .collect(),
+        )
+    };
+    let (shadow_tone, highlight_tone) = (tones(&o.shadows), tones(&o.highlights));
+    let width = |f: &ToneFade| (f.tonal_width / 100.0).max(0.01);
     px.iter()
         .zip(&blur)
-        .map(|(p, b)| {
-            let lum = (p[0] as f32 + p[1] as f32 + p[2] as f32) / 3.0 / 255.0;
-            // Less in the deep shadows and bright highlights
-            let fade_k = 1.0
-                - fade.0 / 100.0 * (1.0 - lum / 0.3).clamp(0.0, 1.0)
-                - fade.1 / 100.0 * ((lum - 0.7) / 0.3).clamp(0.0, 1.0);
+        .enumerate()
+        .map(|(i, (p, b))| {
+            let mut fade_k = 1.0;
+            if let Some(t) = &shadow_tone {
+                let wd = width(&o.shadows);
+                fade_k -= o.shadows.fade / 100.0 * (1.0 - t[i] / wd).clamp(0.0, 1.0);
+            }
+            if let Some(t) = &highlight_tone {
+                let wd = width(&o.highlights);
+                fade_k -= o.highlights.fade / 100.0 * ((t[i] - (1.0 - wd)) / wd).clamp(0.0, 1.0);
+            }
             let s = |c: usize| {
                 let d = p[c] as f32 - b[c] as f32;
                 let d = if d.abs() <= floor {
@@ -861,7 +953,7 @@ pub fn smart_sharpen(
                 } else {
                     d - floor * d.signum()
                 };
-                (p[c] as f32 + d * amount / 100.0 * fade_k.max(0.0))
+                (p[c] as f32 + d * o.amount / 100.0 * f32::max(fade_k, 0.0))
                     .round()
                     .clamp(0.0, 255.0) as u8
             };
@@ -1289,7 +1381,11 @@ mod tests {
         // the step across the blocks' edges
         let blocks: Vec<Px> = (0..16 * 16)
             .map(|i| {
-                let v = if ((i % 16) / 8 + (i / 16) / 8) % 2 == 0 { 100 } else { 110 };
+                let v = if ((i % 16) / 8 + (i / 16) / 8) % 2 == 0 {
+                    100
+                } else {
+                    110
+                };
                 [v, v, v, 255]
             })
             .collect();
@@ -1320,7 +1416,11 @@ mod tests {
             },
         );
         assert!(red.iter().zip(&noisy).any(|(a, b)| a[0] != b[0]));
-        assert!(red.iter().zip(&noisy).all(|(a, b)| a[1] == b[1] && a[2] == b[2]));
+        assert!(
+            red.iter()
+                .zip(&noisy)
+                .all(|(a, b)| a[1] == b[1] && a[2] == b[2])
+        );
     }
 
     #[test]
@@ -1445,20 +1545,48 @@ mod tests {
             spread(&noisy)
         );
         let px = checker(32, 32);
-        let sharp = smart_sharpen(
-            &px,
-            32,
-            32,
-            100.0,
-            1.0,
-            0.0,
-            SharpenRemove::GaussianBlur,
-            0.0,
-            (0.0, 0.0),
-        );
+        let plain = SmartSharpen {
+            amount: 100.0,
+            noise: 0.0,
+            remove: SharpenRemove::GaussianBlur,
+            ..Default::default()
+        };
+        let sharp = smart_sharpen(&px, 32, 32, &plain);
         // Edges gain contrast
         let i = 3; // the last dark column before a light one
         assert!(sharp[i][0] < px[i][0]);
+        // Shadows faded fully: the dark side of the edge keeps its value
+        let faded = smart_sharpen(
+            &px,
+            32,
+            32,
+            &SmartSharpen {
+                shadows: ToneFade {
+                    fade: 100.0,
+                    tonal_width: 100.0,
+                    radius: 1.0,
+                },
+                ..plain
+            },
+        );
+        assert!(faded[i][0] > sharp[i][0]);
+        // Legacy's More Accurate differs from one pass
+        let legacy = SmartSharpen {
+            legacy: true,
+            ..plain
+        };
+        assert_ne!(
+            smart_sharpen(&px, 32, 32, &legacy),
+            smart_sharpen(
+                &px,
+                32,
+                32,
+                &SmartSharpen {
+                    more_accurate: true,
+                    ..legacy
+                }
+            )
+        );
     }
 
     #[test]

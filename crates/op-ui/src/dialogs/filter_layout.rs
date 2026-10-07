@@ -547,56 +547,6 @@ pub const SHAPE_BLUR: &Layout = &Layout {
     ],
 };
 
-pub const SMART_SHARPEN: &Layout = &Layout {
-    size: (324.0, 519.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: true,
-    rows: &[
-        number(
-            "Amount:",
-            135.0,
-            [140.0, 287.0, 200.5, 306.0],
-            "%",
-            205.5,
-            Some((21.0, 303.0, 313.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Radius:",
-            135.0,
-            [140.0, 336.0, 200.5, 355.0],
-            "px",
-            205.5,
-            Some((21.0, 303.0, 362.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Reduce Noise:",
-            135.0,
-            [140.0, 385.0, 200.5, 404.0],
-            "%",
-            205.5,
-            Some((21.0, 303.0, 411.0)),
-            Scale::Linear,
-        ),
-        Row::Popup {
-            label: "Remove:",
-            label_right: 135.0,
-            rect: [140.0, 434.0, 300.0, 455.0],
-        },
-        number(
-            "Angle:",
-            135.0,
-            [140.0, 467.0, 200.5, 486.0],
-            "°",
-            205.5,
-            Some((21.0, 303.0, 493.0)),
-            Scale::Linear,
-        ),
-    ],
-};
-
 pub const OIL_PAINT: &Layout = &Layout {
     size: (324.0, 584.0),
     button_width: 59.5,

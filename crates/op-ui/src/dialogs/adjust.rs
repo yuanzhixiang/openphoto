@@ -294,12 +294,21 @@ const REDUCE_NOISE: &[Param] = &[
     param("Blue Preserve Details:", 0.0, 100.0, 60.0, 0),
 ];
 
+/// In the dialog's order (`smart_sharpen`'s indexes).
 const SMART_SHARPEN: &[Param] = &[
     param("Amount:", 1.0, 500.0, 200.0, 0),
     param("Radius:", 0.1, 64.0, 1.0, 1),
     param("Reduce Noise:", 0.0, 100.0, 10.0, 0),
     choice("Remove:", &["Gaussian Blur", "Lens Blur", "Motion Blur"], 1),
     param("Angle:", -180.0, 180.0, 0.0, 0),
+    param("Shadows Fade Amount:", 0.0, 100.0, 0.0, 0),
+    param("Shadows Tonal Width:", 0.0, 100.0, 50.0, 0),
+    param("Shadows Radius:", 1.0, 100.0, 1.0, 0),
+    param("Highlights Fade Amount:", 0.0, 100.0, 0.0, 0),
+    param("Highlights Tonal Width:", 0.0, 100.0, 50.0, 0),
+    param("Highlights Radius:", 1.0, 100.0, 1.0, 0),
+    check("Use Legacy", false),
+    check("More Accurate", false),
 ];
 
 const FIBERS: &[Param] = &[
@@ -641,7 +650,6 @@ impl Kind {
             Self::TraceContour => l::TRACE_CONTOUR,
             Self::Diffuse => l::DIFFUSE,
             Self::ShapeBlur => l::SHAPE_BLUR,
-            Self::SmartSharpen => l::SMART_SHARPEN,
             Self::OilPaint => l::OIL_PAINT,
             Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
             Self::HdrToning => l::HDR_TONING,
@@ -895,6 +903,9 @@ pub struct Extra {
     pub rn_per_channel: bool,
     pub rn_setting: Option<String>,
     pub rn_thumbs: [Option<egui::TextureHandle>; 3],
+    /// Smart Sharpen: Shadows / Highlights open, the saved preset chosen.
+    pub ss_open: bool,
+    pub ss_preset: Option<String>,
     /// The document's size in pixels (Lens Flare's center needs it).
     pub doc_size: (f32, f32),
 }
@@ -1485,18 +1496,28 @@ impl AdjustDialog {
                     channels: [channel(0), channel(1), channel(2)],
                 })
             }
-            Kind::SmartSharpen => Filter::SmartSharpen {
-                amount: v[0],
-                radius: v[1],
-                noise: v[2],
-                remove: [
-                    mf::SharpenRemove::GaussianBlur,
-                    mf::SharpenRemove::LensBlur,
-                    mf::SharpenRemove::MotionBlur,
-                ][pick(v[3])],
-                angle: v[4],
-                fade: (0.0, 0.0),
-            },
+            Kind::SmartSharpen => {
+                let tone = |k: usize| mf::ToneFade {
+                    fade: v[k],
+                    tonal_width: v[k + 1],
+                    radius: v[k + 2],
+                };
+                Filter::SmartSharpen(mf::SmartSharpen {
+                    amount: v[0],
+                    radius: v[1],
+                    noise: v[2],
+                    remove: [
+                        mf::SharpenRemove::GaussianBlur,
+                        mf::SharpenRemove::LensBlur,
+                        mf::SharpenRemove::MotionBlur,
+                    ][pick(v[3]).min(2)],
+                    angle: v[4],
+                    shadows: tone(smart_sharpen::SHADOWS),
+                    highlights: tone(smart_sharpen::HIGHLIGHTS),
+                    legacy: v[smart_sharpen::LEGACY] == 1.0,
+                    more_accurate: v[smart_sharpen::MORE_ACCURATE] == 1.0,
+                })
+            }
             Kind::Fibers => Filter::Fibers {
                 variance: v[0],
                 strength: v[1],
@@ -1762,6 +1783,7 @@ impl AdjustDialog {
                     None if self.kind == Kind::LensBlur => lens_blur::size(ctx.content_rect()),
                     None if self.kind == Kind::Wave => wave::SIZE,
                     None if self.kind == Kind::ReduceNoise => reduce_noise::SIZE,
+                    None if self.kind == Kind::SmartSharpen => self.smart_sharpen_size(),
                     None => self
                         .layout()
                         .map_or_else(|| self.kind.size(), |l| vec2(pt(l.size.0), pt(l.size.1))),
@@ -1776,6 +1798,8 @@ impl AdjustDialog {
                     self.wave_ui(ui, rect)
                 } else if self.kind == Kind::ReduceNoise {
                     self.reduce_noise_ui(ui, rect)
+                } else if self.kind == Kind::SmartSharpen {
+                    self.smart_sharpen_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
                     self.classic_ui(ui, rect, layout)
                 } else if let Some(layout) = self.kind.plain() {
@@ -2572,7 +2596,7 @@ impl AdjustDialog {
     /// The preview's size in pixels (the classic pane's 196 pt square,
     /// the plug-in style dialogs' 256 pt one, at two pixels a point).
     pub fn pane_px(&self) -> (usize, usize) {
-        if let Some([x0, y0, x1, y1]) = legacy::preview_rect(self.kind) {
+        if let Some([x0, y0, x1, y1]) = self.legacy_area() {
             (((x1 - x0) * 2.0) as usize, ((y1 - y0) * 2.0) as usize)
         } else if self.kind == Kind::Shear {
             (600, 300)
@@ -3016,6 +3040,7 @@ fn auto_brightness_contrast(histogram: &[u64; 256]) -> (i32, i32) {
 mod legacy;
 mod lens_blur;
 mod reduce_noise;
+mod smart_sharpen;
 
 /// A flat 13 pt button as the plug-in dialogs' Randomize (`#454545`,
 /// `#666666` edge, `#5a5a5a` while pressed). Returns whether it was

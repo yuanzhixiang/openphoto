@@ -389,10 +389,8 @@ impl OpenPhotoApp {
                     && let Some((w, h, px)) = dialogs::adjust_thumbnail(&state.doc, (240, 220))
                 {
                     for c in 0..3 {
-                        let gray: Vec<egui::Color32> = px
-                            .iter()
-                            .map(|p| egui::Color32::from_gray(p[c]))
-                            .collect();
+                        let gray: Vec<egui::Color32> =
+                            px.iter().map(|p| egui::Color32::from_gray(p[c])).collect();
                         dialog.extra.rn_thumbs[c] = Some(ctx.load_texture(
                             format!("reduce-noise-channel-{c}"),
                             egui::ColorImage::new([w, h], gray),

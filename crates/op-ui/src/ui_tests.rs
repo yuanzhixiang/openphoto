@@ -8776,7 +8776,15 @@ fn reduce_noise_dialog_advanced_per_channel() {
     shot_dialog(&mut h, "reduce_noise_advanced", 807.0, 658.0);
     click(&mut h, at(586.0, 221.5));
     h.run_steps(3);
-    assert!(h.state().state.adjust_dialog.as_ref().unwrap().extra.rn_per_channel);
+    assert!(
+        h.state()
+            .state
+            .adjust_dialog
+            .as_ref()
+            .unwrap()
+            .extra
+            .rn_per_channel
+    );
     shot_dialog(&mut h, "reduce_noise_channel", 807.0, 658.0);
     // Green's Strength reaches the filter
     let dialog = h.state_mut().state.adjust_dialog.as_mut().unwrap();
@@ -8793,4 +8801,45 @@ fn reduce_noise_dialog_advanced_per_channel() {
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
     assert_eq!(last_history(&h), "Reduce Noise");
+}
+
+#[test]
+fn smart_sharpen_dialog_opens_shadows_highlights() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::SmartSharpen);
+    h.run_steps(4);
+    shot_dialog(&mut h, "smart_sharpen", 685.0, 291.0);
+    let (x, y) = dialog_origin(&mut h);
+    let pt = crate::theme::pt;
+    // Shadows / Highlights opens
+    click(&mut h, egui::pos2(pt(x + 340.0), pt(y + 257.5)));
+    h.run_steps(4);
+    assert!(
+        h.state()
+            .state
+            .adjust_dialog
+            .as_ref()
+            .unwrap()
+            .extra
+            .ss_open
+    );
+    let (x, y) = dialog_origin(&mut h);
+    shot_dialog(&mut h, "smart_sharpen_open", 685.0, 502.0);
+    let _ = (x, y);
+    // Shadows' Fade Amount and Use Legacy reach the filter
+    let dialog = h.state_mut().state.adjust_dialog.as_mut().unwrap();
+    dialog.test_set_value(5, "40");
+    dialog.test_set_value(11, "1");
+    h.run_steps(2);
+    match h.state().state.adjust_dialog.as_ref().unwrap().effect() {
+        Some(crate::dialogs::Effect::Filter(op_core::filter::Filter::SmartSharpen(o))) => {
+            assert_eq!(o.shadows.fade, 40.0);
+            assert!(o.legacy);
+        }
+        other => panic!("{other:?}"),
+    }
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "Smart Sharpen");
 }

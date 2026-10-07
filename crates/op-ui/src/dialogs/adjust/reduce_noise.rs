@@ -41,6 +41,7 @@ fn overall_row(label: &'static str, y: f32, unit: Option<&'static str>) -> Row {
         field: [659.0, y - 9.5, 703.0, y + 8.5],
         unit: unit.map(|u| (u, 708.0)),
         track: (540.5, 758.5, y + 16.0),
+        scale: super::filter_layout::Scale::Linear,
     }
 }
 
@@ -214,6 +215,7 @@ impl AdjustDialog {
             field: [639.0, y - 9.0, 683.5, y + 9.0],
             unit,
             track: (540.5, 758.5, y + 15.5),
+            scale: super::filter_layout::Scale::Linear,
         };
         self.legacy_row(
             ui,

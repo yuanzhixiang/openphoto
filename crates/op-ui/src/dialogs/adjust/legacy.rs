@@ -29,13 +29,26 @@ pub struct Row {
     pub field: [f32; 4],
     pub unit: Option<(&'static str, f32)>,
     pub track: (f32, f32, f32),
+    /// How values spread along the track (linear in most).
+    pub scale: super::filter_layout::Scale,
 }
 
 impl AdjustDialog {
+    /// This dialog's preview area: `preview_rect`, Smart Sharpen's shorter
+    /// with Shadows / Highlights folded.
+    pub(super) fn legacy_area(&self) -> Option<[f32; 4]> {
+        let area = preview_rect(self.kind)?;
+        Some(if self.kind == Kind::SmartSharpen && !self.extra.ss_open {
+            [8.0, 36.0, 271.0, 235.5]
+        } else {
+            area
+        })
+    }
+
     /// The preview (the document as filtered at the pane's zoom; dragging
     /// pans it) and its zoom controls centered under it at `zoom_y`.
     pub(super) fn legacy_preview(&mut self, ui: &mut Ui, frame: Rect, zoom_y: f32) {
-        let Some(p) = preview_rect(self.kind) else {
+        let Some(p) = self.legacy_area() else {
             return;
         };
         let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
@@ -163,14 +176,14 @@ impl AdjustDialog {
                 i,
                 at(x0, top),
                 at(x1, 0.0).x,
-                super::filter_layout::Scale::Linear,
+                row.scale,
             );
         } else {
             let line = Rect::from_min_max(at(x0, top), at(x1, top + 3.0));
             ui.painter().rect_filled(line, 0, Color32::from_gray(0x75));
             let v = self.value(i).unwrap_or(p.default);
             let (a, b) = (line.left() - pt(2.25), line.right() + pt(0.75));
-            let x = a + (b - a) * ((v - p.min) / (p.max - p.min)).clamp(0.0, 1.0);
+            let x = a + (b - a) * row.scale.place(v, p.min, p.max);
             appkit::pin(
                 ui.painter(),
                 Pos2::new(x, line.bottom() + pt(0.5)),
