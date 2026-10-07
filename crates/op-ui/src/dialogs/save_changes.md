@@ -6,18 +6,20 @@
 
 ## 布局与视觉
 
-按 Photoshop 确认框的结构排列（单位为 Photoshop 点，尚未逐像素比对）：
+与 Photoshop 2026 一样是 macOS 的提示框，直接用 `alert.rs` 的 `Alert::choose` 绘制（尺寸与配色见 `alert.md`）：
 
-- 公共外框与标题栏（`common.md`），标题「OpenPhoto」，420 × 150。
-- 正文：「Save changes to the OpenPhoto document “文档名” before closing?」，13 pt，左右各留 24，超长时换行。
-- 底部一排按钮：左侧「Don't Save」，右侧「Cancel」「Save」，按钮 96 × 24，距底边 24。
+- 警告三角加应用徽标的图标。
+- 正文（13 pt 系统粗体）：「Save changes to the OpenPhoto document “文档名” before closing?」（Photoshop 是「Adobe Photoshop document」）。
+- 三个整宽按钮自上而下：Save（默认按钮，蓝色）、Don’t Save（弯撇号，与 Photoshop 一致）、Cancel。
+
+与 Photoshop 截图并排比对一致（Photoshop 的截图是窗口未激活时的灰色默认按钮）。
 
 ## 交互
 
 - `show(ctx, title)` 每帧绘制，给出回答时返回 `SaveChoice`：`Save`、`DontSave`、`Cancel`。
-- 点击按钮；Enter = Save；Esc = Cancel；⌘D = Don't Save（macOS 的惯例）。
+- 点击按钮；Enter = Save；Esc = Cancel；⌘D = Don’t Save（macOS 的惯例）。
 - 打开期间是模态的（`AppState::modal_open()` 为真），菜单命令与快捷键不生效，⌘D 等按键留给它。
 
 ## 已知限制
 
-- Photoshop 的确认框带应用图标、文字为「Adobe Photoshop document」，并以蓝色突出默认按钮；这里的按钮与其它对话框一致。
+- 文字是「OpenPhoto document」而不是 Photoshop 的「Adobe Photoshop document」。
