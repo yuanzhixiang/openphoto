@@ -52,7 +52,16 @@ PackBits encoding: runs of 3 or more identical bytes are encoded as repeat segme
 - `masks_round_trip`: a disabled mask is written and read back with matching values and enabled state.
 - `a_lone_background_is_stored_as_the_merged_image`: with only a background, it is written as the composite and reads back as a background layer with matching pixels.
 - `rejects_other_files`: non-PSD data returns an error.
-- `photoshop_check::write_sample` (`#[ignore]`): writes `target/psd-check/ours.psd` for inspection in Photoshop or other software.
+- `photoshop_check::write_sample` (`#[ignore]`) writes `target/psd-check/ours.psd` for inspection in Photoshop or other software. It holds two layers above the background:
+  - a red box at 60% Multiply that reaches past the canvas, with a mask hiding x < 40;
+  - a blue bar with a disabled all-black mask.
+
+  Opened in Photoshop 2026 (checked by script), the file reads as written:
+  - both layers have their masks, the blue bar's disabled;
+  - the red box has 60% opacity and Multiply;
+  - at (30, 10) the masked red is hidden, giving white;
+  - at (50, 10) the red is (234, 120, 120);
+  - at (30, 38) the blue shows, since a disabled mask hides nothing.
 - `photoshop_check::read_photoshop_file` (`#[ignore]`): reads the Photoshop-saved PSD specified by the environment variable `OPENPHOTO_PSD`; the bottommost layer should be the background layer.
 
 ### Lock Tests

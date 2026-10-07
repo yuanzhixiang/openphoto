@@ -1107,6 +1107,26 @@ mod photoshop_check {
         let mut layer = Layer::raster(doc.new_layer_id(), "Red Box", image);
         layer.opacity = 0.6;
         layer.blend_mode = BlendMode::Multiply;
+        // A mask hiding the left of x 40
+        let mut mask = op_core::LayerMask::filled(64, 48, 255);
+        for y in 0..48 {
+            for x in 0..40 {
+                mask.image.set_pixel(x, y, [0, 0, 0, 255]);
+            }
+        }
+        layer.mask = Some(mask);
+        doc.insert_above_active(layer);
+        // A blue box under a disabled mask that would hide it all
+        let mut blue = TiledImage::new(64, 48);
+        for y in 34..44 {
+            for x in 4..60 {
+                blue.set_pixel(x, y, [30, 30, 220, 255]);
+            }
+        }
+        let mut layer = Layer::raster(doc.new_layer_id(), "Blue Bar", blue);
+        let mut off = op_core::LayerMask::filled(64, 48, 0);
+        off.enabled = false;
+        layer.mask = Some(off);
         doc.insert_above_active(layer);
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/psd-check");
         std::fs::create_dir_all(&dir).unwrap();
