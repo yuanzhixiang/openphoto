@@ -64,6 +64,20 @@ pub const TWIRL: Layout = Layout {
     diagram: Some((293.0, 227.0)),
 };
 
+/// Pixelate > Crystallize and Pointillize: "Cell Size" over a slider, no
+/// diagram (measured on Photoshop 2026, 457 × 367 pt).
+pub const CELL_SIZE: Layout = Layout {
+    size: (457.0, 367.0),
+    buttons_x: 350.5,
+    control: Control::Slider {
+        label_y: 327.0,
+        field_x: 284.0,
+        track_x1: 322.5,
+    },
+    mode: None,
+    diagram: None,
+};
+
 pub const PINCH: Layout = Layout {
     size: (468.0, 367.0),
     buttons_x: 347.5,

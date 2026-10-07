@@ -476,6 +476,19 @@ pub const TRACE_CONTOUR: &Layout = &Layout {
     ],
 };
 
+/// Stylize > Diffuse: the Mode radios under the preview (324 × 430 pt).
+pub const DIFFUSE: &Layout = &Layout {
+    size: (324.0, 430.0),
+    button_width: 59.5,
+    preview_y: 118.5,
+    pane: true,
+    rows: &[Row::Radios {
+        title: "Mode",
+        group: [10.5, 295.5, 314.0, 419.0],
+        ys: &[320.0, 347.0, 374.0, 401.0],
+    }],
+};
+
 pub const OFFSET: &Layout = &Layout {
     size: (323.0, 256.0),
     button_width: 60.0,

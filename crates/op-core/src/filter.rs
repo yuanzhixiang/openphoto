@@ -29,6 +29,19 @@ pub enum SpherizeMode {
     VerticalOnly,
 }
 
+/// Diffuse's Mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiffuseMode {
+    /// Any neighbor.
+    Normal,
+    /// Only a darker neighbor replaces a pixel.
+    DarkenOnly,
+    /// Only a lighter one.
+    LightenOnly,
+    /// The neighbor closest in color, so edges stay soft-edged.
+    Anisotropic,
+}
+
 /// Wind's Method.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WindMethod {
@@ -134,6 +147,14 @@ pub enum Filter {
     Mosaic { cell: u32 },
     /// Stylize > Solarize: values above 127 are inverted.
     Solarize,
+    /// Pixelate > Crystallize: Voronoi cells around one randomly placed
+    /// point per `cell` × `cell` block, each filled with its average color.
+    Crystallize { cell: u32 },
+    /// Pixelate > Pointillize: dots about `cell` pixels across in the
+    /// colors under them (a little varied), on the background color.
+    Pointillize { cell: u32 },
+    /// Stylize > Diffuse: pixels swapped with random neighbors, in `mode`.
+    Diffuse { mode: DiffuseMode },
     /// Render > Clouds: soft fractal noise between the foreground and
     /// background colors, filling the layer opaquely; a new pattern each
     /// time (`seed`).
@@ -186,6 +207,9 @@ impl Filter {
             Self::Pinch { .. } => "Pinch",
             Self::Spherize { .. } => "Spherize",
             Self::PolarCoordinates { .. } => "Polar Coordinates",
+            Self::Crystallize { .. } => "Crystallize",
+            Self::Pointillize { .. } => "Pointillize",
+            Self::Diffuse { .. } => "Diffuse",
             Self::Clouds { .. } => "Clouds",
             Self::DifferenceClouds { .. } => "Difference Clouds",
         }
@@ -653,12 +677,136 @@ fn distort_source(filter: Filter, x: f32, y: f32, cx: f32, cy: f32, w: f32, h: f
     }
 }
 
+/// Crystallize: each `cell` × `cell` block holds one seed point at a
+/// random spot; every pixel joins its nearest seed (searching the blocks
+/// around it), and each cell is filled with its pixels' average color.
+fn crystallize(src: &Buffer, cell: usize) -> Vec<[u8; 4]> {
+    let (w, h) = (src.w, src.h);
+    let (bw, bh) = (w.div_ceil(cell), h.div_ceil(cell));
+    let seed = |bx: usize, by: usize| {
+        (
+            (bx * cell) as f32 + noise(bx, by, 21) * cell as f32,
+            (by * cell) as f32 + noise(bx, by, 22) * cell as f32,
+        )
+    };
+    let mut owner = vec![0usize; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            let (bx, by) = (x / cell, y / cell);
+            let mut best = (f32::MAX, 0usize);
+            for ny in by.saturating_sub(1)..(by + 2).min(bh) {
+                for nx in bx.saturating_sub(1)..(bx + 2).min(bw) {
+                    let (sx, sy) = seed(nx, ny);
+                    let (dx, dy) = (x as f32 + 0.5 - sx, y as f32 + 0.5 - sy);
+                    let d = dx * dx + dy * dy;
+                    if d < best.0 {
+                        best = (d, ny * bw + nx);
+                    }
+                }
+            }
+            owner[y * w + x] = best.1;
+        }
+    }
+    let mut sum = vec![[0f32; 5]; bw * bh];
+    for (i, &o) in owner.iter().enumerate() {
+        let p = src.px[i];
+        for c in 0..4 {
+            sum[o][c] += p[c];
+        }
+        sum[o][4] += 1.0;
+    }
+    owner
+        .iter()
+        .map(|&o| {
+            let s = sum[o];
+            Buffer::straight([s[0] / s[4], s[1] / s[4], s[2] / s[4], s[3] / s[4]])
+        })
+        .collect()
+}
+
+/// Pointillize: the background color, with dots `cell` pixels across
+/// placed at a random spot in each block of a grid `cell` × 0.75 apart,
+/// each colored by the image under its center, varied a little per
+/// channel; later dots cover earlier ones.
+fn pointillize(src: &Buffer, cell: usize, paper: [u8; 3]) -> Vec<[u8; 4]> {
+    let (w, h) = (src.w, src.h);
+    let mut out = vec![[paper[0], paper[1], paper[2], 255]; w * h];
+    let step = ((cell as f32 * 0.75).round() as usize).max(2);
+    let r = cell as f32 / 2.0;
+    for by in 0..h.div_ceil(step) {
+        for bx in 0..w.div_ceil(step) {
+            let cx = (bx * step) as f32 + noise(bx, by, 31) * step as f32;
+            let cy = (by * step) as f32 + noise(bx, by, 32) * step as f32;
+            let base = Buffer::straight(src.at(cx as isize, cy as isize));
+            let color = [0, 1, 2].map(|c| {
+                let jitter = (noise(bx, by, 33 + c) - 0.5) * 48.0;
+                (base[c] as f32 + jitter).round().clamp(0.0, 255.0) as u8
+            });
+            let (x0, x1) = (
+                (cx - r).floor().max(0.0) as usize,
+                ((cx + r).ceil() as usize).min(w),
+            );
+            let (y0, y1) = (
+                (cy - r).floor().max(0.0) as usize,
+                ((cy + r).ceil() as usize).min(h),
+            );
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    let (dx, dy) = (x as f32 + 0.5 - cx, y as f32 + 0.5 - cy);
+                    if dx * dx + dy * dy <= r * r {
+                        out[y * w + x] = [color[0], color[1], color[2], 255];
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Diffuse: each pixel takes a randomly chosen pixel of its 3 × 3
+/// neighborhood (Normal), only if darker or lighter (Darken / Lighten
+/// Only), or the neighbor closest in color among a random few
+/// (Anisotropic).
+fn diffuse(src: &Buffer, mode: DiffuseMode) -> Vec<[u8; 4]> {
+    let (w, h) = (src.w, src.h);
+    let luma = |p: [f32; 4]| p[0] * 0.299 + p[1] * 0.587 + p[2] * 0.114;
+    let pick = |x: usize, y: usize, k: usize| {
+        let n = (noise(x, y, 41 + k) * 9.0) as isize;
+        src.at(x as isize + n % 3 - 1, y as isize + n / 3 - 1)
+    };
+    (0..w * h)
+        .map(|i| {
+            let (x, y) = (i % w, i / w);
+            let here = src.px[i];
+            let p = match mode {
+                DiffuseMode::Normal => pick(x, y, 0),
+                DiffuseMode::DarkenOnly => {
+                    let n = pick(x, y, 0);
+                    if luma(n) < luma(here) { n } else { here }
+                }
+                DiffuseMode::LightenOnly => {
+                    let n = pick(x, y, 0);
+                    if luma(n) > luma(here) { n } else { here }
+                }
+                DiffuseMode::Anisotropic => (0..3)
+                    .map(|k| pick(x, y, k))
+                    .min_by(|a, b| {
+                        let d = |p: [f32; 4]| (0..4).map(|c| (p[c] - here[c]).abs()).sum::<f32>();
+                        d(*a).total_cmp(&d(*b))
+                    })
+                    .unwrap_or(here),
+            };
+            Buffer::straight(p)
+        })
+        .collect()
+}
+
 /// A repeatable per-pixel random value in 0..1.
 fn noise(x: usize, y: usize, channel: usize) -> f32 {
     let mut v = (x as u64)
         .wrapping_mul(0x9E37_79B9_7F4A_7C15)
         .wrapping_add((y as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F))
-        .wrapping_add(channel as u64 * 0x1656_67B1_9E37_79F9);
+        .wrapping_add((channel as u64).wrapping_mul(0x1656_67B1_9E37_79F9));
     v ^= v >> 33;
     v = v.wrapping_mul(0xFF51_AFD7_ED55_8CCD);
     v ^= v >> 33;
@@ -671,6 +819,7 @@ fn filtered(
     filter: Filter,
     selection: Option<&crate::selection::Selection>,
     background: Option<[u8; 3]>,
+    paper: [u8; 3],
 ) -> Vec<[u8; 4]> {
     let src = Buffer::from_image(image);
     let (w, h) = (src.w, src.h);
@@ -1154,6 +1303,9 @@ fn filtered(
             }
             out
         }
+        Filter::Crystallize { cell } => crystallize(&src, cell.max(3) as usize),
+        Filter::Pointillize { cell } => pointillize(&src, cell.max(3) as usize, paper),
+        Filter::Diffuse { mode } => diffuse(&src, mode),
         Filter::Clouds {
             foreground,
             background,
@@ -1211,6 +1363,7 @@ pub fn apply(doc: &mut Document, filter: Filter, background: [u8; 3]) -> Result<
         filter,
         selection.as_ref(),
         is_background.then_some(background),
+        background,
     );
     for y in 0..h {
         for x in 0..w {
@@ -1633,5 +1786,56 @@ mod tests {
             .flat_map(|row| row.windows(2).map(|w| (w[0] - w[1]).abs()))
             .fold(0f32, f32::max);
         assert!(step < 0.3, "{step}");
+    }
+
+    /// A 40 × 40 horizontal gradient as a filter source.
+    fn ramp() -> Buffer {
+        let mut img = TiledImage::new(40, 40);
+        for y in 0..40 {
+            for x in 0..40 {
+                let v = (x * 6) as u8;
+                img.set_pixel(x, y, [v, 255 - v, (y * 6) as u8, 255]);
+            }
+        }
+        Buffer::from_image(&img)
+    }
+
+    #[test]
+    fn crystallize_fills_cells_with_one_color() {
+        let out = crystallize(&ramp(), 10);
+        let mut colors: Vec<[u8; 4]> = out.clone();
+        colors.sort();
+        colors.dedup();
+        // About one color per 10 × 10 block, far fewer than pixels
+        assert!((10..=25).contains(&colors.len()), "{}", colors.len());
+        // Neighbors mostly share their cell's color
+        let same = (0..out.len() - 1).filter(|&i| out[i] == out[i + 1]).count();
+        assert!(same > out.len() * 8 / 10);
+    }
+
+    #[test]
+    fn pointillize_paints_dots_on_the_background() {
+        let out = pointillize(&ramp(), 6, [255, 255, 255]);
+        let paper = out.iter().filter(|p| **p == [255, 255, 255, 255]).count();
+        assert!(paper > 0 && paper < out.len() / 2, "{paper}");
+        assert!(out.iter().all(|p| p[3] == 255));
+    }
+
+    #[test]
+    fn diffuse_moves_pixels_between_neighbors() {
+        let src = ramp();
+        let normal = diffuse(&src, DiffuseMode::Normal);
+        let moved = (0..normal.len())
+            .filter(|&i| normal[i] != Buffer::straight(src.px[i]))
+            .count();
+        assert!(moved > normal.len() / 2, "{moved}");
+        // Darken Only never lightens; Lighten Only never darkens
+        let luma = |p: [u8; 4]| p[0] as f32 * 0.299 + p[1] as f32 * 0.587 + p[2] as f32 * 0.114;
+        let dark = diffuse(&src, DiffuseMode::DarkenOnly);
+        let light = diffuse(&src, DiffuseMode::LightenOnly);
+        for i in 0..dark.len() {
+            let here = luma(Buffer::straight(src.px[i]));
+            assert!(luma(dark[i]) <= here + 0.01 && luma(light[i]) >= here - 0.01);
+        }
     }
 }

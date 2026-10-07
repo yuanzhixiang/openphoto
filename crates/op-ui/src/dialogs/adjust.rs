@@ -11,7 +11,7 @@
 
 use egui::{Align2, Color32, Key, Pos2, Rect, Sense, Stroke, Ui, vec2};
 use op_core::adjust::Adjustment;
-use op_core::filter::{Filter, OffsetFill, SpherizeMode, WindMethod};
+use op_core::filter::{DiffuseMode, Filter, OffsetFill, SpherizeMode, WindMethod};
 
 use super::{
     appkit, black_white, brightness_contrast, channel_mixer, color_balance, common, curves,
@@ -124,6 +124,13 @@ const MOTION_BLUR: &[Param] = &[
     param("Distance (pixels):", 1.0, 2000.0, 10.0, 0),
 ];
 const TWIRL: &[Param] = &[param("Angle (°):", -999.0, 999.0, 50.0, 0)];
+const CRYSTALLIZE: &[Param] = &[param("Cell Size", 3.0, 300.0, 10.0, 0)];
+const POINTILLIZE: &[Param] = &[param("Cell Size", 3.0, 300.0, 5.0, 0)];
+const DIFFUSE: &[Param] = &[choice(
+    "Mode",
+    &["Normal", "Darken Only", "Lighten Only", "Anisotropic"],
+    0,
+)];
 const PINCH: &[Param] = &[param("Amount (%):", -100.0, 100.0, 50.0, 0)];
 const SPHERIZE: &[Param] = &[
     param("Amount (%):", -100.0, 100.0, 100.0, 0),
@@ -196,6 +203,9 @@ pub enum Kind {
     MotionBlur,
     Emboss,
     Twirl,
+    Crystallize,
+    Pointillize,
+    Diffuse,
     Pinch,
     Spherize,
     PolarCoordinates,
@@ -237,6 +247,9 @@ impl Kind {
             Self::MotionBlur => "Motion Blur",
             Self::Emboss => "Emboss",
             Self::Twirl => "Twirl",
+            Self::Crystallize => "Crystallize",
+            Self::Pointillize => "Pointillize",
+            Self::Diffuse => "Diffuse",
             Self::Pinch => "Pinch",
             Self::Spherize => "Spherize",
             Self::PolarCoordinates => "Polar Coordinates",
@@ -278,6 +291,9 @@ impl Kind {
             Self::MotionBlur => MOTION_BLUR,
             Self::Emboss => EMBOSS,
             Self::Twirl => TWIRL,
+            Self::Crystallize => CRYSTALLIZE,
+            Self::Pointillize => POINTILLIZE,
+            Self::Diffuse => DIFFUSE,
             Self::Pinch => PINCH,
             Self::Spherize => SPHERIZE,
             Self::PolarCoordinates => POLAR,
@@ -307,6 +323,7 @@ impl Kind {
             Self::DustAndScratches => l::DUST_AND_SCRATCHES,
             Self::Offset => l::OFFSET,
             Self::TraceContour => l::TRACE_CONTOUR,
+            Self::Diffuse => l::DIFFUSE,
             _ => return None,
         })
     }
@@ -315,6 +332,7 @@ impl Kind {
     fn distort(self) -> Option<&'static distort::Layout> {
         Some(match self {
             Self::Twirl => &distort::TWIRL,
+            Self::Crystallize | Self::Pointillize => &distort::CELL_SIZE,
             Self::Pinch => &distort::PINCH,
             Self::Spherize => &distort::SPHERIZE,
             Self::PolarCoordinates => &distort::POLAR,
@@ -623,6 +641,16 @@ impl AdjustDialog {
                 distance: v[1] as u32,
             },
             Kind::Twirl => Filter::Twirl { angle: v[0] as i32 },
+            Kind::Crystallize => Filter::Crystallize { cell: v[0] as u32 },
+            Kind::Pointillize => Filter::Pointillize { cell: v[0] as u32 },
+            Kind::Diffuse => Filter::Diffuse {
+                mode: [
+                    DiffuseMode::Normal,
+                    DiffuseMode::DarkenOnly,
+                    DiffuseMode::LightenOnly,
+                    DiffuseMode::Anisotropic,
+                ][v[0] as usize],
+            },
             Kind::Pinch => Filter::Pinch {
                 amount: v[0] as i32,
             },
@@ -951,7 +979,12 @@ impl AdjustDialog {
                     0,
                     self.first_frame,
                 );
-                let unit = if self.kind == Kind::Twirl { "°" } else { "%" };
+                // Crystallize's and Pointillize's cell size has no unit
+                let unit = match self.kind {
+                    Kind::Twirl => "°",
+                    Kind::Crystallize | Kind::Pointillize => "",
+                    _ => "%",
+                };
                 appkit::text(
                     ui,
                     Pos2::new(field.right() + pt(distort::UNIT_GAP), field.center().y),
@@ -1236,6 +1269,9 @@ mod tests {
             Kind::MotionBlur,
             Kind::Emboss,
             Kind::Twirl,
+            Kind::Crystallize,
+            Kind::Pointillize,
+            Kind::Diffuse,
             Kind::Pinch,
             Kind::Spherize,
             Kind::PolarCoordinates,

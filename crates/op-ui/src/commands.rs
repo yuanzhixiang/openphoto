@@ -94,6 +94,10 @@ pub enum Command {
     MotionBlur,
     Emboss,
     Twirl,
+    /// Filter > Pixelate > Crystallize..., Pointillize...; Stylize > Diffuse...
+    Crystallize,
+    Pointillize,
+    Diffuse,
     Pinch,
     Spherize,
     PolarCoordinates,
@@ -526,6 +530,9 @@ impl Command {
             | Self::FindEdges
             | Self::MotionBlur
             | Self::Twirl
+            | Self::Crystallize
+            | Self::Pointillize
+            | Self::Diffuse
             | Self::Pinch
             | Self::Spherize
             | Self::PolarCoordinates
@@ -890,6 +897,9 @@ impl Command {
             | Self::TraceContour
             | Self::Wind
             | Self::Twirl
+            | Self::Crystallize
+            | Self::Pointillize
+            | Self::Diffuse
             | Self::Pinch
             | Self::Spherize
             | Self::PolarCoordinates
@@ -1288,6 +1298,9 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         | Command::MotionBlur
         | Command::Emboss
         | Command::Twirl
+        | Command::Crystallize
+        | Command::Pointillize
+        | Command::Diffuse
         | Command::Pinch
         | Command::Spherize
         | Command::PolarCoordinates
@@ -1325,6 +1338,9 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 Command::MotionBlur => (AdjustKind::MotionBlur, "Motion Blur"),
                 Command::Emboss => (AdjustKind::Emboss, "Emboss"),
                 Command::Twirl => (AdjustKind::Twirl, "Twirl"),
+                Command::Crystallize => (AdjustKind::Crystallize, "Crystallize"),
+                Command::Pointillize => (AdjustKind::Pointillize, "Pointillize"),
+                Command::Diffuse => (AdjustKind::Diffuse, "Diffuse"),
                 Command::Pinch => (AdjustKind::Pinch, "Pinch"),
                 Command::Spherize => (AdjustKind::Spherize, "Spherize"),
                 Command::PolarCoordinates => (AdjustKind::PolarCoordinates, "Polar Coordinates"),

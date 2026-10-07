@@ -6192,3 +6192,54 @@ fn screenshot_clouds() {
     run_command(&mut h, crate::commands::Command::Clouds);
     shot(&mut h, "clouds");
 }
+
+#[test]
+#[ignore]
+fn screenshot_pixelate_and_diffuse_dialogs() {
+    use crate::commands::Command;
+    for (command, name, w, ht) in [
+        (Command::Crystallize, "crystallize", 457.0, 367.0),
+        (Command::Pointillize, "pointillize", 457.0, 367.0),
+        (Command::Diffuse, "diffuse", 324.0, 430.0),
+    ] {
+        let mut h = harness(Vec::new());
+        probe_document(&mut h);
+        run_command(&mut h, command);
+        h.run_steps(4);
+        shot_dialog(&mut h, name, w, ht);
+    }
+}
+
+#[test]
+fn crystallize_pointillize_and_diffuse_apply() {
+    use crate::commands::Command;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // Something to work on: a gradient across the layer
+    {
+        let doc = &mut h.state_mut().state.active().unwrap().doc;
+        let id = doc.layers[0].id;
+        let image = doc.layer_mut(id).unwrap().image_mut().unwrap();
+        for y in 0..200 {
+            for x in 0..200 {
+                image.set_pixel(x, y, [x as u8, y as u8, 128, 255]);
+            }
+        }
+        doc.mark_dirty();
+    }
+    for (command, name) in [
+        (Command::Crystallize, "Crystallize"),
+        (Command::Pointillize, "Pointillize"),
+        (Command::Diffuse, "Diffuse"),
+    ] {
+        let before = layer_pixel(&h, 0, 50, 50);
+        run_command(&mut h, command);
+        assert!(h.state().state.adjust_dialog.is_some(), "{name}");
+        h.key_press(egui::Key::Enter);
+        h.run_steps(3);
+        assert_eq!(last_history(&h), name);
+        assert_eq!(h.state().state.last_filter.map(|f| f.name()), Some(name));
+        let changed = (0..20).any(|i| layer_pixel(&h, 0, 40 + i, 50) != before);
+        assert!(changed, "{name}");
+    }
+}

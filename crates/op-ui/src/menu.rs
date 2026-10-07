@@ -80,6 +80,9 @@ const ALL_COMMANDS: &[Command] = &[
     Command::MotionBlur,
     Command::Emboss,
     Command::Twirl,
+    Command::Crystallize,
+    Command::Pointillize,
+    Command::Diffuse,
     Command::Pinch,
     Command::Spherize,
     Command::PolarCoordinates,
@@ -865,12 +868,12 @@ impl NativeMenu {
                     "Pixelate",
                     &[
                         ("Color Halftone...", None),
-                        ("Crystallize...", None),
+                        ("Crystallize...", Some(Command::Crystallize)),
                         ("Facet", None),
                         ("Fragment", Some(Command::Fragment)),
                         ("Mezzotint...", None),
                         ("Mosaic...", Some(Command::Mosaic)),
-                        ("Pointillize...", None),
+                        ("Pointillize...", Some(Command::Pointillize)),
                     ],
                 ),
                 &Submenu::with_items(
@@ -901,7 +904,7 @@ impl NativeMenu {
                 &filter_sub(
                     "Stylize",
                     &[
-                        ("Diffuse...", None),
+                        ("Diffuse...", Some(Command::Diffuse)),
                         ("Emboss...", Some(Command::Emboss)),
                         ("Extrude...", None),
                         ("Find Edges", Some(Command::FindEdges)),

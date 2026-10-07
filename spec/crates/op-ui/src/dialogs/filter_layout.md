@@ -15,7 +15,7 @@ All coordinates are Photoshop points from the dialog's top-left corner (includin
   - `Row::Radios`: group box title, group box rectangle (the title sits on the top border), the y of each radio button's center (x fixed at 27).
   - `Row::Check`: checkbox label and top-left corner.
 - `PANE` (16, 43)–(212, 239) is the preview pane, and `ZOOM_Y` 261.75 is the center line of the zoom controls.
-- Sizes: Gaussian Blur, High Pass 324 × 335; Box Blur, Median 324 × 342; Minimum, Maximum 324 × 378; Unsharp Mask 324 × 436; Add Noise 324 × 452; Mosaic 324 × 338; Motion Blur 324 × 389; Emboss 324 × 431; Surface Blur 324 × 395; Dust & Scratches 324 × 387; Trace Contour 324 × 425 (the Edge group box is in the same position as Add Noise's Distribution); Offset 323 × 256.
+- Sizes: Gaussian Blur, High Pass 324 × 335; Box Blur, Median 324 × 342; Minimum, Maximum 324 × 378; Unsharp Mask 324 × 436; Add Noise 324 × 452; Mosaic 324 × 338; Diffuse 324 × 430 (the Mode group box (10.5, 295.5)–(314, 419), radio centers y 320, 347, 374, 401); Motion Blur 324 × 389; Emboss 324 × 431; Surface Blur 324 × 395; Dust & Scratches 324 × 387; Trace Contour 324 × 425 (the Edge group box is in the same position as Add Noise's Distribution); Offset 323 × 256.
 - Box Blur and Median have the same layout but different scales (1–2000 for the former, 1–500 for the latter), so they are two `Layout`s.
 
 ## Slider scales (`Scale`)
