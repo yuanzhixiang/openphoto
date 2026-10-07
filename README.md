@@ -125,7 +125,29 @@ OpenPhoto is a Cargo workspace. The document model knows nothing about the inter
 | [`op-color`](crates/op-color) | Color models and conversions |
 | [`op-tools`](crates/op-tools) | Tool definitions and their shortcuts |
 | [`op-ui`](crates/op-ui) | The egui interface: menus, option bar, toolbar, panels, dialogs and tool interaction |
+| [`op-mcp`](crates/op-mcp) | MCP server: every editing operation behind keyword search, over stdio |
 | [`app`](app) | The executable |
+
+## MCP server
+
+Agents can edit images through [`op-mcp`](crates/op-mcp), an MCP server speaking JSON-RPC 2.0 over stdio. It calls the same `op-core` / `op-io` functions as the interface, so results match the application exactly.
+
+```bash
+cargo run -p op-mcp
+```
+
+Instead of exposing every operation as its own tool, the server exposes exactly two:
+
+| Tool | Purpose |
+|---|---|
+| `search_tools` | Keyword search over ~100 operations (adjustments, filters, layers, selections, canvas, painting, history); returns matching names with their full input schemas |
+| `call_tool` | Run one operation by name with arguments |
+
+The workflow is discover-then-run: `search_tools` with `{"query": "gaussian blur"}` returns `filter_gaussian_blur` with its schema, and `call_tool` with `{"name": "filter_gaussian_blur", "arguments": {"radius": 2.0}}` applies it. Documents stay open in the server between calls: `open_image` or `new_document` first, then edit, then `export_composite` or `save_image` (`.psd` keeps the layers). `cargo test -p op-mcp` covers search scoring and an edit round-trip through the protocol.
+
+```json
+{ "mcpServers": { "openphoto": { "command": "cargo", "args": ["run", "--quiet", "-p", "op-mcp"] } } }
+```
 
 ## Testing
 

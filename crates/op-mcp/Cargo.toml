@@ -1,0 +1,16 @@
+[package]
+name = "op-mcp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "OpenPhoto MCP server: keyword-searchable gateway over image operations"
+
+[[bin]]
+name = "op-mcp"
+path = "src/main.rs"
+
+[dependencies]
+op-core.workspace = true
+op-io.workspace = true
+serde_json.workspace = true
