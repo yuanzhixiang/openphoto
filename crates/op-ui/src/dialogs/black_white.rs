@@ -56,6 +56,14 @@ impl Default for Dialog {
     }
 }
 
+impl Dialog {
+    /// Auto: the weights `op_core::auto::black_white` picked (the tint is
+    /// kept).
+    pub fn auto(&mut self, weights: [i32; 6]) {
+        self.weights = weights.map(|w| w.to_string());
+    }
+}
+
 fn parse(text: &str, (min, max): (f32, f32)) -> Option<i32> {
     let v: f32 = text
         .trim()
@@ -329,11 +337,11 @@ impl Dialog {
         }
 
         uxp::preview(ui, at(272.0, 163.0), preview);
-        // Auto (Photoshop picks weights from the image) is not available here
+        // Auto: the app picks weights from the image (`auto`)
         uxp::buttons(
             ui,
             frame,
-            Some(("Auto", false)),
+            Some(("Auto", true)),
             self.adjustment().is_some(),
             false,
         )

@@ -319,6 +319,88 @@ pub fn tables(doc: &Document, options: &Options) -> [[u8; 256]; 3] {
     compute(&samples(doc), options).map(|c| c.table())
 }
 
+/// Black & White's Auto: the six weights (reds, yellows, greens, cyans,
+/// blues, magentas, in percent) that spread the grays the widest without
+/// clipping more than 0.5% of the pixels, searched from Photoshop's
+/// default mix and held near it.
+pub fn black_white(pixels: &[[u8; 3]]) -> [i32; 6] {
+    const DEFAULT: [i32; 6] = [40, 60, 40, 60, 20, 80];
+    // Each pixel's gray is min + (mid - min) × secondary + (max - mid) ×
+    // primary: keep the parts and which weights they use
+    let step = (pixels.len() / 20_000).max(1);
+    let parts: Vec<(f32, f32, usize, f32, usize)> = pixels
+        .iter()
+        .step_by(step)
+        .map(|p| {
+            let [r, g, b] = p.map(|v| v as f32);
+            let max = r.max(g).max(b);
+            let min = r.min(g).min(b);
+            let mid = r + g + b - max - min;
+            let primary = if max == r {
+                0
+            } else if max == g {
+                2
+            } else {
+                4
+            };
+            let secondary = if min == b {
+                1
+            } else if min == r {
+                3
+            } else {
+                5
+            };
+            (min, mid - min, secondary, max - mid, primary)
+        })
+        .collect();
+    if parts.is_empty() {
+        return DEFAULT;
+    }
+    let score = |w: &[i32; 6]| -> f32 {
+        let n = parts.len() as f32;
+        let (mut sum, mut sq, mut clipped) = (0.0f32, 0.0f32, 0usize);
+        for &(min, a, s, b, p) in &parts {
+            let g = min + a * w[s] as f32 / 100.0 + b * w[p] as f32 / 100.0;
+            if !(0.0..=255.0).contains(&g) {
+                clipped += 1;
+            }
+            let g = g.clamp(0.0, 255.0);
+            sum += g;
+            sq += g * g;
+        }
+        let mean = sum / n;
+        let spread = (sq / n - mean * mean).max(0.0).sqrt();
+        let over = (clipped as f32 / n - 0.005).max(0.0);
+        let drift: f32 = w
+            .iter()
+            .zip(DEFAULT)
+            .map(|(&a, d)| (a - d).abs() as f32)
+            .sum();
+        spread - over * 2000.0 - drift * 0.01
+    };
+    let mut w = DEFAULT;
+    let mut best = score(&w);
+    let mut delta = 32;
+    while delta >= 1 {
+        let mut better = true;
+        while better {
+            better = false;
+            for i in 0..6 {
+                for d in [delta, -delta] {
+                    let mut t = w;
+                    t[i] = (t[i] + d).clamp(-200, 300);
+                    let s = score(&t);
+                    if s > best + 1e-4 {
+                        (w, best, better) = (t, s, true);
+                    }
+                }
+            }
+        }
+        delta /= 2;
+    }
+    w
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -381,6 +463,27 @@ mod tests {
         let mid = [148u8, 128, 128];
         let out = [0, 1, 2].map(|c| ch[c].map(mid[c] as f32).round());
         assert!((out[0] - out[1]).abs() <= 2.0, "{out:?}");
+    }
+
+    #[test]
+    fn black_and_white_spreads_the_grays() {
+        // Red and blue of equal default gray: Auto pulls them apart
+        let mut px = vec![[200, 40, 40]; 500];
+        px.extend(vec![[40, 40, 200]; 500]);
+        let w = black_white(&px);
+        let gray = |p: [f32; 3], w: &[i32; 6]| {
+            // (red's and blue's secondaries are magenta)
+            p[2].min(p[0])
+                + (p[0].max(p[2]) - p[0].min(p[2])) * w[if p[0] > p[2] { 0 } else { 4 }] as f32
+                    / 100.0
+        };
+        let before = (gray([200.0, 40.0, 40.0], &[40, 60, 40, 60, 20, 80])
+            - gray([40.0, 40.0, 200.0], &[40, 60, 40, 60, 20, 80]))
+        .abs();
+        let after = (gray([200.0, 40.0, 40.0], &w) - gray([40.0, 40.0, 200.0], &w)).abs();
+        assert!(after > before + 20.0, "{w:?}");
+        assert!(w.iter().all(|v| (-200..=300).contains(v)));
+        assert_eq!(black_white(&[]), [40, 60, 40, 60, 20, 80]);
     }
 
     #[test]

@@ -1556,7 +1556,10 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                             dialog.recall(last);
                         }
                         dialog.set_channel_histograms(adjust::rgb_histograms(&state.doc));
-                        if matches!(kind, AdjustKind::Levels | AdjustKind::Curves) {
+                        if matches!(
+                            kind,
+                            AdjustKind::Levels | AdjustKind::Curves | AdjustKind::BlackWhite
+                        ) {
                             dialog.extra.auto_samples = op_core::auto::samples(&state.doc);
                             dialog.extra.auto_options = auto_defaults;
                         }

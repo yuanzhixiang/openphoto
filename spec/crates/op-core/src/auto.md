@@ -9,7 +9,7 @@ This module implements Photoshop's Auto Color Correction Options:
 - the shadow, midtone and highlight target colors;
 - the shadow and highlight clipping percentages.
 
-It turns these into per-channel Levels values. Those values drive:
+It turns these into per-channel Levels values, and it also picks Black & White's Auto weights. Those values drive:
 
 - Levels' Auto (`dialogs/levels.md` in `op-ui`), which shows them as the values themselves;
 - Curves' Auto (`dialogs/curves.md`), which shows them as curve points;
@@ -60,10 +60,17 @@ It turns these into per-channel Levels values. Those values drive:
     - Gamma is limited to 0.1–9.99.
     - If fewer than 0.1% of the pixels qualify, nothing changes.
 - **`tables(doc, options)`** returns the lookup tables for `samples(doc)`.
+- **`black_white(pixels) -> [i32; 6]`** is Black & White's Auto. It returns the weights for reds, yellows, greens, cyans, blues and magentas, in percent:
+  - It works on up to about 20,000 of the pixels.
+  - Each pixel's gray depends on two of the weights, as in `Adjustment::BlackWhite`.
+  - Starting from Photoshop's default mix (40, 60, 40, 60, 20, 80), a pattern search changes one weight at a time, in steps of 32 down to 1, within −200–300.
+  - The search maximizes the standard deviation of the clamped grays. It is penalized for clipping more than 0.5% of the pixels and, slightly (0.01 per percent), for moving away from the default mix.
+  - With no pixels it returns the default mix.
 
 ## Known limitations
 
 - Photoshop doesn't document how Enhance Brightness and Contrast works, and it behaves like Brightness/Contrast's Auto. The halfway-to-gray gamma is an approximation. Making it match exactly is part of P3 #26, together with Brightness/Contrast's Auto.
+- Black & White's Auto follows Photoshop's description ("maximizing the distribution of gray values"); its weights haven't been compared with Photoshop's.
 - Snap Neutral Midtones' thresholds and Find Dark & Light Colors' averaging haven't been compared with Photoshop level by level.
 - Large images are sampled, not counted in full.
 
@@ -72,4 +79,5 @@ It turns these into per-channel Levels values. Those values drive:
 - `per_channel_and_monochromatic`: per-channel ranges, and one shared range for Monochromatic.
 - `dark_and_light_colors_and_targets`: the darkest and lightest pixels set each channel, and the shadow target becomes the output black.
 - `snapping_neutral_midtones`: a red-cast gray ramp comes back neutral in the midtones.
+- `black_and_white_spreads_the_grays`: red and blue that the default mix leaves close end up further apart, and the weights stay within range.
 - `brightness_and_contrast_lifts_a_dark_image`: a shadow-heavy image gets a gamma above 1, the same for all channels.

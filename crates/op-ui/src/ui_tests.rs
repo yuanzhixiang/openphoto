@@ -938,6 +938,40 @@ fn auto_color_correction_options_from_levels() {
 }
 
 #[test]
+fn black_and_white_auto_picks_weights_from_the_image() {
+    use crate::theme::pt;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // Red over the top half, blue below (104 and 72 with the default mix)
+    h.state_mut().state.foreground = Color::from_rgba8([200, 40, 40, 255]);
+    select_rect(&mut h, 0.0, 0.0, 734.0, 400.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.state_mut().state.foreground = Color::from_rgba8([40, 40, 200, 255]);
+    select_rect(&mut h, 0.0, 400.0, 734.0, 811.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.run_steps(2);
+    run_command(&mut h, crate::commands::Command::BlackWhite);
+    h.run_steps(3);
+    let gap = |h: &mut Harness<'_, OpenPhotoApp>| {
+        let (top, bottom) = (composite_pixel(h, 300, 100), composite_pixel(h, 300, 700));
+        top[0].abs_diff(bottom[0])
+    };
+    let before = gap(&mut h);
+    let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
+    // Auto (the third button on the right) pulls the two grays apart
+    click(
+        &mut h,
+        egui::pos2(rect.right() - pt(129.0 - 54.5), rect.top() + pt(48.0 + 72.0 + 12.0)),
+    );
+    h.run_steps(3);
+    let after = gap(&mut h);
+    assert!(after > before + 20, "{before} {after}");
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+}
+
+#[test]
 fn levels_and_curves_eyedroppers_sample_the_image() {
     use crate::theme::pt;
     let mut h = harness(Vec::new());

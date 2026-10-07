@@ -1653,7 +1653,13 @@ impl AdjustDialog {
             Some(Custom::Posterize(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),
             Some(Custom::Exposure(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),
             Some(Custom::PhotoFilter(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),
-            Some(Custom::BlackWhite(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),
+            Some(Custom::BlackWhite(d)) => {
+                let pressed = d.ui(ui, frame, self.first_frame, &mut self.preview);
+                if pressed == Some(uxp::Button::Third) {
+                    d.auto(op_core::auto::black_white(&self.extra.auto_samples));
+                }
+                pressed
+            }
             Some(Custom::Threshold(d)) => d.ui(ui, frame, self.first_frame, &mut self.preview),
             Some(Custom::GradientMap(d)) => d.ui(ui, frame, &mut self.preview),
             Some(Custom::Kernel(d)) => {
