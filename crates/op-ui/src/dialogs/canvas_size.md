@@ -6,16 +6,19 @@ Image › Canvas Size...（⌥⌘C）：改变画布尺寸而不缩放图像，�
 
 ## 布局
 
-尺寸按 Photoshop 对话框截图量取（参考截图像素，经 `UI_SCALE` 缩放）。对话框 681×553，圆角 10，带阴影，不遮暗背景。
+按 Photoshop 2026 的 Canvas Size 对话框（2x 截图）逐点量取，与 New Layer 同一类（UXP 样式）。对话框 458 × 372 pt，坐标为距对话框左上角的 pt：
 
-- **标题栏**：浅灰底 `#d0d2d4`，居中深色「Canvas Size」（由 `common.rs` 绘制，高 28 pt）。
-- **Current Size: 1.70M**：带一条延伸到右侧的分隔线；下面是当前的 Width、Height（像素）。
-- **New Size: 1.70M**：随输入实时更新；输入无效时显示「—」。下面是：
-  - Width、Height 两行，各有数字输入框（119 宽）和单位下拉（237 宽）。
-  - 「Relative to current dimension」复选框。
-  - Anchor 3×3 锚点。
-  - Canvas extension color：下拉框加右侧色块。
-- **右侧**：OK、Cancel 两个胶囊形按钮。
+- **标题栏**：与 New Layer 相同（`common::frame`，系统粗体 13 pt「Canvas Size」）。
+- 文字为 12 pt 面板字体（Adobe Clean，这里用 Source Sans 3），颜色 `#f1f1f1`，不可用时 `#8e8e8e`。
+- **Current Size: 13.5K**：粗体，左端 20，中心 y 57.5；其后 8 pt 起一条 1 pt 的 `#737373` 线，到 x 356。下面 Width、Height 两行（标签右对齐于 55，中心 y 81、102.5），数值从 64 起，如「64 px」。
+- **New Size: 13.5K**：粗体，中心 y 130.5，同样带线；随输入实时更新，输入无效时显示「—」。
+- Width、Height 输入框 (64–145，y 145–169 与 174–198；标签右对齐于 55)，单位下拉 (153–313，同样两行；文字左缩进 9 pt，下拉箭头离右边 13.5 pt)。
+- 「Relative to current dimension」复选框：12 pt 方框在 (64, 216)，文字在方框右 9.5 pt。
+- 「Anchor」：左端 20，中心 y 255。锚点格：3 × 3、每格 23 pt，1 pt `#787878` 线，左上角 (64, 246)。锚点格画直径 7 pt 的圆点；箭头长 13.25 pt，箭头头部长 7.75 pt、宽 7.5 pt，杆宽 2 pt，以格子中心为中心。
+- 「Canvas extension color」：左端 20.5，中心 y 341；下拉 (140–300，y 328–352)；色块 (308–356，y 328–352，3 pt 圆角，1 pt `#8e8e8e` 边，显示当前扩展颜色)。没有背景图层时文字变暗，下拉画成无边框的 `#5c5c5c` 平框、文字与箭头 `#8e8e8e`，不能点。
+- **OK**（默认按钮，粗体）(368–438，y 48–72) 与 **Cancel** (368–438，y 84–108)：`common::ps_button`。
+
+与 Photoshop 截图相比，各元素位置相差不超过 1 pt；文字宽度因字体不同略宽（长句约 3%）。
 
 ## 尺寸大小显示
 
