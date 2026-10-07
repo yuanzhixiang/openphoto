@@ -22,7 +22,9 @@ impl EdgeMap {
     pub fn new(width: u32, height: u32, rgba: &[u8], contrast: f32) -> Self {
         let (w, h) = (width as usize, height as usize);
         let luma: Vec<f32> = rgba
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|p| {
                 let a = p[3] as f32 / 255.0;
                 (0.299 * p[0] as f32 + 0.587 * p[1] as f32 + 0.114 * p[2] as f32) / 255.0 * a
