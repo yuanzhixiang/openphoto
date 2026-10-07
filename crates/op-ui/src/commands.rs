@@ -73,6 +73,8 @@ pub enum Command {
     LastFilter,
     Average,
     Solarize,
+    /// Filter > Pixelate > Facet.
+    Facet,
     /// Filter > Render > Clouds, Difference Clouds.
     Clouds,
     DifferenceClouds,
@@ -535,6 +537,7 @@ impl Command {
             | Self::Solarize
             | Self::Clouds
             | Self::DifferenceClouds
+            | Self::Facet
             | Self::Blur
             | Self::BlurMore
             | Self::Sharpen
@@ -901,6 +904,7 @@ impl Command {
             | Self::Solarize
             | Self::Clouds
             | Self::DifferenceClouds
+            | Self::Facet
             | Self::Blur
             | Self::BlurMore
             | Self::Sharpen
@@ -1247,6 +1251,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
         | Command::Solarize
         | Command::Clouds
         | Command::DifferenceClouds
+        | Command::Facet
         | Command::Blur
         | Command::BlurMore
         | Command::Sharpen
@@ -1267,6 +1272,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                 Command::Fragment => Some(Filter::Fragment),
                 Command::Despeckle => Some(Filter::Despeckle),
                 Command::SharpenEdges => Some(Filter::SharpenEdges),
+                Command::Facet => Some(Filter::Facet),
                 Command::Clouds => Some(Filter::Clouds {
                     foreground: [0; 3],
                     background: [0; 3],

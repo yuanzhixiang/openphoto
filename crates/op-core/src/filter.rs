@@ -229,6 +229,9 @@ pub enum Filter {
     /// Pixelate > Color Halftone: each of the first three channels as dots
     /// on a screen at its angle (degrees), up to `radius` pixels.
     ColorHalftone { radius: u32, angles: [i32; 4] },
+    /// Pixelate > Facet: similar neighboring colors clumped into flat
+    /// patches.
+    Facet,
     /// Stylize > Diffuse: pixels swapped with random neighbors, in `mode`.
     Diffuse { mode: DiffuseMode },
     /// Render > Clouds: soft fractal noise between the foreground and
@@ -286,6 +289,7 @@ impl Filter {
             Self::Crystallize { .. } => "Crystallize",
             Self::Ripple { .. } => "Ripple",
             Self::Tiles { .. } => "Tiles",
+            Self::Facet => "Facet",
             Self::ColorHalftone { .. } => "Color Halftone",
             Self::Mezzotint { .. } => "Mezzotint",
             Self::Pointillize { .. } => "Pointillize",
@@ -933,6 +937,40 @@ fn color_halftone(src: &Buffer, radius: u32, angles: [i32; 4]) -> Vec<[u8; 4]> {
     out
 }
 
+/// Facet (a Kuwahara filter): each pixel takes the average of whichever
+/// of the four 3 × 3 squares it is a corner of has the least spread of
+/// brightness, so flat areas clump into patches and edges stay sharp.
+fn facet(src: &Buffer) -> Vec<[u8; 4]> {
+    let (w, h) = (src.w, src.h);
+    let luma = |p: [f32; 4]| p[0] * 0.299 + p[1] * 0.587 + p[2] * 0.114;
+    (0..w * h)
+        .map(|i| {
+            let (x, y) = ((i % w) as isize, (i / w) as isize);
+            let mut best = (f32::MAX, [0f32; 4]);
+            for (sx, sy) in [(-2, -2), (0, -2), (-2, 0), (0, 0)] {
+                let mut sum = [0f32; 4];
+                let (mut l, mut l2) = (0f32, 0f32);
+                for dy in 0..3 {
+                    for dx in 0..3 {
+                        let p = src.at(x + sx + dx, y + sy + dy);
+                        for c in 0..4 {
+                            sum[c] += p[c] / 9.0;
+                        }
+                        let v = luma(p);
+                        l += v / 9.0;
+                        l2 += v * v / 9.0;
+                    }
+                }
+                let spread = l2 - l * l;
+                if spread < best.0 {
+                    best = (spread, sum);
+                }
+            }
+            Buffer::straight(best.1)
+        })
+        .collect()
+}
+
 /// Mezzotint: each channel becomes 255 or 0, at random with its value as
 /// the chance. Dots draw a fresh chance per pixel (Medium and Coarse per 2
 /// and 3 pixel blocks, Grainy with half the chances shared by a 2 pixel
@@ -1529,6 +1567,7 @@ fn filtered(
         Filter::Pointillize { cell } => pointillize(&src, cell.max(3) as usize, paper),
         Filter::Diffuse { mode } => diffuse(&src, mode),
         Filter::Mezzotint { kind } => mezzotint(&src, kind),
+        Filter::Facet => facet(&src),
         Filter::Tiles {
             count,
             offset,
@@ -2138,5 +2177,26 @@ mod tests {
                 .sum::<u32>()
         };
         assert!(red(32) > red(0) * 2, "{} {}", red(32), red(0));
+    }
+
+    #[test]
+    fn facet_flattens_noise_and_keeps_edges() {
+        // Left half dark, right half light, with a little noise
+        let mut img = TiledImage::new(20, 20);
+        for y in 0..20 {
+            for x in 0..20 {
+                let base: u8 = if x < 10 { 40 } else { 200 };
+                let v = base + ((x * 7 + y * 13) % 5) as u8;
+                img.set_pixel(x, y, [v, v, v, 255]);
+            }
+        }
+        let out = facet(&Buffer::from_image(&img));
+        // The edge stays where it was
+        assert!(out[5 * 20 + 9][0] < 60 && out[5 * 20 + 10][0] > 180);
+        // The noise is smoothed: fewer distinct values on a row
+        let mut row: Vec<u8> = (0..10).map(|x| out[5 * 20 + x][0]).collect();
+        row.sort();
+        row.dedup();
+        assert!(row.len() <= 3, "{row:?}");
     }
 }

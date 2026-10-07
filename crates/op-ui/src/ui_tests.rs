@@ -3365,6 +3365,7 @@ fn more_filters_from_the_menu() {
         (Command::FindEdges, "Find Edges"),
         (Command::Despeckle, "Despeckle"),
         (Command::SharpenEdges, "Sharpen Edges"),
+        (Command::Facet, "Facet"),
     ] {
         run_command(&mut h, command);
         assert_eq!(last_history(&h), name);

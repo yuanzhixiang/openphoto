@@ -66,6 +66,7 @@ const ALL_COMMANDS: &[Command] = &[
     Command::Average,
     Command::Solarize,
     Command::Clouds,
+    Command::Facet,
     Command::DifferenceClouds,
     Command::GaussianBlur,
     Command::BoxBlur,
@@ -900,7 +901,7 @@ impl NativeMenu {
                     &[
                         ("Color Halftone...", Some(Command::ColorHalftone)),
                         ("Crystallize...", Some(Command::Crystallize)),
-                        ("Facet", None),
+                        ("Facet", Some(Command::Facet)),
                         ("Fragment", Some(Command::Fragment)),
                         ("Mezzotint...", Some(Command::Mezzotint)),
                         ("Mosaic...", Some(Command::Mosaic)),
