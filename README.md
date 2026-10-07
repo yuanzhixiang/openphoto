@@ -4,6 +4,8 @@
 
 OpenPhoto 是用 Rust 编写的 Photoshop 复刻，目标是功能、交互、快捷键与 Photoshop 2026 一致，界面与 Photoshop 原版像素级一致（同一窗口尺寸下逐像素比对）。参照物是运行中的 Photoshop 2026（macOS，默认「中灰」主题、Essentials 工作区）。各模块的具体行为见对应源码路径的 spec；界面层总规范见 `crates/op-ui/src/README.md`。
 
+除了图形界面，`op-mcp` 是一个 MCP 服务器：AI Agent 通过它调用与界面相同的编辑操作（调整、滤镜、图层、选区、画布、填充、历史记录），见 `crates/op-mcp/src/main.md`。
+
 ## 与 Photoshop 的功能差距
 
 本节列出 Photoshop 2026 有、OpenPhoto 目前没有（或只有一部分）的功能，按优先级排列，数据来自 Photoshop 2026 的菜单、工具栏和面板。每补上一项就从这里删除或改写，所以本节始终描述当前的差距。

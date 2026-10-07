@@ -9,7 +9,7 @@
 ### 工作区成员
 
 - `resolver = "3"`。
-- `members = ["app", "crates/*"]`：`app`（二进制 `openphoto`）以及 `crates/` 下的全部 crate——`op-core`、`op-color`、`op-io`、`op-tools`、`op-render`、`op-ui`。
+- `members = ["app", "crates/*"]`：`app`（二进制 `openphoto`）以及 `crates/` 下的全部 crate——`op-core`、`op-color`、`op-io`、`op-tools`、`op-render`、`op-ui`，以及独立的二进制 crate `op-mcp`（MCP 服务器，见 `crates/op-mcp/src/main.md`）。
 - `default-members = ["app"]`：在根目录直接 `cargo build` / `cargo run` 只针对 `app`，其它 crate 作为它的依赖被编译；要单独构建或测试某个 crate 需显式用 `-p` 或 `--workspace`。
 
 ### 共享包元数据（`[workspace.package]`）
@@ -36,6 +36,7 @@
 | `rfd` | 0.17 | 原生文件对话框 |
 | `thiserror` | 2 | 错误类型 |
 | `log` / `env_logger` | 0.4 / 0.11 | 日志门面与实现 |
+| `serde_json` | 1 | `op-mcp` 读写 JSON-RPC 消息 |
 
 egui 生态（`eframe`、`egui`、`egui-wgpu`、`egui-phosphor`）与 `wgpu` 的版本必须相互匹配，否则会出现两份不兼容的类型；`op-render` 通过 `egui_wgpu::wgpu` 重导出使用 wgpu，而不是直接依赖 `wgpu`。
 
