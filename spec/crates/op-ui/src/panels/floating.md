@@ -8,6 +8,10 @@ Panels opened from the Window menu that are not docked in the right-hand panel c
 
 `AppState::floating` (`FloatingPanels`): whether each of the six panels is open. `toggle` toggles it. Positions are remembered by egui's Area (kept after dragging).
 
+## Panel menus
+
+The Info and Navigator headers have a panel menu icon (four lines, 22 pt left of the close button) whose menu offers Panel Options... (`panel_options.md`).
+
 ## Layout and visuals
 
 - Frame: panel background color, 1 pt stroke in the divider color, shadow.

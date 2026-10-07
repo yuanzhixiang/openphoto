@@ -11,11 +11,9 @@ use crate::icons;
 use crate::state::AppState;
 use crate::theme::{self, pt};
 
-/// Photoshop draws the view box in red.
-const VIEW_BOX: Color32 = Color32::from_rgb(0xff, 0x00, 0x00);
-
 pub fn show(ui: &mut Ui, app: &mut AppState) {
     let rect = ui.max_rect();
+    let box_color = app.navigator_box;
     let ppp = ui.ctx().pixels_per_point();
     let Some(state) = app.active() else {
         return;
@@ -40,8 +38,15 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         image.min + Vec2::new(x1, y1) * scale,
     )
     .intersect(image);
-    ui.painter()
-        .rect_stroke(view, 0, Stroke::new(1.0, VIEW_BOX), StrokeKind::Inside);
+    let [r, g, b] = super::panel_options::VIEW_BOX_COLORS
+        [box_color.min(super::panel_options::VIEW_BOX_COLORS.len() - 1)]
+    .1;
+    ui.painter().rect_stroke(
+        view,
+        0,
+        Stroke::new(1.0, Color32::from_rgb(r, g, b)),
+        StrokeKind::Inside,
+    );
     // Dragging (or clicking) centers the view there
     let response = ui.interact(area, ui.id().with("navigator"), Sense::click_and_drag());
     if (response.dragged() || response.clicked())

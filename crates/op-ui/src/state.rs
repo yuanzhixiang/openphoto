@@ -1591,6 +1591,16 @@ pub struct AppState {
     /// luminosity, 1–3 red, green, blue, 4 RGB, 5 Colors).
     pub histogram_expanded: bool,
     pub histogram_channel: usize,
+    /// Info Panel Options, the Navigator's view box color (an index into
+    /// `panel_options::VIEW_BOX_COLORS`), and a Panel Options dialog while
+    /// open (which panel, and the options as edited).
+    pub info_options: crate::panels::panel_options::InfoOptions,
+    pub navigator_box: usize,
+    pub panel_options: Option<(
+        crate::panels::floating::Floating,
+        crate::panels::panel_options::InfoOptions,
+        usize,
+    )>,
     /// Entering Full Screen Mode: Photoshop's warning, while asked.
     pub full_screen_prompt: Option<crate::dialogs::alert::Alert>,
     /// "Don't show again" was ticked in that warning.
@@ -1781,6 +1791,9 @@ impl Default for AppState {
             reveal_tools: false,
             histogram_expanded: false,
             histogram_channel: 0,
+            info_options: Default::default(),
+            navigator_box: 0,
+            panel_options: None,
             full_screen_prompt: None,
             skip_full_screen_prompt: false,
             seed_override: None,
@@ -1938,6 +1951,7 @@ impl AppState {
             || self.auto_options_dialog.is_some()
             || self.save_options.is_some()
             || self.guide_layout.is_some()
+            || self.panel_options.is_some()
             || self.delete_crop_preset.is_some()
             || self.new_guide_dialog.is_some()
             || self.new_layer_dialog.is_some()

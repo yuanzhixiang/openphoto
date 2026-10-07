@@ -1246,6 +1246,7 @@ impl eframe::App for OpenPhotoApp {
         self.warp_grid_dialog(&ctx);
         self.save_options_dialog(&ctx);
         self.guide_layout_dialog(&ctx);
+        panels::floating::panel_options(&ctx, &mut self.state);
         self.new_guide_dialog(&ctx);
         self.new_layer_dialog(&ctx);
         self.duplicate_dialog(&ctx);

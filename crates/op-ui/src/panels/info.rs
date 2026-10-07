@@ -11,7 +11,22 @@ use crate::theme::{color, pt};
 
 pub fn show(ui: &mut Ui, app: &mut AppState) {
     let rect = ui.max_rect();
-    let app_units = app.ruler_units;
+    let options = app.info_options;
+    // The mouse coordinates' unit: Info Panel Options', else the rulers'
+    let app_units = options.units.unwrap_or(app.ruler_units);
+    // Info Panel Options' status lines
+    let status_lines: Vec<String> = app
+        .active_doc
+        .and_then(|id| app.docs.get(&id))
+        .map(|d| {
+            super::panel_options::STATUS
+                .iter()
+                .zip(options.status)
+                .filter(|(_, on)| *on)
+                .map(|(s, _)| s.text(app, d))
+                .collect()
+        })
+        .unwrap_or_default();
     // The Color Sampler's Sample Size
     let sampler_size = app
         .setting("sampler.size", "0")
@@ -41,19 +56,14 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
     };
     let line = pt(16.0);
     let col2 = rect.width() / 2.0 + pt(6.0);
-    let rgb = color.map(|c| c.to_rgba8());
-    for (i, (label, v)) in ["R:", "G:", "B:"].iter().zip(0..3).enumerate() {
-        let value = rgb.map_or(String::new(), |c| c[v].to_string());
-        text(format!("{label}  {value}"), pt(18.0), i as f32 * line);
+    // The two color readouts (Info Panel Options), each with its bit depth
+    for (readout, x) in [(options.first, pt(18.0)), (options.second, col2)] {
+        let lines = readout.lines(color);
+        for (i, (label, value)) in lines.iter().enumerate() {
+            text(format!("{label}  {value}"), x, i as f32 * line);
+        }
+        text("8-bit".into(), x, lines.len() as f32 * line);
     }
-    text("8-bit".into(), pt(18.0), 3.0 * line);
-    let cmyk = color.map(op_color::Cmyk::from_color);
-    let parts = cmyk.map(|c| [c.c, c.m, c.y, c.k]);
-    for (i, label) in ["C:", "M:", "Y:", "K:"].iter().enumerate() {
-        let value = parts.map_or(String::new(), |p| format!("{:.0}%", p[i] * 100.0));
-        text(format!("{label}  {value}"), col2, i as f32 * line);
-    }
-    text("8-bit".into(), col2, 4.0 * line);
 
     let y0 = 5.5 * line;
     painter.line_segment(
@@ -83,12 +93,6 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
     text(format!("W:  {sw}"), col2, y0);
     text(format!("H:  {sh}"), col2, y0 + line);
 
-    let (flat, layered) = crate::status_info::document_sizes(state);
-    let doc = format!(
-        "Doc: {}/{}",
-        crate::status_info::size(flat),
-        crate::status_info::size(layered)
-    );
     // The color samplers, two to a row as in Photoshop: "#1" and R, G, B
     let samplers = state.color_samplers.clone();
     let mut doc_y = y0 + 2.6 * line;
@@ -115,7 +119,9 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         }
         doc_y = y + SAMPLER_ROW;
     }
-    text(doc, 0.0, doc_y);
+    for (k, s) in status_lines.into_iter().enumerate() {
+        text(s, 0.0, doc_y + k as f32 * line);
+    }
 }
 
 /// One row of color samplers: three lines and a gap.

@@ -113,6 +113,7 @@ pub fn show(ctx: &egui::Context, app: &mut AppState, panel_column_left: f32, top
             continue;
         }
         let mut close = false;
+        let mut options = None;
         egui::Area::new(egui::Id::new(("floating-panel", panel.title())))
             .default_pos(default)
             .movable(true)
@@ -168,6 +169,36 @@ pub fn show(ctx: &egui::Context, app: &mut AppState, panel_column_left: f32, top
                 if close_response.clicked() {
                     close = true;
                 }
+                // Info and Navigator: a panel menu with Panel Options...
+                if matches!(panel, Floating::Info | Floating::Navigator) {
+                    let menu = Rect::from_center_size(
+                        x.center() - Vec2::new(pt(22.0), 0.0),
+                        Vec2::splat(pt(18.0)),
+                    );
+                    let menu_response =
+                        ui.interact(menu, ui.id().with(("menu", panel.title())), Sense::click());
+                    for k in 0..4 {
+                        painter.rect_filled(
+                            Rect::from_center_size(
+                                menu.center() + Vec2::new(0.0, pt(2.0 * k as f32 - 3.0)),
+                                Vec2::new(pt(10.0), pt(1.0)),
+                            ),
+                            0,
+                            if menu_response.hovered() {
+                                color::TEXT
+                            } else {
+                                Color32::from_gray(0xa8)
+                            },
+                        );
+                    }
+                    egui::Popup::menu(&menu_response)
+                        .id(ui.id().with(("panel-menu", panel.title())))
+                        .show(|ui| {
+                            if ui.button("Panel Options...").clicked() {
+                                options = Some(panel);
+                            }
+                        });
+                }
                 let body = Rect::from_min_max(Pos2::new(rect.left(), header.bottom()), rect.max)
                     .shrink(pt(10.0));
                 let mut child = ui.new_child(egui::UiBuilder::new().max_rect(body));
@@ -183,6 +214,60 @@ pub fn show(ctx: &egui::Context, app: &mut AppState, panel_column_left: f32, top
         if close {
             app.floating.toggle(panel);
         }
+        if let Some(panel) = options {
+            app.panel_options = Some((panel, app.info_options, app.navigator_box));
+        }
+    }
+}
+
+/// The Panel Options dialog of the Info or Navigator panel: OK keeps the
+/// options, Cancel or Escape drops them.
+pub fn panel_options(ctx: &egui::Context, app: &mut AppState) {
+    let Some((panel, mut info, mut view_box)) = app.panel_options.take() else {
+        return;
+    };
+    let mut done = None;
+    egui::Modal::new(egui::Id::new("panel-options")).show(ctx, |ui| {
+        ui.set_min_width(pt(300.0));
+        let title = match panel {
+            Floating::Info => "Info Panel Options",
+            _ => "Navigator Panel Options",
+        };
+        ui.heading(title);
+        if panel == Floating::Info {
+            super::panel_options::info_options_ui(ui, &mut info);
+        } else {
+            ui.strong("Color:");
+            egui::ComboBox::from_id_salt("navigator-box")
+                .selected_text(super::panel_options::VIEW_BOX_COLORS[view_box].0)
+                .show_ui(ui, |ui| {
+                    for (k, (name, _)) in super::panel_options::VIEW_BOX_COLORS.iter().enumerate() {
+                        ui.selectable_value(&mut view_box, k, *name);
+                    }
+                });
+        }
+        ui.horizontal(|ui| {
+            if ui.button("OK").clicked() {
+                done = Some(true);
+            }
+            if ui.button("Cancel").clicked() {
+                done = Some(false);
+            }
+        });
+    });
+    if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        done = Some(false);
+    }
+    if ctx.input(|i| i.key_pressed(egui::Key::Enter)) && !ctx.egui_wants_keyboard_input() {
+        done = Some(true);
+    }
+    match done {
+        Some(true) => {
+            app.info_options = info;
+            app.navigator_box = view_box;
+        }
+        Some(false) => {}
+        None => app.panel_options = Some((panel, info, view_box)),
     }
 }
 

@@ -6796,6 +6796,46 @@ fn flip_view_and_show_items() {
 }
 
 #[test]
+fn info_and_navigator_panel_options() {
+    use crate::commands::Command;
+    use crate::panels::panel_options::Readout;
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, Command::ToggleInfo);
+    h.run_steps(2);
+    // The panel menu's Panel Options... opens the dialog
+    let area = h
+        .ctx
+        .memory(|m| m.area_rect(egui::Id::new(("floating-panel", "Info"))))
+        .expect("the Info panel shows");
+    let pt = crate::theme::pt;
+    click(&mut h, area.right_top() + egui::vec2(-pt(36.0), pt(13.0)));
+    h.get_by_label("Panel Options...").click();
+    h.run_steps(2);
+    assert!(h.state().state.panel_options.is_some());
+    // HSB first, Web second, with the document's dimensions: OK keeps them
+    if let Some((_, o, _)) = &mut h.state_mut().state.panel_options {
+        o.first = Readout::Hsb;
+        o.second = Readout::Web;
+        o.status = [true, true, false];
+    }
+    h.run_steps(1);
+    shot(&mut h, "info_panel_options");
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    let o = h.state().state.info_options;
+    assert_eq!((o.first, o.second), (Readout::Hsb, Readout::Web));
+    shot(&mut h, "info_panel_hsb");
+    // Escape drops changes
+    h.state_mut().state.panel_options = Some((crate::panels::floating::Floating::Navigator, o, 3));
+    h.run_steps(1);
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert_eq!(h.state().state.navigator_box, 0);
+}
+
+#[test]
 fn brushes_and_brush_settings_panels() {
     use crate::commands::Command;
     use egui_kittest::kittest::Queryable;
