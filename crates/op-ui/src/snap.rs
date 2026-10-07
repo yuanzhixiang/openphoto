@@ -155,6 +155,15 @@ pub fn point(ui: &egui::Ui, state: &mut DocState, p: Pos2, ppp: f32) -> Pos2 {
     }
 }
 
+/// A document point pulled to the drag's targets only (no smart guides):
+/// a transform handle, whose drag's smart guides belong to the box.
+pub fn point_plain(ui: &egui::Ui, state: &DocState, p: Pos2, ppp: f32) -> Pos2 {
+    match &state.snap {
+        Some(t) if !ui.input(|i| i.modifiers.ctrl) => t.point(p, tolerance(state, ppp)),
+        _ => p,
+    }
+}
+
 /// The Move tool's offset pulled to the drag's targets.
 pub fn offset(ui: &egui::Ui, state: &DocState, d: Vec2, ppp: f32) -> Vec2 {
     match &state.snap {

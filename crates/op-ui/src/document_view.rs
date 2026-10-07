@@ -320,9 +320,10 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             crate::snap::begin(state, &view_options, moving);
         }
     }
-    // A point drag's smart guides go when the button is up (the Move
-    // tool clears its own when the move ends)
-    if tool != Tool::Move && !ui.input(|i| i.pointer.primary_down() || i.pointer.primary_released())
+    // A point drag's or a transform's smart guides go when the button is
+    // up (the Move tool clears its own when the move ends)
+    if (tool != Tool::Move || state.free_transform.is_some())
+        && !ui.input(|i| i.pointer.primary_down() || i.pointer.primary_released())
     {
         state.smart_guides = None;
     }

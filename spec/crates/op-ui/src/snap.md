@@ -27,7 +27,8 @@ Gathered once when a drag starts (`begin`, called by `document_view.rs`) and kep
 - `offset`: the Move tool's drag offset adjusted so the left edge, right edge or center (top, bottom, middle) of the box being moved lands on a target; of the candidates within the distance, the one changing the offset least wins. The box is `op_core::transform::bounds` at the start (the selection's bounds, or the moved layers' pixels). The moved layers (the selected layers and those linked to them) are left out of the targets.
 - Free Transform: a drag while transforming gathers targets as the Move tool does, leaving out the layers being transformed. While the box is neither turned nor reshaped:
   - Moving it pulls the box's edges or middle onto targets (`offset`, with the box as it is at the drag's start as `moving`).
-  - A side or corner handle pulls the pointer itself (`point`).
+  - Moving it also lets the smart guides line the box up (`SmartGuides::align_with`, as for the Move tool).
+  - A side or corner handle pulls the pointer itself to the targets only (`point_plain`: the drag's smart guides belong to the box).
 - Crop tool: a drag gathers targets. While the box isn't turned (box space is then the document's), `crop_tool::snap_box` does the snapping:
   - Moving the box pulls its edges or middle onto targets.
   - A handle pulls each edge it moved to the nearest line within the distance.

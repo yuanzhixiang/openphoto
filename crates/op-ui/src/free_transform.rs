@@ -528,10 +528,19 @@ pub fn input(
         state.free_transform.as_ref().and_then(|t| t.drag.clone()),
     ) {
         (Some(p), Some(drag)) if drag.angle == 0.0 && drag.quad.is_none() => match drag.handle {
+            // (the smart guides line the box up too)
             TransformHandle::Move => {
-                Some(drag.start + crate::snap::offset(ui, state, p - drag.start, ppp))
+                let d = p - drag.start;
+                let snapped = crate::snap::offset(ui, state, d, ppp);
+                let tolerance = crate::snap::tolerance(state, ppp);
+                let ctrl = ui.input(|i| i.modifiers.ctrl);
+                let out = match &mut state.smart_guides {
+                    Some(smart) if !ctrl => smart.align_with(d, snapped, tolerance),
+                    _ => snapped,
+                };
+                Some(drag.start + out)
             }
-            TransformHandle::Scale(..) => Some(crate::snap::point(ui, state, p, ppp)),
+            TransformHandle::Scale(..) => Some(crate::snap::point_plain(ui, state, p, ppp)),
             _ => Some(p),
         },
         (p, _) => p,
