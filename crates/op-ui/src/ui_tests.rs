@@ -4297,6 +4297,21 @@ const PS_BAR_MARKS: &[BarMarks] = &[
         &[253.5, 404.5, 521.5, 638.5, 673.5],
         &[195.0, 248.5],
     ),
+    ("SelectionBrush", &[], &[108.0, 157.0, 288.0, 331.5, 346.0]),
+    (
+        "Remove",
+        &[294.5, 329.5, 444.0, 561.0, 923.5, 958.5],
+        &[
+            116.0, 141.0, 198.5, 234.0, 248.5, 262.5, 287.5, 339.0, 438.5, 453.5, 556.0,
+        ],
+    ),
+    (
+        "AdjustmentBrush",
+        &[326.0, 391.0, 476.0, 511.0, 579.0, 720.5],
+        &[
+            173.0, 321.0, 359.0, 384.0, 629.5, 666.0, 680.5, 754.5, 791.0, 805.5,
+        ],
+    ),
 ];
 
 /// The x (bar points) of separators and of frame edges in an options bar
@@ -4802,4 +4817,30 @@ fn screenshot_layer_drag_and_rename() {
     double_click(&mut h, at_pt(1130.0, 695.0));
     h.run_steps(2);
     shot(&mut h, "layer_rename");
+}
+
+#[test]
+fn selection_brush_remove_and_adjustment_brush_bars_edit_their_settings() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let setting =
+        |h: &Harness<'_, OpenPhotoApp>, k: &str| h.state().state.tool_settings.get(k).cloned();
+    // Selection Brush: Subtract (160–233)
+    h.state_mut().state.select_tool(Tool::SelectionBrush);
+    h.run_steps(2);
+    click(&mut h, at_pt(200.0, 45.5));
+    assert_eq!(setting(&h, "selbrush.mode").as_deref(), Some("1"));
+    // Remove: Create new layer (box at 818.5); pressure starts on
+    h.state_mut().state.select_tool(Tool::Remove);
+    h.run_steps(2);
+    click(&mut h, at_pt(823.5, 45.25));
+    assert_eq!(setting(&h, "remove.new_layer").as_deref(), Some("1"));
+    click(&mut h, at_pt(275.0, 45.5));
+    assert_eq!(setting(&h, "remove.pressure").as_deref(), Some("0"));
+    // Adjustment Brush: Overlay (517)
+    h.state_mut().state.select_tool(Tool::AdjustmentBrush);
+    h.run_steps(2);
+    click(&mut h, at_pt(522.0, 45.25));
+    assert_eq!(setting(&h, "adjbrush.overlay").as_deref(), Some("1"));
 }

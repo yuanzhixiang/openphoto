@@ -96,6 +96,12 @@ pub enum Item {
     /// A Slice tool size: its label at lx and field from x0 to x1, usable
     /// once a style other than Normal is chosen.
     SliceSize(f32, &'static str, f32, f32, &'static str),
+    /// A choice drawn as a box from x0 to x1 with an icon (centered at the
+    /// third x) and a label (from the fourth); the chosen one is pressed,
+    /// the others dimmed: the setting's key and this choice's value.
+    LabeledRadio(f32, f32, f32, f32, Icon, &'static str, &'static str, usize),
+    /// A button from x0 to x1 with a menu (a small triangle at its corner).
+    MenuButton(f32, f32, &'static str),
 }
 
 use Item::*;
@@ -301,6 +307,16 @@ const PATH_SELECTION: &[Item] = &[
 /// The type tools (the masks share them).
 const HORIZONTAL_TYPE: &[Item] = type_bar!(Icon::TextLeft, Icon::TextCenter, Icon::TextRight);
 const VERTICAL_TYPE: &[Item] = type_bar!(Icon::TextTop, Icon::TextMiddle, Icon::TextBottom);
+
+const ADJUSTMENTS: &[&str] = &[
+    "Color and vibrance",
+    "Brightness and contrast",
+    "Exposure",
+    "Hue and saturation",
+    "Color balance",
+    "Black and white",
+];
+const BRUSH_SIZES: &[&str] = &["10", "25", "50", "100", "200", "400"];
 
 /// The tools' bars, measured on Photoshop 2026.
 pub fn layout(tool: Tool) -> Option<&'static [Item]> {
@@ -1366,6 +1382,125 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             Glyph(508.5, Icon::CornerRadius),
             Field(518.5, 564.0, "frame.radius", "0 px"),
         ],
+        SelectionBrush => &[
+            LabeledRadio(
+                108.0,
+                157.0,
+                121.0,
+                131.0,
+                Icon::BrushAdd,
+                "Add",
+                "selbrush.mode",
+                0,
+            ),
+            LabeledRadio(
+                160.0,
+                233.0,
+                174.0,
+                184.5,
+                Icon::BrushSubtract,
+                "Subtract",
+                "selbrush.mode",
+                1,
+            ),
+            Label(243.5, "Opacity:"),
+            Percent(288.0, 332.5, 347.0, "selbrush.opacity", "100%"),
+            Picker(372.0),
+            Icon(423.0, Icon::GearMenu, "Set additional options"),
+        ],
+        Remove => &[
+            Radio(
+                128.5,
+                Icon::BrushAdd,
+                "Add to the area to remove",
+                "remove.mode",
+                0,
+            ),
+            Radio(
+                157.0,
+                Icon::BrushSubtract,
+                "Subtract from the area to remove",
+                "remove.mode",
+                1,
+            ),
+            Label(175.5, "Size"),
+            Combo(198.5, 235.0, 249.5, "remove.size", "50", BRUSH_SIZES),
+            Toggle(
+                275.0,
+                Icon::PenPressure,
+                "Always use pressure for size",
+                "remove.pressure",
+            ),
+            Sep(294.5),
+            Icon(312.5, Icon::GearMenu, "Set additional options"),
+            Sep(329.5),
+            MenuButton(339.0, 439.5, "Find distractions"),
+            Sep(444.0),
+            MenuButton(453.5, 557.0, "Auto (May use g..."),
+            Sep(561.0),
+            Check(566.0, "Sample all layers", "remove.all_layers", false),
+            Check(
+                671.5,
+                "Remove after each stroke",
+                "remove.after_stroke",
+                true,
+            ),
+            Check(818.5, "Create new layer", "remove.new_layer", false),
+            Sep(923.5),
+            IconOff(941.5, Icon::Feedback),
+            Sep(958.5),
+            IconOff(976.0, Icon::CropReset),
+            IconOff(1009.5, Icon::CropCommit),
+        ],
+        AdjustmentBrush => &[
+            Label(110.5, "Adjustment:"),
+            Popup(173.0, 322.0, "adjbrush.adjustment", ADJUSTMENTS),
+            Sep(326.0),
+            Radio(
+                346.0,
+                Icon::BrushSubtract,
+                "Subtract from the adjustment",
+                "adjbrush.mode",
+                0,
+            ),
+            Radio(
+                371.5,
+                Icon::BrushAdd,
+                "Add to the adjustment",
+                "adjbrush.mode",
+                1,
+            ),
+            Sep(391.0),
+            Picker(410.0),
+            Toggle(
+                457.0,
+                Icon::PenPressure,
+                "Always use pressure for size",
+                "adjbrush.pressure",
+            ),
+            Sep(476.0),
+            Icon(494.75, Icon::ObjectFinder, "Select a subject to adjust"),
+            Sep(511.0),
+            Check(517.0, "Overlay", "adjbrush.overlay", false),
+            Sep(579.0),
+            Label(585.5, "Opacity:"),
+            Percent(629.5, 667.0, 681.5, "adjbrush.opacity", "100%"),
+            Toggle(
+                701.75,
+                Icon::OpacityPressure,
+                "Always use pressure for opacity",
+                "adjbrush.opacity_pressure",
+            ),
+            Sep(720.5),
+            Label(727.5, "Flow:"),
+            Percent(754.5, 792.0, 806.5, "adjbrush.flow", "100%"),
+            Toggle(
+                826.0,
+                Icon::Airbrush,
+                "Enable airbrush-style build-up effects",
+                "adjbrush.airbrush",
+            ),
+        ],
         Count => &[
             Label(110.5, "Count:"),
             Label(151.5, "0"),
@@ -1522,7 +1657,7 @@ fn default_choice(key: &str) -> &'static str {
         "colorreplace.mode" => "2",
         "colorreplace.limits" | "bgeraser.limits" => "1",
         "gradient.method" => "3",
-        "pen.mode" | "frame.stroke_align" | "artboard.size" => "1",
+        "pen.mode" | "frame.stroke_align" | "artboard.size" | "adjbrush.mode" => "1",
         _ => "0",
     }
 }
@@ -1597,6 +1732,7 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                             | "mixer.clean"
                             | "bgeraser.continuous"
                             | "colorreplace.continuous"
+                            | "remove.pressure"
                     ),
                 );
                 if b.icon(x, icon, tip, on, true).clicked() {
@@ -1840,6 +1976,40 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                     b.field_off(x0, x1);
                 }
             }
+            LabeledRadio(x0, x1, cx, lx, icon, label, key, value) => {
+                let on = choice(app, key) == value;
+                let rect = b.toggle_frame(x0, x1, on);
+                let r = b.ui.interact(
+                    rect,
+                    b.ui.id().with(("labeled-radio", key, value)),
+                    egui::Sense::click(),
+                );
+                // The choice not taken is dimmed
+                let ink = if on {
+                    crate::theme::color::OPTIONS_ICON
+                } else {
+                    egui::Color32::from_gray(0x9a)
+                };
+                let bg = if on {
+                    crate::theme::color::TOOL_ACTIVE
+                } else {
+                    crate::theme::color::OPTIONS_BAR
+                };
+                crate::ps_icons::paint(b.ui.painter(), b.at(cx, 17.5), icon, ink, bg);
+                b.ui.painter().text(
+                    b.at(lx - 0.75, 17.25),
+                    egui::Align2::LEFT_CENTER,
+                    label,
+                    crate::theme::body(),
+                    if on { crate::options_kit::LABEL } else { ink },
+                );
+                if r.clicked() {
+                    set_choice(app, key, value);
+                }
+            }
+            MenuButton(x0, x1, label) => {
+                b.menu_button(x0, x1, label);
+            }
             Swatch(x0, x1, x2, white) => {
                 let fill = if white {
                     egui::Color32::WHITE
@@ -1901,8 +2071,17 @@ fn picker(b: &mut Bar, app: &mut AppState, x: f32) {
     let (size, hardness) = match app.paint_options(tool) {
         Some(o) => (o.size, o.hardness),
         None => {
-            let s = app.setting(picker_key(tool), "13").parse().unwrap_or(13.0);
-            (s, 1.0)
+            let s = app
+                .setting(picker_key(tool), picker_default(tool))
+                .parse()
+                .unwrap_or(13.0);
+            // The Adjustment Brush's tip is soft
+            let hardness = if tool == Tool::AdjustmentBrush {
+                0.0
+            } else {
+                1.0
+            };
+            (s, hardness)
         }
     };
     let response = b.brush_picker(x, &format!("{size:.0}"), size, hardness);
@@ -1940,13 +2119,24 @@ fn picker(b: &mut Bar, app: &mut AppState, x: f32) {
             o.size = size;
             o.hardness = hardness;
         }
-        None => *app.setting(picker_key(tool), "13") = format!("{size:.0}"),
+        None => *app.setting(picker_key(tool), picker_default(tool)) = format!("{size:.0}"),
+    }
+}
+
+/// A brush size's starting value (Photoshop's).
+fn picker_default(tool: Tool) -> &'static str {
+    match tool {
+        Tool::SelectionBrush => "200",
+        Tool::AdjustmentBrush => "100",
+        _ => "13",
     }
 }
 
 /// Where a tool without paint options keeps its brush size.
 fn picker_key(tool: Tool) -> &'static str {
     match tool {
+        Tool::SelectionBrush => "selbrush.size",
+        Tool::AdjustmentBrush => "adjbrush.size",
         Tool::PatternStamp => "pattern.size",
         Tool::ArtHistoryBrush => "arthistory.size",
         Tool::ColorReplacement => "colorreplace.size",

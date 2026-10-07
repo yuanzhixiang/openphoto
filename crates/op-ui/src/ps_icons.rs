@@ -163,6 +163,10 @@ pub enum Icon {
     FrameCustom,
     /// A stroke centered on its edge (a square with handles).
     StrokeCenter,
+    /// A paintbrush with a plus or a minus (adding to or taking from a
+    /// selection or an area: Selection Brush, Remove, Adjustment Brush).
+    BrushAdd,
+    BrushSubtract,
     Eye,
     /// A partly locked layer's lock (and the background's): hollow.
     LayerLock,
@@ -1546,6 +1550,24 @@ pub fn paint_scaled(
             );
             for (x, y) in [(-10.0, -10.0), (10.0, -10.0), (-10.0, 10.0), (10.0, 10.0)] {
                 pen.rect(x - 2.0, y - 2.0, x + 2.0, y + 2.0);
+            }
+        }
+        Icon::BrushAdd | Icon::BrushSubtract => {
+            // Traced at 2x: the handle, its ferrule and the bristles
+            pen.poly(&[(11.0, -16.0), (15.0, -13.0), (1.0, 3.0), (-3.0, -1.0)]);
+            pen.poly(&[(-4.0, 0.0), (0.0, 4.0), (-2.0, 6.0), (-6.0, 2.0)]);
+            pen.poly(&[
+                (-6.0, 3.0),
+                (-2.0, 7.0),
+                (-4.0, 12.0),
+                (-9.0, 15.0),
+                (-15.0, 15.0),
+                (-12.0, 10.0),
+                (-11.0, 5.0),
+            ]);
+            pen.rect(8.0, 7.0, 21.0, 9.5);
+            if icon == Icon::BrushAdd {
+                pen.rect(13.25, 1.0, 15.75, 14.0);
             }
         }
         Icon::Swap => {
