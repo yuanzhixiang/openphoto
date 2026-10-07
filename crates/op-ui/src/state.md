@@ -10,7 +10,7 @@
 - `tool`：当前工具，默认是矩形选框（与 Photoshop 新装后的默认一致）。
 - `tool_slots`：工具栏每一格当前显示的工具（该组最近用过的那个），初始为各组第一个。`select_tool(t)` 同时设置当前工具和它所在格显示的工具。
 - `foreground` / `background`：前景色默认 `#14a5dc`，背景色白色。
-- `view`：视图开关（`ViewOptions`，见 `rulers.md`）。
+- `view`：视图开关（`ViewOptions`，见 `rulers.md`）。其中 `smart_guides`（智能参考线，默认开）只由 Properties 面板的 Guides 分区切换，还没有效果。
 - `modify_dialog`：Select › Modify 对话框，打开期间为 `Some`。
 - `new_document_dialog`：New 对话框，打开期间为 `Some`。
 - `new_guide_dialog`：New Guide 对话框，打开期间为 `Some`。
