@@ -21,7 +21,7 @@ The pixel work of more of the Filter menu, on a layer's straight RGBA pixels, re
 - Smart Sharpen: an unsharp mask whose blur matches Remove (Gaussian of the radius, Lens: a tighter Gaussian, Motion: a line at the angle); differences under Reduce Noise × 10 % levels are left alone; the shadows' and highlights' Fade Amounts weaken it in the darkest and brightest 30 %.
 - Fibers: each column a random walk between the background and foreground colors, Variance its step, Strength the length of its smoothing along the column.
 - Lens Flare: a glow and ring at the center, ghosts along the line through the image's middle, a streak for Movie Prime, screened over the image; Brightness scales it; the lens sets the size.
-- Extrude: squares of the size, Blocks (rims on the lower and right edges in shadow; Solid Front Faces paints the square's average) or Pyramids (four faces lit from the top left), Depth scaling the shading, random or Level-based heights.
+- Extrude: squares of the size, Blocks (rims on the lower and right edges in shadow; Solid Front Faces paints the square's average) or Pyramids (four faces lit from the top left), Depth scaling the shading, random or Level-based heights. Mask Incomplete Blocks leaves the squares cut off by the image's edge as they are.
 - Oil Paint: a Kuwahara smoothing whose reach grows with Stylization and Scale, mixed by Cleanliness, then lighting from the angle with Shine.
 
 ## Not included

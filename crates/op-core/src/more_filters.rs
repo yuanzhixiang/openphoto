@@ -920,7 +920,8 @@ pub enum ExtrudeType {
 /// toward the viewer (Blocks: a front face in the square's average color,
 /// or the image with Solid Front Faces off; Pyramids: four shaded
 /// faces), `depth` (1–255) setting how strongly the sides darken, random
-/// or by the square's brightness (Level-based).
+/// or by the square's brightness (Level-based). With `mask_incomplete`
+/// the squares cut off by the image's edge are left as they are.
 #[allow(clippy::too_many_arguments)] // one per control in the dialog
 pub fn extrude(
     px: &[Px],
@@ -931,6 +932,7 @@ pub fn extrude(
     depth: f32,
     level_based: bool,
     solid: bool,
+    mask_incomplete: bool,
     seed: u32,
 ) -> Vec<Px> {
     let size = size.max(2);
@@ -938,6 +940,9 @@ pub fn extrude(
     for by in (0..h).step_by(size) {
         for bx in (0..w).step_by(size) {
             let (bw, bh) = ((w - bx).min(size), (h - by).min(size));
+            if mask_incomplete && (bw < size || bh < size) {
+                continue;
+            }
             let mut avg = [0f32; 3];
             for y in by..by + bh {
                 for x in bx..bx + bw {
@@ -1310,9 +1315,27 @@ mod tests {
             30.0,
             true,
             false,
+            false,
             1,
         );
         assert_ne!(blocks, checker(32, 32));
+        // 32 is 3 squares of 10 and 2 pixels: Mask Incomplete Blocks leaves
+        // the last 2 rows and columns alone
+        let masked = extrude(
+            &checker(32, 32),
+            32,
+            32,
+            ExtrudeType::Blocks,
+            10,
+            30.0,
+            false,
+            true,
+            true,
+            1,
+        );
+        assert_eq!(masked[31 * 32 + 31], checker(32, 32)[31 * 32 + 31]);
+        assert_eq!(masked[5 * 32 + 31], checker(32, 32)[5 * 32 + 31]);
+        assert_ne!(&masked[..10], &checker(32, 32)[..10]);
         let oil = oil_paint(&checker(32, 32), 32, 32, 2.0, 5.0, 1.0, -60.0, 2.0);
         assert_eq!(oil.len(), 32 * 32);
     }

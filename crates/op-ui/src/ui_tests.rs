@@ -8740,3 +8740,21 @@ fn wave_dialog_randomizes() {
     h.run_steps(3);
     assert_eq!(last_history(&h), "Wave");
 }
+
+#[test]
+#[ignore]
+fn screenshot_plain_filter_dialogs() {
+    use crate::commands::Command;
+    for (command, name, w, ht) in [
+        (Command::Displace, "displace", 330.0, 232.0),
+        (Command::Extrude, "extrude", 402.0, 167.0),
+        (Command::Fibers, "fibers", 445.0, 445.0),
+        (Command::LensFlare, "lens_flare", 430.0, 450.0),
+    ] {
+        let mut h = harness(Vec::new());
+        reference_document(&mut h);
+        run_command(&mut h, command);
+        h.run_steps(4);
+        shot_dialog(&mut h, name, w, ht);
+    }
+}

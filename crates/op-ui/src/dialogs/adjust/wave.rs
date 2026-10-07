@@ -130,27 +130,12 @@ impl AdjustDialog {
             egui::StrokeKind::Inside,
         );
         self.pane_ui(ui, preview.shrink(pt(1.0)));
-        let randomize = r(371.0, 291.0, 464.0, 317.0);
-        let response = ui.interact(randomize, ui.id().with("wave-randomize"), Sense::click());
-        painter.rect(
-            randomize,
-            pt(2.0),
-            if response.is_pointer_button_down_on() {
-                Color32::from_gray(0x5a)
-            } else {
-                Color32::from_gray(0x45)
-            },
-            Stroke::new(pt(1.0), Color32::from_gray(0x66)),
-            egui::StrokeKind::Inside,
-        );
-        appkit::text(
+        if super::flat_button(
             ui,
-            randomize.center(),
-            Align2::CENTER_CENTER,
+            r(371.0, 291.0, 464.0, 317.0),
             "Randomize",
-            appkit::TEXT,
-        );
-        if response.clicked() {
+            "wave-randomize",
+        ) {
             self.extra.seed = self
                 .extra
                 .seed

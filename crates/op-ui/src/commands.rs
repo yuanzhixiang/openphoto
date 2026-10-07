@@ -1640,6 +1640,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                         // Gradient Map runs from the foreground to the background color
                         dialog.set_gradient_colors(colors);
                         dialog.set_colors(colors);
+                        dialog.extra.doc_size = (state.doc.width as f32, state.doc.height as f32);
                         dialog.extra.on_background = state
                             .doc
                             .active_layer

@@ -351,6 +351,7 @@ pub enum Filter {
         depth: f32,
         level_based: bool,
         solid: bool,
+        mask_incomplete: bool,
         seed: u32,
     },
     OilPaint {
@@ -2103,6 +2104,7 @@ fn more(
             depth,
             level_based,
             solid,
+            mask_incomplete,
             seed,
         } => m::extrude(
             px,
@@ -2113,6 +2115,7 @@ fn more(
             depth,
             level_based,
             solid,
+            mask_incomplete,
             seed,
         ),
         Filter::OilPaint {

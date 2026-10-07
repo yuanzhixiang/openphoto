@@ -1,6 +1,6 @@
 //! Photoshop 2026's small filter dialogs without a preview (Stylize ›
 //! Tiles..., Pixelate › Color Halftone..., Blur › Radial Blur...,
-//! Distort › Shear...): OK and Cancel
+//! Distort › Shear..., Distort › Displace..., Stylize › Extrude...): OK and Cancel
 //! (89 pt wide) at the top right and the settings as text, fields, radio
 //! buttons and checkboxes, measured on Photoshop. Coordinates are
 //! Photoshop points from the dialog's top-left corner.
@@ -31,9 +31,21 @@ pub enum Item {
         top: f32,
         pins: (f32, f32),
     },
-    /// A group box (x0, y0, x1, y1) with its title on the top edge, 19 pt
-    /// in; sets nothing.
-    Group { title: &'static str, rect: [f32; 4] },
+    /// A group box (x0, y0, x1, y1) with its title on the top edge from
+    /// `title_x`; sets nothing.
+    Group {
+        title: &'static str,
+        rect: [f32; 4],
+        title_x: f32,
+    },
+    /// A checkbox: its box's top-left corner, `size` pt square, the label
+    /// `gap` pt after it.
+    Check {
+        label: &'static str,
+        min: (f32, f32),
+        size: f32,
+        gap: f32,
+    },
     /// Radial Blur's Blur Center: a white box drawing the blur's pattern
     /// around the center, which a click or drag moves; sets nothing.
     CenterBox { rect: [f32; 4] },
@@ -176,6 +188,7 @@ pub const RADIAL_BLUR: Layout = Layout {
         Item::Group {
             title: "Blur Method:",
             rect: [12.0, 113.0, 117.5, 175.5],
+            title_x: 31.0,
         },
         Item::Radios {
             centers: &[(26.0, 133.0), (26.0, 156.0)],
@@ -184,6 +197,7 @@ pub const RADIAL_BLUR: Layout = Layout {
         Item::Group {
             title: "Quality:",
             rect: [12.0, 184.0, 117.5, 266.5],
+            title_x: 31.0,
         },
         Item::Radios {
             centers: &[(26.0, 204.0), (26.0, 226.0), (26.0, 248.0)],
@@ -213,6 +227,7 @@ pub const SHEAR: Layout = Layout {
         Item::Group {
             title: "Undefined Areas:",
             rect: [8.0, 181.0, 143.5, 222.5],
+            title_x: 27.0,
         },
         Item::Radios {
             centers: &[(20.0, 196.0), (20.0, 212.0)],
@@ -220,6 +235,90 @@ pub const SHEAR: Layout = Layout {
         },
         Item::Pane {
             rect: [8.0, 234.0, 310.0, 386.0],
+        },
+    ],
+};
+
+/// Distort › Displace (330 × 232 pt): the two scales, then Displacement
+/// Map and Undefined Areas in group boxes.
+pub const DISPLACE: Layout = Layout {
+    size: (330.0, 232.0),
+    buttons_x: 223.5,
+    buttons: PLUGIN_BUTTONS,
+    text_size: 11.0,
+    items: &[
+        Item::Field {
+            label: ("Horizontal Scale", 9.0),
+            rect: [143.0, 37.5, 205.0, 56.5],
+            unit: None,
+        },
+        Item::Field {
+            label: ("Vertical Scale", 9.0),
+            rect: [143.0, 66.5, 205.0, 85.5],
+            unit: None,
+        },
+        Item::Group {
+            title: "Displacement Map:",
+            rect: [9.0, 101.0, 205.0, 149.0],
+            title_x: 23.0,
+        },
+        Item::Radios {
+            centers: &[(20.5, 118.0), (20.5, 138.0)],
+            gap: 13.5,
+        },
+        Item::Group {
+            title: "Undefined Areas:",
+            rect: [9.0, 158.0, 205.0, 206.0],
+            title_x: 23.0,
+        },
+        Item::Radios {
+            centers: &[(20.5, 175.0), (20.5, 195.0)],
+            gap: 13.5,
+        },
+    ],
+};
+
+/// Stylize › Extrude (402 × 167 pt): Type, Size and Depth in rows, the
+/// depth's basis beside it, and two checkboxes.
+pub const EXTRUDE: Layout = Layout {
+    size: (402.0, 167.0),
+    buttons_x: 295.5,
+    buttons: PLUGIN_BUTTONS,
+    text_size: 11.0,
+    items: &[
+        Item::Text {
+            text: "Type:",
+            at: (9.0, 46.0),
+        },
+        Item::Radios {
+            centers: &[(55.0, 46.0), (125.0, 46.0)],
+            gap: 13.0,
+        },
+        Item::Field {
+            label: ("Size:", 9.0),
+            rect: [43.0, 65.5, 77.0, 84.5],
+            unit: Some(("Pixels", 83.0)),
+        },
+        Item::Field {
+            label: ("Depth:", 9.0),
+            rect: [53.0, 96.5, 87.0, 115.5],
+            unit: None,
+        },
+        Item::Radios {
+            centers: &[(108.5, 106.0), (190.0, 106.0)],
+            gap: 12.5,
+        },
+        Item::Check {
+            label: "Solid Front Faces",
+            min: (11.0, 129.5),
+            size: 11.0,
+            gap: 7.0,
+        },
+        Item::Check {
+            label: "Mask Incomplete Blocks",
+            min: (11.0, 145.5),
+            size: 11.0,
+            gap: 7.0,
         },
     ],
 };

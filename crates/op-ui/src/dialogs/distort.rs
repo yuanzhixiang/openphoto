@@ -52,8 +52,22 @@ pub enum Control {
 
 pub struct Layout {
     pub size: (f32, f32),
-    /// OK and Cancel's left edge (89 pt wide).
+    /// OK and Cancel's left edge and width (89 pt in most).
     pub buttons_x: f32,
+    pub buttons_w: f32,
+    /// A Randomize button (x0, y0, x1, y1) that draws a new pattern
+    /// (Fibers).
+    pub randomize: Option<[f32; 4]>,
+    /// A plain preview box (x0, y0, x1, y1) instead of the framed one with
+    /// gutters and the zoom bar (Lens Flare, whose box also places the
+    /// flare's center).
+    pub view: Option<[f32; 4]>,
+    /// Radio buttons for the setting after the sliders (Lens Flare's Lens
+    /// Type).
+    pub after: Option<RadioGroup>,
+    /// How far the slider rows' fields and tracks sit below the usual
+    /// place (`FIELD_Y`, `TRACK_Y`): Lens Flare's are 3 pt higher.
+    pub rows_dy: f32,
     pub control: Control,
     /// A pop-up for the last setting (Spherize's Mode, Ripple's Size,
     /// Mezzotint's Type): its rect (x0, y0, x1, y1) and its label's left.
@@ -62,9 +76,57 @@ pub struct Layout {
     pub diagram: Option<(f32, f32)>,
 }
 
+/// Render › Fibers: Variance and Strength over sliders and Randomize
+/// under them; 128.5 pt buttons (445 × 445 pt).
+pub const FIBERS: Layout = Layout {
+    size: (445.0, 445.0),
+    buttons_x: 298.5,
+    buttons_w: 128.5,
+    randomize: Some([98.0, 410.0, 191.0, 436.0]),
+    view: None,
+    after: None,
+    rows_dy: 0.0,
+    control: Control::Sliders {
+        label_ys: &[327.0, 377.0],
+        field_x: 231.0,
+        track_x1: 270.5,
+    },
+    mode: None,
+    diagram: None,
+};
+
+/// Render › Lens Flare: the plain preview box with the flare's center,
+/// Brightness over a slider and Lens Type (430 × 450 pt).
+pub const LENS_FLARE: Layout = Layout {
+    size: (430.0, 450.0),
+    buttons_x: 283.5,
+    buttons_w: 129.5,
+    randomize: None,
+    view: Some([8.0, 36.0, 266.0, 293.5]),
+    after: Some(RadioGroup {
+        title: Some(("Lens Type", 365.0)),
+        rect: [8.0, 363.0, 266.0, 440.0],
+        x: 20.0,
+        ys: &[380.0, 396.0, 412.0, 428.0],
+    }),
+    rows_dy: -3.0,
+    control: Control::Slider {
+        label_y: 324.0,
+        field_x: 203.0,
+        track_x1: 255.5,
+    },
+    mode: None,
+    diagram: None,
+};
+
 pub const TWIRL: Layout = Layout {
     size: (433.0, 367.0),
     buttons_x: 312.5,
+    buttons_w: 89.0,
+    randomize: None,
+    view: None,
+    after: None,
+    rows_dy: 0.0,
     control: Control::Slider {
         label_y: 327.0,
         field_x: 223.0,
@@ -79,6 +141,11 @@ pub const TWIRL: Layout = Layout {
 pub const CELL_SIZE: Layout = Layout {
     size: (457.0, 367.0),
     buttons_x: 350.5,
+    buttons_w: 89.0,
+    randomize: None,
+    view: None,
+    after: None,
+    rows_dy: 0.0,
     control: Control::Slider {
         label_y: 327.0,
         field_x: 284.0,
@@ -93,6 +160,11 @@ pub const CELL_SIZE: Layout = Layout {
 pub const RIPPLE: Layout = Layout {
     size: (405.0, 404.0),
     buttons_x: 298.5,
+    buttons_w: 89.0,
+    randomize: None,
+    view: None,
+    after: None,
+    rows_dy: 0.0,
     control: Control::Slider {
         label_y: 327.0,
         field_x: 218.0,
@@ -106,6 +178,11 @@ pub const RIPPLE: Layout = Layout {
 pub const MEZZOTINT: Layout = Layout {
     size: (405.0, 354.0),
     buttons_x: 298.5,
+    buttons_w: 89.0,
+    randomize: None,
+    view: None,
+    after: None,
+    rows_dy: 0.0,
     control: Control::None,
     mode: Some(([55.0, 318.0, 253.0, 336.0], 21.0)),
     diagram: None,
@@ -116,6 +193,11 @@ pub const MEZZOTINT: Layout = Layout {
 pub const ZIGZAG: Layout = Layout {
     size: (433.0, 454.0),
     buttons_x: 312.5,
+    buttons_w: 89.0,
+    randomize: None,
+    view: None,
+    after: None,
+    rows_dy: 0.0,
     control: Control::Sliders {
         label_ys: &[327.0, 377.0],
         field_x: 231.0,
@@ -128,6 +210,11 @@ pub const ZIGZAG: Layout = Layout {
 pub const PINCH: Layout = Layout {
     size: (468.0, 367.0),
     buttons_x: 347.5,
+    buttons_w: 89.0,
+    randomize: None,
+    view: None,
+    after: None,
+    rows_dy: 0.0,
     control: Control::Slider {
         label_y: 324.0,
         field_x: 253.0,
@@ -140,6 +227,11 @@ pub const PINCH: Layout = Layout {
 pub const SPHERIZE: Layout = Layout {
     size: (433.0, 404.0),
     buttons_x: 312.5,
+    buttons_w: 89.0,
+    randomize: None,
+    view: None,
+    after: None,
+    rows_dy: 0.0,
     control: Control::Slider {
         label_y: 327.0,
         field_x: 218.0,
@@ -152,6 +244,11 @@ pub const SPHERIZE: Layout = Layout {
 pub const POLAR: Layout = Layout {
     size: (405.0, 375.0),
     buttons_x: 298.5,
+    buttons_w: 89.0,
+    randomize: None,
+    view: None,
+    after: None,
+    rows_dy: 0.0,
     control: Control::Radios(&[RadioGroup {
         title: None,
         rect: [8.0, 317.0, 281.0, 366.0],
@@ -184,6 +281,11 @@ pub struct RadioGroup {
 pub const WIND: Layout = Layout {
     size: (405.0, 461.0),
     buttons_x: 298.5,
+    buttons_w: 89.0,
+    randomize: None,
+    view: None,
+    after: None,
+    rows_dy: 0.0,
     control: Control::Radios(&[
         RadioGroup {
             title: Some(("Method", 334.0)),

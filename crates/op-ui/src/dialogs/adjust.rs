@@ -311,7 +311,7 @@ const EXTRUDE: &[Param] = &[
     choice("Type", &["Blocks", "Pyramids"], 0),
     param("Size:", 2.0, 255.0, 30.0, 0),
     param("Depth:", 1.0, 255.0, 30.0, 0),
-    choice("Depth Based On", &["Random", "Level-based"], 1),
+    choice("Depth Based On", &["Random", "Level-based"], 0),
     check("Solid Front Faces", false),
     check("Mask Incomplete Blocks", false),
 ];
@@ -347,7 +347,7 @@ const SHEAR: &[Param] = &[choice(
 const DISPLACE: &[Param] = &[
     param("Horizontal Scale:", -999.0, 999.0, 10.0, 0),
     param("Vertical Scale:", -999.0, 999.0, 10.0, 0),
-    choice("Displacement Map", &["Stretch to Fit", "Tile"], 0),
+    choice("Displacement Map", &["Stretch To Fit", "Tile"], 0),
     choice("Undefined Areas", &["Wrap Around", "Repeat Edge Pixels"], 1),
 ];
 
@@ -635,11 +635,7 @@ impl Kind {
             Self::ShapeBlur => l::SHAPE_BLUR,
             Self::ReduceNoise => l::REDUCE_NOISE,
             Self::SmartSharpen => l::SMART_SHARPEN,
-            Self::Fibers => l::FIBERS,
-            Self::LensFlare => l::LENS_FLARE,
-            Self::Extrude => l::EXTRUDE,
             Self::OilPaint => l::OIL_PAINT,
-            Self::Displace => l::DISPLACE,
             Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
             Self::HdrToning => l::HDR_TONING,
             Self::ReplaceColor => l::REPLACE_COLOR,
@@ -657,6 +653,8 @@ impl Kind {
             Self::HsbHsl => &plain_filter::HSB_HSL,
             Self::RadialBlur => &plain_filter::RADIAL_BLUR,
             Self::Shear => &plain_filter::SHEAR,
+            Self::Displace => &plain_filter::DISPLACE,
+            Self::Extrude => &plain_filter::EXTRUDE,
             _ => return None,
         })
     }
@@ -673,6 +671,8 @@ impl Kind {
             Self::Spherize => &distort::SPHERIZE,
             Self::PolarCoordinates => &distort::POLAR,
             Self::Wind => &distort::WIND,
+            Self::Fibers => &distort::FIBERS,
+            Self::LensFlare => &distort::LENS_FLARE,
             _ => return None,
         })
     }
@@ -879,6 +879,11 @@ pub struct Extra {
     /// in the preview (the app reads its depth, `set_focal_distance`).
     pub lens_pick: bool,
     pub lens_focal_at: Option<(f32, f32)>,
+    /// Lens Flare's center, 0–1 across and down the image (the middle at
+    /// first; a click in the preview moves it).
+    pub flare_center: (f32, f32),
+    /// The document's size in pixels (Lens Flare's center needs it).
+    pub doc_size: (f32, f32),
 }
 
 /// The active layer made small for a preview box `max` pixels at most
@@ -1059,6 +1064,7 @@ impl AdjustDialog {
                     Vec::new()
                 },
                 radial_center: (0.5, 0.5),
+                flare_center: (0.5, 0.5),
                 shear_points: vec![(0.0, 0.0), (1.0, 0.0)],
                 ..Default::default()
             },
@@ -1470,7 +1476,7 @@ impl AdjustDialog {
                 seed: e.seed,
             },
             Kind::LensFlare => Filter::LensFlare {
-                center: (0.5, 0.5),
+                center: e.flare_center,
                 brightness: v[0],
                 lens: mf::LensType::ALL[pick(v[1])],
             },
@@ -1480,6 +1486,7 @@ impl AdjustDialog {
                 depth: v[2],
                 level_based: v[3] == 1.0,
                 solid: v[4] == 1.0,
+                mask_incomplete: v[5] == 1.0,
                 seed: e.seed,
             },
             Kind::OilPaint => Filter::OilPaint {
@@ -2098,20 +2105,27 @@ impl AdjustDialog {
         ui: &mut Ui,
         frame: Rect,
         label_ys: &[f32],
-        field_x: f32,
-        track_x1: f32,
+        (field_x, track_x1): (f32, f32),
+        rows_dy: f32,
     ) {
         let params = self.kind.params();
         for (k, &label_y) in label_ys.iter().enumerate() {
             let dy = label_y - label_ys[0];
             let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y + dy));
+            // The field and track, moved by the layout's `rows_dy`
+            let at_row = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y + dy + rows_dy));
             let p = &params[k];
             let label = p.label.split(" (").next().unwrap_or(p.label);
-            let label = label.trim_end_matches(':');
+            // Lens Flare's keeps its colon
+            let label = if self.kind == Kind::LensFlare {
+                label
+            } else {
+                label.trim_end_matches(':')
+            };
             distort::label(ui, at(23.5, label_ys[0]), Align2::LEFT_CENTER, label);
             let field = Rect::from_min_max(
-                at(field_x, distort::FIELD_Y.0),
-                at(field_x + distort::FIELD_W, distort::FIELD_Y.1),
+                at_row(field_x, distort::FIELD_Y.0),
+                at_row(field_x + distort::FIELD_W, distort::FIELD_Y.1),
             );
             appkit::field(
                 ui,
@@ -2126,7 +2140,7 @@ impl AdjustDialog {
             // Crystallize's, Pointillize's and ZigZag's settings have no unit
             let unit = match self.kind {
                 Kind::Twirl => "°",
-                Kind::Crystallize | Kind::Pointillize | Kind::ZigZag => "",
+                Kind::Crystallize | Kind::Pointillize | Kind::ZigZag | Kind::Fibers => "",
                 _ => "%",
             };
             appkit::text(
@@ -2137,19 +2151,52 @@ impl AdjustDialog {
                 appkit::TEXT,
             );
             let response = ui.interact(
-                distort::slider_rect(at, track_x1),
+                distort::slider_rect(at_row, track_x1),
                 ui.id().with(("distort-slider", k)),
                 Sense::click_and_drag(),
             );
             if (response.dragged() || response.clicked())
                 && let Some(pointer) = response.interact_pointer_pos()
             {
-                let t = distort::slider_place(at, track_x1, pointer.x);
+                let t = distort::slider_place(at_row, track_x1, pointer.x);
                 self.set(k, (p.min + (p.max - p.min) * t).round());
             }
             let v = self.value(k).unwrap_or(p.default);
-            distort::slider(ui, at, track_x1, (v - p.min) / (p.max - p.min));
+            distort::slider(ui, at_row, track_x1, (v - p.min) / (p.max - p.min));
         }
+    }
+
+    /// Lens Flare's center in its preview: a crosshair where it is; a click
+    /// or drag puts it there (as a fraction of the image).
+    fn flare_center_ui(&mut self, ui: &mut Ui, view: Rect) {
+        let (Some((cx, cy)), (w, h)) = (self.pane_center, self.extra.doc_size) else {
+            return;
+        };
+        if w <= 0.0 || h <= 0.0 {
+            return;
+        }
+        // The preview shows the image at its zoom around `pane_center`
+        let k = pt(0.5) * self.pane_zoom;
+        let to_view = |(fx, fy): (f32, f32)| {
+            Pos2::new(
+                view.center().x + (fx * w - cx) * k,
+                view.center().y + (fy * h - cy) * k,
+            )
+        };
+        let response = ui.interact(view, ui.id().with("flare-center"), Sense::click_and_drag());
+        if (response.clicked() || response.dragged())
+            && let Some(p) = response.interact_pointer_pos()
+        {
+            self.extra.flare_center = (
+                ((cx + (p.x - view.center().x) / k) / w).clamp(0.0, 1.0),
+                ((cy + (p.y - view.center().y) / k) / h).clamp(0.0, 1.0),
+            );
+        }
+        let c = to_view(self.extra.flare_center);
+        let painter = ui.painter_at(view);
+        let s = Stroke::new(pt(1.0), Color32::BLACK);
+        painter.line_segment([c - vec2(pt(4.0), 0.0), c + vec2(pt(4.0), 0.0)], s);
+        painter.line_segment([c - vec2(0.0, pt(4.0)), c + vec2(0.0, pt(4.0))], s);
     }
 
     /// A Distort filter's plug-in style dialog (see `distort`).
@@ -2157,14 +2204,31 @@ impl AdjustDialog {
         let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
         let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
         common::frame(ui, frame, self.kind.title(), theme::dialog_bold(pt(13.0)));
-        distort::frame(ui, at);
-        if let Some(texture) = &self.pane {
-            distort::image(ui, at, texture);
+        if let Some(v) = layout.view {
+            // A plain box; Lens Flare's center is placed in it
+            let b = r(v[0], v[1], v[2], v[3]);
+            ui.painter().rect(
+                b,
+                0,
+                Color32::from_gray(0x4d),
+                Stroke::new(pt(1.0), Color32::from_gray(0x3e)),
+                egui::StrokeKind::Inside,
+            );
+            let inner = b.shrink(pt(1.0));
+            self.pane_ui(ui, inner);
+            if self.kind == Kind::LensFlare {
+                self.flare_center_ui(ui, inner);
+            }
+        } else {
+            distort::frame(ui, at);
+            if let Some(texture) = &self.pane {
+                distort::image(ui, at, texture);
+            }
+            let view = distort::VIEW;
+            self.pane_drag(ui, r(view[0], view[1], view[2], view[3]));
+            let zoom = distort::zoom_bar(ui, at, &zoom_label(self.pane_zoom));
+            self.zoom_pane(zoom);
         }
-        let view = distort::VIEW;
-        self.pane_drag(ui, r(view[0], view[1], view[2], view[3]));
-        let zoom = distort::zoom_bar(ui, at, &zoom_label(self.pane_zoom));
-        self.zoom_pane(zoom);
 
         let params = self.kind.params();
         match layout.control {
@@ -2172,12 +2236,12 @@ impl AdjustDialog {
                 label_y,
                 field_x,
                 track_x1,
-            } => self.distort_sliders(ui, frame, &[label_y], field_x, track_x1),
+            } => self.distort_sliders(ui, frame, &[label_y], (field_x, track_x1), layout.rows_dy),
             distort::Control::Sliders {
                 label_ys,
                 field_x,
                 track_x1,
-            } => self.distort_sliders(ui, frame, label_ys, field_x, track_x1),
+            } => self.distort_sliders(ui, frame, label_ys, (field_x, track_x1), layout.rows_dy),
             distort::Control::None => {}
             distort::Control::Radios(groups) => {
                 for (i, group) in groups.iter().enumerate() {
@@ -2189,6 +2253,23 @@ impl AdjustDialog {
                                 self.values[i] = k.to_string();
                             }
                         }
+                    }
+                }
+            }
+        }
+        // Radio buttons for the setting after the sliders
+        if let Some(group) = &layout.after {
+            let i = match layout.control {
+                distort::Control::Slider { .. } => 1,
+                distort::Control::Sliders { label_ys, .. } => label_ys.len(),
+                _ => 0,
+            };
+            distort::group(ui, at, group);
+            if let Some(ParamKind::Choice(options)) = params.get(i).map(|p| p.kind) {
+                let chosen = self.value(i).unwrap_or(0.0) as usize;
+                for (k, (&y, option)) in group.ys.iter().zip(options).enumerate() {
+                    if distort::radio(ui, at(group.x, y), option, chosen == k) {
+                        self.values[i] = k.to_string();
                     }
                 }
             }
@@ -2234,11 +2315,22 @@ impl AdjustDialog {
             }
         }
 
+        if let Some(b) = layout.randomize {
+            let rect = r(b[0], b[1], b[2], b[3]);
+            if flat_button(ui, rect, "Randomize", "distort-randomize") {
+                self.extra.seed = self
+                    .extra
+                    .seed
+                    .wrapping_mul(747_796_405)
+                    .wrapping_add(2_891_336_453);
+            }
+        }
+
         let x0 = layout.buttons_x;
         let valid = self.effect().is_some();
         let ok = appkit::button_with(
             ui,
-            r(x0, 41.0, x0 + 89.0, 67.0),
+            r(x0, 41.0, x0 + layout.buttons_w, 67.0),
             "OK",
             (true, valid),
             13.0,
@@ -2246,7 +2338,7 @@ impl AdjustDialog {
         );
         let cancel = appkit::button_with(
             ui,
-            r(x0, 77.0, x0 + 89.0, 103.0),
+            r(x0, 77.0, x0 + layout.buttons_w, 103.0),
             "Cancel",
             (false, true),
             13.0,
@@ -2279,6 +2371,8 @@ impl AdjustDialog {
         };
         let label = |ui: &Ui, pos: Pos2, text: &str| label_at(ui, pos, text);
         let mut i = 0;
+        // The first field takes the focus
+        let mut focused = false;
         for item in layout.items {
             match *item {
                 Item::Text { text, at: (x, y) } => {
@@ -2297,8 +2391,9 @@ impl AdjustDialog {
                         (p.min, p.max),
                         1.0,
                         p.decimals,
-                        self.first_frame && i == 0,
+                        self.first_frame && !focused,
                     );
+                    focused = true;
                     if let Some((unit, x)) = unit {
                         label_at(ui, Pos2::new(at(x, 0.0).x, cy), unit);
                     }
@@ -2310,9 +2405,24 @@ impl AdjustDialog {
                     (at(x0, top), at(x1, top).x),
                     (at(pins.0, 0.0).x, at(pins.1, 0.0).x),
                 ),
-                Item::Group { title, rect } => {
+                Item::Check {
+                    label,
+                    min,
+                    size,
+                    gap,
+                } => {
+                    let mut on = self.value(i) == Some(1.0);
+                    appkit::checkbox_with(ui, at(min.0, min.1), (size, gap), label, &mut on, true);
+                    self.values[i] = (on as u8).to_string();
+                    i += 1;
+                }
+                Item::Group {
+                    title,
+                    rect,
+                    title_x,
+                } => {
                     let g = r(rect);
-                    let title_x = at(rect[0] + 19.0, 0.0).x;
+                    let title_x = at(title_x, 0.0).x;
                     let galley =
                         theme::tracked_galley(ui.painter(), title, font.clone(), appkit::TEXT);
                     appkit::group(
@@ -2825,6 +2935,32 @@ fn auto_brightness_contrast(histogram: &[u64; 256]) -> (i32, i32) {
 }
 
 mod lens_blur;
+
+/// A flat 13 pt button as the plug-in dialogs' Randomize (`#454545`,
+/// `#666666` edge, `#5a5a5a` while pressed). Returns whether it was
+/// clicked.
+fn flat_button(ui: &mut Ui, rect: Rect, label: &str, id: &str) -> bool {
+    let response = ui.interact(rect, ui.id().with(id), Sense::click());
+    ui.painter().rect(
+        rect,
+        pt(2.0),
+        if response.is_pointer_button_down_on() {
+            Color32::from_gray(0x5a)
+        } else {
+            Color32::from_gray(0x45)
+        },
+        Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+        egui::StrokeKind::Inside,
+    );
+    ui.painter().text(
+        rect.center(),
+        Align2::CENTER_CENTER,
+        label,
+        theme::dialog(pt(13.0)),
+        appkit::TEXT,
+    );
+    response.clicked()
+}
 mod wave;
 #[cfg(test)]
 pub use lens_blur::image_rect as lens_image_rect;
