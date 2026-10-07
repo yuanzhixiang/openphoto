@@ -6,7 +6,7 @@ The options the Info and Navigator panels' panel menus open with Panel Options..
 
 ## Info
 
-- **`Readout`:** Actual Color, RGB Color, Web Color, HSB Color, Grayscale, CMYK Color, Lab Color. `lines(color)` gives the labels and values the Info panel shows (`info.md`), or the labels with empty values without a color.
+- **`Readout`:** Actual Color, RGB Color, Web Color, HSB Color, Grayscale, CMYK Color, Lab Color, Opacity (given the active layer's color, it reads its alpha as a percentage). `lines(color)` gives the labels and values the Info panel shows (`info.md`), or the labels with empty values without a color.
 - **`InfoOptions`** (`AppState::info_options`):
   - the first and second readout (Photoshop's defaults: Actual Color and CMYK Color);
   - the mouse coordinates' unit (None: the rulers');

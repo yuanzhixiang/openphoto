@@ -16,10 +16,13 @@ pub enum Readout {
     Grayscale,
     Cmyk,
     Lab,
+    /// The active layer's opacity under the pointer (the color passed is
+    /// the layer's, not the composite's).
+    Opacity,
 }
 
 impl Readout {
-    pub const ALL: [Readout; 7] = [
+    pub const ALL: [Readout; 8] = [
         Readout::Actual,
         Readout::Rgb,
         Readout::Web,
@@ -27,6 +30,7 @@ impl Readout {
         Readout::Grayscale,
         Readout::Cmyk,
         Readout::Lab,
+        Readout::Opacity,
     ];
 
     pub fn label(self) -> &'static str {
@@ -38,6 +42,7 @@ impl Readout {
             Readout::Grayscale => "Grayscale",
             Readout::Cmyk => "CMYK Color",
             Readout::Lab => "Lab Color",
+            Readout::Opacity => "Opacity",
         }
     }
 
@@ -52,9 +57,10 @@ impl Readout {
                 Readout::Grayscale => empty(&["K:"]),
                 Readout::Cmyk => empty(&["C:", "M:", "Y:", "K:"]),
                 Readout::Lab => empty(&["L:", "a:", "b:"]),
+                Readout::Opacity => empty(&["Op:"]),
             };
         };
-        let [r, g, b, _] = c.to_rgba8();
+        let [r, g, b, a] = c.to_rgba8();
         match self {
             Readout::Actual | Readout::Rgb => vec![
                 ("R:", r.to_string()),
@@ -85,6 +91,7 @@ impl Readout {
                     .map(|(l, v)| (l, format!("{:.0}%", v * 100.0)))
                     .collect()
             }
+            Readout::Opacity => vec![("Op:", format!("{:.0}%", a as f32 / 2.55))],
             Readout::Lab => {
                 let lab = op_color::Lab::from_color(c);
                 vec![
@@ -173,6 +180,13 @@ pub fn info_options_ui(ui: &mut Ui, o: &mut InfoOptions) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opacity_reads_the_alpha() {
+        let c = op_core::Color::from_rgba8([10, 20, 30, 128]);
+        assert_eq!(Readout::Opacity.lines(Some(c)), vec![("Op:", "50%".to_string())]);
+        assert_eq!(Readout::Opacity.lines(None), vec![("Op:", String::new())]);
+    }
 
     #[test]
     fn readouts() {

@@ -19,7 +19,8 @@ Measured from a 2x capture of Photoshop 2026's Info panel. Positions are in poin
 
 ## Content
 
-- Left column: the first color readout, right column: the second (Info Panel Options, `panel_options.md`; Actual Color and CMYK Color by default). Readouts (`Readout::lines`) of the composite's color under the pointer: Actual Color and RGB Color as R, G, B (0–255); Web Color as R, G, B in hexadecimal; HSB Color as H (degrees), S and B (percent); Grayscale as K (percent ink of the luminosity); CMYK Color as C, M, Y, K (a simple conversion via `op_color::Cmyk`, in percent); Lab Color as L, a, b.
+- Left column: the first color readout, right column: the second (Info Panel Options, `panel_options.md`; Actual Color and CMYK Color by default). Readouts (`Readout::lines`) of the composite's color under the pointer: Actual Color and RGB Color as R, G, B (0–255); Web Color as R, G, B in hexadecimal; HSB Color as H (degrees), S and B (percent); Grayscale as K (percent ink of the luminosity); CMYK Color as C, M, Y, K (a simple conversion via `op_color::Cmyk`, in percent); Lab Color as L, a, b; Opacity as Op, the active layer's opacity under the pointer (percent; the only readout that reads the layer rather than the composite).
+- **Icon menus:** a click on a readout's eyedropper (an 18 pt square around it) opens its readout menu (Actual Color … Opacity, the current one checked), a native pop-up whose pick becomes that column's readout in Info Panel Options; a click on the position crosshair opens the units (Pixels … Percent), whose pick becomes Mouse Coordinates' unit.
 - X, Y (the pointer's distance from the rulers' origin, see `rulers.md`); W, H (the width and height of the selection's bounding rectangle, empty when there is no selection). All four are in Info Panel Options' Mouse Coordinates unit, or the rulers' unit when it is "Rulers' Units" (the default) (`unit_value`): whole pixels (rounded down), inches to three decimals, centimeters and picas to two, millimeters, points and percent to one (Photoshop's decimal places per unit have not been measured).
 - Color samplers (`DocState::color_samplers`): R, G, B of the merged image at each sampler, averaged over the Color Sampler's Sample Size.
 - The status lines Info Panel Options turns on (Document Sizes by default, Document Dimensions, Current Tool), one a line, in the status bar's wording (`status_info::StatusInfo::text`, e.g. "Doc: flattened size/layered size").
@@ -28,7 +29,7 @@ Measured from a 2x capture of Photoshop 2026's Info panel. Positions are in poin
 ## Known limitations
 
 - CMYK is not converted using a color profile. Only three of Photoshop's status items are offered.
-- The icons are drawn (the eyedropper is Phosphor's glyph), not Photoshop's artwork, and their menus (Photoshop's readout and unit menus on the icons' triangles) don't open.
+- The icons are drawn (the eyedropper is Phosphor's glyph), not Photoshop's artwork. The readout menus lack Photoshop's Proof Color and Total Ink, which need color management (P2 #19).
 - Tool hints exist only for the Color Sampler; other tools show no hint section.
 - The panel can't be resized; its height follows its sections.
 
@@ -36,4 +37,5 @@ Measured from a 2x capture of Photoshop 2026's Info panel. Positions are in poin
 
 - `ui_tests::info_and_navigator_panel_options`: the panel menu's Panel Options... opens the dialog; HSB and Web readouts with Document Dimensions are kept on OK; Escape drops a Navigator change. Screenshots `info_panel_options.png`, `info_panel_hsb.png`.
 - `ui_tests::info_panel_sections`: the height with one row of samplers and Document Sizes, and with the Color Sampler's hint. Screenshot `info_panel.png` (compared side by side with Photoshop's capture).
+- `panel_options::tests::opacity_reads_the_alpha`: a half-transparent color reads Op 50%.
 - `lengths_in_the_rulers_unit`: 36.6 px reads 36 in pixels; at 72 ppi 36 px are 0.500 in and 1.27 cm; 50 px are 25.0% of a 200 px width and 50.0% of a 100 px height. (The size format is covered by `status_info::tests::sizes_read_like_photoshops`.)

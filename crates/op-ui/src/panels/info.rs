@@ -5,6 +5,8 @@
 use egui::{Align2, Color32, Pos2, Rect, Stroke, Ui, Vec2};
 
 use super::floating::small;
+use super::panel_options::Readout;
+use crate::native_popup::Entry;
 use crate::rulers::RulerUnit;
 use crate::state::AppState;
 use crate::theme::pt;
@@ -133,6 +135,14 @@ fn size_icon(painter: &egui::Painter, c: Pos2) {
     }
 }
 
+/// An icon's menu (its triangle): a native pop-up of `entries` on a click
+/// in the icon's 18 pt square around `center`. Returns the pick.
+fn icon_menu(ui: &mut Ui, center: Pos2, id: (&str, usize), entries: &[Entry]) -> Option<usize> {
+    let rect = Rect::from_center_size(center, Vec2::splat(pt(18.0)));
+    let response = ui.interact(rect, ui.id().with(id), egui::Sense::click());
+    crate::native_popup::dropdown(ui, &response, response.id.with("menu"), entries)
+}
+
 pub fn show(ui: &mut Ui, app: &mut AppState) {
     // The body without the floating frame's margin: Photoshop draws its
     // dividers edge to edge
@@ -170,6 +180,11 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         (p.x >= 0.0 && p.y >= 0.0)
             .then(|| state.sample_average(p.x as u32, p.y as u32, 1, op_core::SampleScope::All))?
     });
+    let layer_color = pointer.and_then(|p| {
+        (p.x >= 0.0 && p.y >= 0.0).then(|| {
+            state.sample_average(p.x as u32, p.y as u32, 1, op_core::SampleScope::Current)
+        })?
+    });
     let sel = state.doc.selection().and_then(|s| s.bounds());
     let painter = ui.painter_at(body);
     let font = small();
@@ -200,10 +215,28 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         );
     };
 
-    // The two color readouts (Info Panel Options), each with its bit depth
-    for (readout, x) in [(options.first, 0.0), (options.second, COLUMN)] {
+    // The two color readouts (Info Panel Options), each with its bit depth;
+    // an eyedropper's triangle picks its readout
+    let mut picked = options;
+    for (k, (readout, x)) in [(options.first, 0.0), (options.second, COLUMN)]
+        .into_iter()
+        .enumerate()
+    {
         eyedropper(&painter, at(x + pt(14.25), pt(33.75)));
-        for (i, (label, value)) in readout.lines(color).iter().enumerate() {
+        let entries: Vec<Entry> = Readout::ALL
+            .iter()
+            .map(|r| Entry::item(r.label(), *r == readout))
+            .collect();
+        if let Some(i) = icon_menu(ui, at(x + pt(14.25), pt(33.75)), ("info-readout", k), &entries) {
+            if k == 0 {
+                picked.first = Readout::ALL[i];
+            } else {
+                picked.second = Readout::ALL[i];
+            }
+        }
+        // Opacity reads the active layer, the others the composite
+        let shown = if readout == Readout::Opacity { layer_color } else { color };
+        for (i, (label, value)) in readout.lines(shown).iter().enumerate() {
             pair(label, value, x + COLON, READOUT_Y + i as f32 * LINE);
         }
         text(
@@ -232,6 +265,14 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         )
     });
     crosshair(&painter, at(pt(14.5), pt(106.5)));
+    // The crosshair's triangle picks the mouse coordinates' unit
+    let entries: Vec<Entry> = RulerUnit::ALL
+        .iter()
+        .map(|u| Entry::item(u.label(), *u == unit))
+        .collect();
+    if let Some(i) = icon_menu(ui, at(pt(14.5), pt(106.5)), ("info-units", 0), &entries) {
+        picked.units = Some(RulerUnit::ALL[i]);
+    }
     size_icon(&painter, at(COLUMN + pt(14.25), pt(106.5)));
     let row = pt(99.75);
     pair("X:", &x, COLON, row);
@@ -297,6 +338,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
             );
         }
     }
+    app.info_options = picked;
 }
 
 /// How many rows of color samplers the Info panel shows for the active
