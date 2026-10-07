@@ -1259,9 +1259,66 @@ fn gradient_tool_paints_foreground_to_background() {
     assert_eq!(last_history(&h), "Gradient");
     assert_eq!(composite_pixel(&mut h, 50, 10), [0, 0, 0, 255]);
     assert_eq!(composite_pixel(&mut h, 700, 700), [255, 255, 255, 255]);
+    // Halfway, the options bar's Method (Smooth by default) decides
     let mid = composite_pixel(&mut h, 350, 500)[0];
-    assert!((118..=138).contains(&mid), "{mid}");
+    let want =
+        op_core::gradient::blend_colors([0; 3], [255; 3], 0.5, op_core::gradient::Method::Smooth)
+            [0];
+    assert!(mid.abs_diff(want) <= 2, "{mid} {want}");
     shot(&mut h, "gradient");
+}
+
+#[test]
+fn gradient_editor_for_the_tool_and_gradient_map() {
+    use crate::theme::pt;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.foreground = Color::from_rgba8([0, 0, 0, 255]);
+    h.state_mut().state.background = Color::from_rgba8([255, 255, 255, 255]);
+    h.key_press(egui::Key::G);
+    h.run_steps(2);
+    // The options bar's gradient opens the Gradient Editor
+    click(&mut h, at_pt(277.0, 45.25));
+    assert!(h.state().state.gradient_editor.is_some());
+    // (centered: its corner where a 516 × 470 dialog starts)
+    let corner = h.ctx.content_rect().center() - crate::dialogs::gradient_editor::SIZE / 2.0;
+    let at = |x: f32, y: f32| corner + egui::vec2(pt(x), pt(y));
+    shot(&mut h, "gradient_editor");
+    // A click under the bar (off the midpoint diamond) adds a color stop; the swatch opens
+    // the Color Picker for it, which makes it red
+    click(&mut h, at(200.0, 322.0));
+    let editor = &h.state().state.gradient_editor.as_ref().unwrap().0;
+    assert_eq!(editor.gradient.colors.len(), 3);
+    click(&mut h, at(115.0, 423.5));
+    assert!(h.state().state.color_picker.is_some());
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("ff0000".into()));
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert!(h.state().state.color_picker.is_none());
+    // OK: the tool paints black, red, white
+    click(&mut h, at(460.0, 51.5));
+    assert!(h.state().state.gradient_editor.is_none());
+    let g = h.state().state.gradient_preset.clone().unwrap();
+    assert_eq!(g.colors[1].color, [255, 0, 0]);
+    let (a, b) = (doc_point(&h, 100.0, 300.0), doc_point(&h, 600.0, 300.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    // (the red stop sits at (200 - 30) / 456 = 37%)
+    let mid = composite_pixel(&mut h, 286, 500);
+    assert!(mid[0] > 240 && mid[1] < 20 && mid[2] < 20, "{mid:?}");
+    // Gradient Map's gradient opens the editor too
+    run_command(&mut h, crate::commands::Command::GradientMap);
+    let corner = h.state().state.adjust_dialog.as_ref().unwrap().rect.min;
+    click(&mut h, corner + egui::vec2(pt(150.0), pt(77.5)));
+    assert!(matches!(
+        h.state().state.gradient_editor,
+        Some((_, crate::state::EditorTarget::GradientMap))
+    ));
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert!(h.state().state.gradient_editor.is_none());
+    assert!(h.state().state.adjust_dialog.is_some());
 }
 
 #[test]

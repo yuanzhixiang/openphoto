@@ -131,6 +131,12 @@ pub enum Adjustment {
     /// Color Lookup through the cube registered as this number
     /// (`color_match::register`).
     ColorLookup(u32),
+    /// Gradient Map with a gradient of any stops: luminosity (0–255) to
+    /// color; Dither adds up to half a level of noise.
+    GradientTable {
+        table: [[u8; 3]; 256],
+        dither: bool,
+    },
 }
 
 impl Adjustment {
@@ -160,6 +166,7 @@ impl Adjustment {
             Self::ReplaceColor { .. } => "Replace Color",
             Self::MatchColor { .. } => "Match Color",
             Self::ColorLookup(_) => "Color Lookup",
+            Self::GradientTable { .. } => "Gradient Map",
         }
     }
 
@@ -985,6 +992,17 @@ fn saturate(rgb: [f32; 3], amount: f32) -> [f32; 3] {
 }
 
 /// The gray a color paints on a layer mask (its luminosity).
+/// A repeatable value in 0..1 per pixel, for dithering.
+pub(crate) fn dither_noise(x: u32, y: u32) -> f32 {
+    let mut v = (x as u64)
+        .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        .wrapping_add((y as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F));
+    v ^= v >> 31;
+    v = v.wrapping_mul(0xFF51_AFD7_ED55_8CCD);
+    v ^= v >> 29;
+    (v >> 40) as f32 / (1u64 << 24) as f32
+}
+
 pub fn mask_gray([r, g, b]: [u8; 3]) -> [u8; 3] {
     let l = luminosity([r, g, b, 255]);
     [l, l, l]
@@ -1138,7 +1156,7 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
         Adjustment::ColorLookup(id) => crate::color_match::lut(id),
         _ => None,
     };
-    let map = |px: [u8; 4]| -> [u8; 4] {
+    let map = |px: [u8; 4], x: u32, y: u32| -> [u8; 4] {
         let [r, g, b, a] = px;
         match adjustment {
             Adjustment::Invert => [255 - r, 255 - g, 255 - b, a],
@@ -1208,6 +1226,21 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
                 );
                 [r, g, b, a]
             }
+            Adjustment::GradientTable { table, dither } => {
+                // The exact luminosity, between two table entries
+                let l = 0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32;
+                let (i, f) = ((l.floor() as usize).min(254), l - l.floor());
+                let noise = if dither {
+                    dither_noise(x, y) - 0.5
+                } else {
+                    0.0
+                };
+                let out = [0, 1, 2].map(|c| {
+                    let v = table[i][c] as f32 + (table[i + 1][c] as f32 - table[i][c] as f32) * f;
+                    (v + noise).round().clamp(0.0, 255.0) as u8
+                });
+                [out[0], out[1], out[2], a]
+            }
             Adjustment::ColorLookup(_) => match &lut {
                 Some(l) => {
                     let [r, g, b] = l.apply([r, g, b]);
@@ -1237,7 +1270,7 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
             if old[3] == 0 {
                 continue;
             }
-            let mut new = map(old);
+            let mut new = map(old, x, y);
             if amount < 255 {
                 for c in 0..3 {
                     let (o, n) = (old[c] as u32, new[c] as u32);

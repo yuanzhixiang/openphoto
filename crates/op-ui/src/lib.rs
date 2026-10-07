@@ -246,11 +246,19 @@ impl OpenPhotoApp {
         let Some(mut dialog) = self.state.adjust_dialog.take() else {
             return;
         };
-        dialog.blocked = self.state.color_picker.is_some();
+        dialog.blocked = self.state.color_picker.is_some() || self.state.gradient_editor.is_some();
         let outcome = dialog.show(ctx);
         if let Some(rgb) = dialog.take_color_request() {
             self.state
                 .open_color_picker(state::PickerTarget::PhotoFilter(rgb));
+        }
+        // Gradient Map's gradient opens the Gradient Editor
+        if let Some(g) = dialog.take_editor_request() {
+            let presets = self.state.gradient_presets();
+            self.state.gradient_editor = Some((
+                dialogs::gradient_editor::GradientEditor::new(g, presets),
+                state::EditorTarget::GradientMap,
+            ));
         }
         let [r, g, b, _] = self.state.background.to_rgba8();
         let background = [r, g, b];
@@ -408,6 +416,42 @@ impl OpenPhotoApp {
         }
         if self.state.quit_approved {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+    }
+
+    /// The Gradient Editor: its OK goes to the Gradient tool or to
+    /// Gradient Map; its color stops use the Color Picker.
+    fn gradient_editor(&mut self, ctx: &egui::Context) {
+        let Some((mut editor, target)) = self.state.gradient_editor.take() else {
+            return;
+        };
+        let active = self.state.color_picker.is_none();
+        let outcome = editor.show(ctx, active);
+        if let Some(rgb) = editor.take_color_request() {
+            self.state
+                .open_color_picker(state::PickerTarget::GradientStop(rgb));
+        }
+        // Gradients made with New are kept for the session
+        let made: Vec<_> = editor
+            .presets
+            .iter()
+            .skip(dialogs::gradient_editor::presets([0; 3], [0; 3]).len())
+            .cloned()
+            .collect();
+        self.state.gradient_made = made;
+        match outcome {
+            dialogs::gradient_editor::Outcome::Open => {
+                self.state.gradient_editor = Some((editor, target));
+            }
+            dialogs::gradient_editor::Outcome::Cancel => {}
+            dialogs::gradient_editor::Outcome::Ok(g) => match target {
+                state::EditorTarget::Tool => self.state.gradient_preset = Some(g),
+                state::EditorTarget::GradientMap => {
+                    if let Some(dialog) = &mut self.state.adjust_dialog {
+                        dialog.set_map_gradient(g);
+                    }
+                }
+            },
         }
     }
 
@@ -743,6 +787,12 @@ impl OpenPhotoApp {
                         dialog.set_color(color);
                     }
                 }
+                state::PickerTarget::GradientStop(_) => {
+                    if let Some((editor, _)) = &mut self.state.gradient_editor {
+                        let [r, g, b, _] = color.to_rgba8();
+                        editor.set_stop_color([r, g, b]);
+                    }
+                }
                 state::PickerTarget::PhotoFilter(_) => {
                     if let Some(dialog) = &mut self.state.adjust_dialog {
                         let [r, g, b, _] = color.to_rgba8();
@@ -928,6 +978,7 @@ impl eframe::App for OpenPhotoApp {
         self.equalize_dialog(&ctx);
         self.image_size_dialog(&ctx);
         self.crop_preset_dialogs(&ctx);
+        self.gradient_editor(&ctx);
         self.new_guide_dialog(&ctx);
         self.new_layer_dialog(&ctx);
         self.duplicate_dialog(&ctx);

@@ -2,9 +2,9 @@
 //! 416 × 230 pt. Sizes are Photoshop points from the dialog's top-left
 //! corner.
 
-use egui::{Color32, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind, Ui, vec2};
+use egui::{Color32, Rect, Stroke, StrokeKind, Ui, vec2};
 use op_core::adjust::Adjustment;
-use op_core::gradient::{Method, blend_colors};
+use op_core::gradient::{Gradient, Method};
 
 use super::appkit;
 use super::uxp::Button;
@@ -15,31 +15,58 @@ pub const SIZE: egui::Vec2 = vec2(pt(416.0), pt(230.0));
 
 #[derive(Clone)]
 pub struct Dialog {
-    /// The gradient's two colors (the foreground and background colors
-    /// when the dialog opens).
-    pub colors: ([u8; 3], [u8; 3]),
+    /// The gradient (Foreground to Background when the dialog opens).
+    pub gradient: Gradient,
     pub dither: bool,
     pub reverse: bool,
     pub method: Method,
+    /// The gradient was clicked: the app opens the Gradient Editor.
+    pub wants_editor: bool,
 }
 
 impl Dialog {
     pub fn new(colors: ([u8; 3], [u8; 3])) -> Self {
         Self {
-            colors,
+            gradient: Gradient::two("Foreground to Background", colors.0, colors.1),
             dither: false,
             reverse: false,
             method: Method::Smooth,
+            wants_editor: false,
         }
     }
 
+    /// The gradient as mapped: reversed, with the dialog's Method.
+    fn used(&self) -> Gradient {
+        let mut g = if self.reverse {
+            self.gradient.reversed()
+        } else {
+            self.gradient.clone()
+        };
+        g.method = self.method;
+        g
+    }
+
+    /// Two opaque stops at the ends with the midpoint halfway map through
+    /// `Adjustment::GradientMap` (measured against Photoshop); anything
+    /// else, or Dither, through the gradient's table.
     pub fn adjustment(&self) -> Adjustment {
-        let (a, b) = self.colors;
-        let (from, to) = if self.reverse { (b, a) } else { (a, b) };
-        Adjustment::GradientMap {
-            from,
-            to,
-            method: self.method,
+        let g = self.used();
+        let simple = g.colors.len() == 2
+            && g.colors[0].location == 0.0
+            && g.colors[1].location == 1.0
+            && g.colors[0].midpoint == 0.5
+            && g.opacities.iter().all(|o| o.opacity >= 1.0)
+            && g.smoothness >= 1.0;
+        if simple && !self.dither {
+            return Adjustment::GradientMap {
+                from: g.colors[0].color,
+                to: g.colors[1].color,
+                method: self.method,
+            };
+        }
+        Adjustment::GradientTable {
+            table: g.table(),
+            dither: self.dither,
         }
     }
 
@@ -64,27 +91,14 @@ impl Dialog {
             StrokeKind::Inside,
         );
         let bar = r(21.0, 68.5, 286.0, 86.5);
-        let (from, to) = if self.reverse {
-            (self.colors.1, self.colors.0)
-        } else {
-            self.colors
-        };
-        let mut mesh = Mesh::default();
-        let steps = 64;
-        for k in 0..=steps {
-            let t = k as f32 / steps as f32;
-            let [cr, cg, cb] = blend_colors(from, to, t, self.method);
-            let c = Color32::from_rgb(cr, cg, cb);
-            let x = bar.left() + bar.width() * t;
-            mesh.colored_vertex(Pos2::new(x, bar.top()), c);
-            mesh.colored_vertex(Pos2::new(x, bar.bottom()), c);
-            if k > 0 {
-                let i = (2 * k) as u32;
-                mesh.add_triangle(i - 2, i - 1, i);
-                mesh.add_triangle(i - 1, i + 1, i);
-            }
+        super::gradient_editor::paint_gradient(&painter, bar, &self.used());
+        // Clicking the gradient opens the Gradient Editor
+        if ui
+            .interact(bar, ui.id().with("gradient-map-bar"), egui::Sense::click())
+            .clicked()
+        {
+            self.wants_editor = true;
         }
-        painter.add(Shape::mesh(mesh));
         // The presets button: a few two-color gradients
         let chevron = r(286.0, 68.5, 299.5, 87.0);
         ps_icons::paint_scaled(
@@ -100,23 +114,25 @@ impl Dialog {
             ui.id().with("gradient-map-presets"),
             egui::Sense::click(),
         );
-        let colors = self.colors;
-        let mut picked = None;
-        egui::Popup::menu(&response)
-            .id(ui.id().with("gradient-map-menu"))
-            .show(|ui| {
-                for (name, pair) in [
-                    ("Foreground to Background", colors),
-                    ("Black, White", ([0; 3], [255; 3])),
-                    ("White, Black", ([255; 3], [0; 3])),
-                ] {
-                    if ui.button(name).clicked() {
-                        picked = Some(pair);
-                    }
-                }
-            });
-        if let Some(pair) = picked {
-            self.colors = pair;
+        // The presets (Photoshop's basics with the dialog's first colors)
+        let first = (
+            self.gradient.colors.first().map_or([0; 3], |s| s.color),
+            self.gradient.colors.last().map_or([255; 3], |s| s.color),
+        );
+        let presets = super::gradient_editor::presets(first.0, first.1);
+        let entries: Vec<_> = presets
+            .iter()
+            .map(|p| {
+                crate::native_popup::Entry::item(p.name.clone(), p.colors == self.gradient.colors)
+            })
+            .collect();
+        if let Some(k) = crate::native_popup::dropdown(
+            ui,
+            &response,
+            ui.id().with("gradient-map-menu"),
+            &entries,
+        ) {
+            self.gradient = presets[k].clone();
         }
 
         appkit::group(
@@ -158,7 +174,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reverse_and_method() {
+    fn reverse_method_and_stops() {
         let mut d = Dialog::new(([0; 3], [255, 0, 0]));
         assert_eq!(
             d.adjustment(),
@@ -178,5 +194,19 @@ mod tests {
                 method: Method::Classic
             }
         );
+        // Dither, or a third stop, maps through the table
+        d.dither = true;
+        assert!(matches!(
+            d.adjustment(),
+            Adjustment::GradientTable { dither: true, .. }
+        ));
+        d.dither = false;
+        d.reverse = false;
+        d.method = Method::Smooth;
+        d.gradient = super::super::gradient_editor::presets([0; 3], [255; 3])[5].clone();
+        let Adjustment::GradientTable { table, .. } = d.adjustment() else {
+            panic!("a table");
+        };
+        assert_eq!(table[128], d.gradient.sample(128.0 / 255.0).0);
     }
 }

@@ -31,7 +31,7 @@ Defines `OpenPhotoApp` (implements `eframe::App`), which:
    - Center: with a document, the document tab bar on top (Standard Screen Mode only; the full screen modes show only the active document) and the current document's view below; without a document, only the pasteboard background (black in Full Screen Mode).
    None of these panels use egui's built-in separators; each region draws its own borders as in Photoshop.
 5. Determines the current document: if the current document no longer exists, switches to the last tab (see `ensure_active` in `doc_tabs.rs`).
-6. Overlays: the History popup panel (when `history_open`), floating panels (Info, Navigator, Histogram, see `panels/floating.md`), the Canvas Size dialog, the Image Size dialog, the Fill dialog, the Trim dialog, adjustment dialogs, the "Save changes?" confirmation, the Color Picker (drawn above the previous two), macOS menu state sync, the status bar's menu when its arrow was clicked (`status_menu`) and the units menu when a ruler was right-clicked (`ruler_menu`), and a dialog dropdown's native menu (`native_popup::take_request`, its pick handed back with `native_popup::deliver`) (macOS only; without a native menu the requests stay), the error alert dialog, and Full Screen Mode's warning (`full_screen_prompt`: Photoshop's text, the app icon, "Don’t show again", Cancel and "Full Screen"; Full Screen enters the mode and remembers the checkbox in `skip_full_screen_prompt`).
+6. Overlays: the History popup panel (when `history_open`), floating panels (Info, Navigator, Histogram, see `panels/floating.md`), the Canvas Size dialog, the Image Size dialog, the Fill dialog, the Trim dialog, adjustment dialogs, the Gradient Editor, the "Save changes?" confirmation, the Color Picker (drawn above the previous two), macOS menu state sync, the status bar's menu when its arrow was clicked (`status_menu`) and the units menu when a ruler was right-clicked (`ruler_menu`), and a dialog dropdown's native menu (`native_popup::take_request`, its pick handed back with `native_popup::deliver`) (macOS only; without a native menu the requests stay), the error alert dialog, and Full Screen Mode's warning (`full_screen_prompt`: Photoshop's text, the app icon, "Don’t show again", Cancel and "Full Screen"; Full Screen enters the mode and remembers the checkbox in `skip_full_screen_prompt`).
 
 ## Frame time log
 
@@ -82,7 +82,11 @@ When the dialog returns OK, if the new size differs from the current size, `resi
 
 ## Adjustment dialogs: eyedroppers, the hand and the Color Picker
 
-While an adjustment dialog samples (`AdjustDialog::sampling`/`targeting`, see `dialogs/adjust.md`), a primary press on the document view outside the dialog removes the preview, reads the merged pixel under it (`composite_rgba8`) and hands it to the dialog; the targeted adjustment hand's drag is followed until the button is released. Photo Filter's Color Picker request opens `PickerTarget::PhotoFilter`; the dialog is `blocked` while any Color Picker is open.
+While an adjustment dialog samples (`AdjustDialog::sampling`/`targeting`, see `dialogs/adjust.md`), a primary press on the document view outside the dialog removes the preview, reads the merged pixel under it (`composite_rgba8`) and hands it to the dialog; the targeted adjustment hand's drag is followed until the button is released. Photo Filter's Color Picker request opens `PickerTarget::PhotoFilter`; the dialog is `blocked` while any Color Picker or the Gradient Editor is open.
+
+## Gradient Editor
+
+`gradient_editor` shows `AppState::gradient_editor` (see `dialogs/gradient_editor.md`). Gradient Map's request (`AdjustDialog::take_editor_request`) opens it with `EditorTarget::GradientMap`. The editor's Color Picker request opens `PickerTarget::GradientStop`, whose OK sets the selected stop's color; the editor ignores Enter and Escape while the picker is open. Gradients made with New are copied to `gradient_made` every frame. OK goes to `gradient_preset` (the tool) or `AdjustDialog::set_map_gradient`; Cancel drops the editor.
 
 ## Displace's map
 

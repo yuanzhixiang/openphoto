@@ -1170,6 +1170,17 @@ pub enum PickerTarget {
     CropShield,
     /// Photo Filter's Color.
     PhotoFilter([u8; 3]),
+    /// The Gradient Editor's selected color stop.
+    GradientStop([u8; 3]),
+}
+
+/// What the Gradient Editor edits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EditorTarget {
+    /// The Gradient tool's gradient.
+    Tool,
+    /// Gradient Map's gradient.
+    GradientMap,
 }
 
 pub struct PickerSession {
@@ -1289,6 +1300,14 @@ pub struct AppState {
     pub crop_options: crate::crop_tool::CropOptions,
     /// Presets saved with New Crop Preset...
     pub crop_presets: crate::crop_tool::CropPresets,
+    /// The Gradient tool's gradient (None: Foreground to Background), the
+    /// gradients made with the editor's New, and the editor while open.
+    pub gradient_preset: Option<op_core::gradient::Gradient>,
+    pub gradient_made: Vec<op_core::gradient::Gradient>,
+    pub gradient_editor: Option<(
+        crate::dialogs::gradient_editor::GradientEditor,
+        EditorTarget,
+    )>,
     /// New Crop Preset... and Delete Crop Preset..., while open.
     pub new_crop_preset: Option<crate::dialogs::new_preset::NewPresetDialog>,
     pub delete_crop_preset: Option<crate::dialogs::size_presets::DeletePresetDialog>,
@@ -1451,6 +1470,9 @@ impl Default for AppState {
             move_options: MoveOptions::default(),
             crop_options: Default::default(),
             crop_presets: Default::default(),
+            gradient_preset: None,
+            gradient_made: Vec::new(),
+            gradient_editor: None,
             new_crop_preset: None,
             delete_crop_preset: None,
             type_options: TypeOptions::default(),
@@ -1627,6 +1649,7 @@ impl AppState {
             || self.equalize_dialog.is_some()
             || self.image_size_dialog.is_some()
             || self.new_crop_preset.is_some()
+            || self.gradient_editor.is_some()
             || self.delete_crop_preset.is_some()
             || self.new_guide_dialog.is_some()
             || self.new_layer_dialog.is_some()
@@ -1671,6 +1694,10 @@ impl AppState {
             PickerTarget::Background => ("Color Picker (Background Color)", self.background),
             PickerTarget::CanvasExtension => ("Color Picker", self.background),
             PickerTarget::FillColor => ("Color Picker (Fill Color)", self.foreground),
+            PickerTarget::GradientStop([r, g, b]) => (
+                "Color Picker (Stop Color)",
+                Color::from_rgba8([r, g, b, 255]),
+            ),
             PickerTarget::PhotoFilter([r, g, b]) => (
                 "Color Picker (Photo Filter Color)",
                 Color::from_rgba8([r, g, b, 255]),
@@ -1690,6 +1717,29 @@ impl AppState {
             picker: crate::dialogs::ColorPicker::new(title, color),
             target,
         });
+    }
+
+    /// The Gradient tool's gradient: the one picked, or Foreground to
+    /// Background, with the options bar's Method.
+    pub fn tool_gradient(&mut self) -> op_core::gradient::Gradient {
+        let [r0, g0, b0, _] = self.foreground.to_rgba8();
+        let [r1, g1, b1, _] = self.background.to_rgba8();
+        let mut g = self.gradient_preset.clone().unwrap_or_else(|| {
+            op_core::gradient::Gradient::two("Foreground to Background", [r0, g0, b0], [r1, g1, b1])
+        });
+        let k: usize = self.setting("gradient.method", "3").parse().unwrap_or(3);
+        g.method = op_core::gradient::Method::ALL[k.min(3)];
+        g
+    }
+
+    /// The editor's and the options bar's presets: Photoshop's basics
+    /// (with the current colors) and the ones made with New.
+    pub fn gradient_presets(&self) -> Vec<op_core::gradient::Gradient> {
+        let [r0, g0, b0, _] = self.foreground.to_rgba8();
+        let [r1, g1, b1, _] = self.background.to_rgba8();
+        let mut list = crate::dialogs::gradient_editor::presets([r0, g0, b0], [r1, g1, b1]);
+        list.extend(self.gradient_made.iter().cloned());
+        list
     }
 
     pub fn active(&mut self) -> Option<&mut DocState> {

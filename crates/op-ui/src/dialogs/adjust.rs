@@ -1170,7 +1170,25 @@ impl AdjustDialog {
     /// Gradient Map's two colors (the foreground and background colors).
     pub fn set_gradient_colors(&mut self, colors: ([u8; 3], [u8; 3])) {
         if let Some(Custom::GradientMap(d)) = &mut self.custom {
-            d.colors = colors;
+            d.gradient =
+                op_core::gradient::Gradient::two("Foreground to Background", colors.0, colors.1);
+        }
+    }
+
+    /// Gradient Map's gradient was clicked: the editor opens with it.
+    pub fn take_editor_request(&mut self) -> Option<op_core::gradient::Gradient> {
+        match &mut self.custom {
+            Some(Custom::GradientMap(d)) => {
+                std::mem::take(&mut d.wants_editor).then(|| d.gradient.clone())
+            }
+            _ => None,
+        }
+    }
+
+    /// The Gradient Editor's OK for Gradient Map.
+    pub fn set_map_gradient(&mut self, g: op_core::gradient::Gradient) {
+        if let Some(Custom::GradientMap(d)) = &mut self.custom {
+            d.gradient = g;
         }
     }
 

@@ -161,6 +161,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let move_options = app.move_options;
     let type_options = app.type_options;
     let crop_options = app.crop_options.clone();
+    let tool_gradient = (app.tool == Tool::Gradient).then(|| app.tool_gradient());
+    let dither = app.flag("gradient.dither", true);
     let perspective_options = crate::perspective_crop::PerspectiveOptions::from_app(app);
     // A dialog over the window takes Enter and Escape
     let modal = app.modal_open();
@@ -526,10 +528,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 shape_input(ui, &response, state, tool, shape_options, [r, g, b], ppp);
             }
             Tool::Gradient => {
-                let [r0, g0, b0, _] = foreground.to_rgba8();
-                let [r1, g1, b1, _] = background.to_rgba8();
-                let colors = ([r0, g0, b0], [r1, g1, b1]);
-                paint_error = gradient_input(ui, &response, state, colors, app.gradient, ppp);
+                let g = tool_gradient.clone().expect("the Gradient tool's");
+                paint_error = gradient_input(ui, &response, state, (&g, dither), app.gradient, ppp);
             }
             Tool::Lasso | Tool::PolygonalLasso => {
                 let options = (
@@ -995,7 +995,7 @@ fn gradient_input(
     ui: &Ui,
     response: &egui::Response,
     state: &mut DocState,
-    colors: ([u8; 3], [u8; 3]),
+    (gradient, dither): (&op_core::gradient::Gradient, bool),
     options: op_core::gradient::GradientOptions,
     ppp: f32,
 ) -> Option<String> {
@@ -1020,12 +1020,13 @@ fn gradient_input(
     if start == end {
         return None;
     }
-    let result = op_core::gradient::gradient(
+    let result = op_core::gradient::gradient_with(
         &mut state.doc,
         (start.x, start.y),
         (end.x, end.y),
-        colors,
+        gradient,
         options,
+        dither,
     );
     match result {
         Ok(()) => {

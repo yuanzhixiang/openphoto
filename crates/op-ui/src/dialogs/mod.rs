@@ -22,6 +22,7 @@ mod exposure;
 mod fade;
 mod fill;
 mod filter_layout;
+pub(crate) mod gradient_editor;
 mod gradient_map;
 mod hue_saturation;
 pub(crate) mod image_size;

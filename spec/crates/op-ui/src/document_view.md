@@ -79,7 +79,7 @@ When the current tool is the Horizontal Type tool, canvas input is handed to `ty
 ## Gradient tool
 
 - Dragging from the press point to the release point sets the gradient direction; with Shift held the direction snaps to multiples of 45° (length unchanged). While dragging, a thin black-and-white line with white endpoints shows the direction.
-- On release, a foreground-to-background gradient is drawn on the current layer according to the gradient options (`op_core::gradient::gradient`), recording "Gradient"; nothing happens when the start and end points are the same; when the layer is hidden or pixel-locked, Photoshop's alert appears.
+- On release, the tool's gradient (`AppState::tool_gradient`: Foreground to Background unless one was picked or edited, with the options bar's Method) is drawn on the current layer according to the gradient options and the options bar's Dither (`op_core::gradient::gradient_with`), recording "Gradient"; nothing happens when the start and end points are the same; when the layer is hidden or pixel-locked, Photoshop's alert appears.
 - The drag in progress is stored in `DocState::gradient_drag`.
 
 ## Rulers and guides

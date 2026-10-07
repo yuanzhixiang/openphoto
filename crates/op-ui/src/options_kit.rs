@@ -686,16 +686,24 @@ impl<'a> Bar<'a> {
 
     /// The gradient swatch: `a` to `b` from `x0` to `x1` (y 5–30), its
     /// chevron box to `x2`.
-    pub fn gradient_swatch(&mut self, x0: f32, x1: f32, x2: f32, a: Color32, b: Color32) {
+    /// The gradient picker: the gradient (over a checkerboard where it is
+    /// see-through) and its chevron. Returns the swatch's and the
+    /// chevron's responses (the Gradient Editor; the presets).
+    pub fn gradient_swatch(
+        &mut self,
+        x0: f32,
+        x1: f32,
+        x2: f32,
+        gradient: &op_core::gradient::Gradient,
+    ) -> (egui::Response, egui::Response) {
         let rect = self.rect(x0, (5.0, 30.0), x1);
-        let mut mesh = egui::Mesh::default();
-        mesh.colored_vertex(rect.left_top(), a);
-        mesh.colored_vertex(rect.right_top(), b);
-        mesh.colored_vertex(rect.right_bottom(), b);
-        mesh.colored_vertex(rect.left_bottom(), a);
-        mesh.add_triangle(0, 1, 2);
-        mesh.add_triangle(0, 2, 3);
-        self.ui.painter().add(egui::Shape::mesh(mesh));
+        crate::widgets::checkerboard(self.ui.painter(), rect, pt(4.0));
+        crate::dialogs::gradient_editor::paint_gradient(self.ui.painter(), rect, gradient);
+        let swatch = self.ui.interact(
+            rect,
+            self.ui.id().with(("gradient-swatch", x0 as i32)),
+            Sense::click(),
+        );
         self.ui.painter().rect_stroke(
             rect,
             0,
@@ -717,6 +725,12 @@ impl<'a> Bar<'a> {
             color::OPTIONS_ICON,
             color::FIELD,
         );
+        let menu = self.ui.interact(
+            chevron,
+            self.ui.id().with(("gradient-chevron", x0 as i32)),
+            Sense::click(),
+        );
+        (swatch, menu)
     }
 
     /// A plain color box from `x0` to `x1` (y 5–30), unframed.

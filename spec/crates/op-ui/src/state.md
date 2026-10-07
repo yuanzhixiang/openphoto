@@ -28,6 +28,9 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `shape`: shape tool options (`ShapeOptions`: polygon sides 5, line weight 1 px, Photoshop's defaults).
 - `move_options`: Move tool options (`MoveOptions`: `auto_select`, `show_transform_controls`, both off by default, matching Photoshop).
 - `gradient`: Gradient tool options (`op_core::gradient::GradientOptions`: type, blend mode, opacity, reverse).
+- `gradient_preset`: the Gradient tool's gradient (None: Foreground to Background with the current colors); `gradient_made`: gradients added with the Gradient Editor's New this session; `gradient_editor`: the open Gradient Editor and what it edits (`EditorTarget::Tool` / `GradientMap`), counted by `modal_open`.
+- `tool_gradient()`: the tool's gradient with the options bar's Method (`gradient.method`); `gradient_presets()`: the editor's presets for the current colors plus `gradient_made`.
+- `PickerTarget::GradientStop(rgb)`: the Color Picker for the Gradient Editor's selected color stop, titled "Color Picker (Stop Color)".
 - `wand`: Magic Wand options: combine mode and region rules (tolerance, anti-alias, contiguous, all layers from `op_core::fill::BucketOptions`, with the same defaults as the Paint Bucket).
 - `editing_background` and `picker_hsb`: whether the Color panel is editing the foreground or background, and the cached HSB. The HSB is cached so that the hue does not jump back to 0 on gray (saturation 0).
 - `floating`: whether the floating panels (Info, Navigator, Histogram) are open (see `panels/floating.md`).

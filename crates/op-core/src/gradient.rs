@@ -172,6 +172,184 @@ fn from_oklab([ll, a, b]: [f32; 3]) -> [f32; 3] {
     .map(linear_to_srgb)
 }
 
+/// A color stop: where (0–1), the color, and where between it and the
+/// next stop the halfway color falls (the midpoint, 0.05–0.95 of the way).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ColorStop {
+    pub location: f32,
+    pub color: [u8; 3],
+    pub midpoint: f32,
+}
+
+/// An opacity stop (0–1), with its midpoint like a color stop's.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OpacityStop {
+    pub location: f32,
+    pub opacity: f32,
+    pub midpoint: f32,
+}
+
+/// A gradient as the Gradient Editor makes it: color and opacity stops
+/// (sorted by location), how it blends (Method) and Smoothness (0–1:
+/// how much of the stops' easing is used).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Gradient {
+    pub name: String,
+    pub colors: Vec<ColorStop>,
+    pub opacities: Vec<OpacityStop>,
+    pub method: Method,
+    pub smoothness: f32,
+}
+
+impl Gradient {
+    /// From `a` to `b`, opaque (Foreground to Background).
+    pub fn two(name: &str, a: [u8; 3], b: [u8; 3]) -> Self {
+        Self {
+            name: name.to_owned(),
+            colors: vec![
+                ColorStop {
+                    location: 0.0,
+                    color: a,
+                    midpoint: 0.5,
+                },
+                ColorStop {
+                    location: 1.0,
+                    color: b,
+                    midpoint: 0.5,
+                },
+            ],
+            opacities: vec![
+                OpacityStop {
+                    location: 0.0,
+                    opacity: 1.0,
+                    midpoint: 0.5,
+                },
+                OpacityStop {
+                    location: 1.0,
+                    opacity: 1.0,
+                    midpoint: 0.5,
+                },
+            ],
+            method: Method::default(),
+            smoothness: 1.0,
+        }
+    }
+
+    /// The gradient the other way round (Reverse).
+    pub fn reversed(&self) -> Self {
+        let mut colors: Vec<ColorStop> = self
+            .colors
+            .iter()
+            .map(|s| ColorStop {
+                location: 1.0 - s.location,
+                ..*s
+            })
+            .collect();
+        let mut opacities: Vec<OpacityStop> = self
+            .opacities
+            .iter()
+            .map(|s| OpacityStop {
+                location: 1.0 - s.location,
+                ..*s
+            })
+            .collect();
+        colors.reverse();
+        opacities.reverse();
+        // Each midpoint belongs to the stop before it, so they shift
+        let shift = |m: Vec<f32>| -> Vec<f32> {
+            let n = m.len();
+            (0..n)
+                .map(|i| if i + 1 < n { 1.0 - m[n - 2 - i] } else { 0.5 })
+                .collect()
+        };
+        let cm = shift(colors.iter().map(|s| s.midpoint).collect());
+        let om = shift(opacities.iter().map(|s| s.midpoint).collect());
+        for (s, m) in colors.iter_mut().zip(cm) {
+            s.midpoint = m;
+        }
+        for (s, m) in opacities.iter_mut().zip(om) {
+            s.midpoint = m;
+        }
+        Self {
+            colors,
+            opacities,
+            ..self.clone()
+        }
+    }
+
+    /// The span `t` falls in among stops at `locations`, and how far along
+    /// it (0–1) after its midpoint's remapping.
+    fn locate(locations: &[(f32, f32)], t: f32) -> (usize, f32) {
+        let n = locations.len();
+        if n < 2 || t <= locations[0].0 {
+            return (0, 0.0);
+        }
+        if t >= locations[n - 1].0 {
+            return (n - 2, 1.0);
+        }
+        let i = (0..n - 1)
+            .find(|&i| t <= locations[i + 1].0)
+            .unwrap_or(n - 2);
+        let (a, mid) = locations[i];
+        let b = locations[i + 1].0;
+        let u = ((t - a) / (b - a).max(1e-6)).clamp(0.0, 1.0);
+        let mid = mid.clamp(0.05, 0.95);
+        let v = if u < mid {
+            u / mid * 0.5
+        } else {
+            0.5 + (u - mid) / (1.0 - mid) * 0.5
+        };
+        (i, v)
+    }
+
+    /// The color and opacity at `t` (0–1).
+    pub fn sample(&self, t: f32) -> ([u8; 3], f32) {
+        let t = t.clamp(0.0, 1.0);
+        let color = match self.colors.len() {
+            0 => [0; 3],
+            1 => self.colors[0].color,
+            _ => {
+                let at: Vec<(f32, f32)> = self
+                    .colors
+                    .iter()
+                    .map(|s| (s.location, s.midpoint))
+                    .collect();
+                let (i, v) = Self::locate(&at, t);
+                // Smoothness 0 is a straight blend; 1 the method's easing
+                let (a, b) = (self.colors[i].color, self.colors[i + 1].color);
+                let eased = blend_colors(a, b, v, self.method);
+                let straight = [0, 1, 2]
+                    .map(|c| (a[c] as f32 + (b[c] as f32 - a[c] as f32) * v).round() as u8);
+                let k = self.smoothness.clamp(0.0, 1.0);
+                [0, 1, 2].map(|c| {
+                    (straight[c] as f32 + (eased[c] as f32 - straight[c] as f32) * k).round() as u8
+                })
+            }
+        };
+        let opacity = match self.opacities.len() {
+            0 => 1.0,
+            1 => self.opacities[0].opacity,
+            _ => {
+                let at: Vec<(f32, f32)> = self
+                    .opacities
+                    .iter()
+                    .map(|s| (s.location, s.midpoint))
+                    .collect();
+                let (i, v) = Self::locate(&at, t);
+                let (a, b) = (self.opacities[i].opacity, self.opacities[i + 1].opacity);
+                a + (b - a) * v
+            }
+        };
+        (color, opacity)
+    }
+
+    /// 256 colors along the gradient (Gradient Map's table: luminosity to
+    /// color).
+    pub fn table(&self) -> [[u8; 3]; 256] {
+        std::array::from_fn(|i| self.sample(i as f32 / 255.0).0)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GradientOptions {
     pub kind: GradientKind,
@@ -203,26 +381,45 @@ pub fn gradient(
     colors: ([u8; 3], [u8; 3]),
     options: GradientOptions,
 ) -> Result<(), FillError> {
+    let mut g = Gradient::two("", colors.0, colors.1);
+    g.method = Method::Classic;
+    g.smoothness = 0.0;
+    gradient_with(doc, a, b, &g, options, false)
+}
+
+/// [`gradient`] with a gradient of any stops (and opacities): each pixel
+/// takes the gradient's color at its place, at its opacity; Dither adds
+/// up to half a level of noise so smooth ramps don't band.
+pub fn gradient_with(
+    doc: &mut Document,
+    a: (f32, f32),
+    b: (f32, f32),
+    gradient: &Gradient,
+    options: GradientOptions,
+    dither: bool,
+) -> Result<(), FillError> {
     // Quick Mask can be painted whatever the layer's state
     if doc.quick_mask.is_none() {
         crate::adjust::check(doc)?;
     }
-    let (c0, c1) = if options.reverse {
-        (colors.1, colors.0)
+    let g = if options.reverse {
+        gradient.reversed()
     } else {
-        colors
+        gradient.clone()
     };
+    // 1024 places along it are plenty
+    let table: Vec<([f32; 3], f32)> = (0..1024)
+        .map(|i| {
+            let (c, o) = g.sample(i as f32 / 1023.0);
+            (c.map(|v| v as f32 / 255.0), o)
+        })
+        .collect();
     let selection = doc.selection().cloned();
     let (w, h) = (doc.width, doc.height);
     let target = doc.edit_target().expect("checked");
     let keep_alpha = target.keep_alpha;
     // On a mask the gradient runs between the colors' grays
-    let (c0, c1) = if target.mask {
-        (crate::adjust::mask_gray(c0), crate::adjust::mask_gray(c1))
-    } else {
-        (c0, c1)
-    };
-    let (c0, c1) = (c0.map(|v| v as f32 / 255.0), c1.map(|v| v as f32 / 255.0));
+    let mask = target.mask;
     let image = target.image;
     for y in 0..h {
         for x in 0..w {
@@ -238,7 +435,24 @@ pub fn gradient(
                 continue;
             }
             let t = options.kind.position(a, b, x as f32 + 0.5, y as f32 + 0.5);
-            let src = [0, 1, 2].map(|c| c0[c] + (c1[c] - c0[c]) * t);
+            // Between two of the table's places
+            let f = t.clamp(0.0, 1.0) * 1023.0;
+            let (i, k) = ((f.floor() as usize).min(1022), f - f.floor());
+            let ((c0, o0), (c1, o1)) = (table[i], table[i + 1]);
+            let mut src = [0, 1, 2].map(|c| c0[c] + (c1[c] - c0[c]) * k);
+            let opacity = o0 + (o1 - o0) * k;
+            if mask {
+                let [r, g, b] = src.map(|v| (v * 255.0).round() as u8);
+                src = [crate::adjust::mask_gray([r, g, b])[0] as f32 / 255.0; 3];
+            }
+            if dither {
+                let n = (crate::adjust::dither_noise(x, y) - 0.5) / 255.0;
+                src = src.map(|v| v + n);
+            }
+            let amount = amount * opacity;
+            if amount <= 0.0 {
+                continue;
+            }
             let dst = base.map(|v| v as f32 / 255.0);
             let out = if keep_alpha {
                 let mixed = blend::composite(
@@ -283,6 +497,73 @@ mod tests {
         assert_eq!(GradientKind::Angle.position(a, b, 5.0, 0.0), 0.0);
         let quarter = GradientKind::Angle.position(a, b, 0.0, -5.0);
         assert!((quarter - 0.25).abs() < 1e-6, "{quarter}");
+    }
+
+    #[test]
+    fn stops_midpoints_opacity_and_reverse() {
+        let mut g = Gradient::two("t", [0, 0, 0], [255, 255, 255]);
+        g.method = Method::Classic;
+        g.smoothness = 0.0;
+        assert_eq!(g.sample(0.0).0, [0; 3]);
+        assert_eq!(g.sample(1.0).0, [255; 3]);
+        assert_eq!(g.sample(0.5).0, [128; 3]);
+        // A midpoint at 25%: the halfway gray comes a quarter of the way
+        g.colors[0].midpoint = 0.25;
+        assert_eq!(g.sample(0.25).0, [128; 3]);
+        // A third stop in the middle (red)
+        g.colors.insert(
+            1,
+            ColorStop {
+                location: 0.5,
+                color: [255, 0, 0],
+                midpoint: 0.5,
+            },
+        );
+        g.colors[0].midpoint = 0.5;
+        assert_eq!(g.sample(0.5).0, [255, 0, 0]);
+        assert_eq!(g.sample(0.75).0, [255, 128, 128]);
+        // Opacity from opaque to clear
+        g.opacities[1].opacity = 0.0;
+        assert!((g.sample(0.5).1 - 0.5).abs() < 1e-6);
+        // Reversed: red stays in the middle, the ends swap
+        let r = g.reversed();
+        assert_eq!(r.sample(0.0).0, [255; 3]);
+        assert_eq!(r.sample(0.5).0, [255, 0, 0]);
+        assert!((r.sample(0.0).1).abs() < 1e-6);
+        // Gradient Map's table
+        assert_eq!(g.table()[255], [255; 3]);
+    }
+
+    #[test]
+    fn painting_stops_with_opacity_and_dither() {
+        let mut d = Document::new_with_background("t", 5, 1, Color::WHITE);
+        let mut g = Gradient::two("t", [0, 0, 0], [0, 0, 0]);
+        g.opacities[1].opacity = 0.0;
+        gradient_with(
+            &mut d,
+            (0.5, 0.5),
+            (4.5, 0.5),
+            &g,
+            GradientOptions::default(),
+            false,
+        )
+        .unwrap();
+        // Black fading out over white
+        assert_eq!(row(&d), [0, 64, 128, 191, 255]);
+        // Dither: a long flat ramp varies by at most a level
+        let mut d = Document::new_with_background("t", 64, 1, Color::WHITE);
+        let g = Gradient::two("t", [100, 100, 100], [101, 101, 101]);
+        gradient_with(
+            &mut d,
+            (0.5, 0.5),
+            (63.5, 0.5),
+            &g,
+            GradientOptions::default(),
+            true,
+        )
+        .unwrap();
+        let r = row(&d);
+        assert!(r.iter().all(|&v| (99..=102).contains(&v)));
     }
 
     #[test]

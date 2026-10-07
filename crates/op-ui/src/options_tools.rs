@@ -1868,12 +1868,34 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 b.color_box(x0, x1, egui::Color32::from_rgb(r, g, bl));
             }
             GradientSwatch(x0, x1, x2) => {
-                let (a, z) = if app.gradient.reverse {
-                    (app.background, app.foreground)
+                let g = app.tool_gradient();
+                let shown = if app.gradient.reverse {
+                    g.reversed()
                 } else {
-                    (app.foreground, app.background)
+                    g.clone()
                 };
-                b.gradient_swatch(x0, x1, x2, to32(a), to32(z));
+                let (swatch, menu) = b.gradient_swatch(x0, x1, x2, &shown);
+                // The swatch opens the Gradient Editor, the chevron the presets
+                if swatch.clicked() {
+                    let presets = app.gradient_presets();
+                    app.gradient_editor = Some((
+                        crate::dialogs::gradient_editor::GradientEditor::new(g, presets),
+                        crate::state::EditorTarget::Tool,
+                    ));
+                }
+                let presets = app.gradient_presets();
+                let entries: Vec<_> = presets
+                    .iter()
+                    .map(|p| crate::native_popup::Entry::item(p.name.clone(), false))
+                    .collect();
+                if let Some(k) = crate::native_popup::dropdown(
+                    b.ui,
+                    &menu,
+                    b.ui.id().with("gradient-presets"),
+                    &entries,
+                ) {
+                    app.gradient_preset = presets.get(k).cloned();
+                }
             }
             Modes(x, key) => {
                 use crate::state::SelectionMode;
