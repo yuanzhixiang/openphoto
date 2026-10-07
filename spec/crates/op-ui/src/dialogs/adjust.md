@@ -83,6 +83,11 @@ Every filter dialog has either a classic, a plugin-style or a plain layout (`Kin
 - OK or Enter (when all values are valid): returns `Outcome::Apply(adjustment)`; Cancel or Esc: returns `Outcome::Cancel`.
 - Modal while open.
 
+## Sampling the image and the Color Picker
+
+- `sampling()`: an eyedropper is chosen in Levels, Curves or Hue/Saturation; `targeting()`: Hue/Saturation's hand is on. `lib.rs` then takes a click on the image outside the dialog (`rect`, where it was last drawn): it removes the preview, reads the merged image's pixel there and passes it to `sample(rgb)` or `target_press(rgb, command)`; a hand drag follows with `target_drag(dx)` until release (`target_from`).
+- Photo Filter's swatch asks for the Color Picker with `take_color_request()`; `set_filter_color` takes its OK. While the Color Picker is open, `blocked` makes the dialog ignore keys and buttons.
+
 ## Test coverage
 
 - `defaults_match_photoshop`: the default adjustments for Levels, Exposure and Hue/Saturation.

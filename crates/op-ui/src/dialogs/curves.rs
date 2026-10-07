@@ -49,6 +49,21 @@ pub struct Dialog {
     pub show_clipping: bool,
     /// The point under the pointer, in curve values.
     hover: Option<(f32, f32)>,
+    /// The Set Black, Gray or White Point eyedropper chosen (`sample`).
+    pub eyedropper: Option<usize>,
+    /// The pencil tool: the curves are drawn freehand as tables (one per
+    /// channel), until the point tool turns them back into points.
+    pub tables: Option<[[u8; 256]; 4]>,
+    /// The pencil stroke's last point (curve values).
+    last_pencil: Option<(f32, f32)>,
+    /// The selected point's Input and Output as typed, and the channel and
+    /// point they were filled from.
+    input_text: String,
+    output_text: String,
+    shown_point: Option<(usize, usize)>,
+    /// Show Clipping while an end-point pin is dragged: the preview shows
+    /// what clips to black (false) or white (true).
+    pub clipping: Option<bool>,
 }
 
 fn identity() -> Vec<(f32, f32)> {
@@ -80,6 +95,13 @@ impl Dialog {
             show: [true; 4],
             show_clipping: false,
             hover: None,
+            eyedropper: None,
+            tables: None,
+            last_pencil: None,
+            input_text: String::new(),
+            output_text: String::new(),
+            shown_point: None,
+            clipping: None,
         }
     }
 
@@ -95,7 +117,38 @@ impl Dialog {
             .collect()
     }
 
+    /// The curves as tables (the pencil's, or the points' splines).
+    fn current_tables(&self) -> [[u8; 256]; 4] {
+        self.tables
+            .unwrap_or_else(|| std::array::from_fn(|c| curve_table(&self.rounded(c))))
+    }
+
     pub fn adjustment(&self) -> Adjustment {
+        // Show Clipping while a pin is dragged: white (black) where no
+        // channel clips, the clipped channels' colors elsewhere
+        if let Some(highlights) = self.clipping {
+            let t = self.current_tables();
+            let comp: [[u8; 256]; 3] =
+                std::array::from_fn(|c| std::array::from_fn(|v| t[0][t[c + 1][v] as usize]));
+            let show = |table: &[u8; 256]| -> [u8; 256] {
+                std::array::from_fn(|v| match (highlights, table[v]) {
+                    (false, 0) => 0,
+                    (false, _) => 255,
+                    (true, 255) => 255,
+                    (true, _) => 0,
+                })
+            };
+            let identity: [u8; 256] = std::array::from_fn(|v| v as u8);
+            return Adjustment::CurveTables([
+                identity,
+                show(&comp[0]),
+                show(&comp[1]),
+                show(&comp[2]),
+            ]);
+        }
+        if let Some(t) = self.tables {
+            return Adjustment::CurveTables(t);
+        }
         let p: [Vec<(u8, u8)>; 4] = std::array::from_fn(|c| {
             let p = self.rounded(c);
             // An untouched channel leaves its values alone
@@ -122,6 +175,78 @@ impl Dialog {
             .iter()
             .find(|(_, p)| self.points == Self::preset_points(p))
             .map_or("Custom", |(name, _)| name)
+    }
+
+    /// Picks the pencil (the curves become tables to draw on) or the point
+    /// tool (the tables become points again, placed along the drawn curve
+    /// every 32 levels).
+    pub fn set_pencil(&mut self, on: bool) {
+        if on && self.tables.is_none() {
+            self.tables = Some(self.current_tables());
+        } else if !on && let Some(t) = self.tables.take() {
+            self.points = t.map(|table| {
+                let pts: Vec<(f32, f32)> = (0..=8)
+                    .map(|k| {
+                        let x = (k * 32).min(255);
+                        (x as f32, table[x] as f32)
+                    })
+                    .collect();
+                // A straight table is the identity's two points
+                if pts.iter().all(|&(x, y)| (x - y).abs() < 1.0) {
+                    identity()
+                } else {
+                    pts
+                }
+            });
+        }
+        self.selected = None;
+    }
+
+    /// Smooth (pencil only): the current channel's table averaged over
+    /// nine levels, as Photoshop's Smooth evens a drawn curve.
+    pub fn smooth(&mut self) {
+        let c = self.channel;
+        if let Some(t) = &mut self.tables {
+            let src = t[c];
+            for (v, out) in t[c].iter_mut().enumerate() {
+                let lo = v.saturating_sub(4);
+                let hi = (v + 4).min(255);
+                let sum: u32 = src[lo..=hi].iter().map(|&x| x as u32).sum();
+                *out = (sum as f32 / (hi - lo + 1) as f32).round() as u8;
+            }
+        }
+    }
+
+    /// The chosen eyedropper's click on a pixel of color `rgb`: Set Black
+    /// (White) Point moves each channel's black (white) end to that
+    /// channel's value; Set Gray Point adds a point taking each channel's
+    /// value to the color's mean, so it comes out neutral.
+    pub fn sample(&mut self, rgb: [u8; 3]) {
+        let Some(k) = self.eyedropper else {
+            return;
+        };
+        let target = rgb.iter().map(|&v| v as f32).sum::<f32>() / 3.0;
+        self.points[0] = identity();
+        for (c, &value) in rgb.iter().enumerate() {
+            let v = value as f32;
+            let points = &mut self.points[c + 1];
+            match k {
+                0 => {
+                    points.retain(|p| p.0 > v);
+                    points.insert(0, (v.min(253.0), 0.0));
+                }
+                2 => {
+                    points.retain(|p| p.0 < v);
+                    points.push((v.max(2.0), 255.0));
+                }
+                _ => {
+                    points.retain(|p| (p.0 - v).abs() >= 4.0);
+                    let i = points.iter().position(|p| p.0 > v).unwrap_or(points.len());
+                    points.insert(i, (v, target));
+                }
+            }
+        }
+        self.selected = None;
     }
 
     /// Auto: each channel's darkest and lightest 0.1% become black and
@@ -244,29 +369,37 @@ impl Dialog {
             self.selected = None;
         }
 
-        // Point and pencil tools (the pencil is not available)
-        let tool = r(20.0, 107.5, 50.0, 133.5);
-        painter.rect(
-            tool,
-            pt(3.0),
-            Color32::from_gray(0x38),
-            Stroke::new(pt(1.0), Color32::from_gray(0x63)),
-            StrokeKind::Inside,
-        );
-        ps_icons::paint(
-            &painter,
-            tool.center(),
-            Icon::CurvePoints,
-            appkit::TEXT,
-            Color32::from_gray(0x38),
-        );
-        ps_icons::paint(
-            &painter,
-            at(64.5, 120.0),
-            Icon::Pencil,
-            appkit::TEXT,
-            color::PANEL,
-        );
+        // Point and pencil tools, the chosen one pressed
+        let pencil = self.tables.is_some();
+        for (k, (rect, icon)) in [
+            (r(20.0, 107.5, 50.0, 133.5), Icon::CurvePoints),
+            (r(49.5, 107.5, 79.5, 133.5), Icon::Pencil),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let chosen = pencil == (k == 1);
+            let fill = if chosen {
+                painter.rect(
+                    rect,
+                    pt(3.0),
+                    Color32::from_gray(0x38),
+                    Stroke::new(pt(1.0), Color32::from_gray(0x63)),
+                    StrokeKind::Inside,
+                );
+                Color32::from_gray(0x38)
+            } else {
+                color::PANEL
+            };
+            ps_icons::paint(&painter, rect.center(), icon, appkit::TEXT, fill);
+            if ui
+                .interact(rect, ui.id().with(("curves-tool", k)), Sense::click())
+                .clicked()
+                && !chosen
+            {
+                self.set_pencil(k == 1);
+            }
+        }
 
         self.graph(ui, frame);
 
@@ -277,9 +410,67 @@ impl Dialog {
             .or(self.hover);
         appkit::label(ui, at(20.5, 339.75), "Output:");
         appkit::label(ui, at(90.0, 389.75), "Input:");
-        if let Some((x, y)) = readout {
-            appkit::label(ui, at(20.5, 355.75), &self.shown(y));
-            appkit::label(ui, at(89.5, 410.25), &self.shown(x));
+        // A selected point's values can be typed
+        let selected = self
+            .selected
+            .filter(|&i| self.tables.is_none() && i < self.points[self.channel].len())
+            .map(|i| (self.channel, i));
+        if let Some((c, i)) = selected {
+            if self.shown_point != Some((c, i)) || self.drag.is_some() {
+                let (x, y) = self.points[c][i];
+                self.input_text = self.shown(x);
+                self.output_text = self.shown(y);
+                self.shown_point = Some((c, i));
+            }
+            let output = appkit::field(
+                ui,
+                r(18.0, 346.5, 62.0, 365.5),
+                &mut self.output_text,
+                "curves-output",
+                (0.0, 255.0),
+                1.0,
+                0,
+                false,
+            );
+            let input = appkit::field(
+                ui,
+                r(87.5, 401.0, 131.5, 420.0),
+                &mut self.input_text,
+                "curves-input",
+                (0.0, 255.0),
+                1.0,
+                0,
+                false,
+            );
+            let pigment = self.pigment;
+            let read = |t: &str| {
+                let v: f32 = t.trim().parse().ok()?;
+                Some(if pigment { 255.0 - v * 2.55 } else { v }.clamp(0.0, 255.0))
+            };
+            let (out_v, in_v) = (read(&self.output_text), read(&self.input_text));
+            let pts = &mut self.points[c];
+            if output.changed()
+                && let Some(y) = out_v
+            {
+                pts[i].1 = y;
+            }
+            if input.changed()
+                && let Some(x) = in_v
+            {
+                let lo = if i > 0 { pts[i - 1].0 + 1.0 } else { 0.0 };
+                let hi = if i + 1 < pts.len() {
+                    pts[i + 1].0 - 1.0
+                } else {
+                    255.0
+                };
+                pts[i].0 = x.clamp(lo, hi.max(lo));
+            }
+        } else {
+            self.shown_point = None;
+            if let Some((x, y)) = readout {
+                appkit::label(ui, at(20.5, 355.75), &self.shown(y));
+                appkit::label(ui, at(89.5, 410.25), &self.shown(x));
+            }
         }
         ps_icons::paint_scaled(
             &painter,
@@ -289,19 +480,18 @@ impl Dialog {
             color::PANEL,
             1.4,
         );
-        for (x, icon) in [
+        for (k, (x, icon)) in [
             (158.0, Icon::EyedropperBlack),
             (188.0, Icon::EyedropperGray),
             (218.0, Icon::EyedropperWhite),
-        ] {
-            ps_icons::paint_scaled(
-                &painter,
-                at(x, 411.5),
-                icon,
-                Color32::from_gray(0xdd),
-                color::PANEL,
-                1.1,
-            );
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let chosen = self.eyedropper == Some(k);
+            if appkit::eyedropper(ui, at(x, 411.5), icon, chosen, 1.1) {
+                self.eyedropper = (!chosen).then_some(k);
+            }
         }
         appkit::checkbox(
             ui,
@@ -373,7 +563,9 @@ impl Dialog {
         };
         let ok = button(ui, 45.0, "OK", true, true);
         let cancel = button(ui, 80.0, "Cancel", false, true);
-        button(ui, 122.0, "Smooth", false, false);
+        if button(ui, 122.0, "Smooth", false, self.tables.is_some()).clicked() {
+            self.smooth();
+        }
         let auto = button(ui, 164.0, "Auto", false, true);
         button(ui, 199.0, "Options...", false, true);
         appkit::checkbox(ui, at(563.5, 243.5), "Preview", preview);
@@ -470,6 +662,37 @@ impl Dialog {
             .hover_pos()
             .filter(|p| graph.contains(*p))
             .map(to_curve);
+        // The pencil draws the curve: each column the pointer crosses
+        // takes its height
+        if let Some(tables) = &mut self.tables {
+            let drawing = response.dragged() || response.clicked() || response.drag_started();
+            if let Some(p) = response.interact_pointer_pos().filter(|_| drawing) {
+                let (x, y) = to_curve(p);
+                let (x0, y0) = self.last_pencil.unwrap_or((x, y));
+                let (a, b) = if x0 <= x {
+                    ((x0, y0), (x, y))
+                } else {
+                    ((x, y), (x0, y0))
+                };
+                for col in a.0.round() as usize..=b.0.round() as usize {
+                    let t = if b.0 > a.0 {
+                        (col as f32 - a.0) / (b.0 - a.0)
+                    } else {
+                        0.0
+                    };
+                    tables[c][col.min(255)] = (a.1 + (b.1 - a.1) * t.clamp(0.0, 1.0)).round() as u8;
+                }
+                self.last_pencil = Some((x, y));
+            }
+            if !response.dragged() {
+                self.last_pencil = None;
+            }
+            let line: Vec<Pos2> = (0..256)
+                .map(|x| to_screen((x as f32, tables[c][x] as f32)))
+                .collect();
+            painter.add(Shape::line(line, Stroke::new(pt(1.75), CHANNEL_COLORS[c])));
+            return;
+        }
         let pts = &mut self.points[c];
         if (response.drag_started() || response.clicked())
             && let Some(p) = response.interact_pointer_pos()
@@ -642,6 +865,11 @@ impl Dialog {
         {
             self.pin_drag = Some(((pins[1] - p.x).abs() < (pins[0] - p.x).abs()) as usize);
         }
+        // Show Clipping: the preview shows what the dragged pin clips
+        self.clipping = self
+            .pin_drag
+            .filter(|_| self.show_clipping)
+            .map(|k| (k == 1) != flip);
         if let (Some(k), Some(p)) = (self.pin_drag, response.interact_pointer_pos()) {
             let (x, _) = to_curve(p);
             let pts = &mut self.points[c];
@@ -655,6 +883,7 @@ impl Dialog {
             }
             if response.drag_stopped() {
                 self.pin_drag = None;
+                self.clipping = None;
             }
         }
         let (black, white) = if flip {
@@ -671,6 +900,36 @@ impl Dialog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pencil_smooth_and_show_clipping() {
+        let mut d = Dialog::new([[0; 256]; 3]);
+        // The pencil takes the curve as a table; a step drawn on it
+        d.set_pencil(true);
+        let t = d.tables.as_mut().unwrap();
+        t[0][128..].fill(255);
+        t[0][..128].fill(0);
+        assert_eq!(d.adjustment(), Adjustment::CurveTables(d.tables.unwrap()));
+        // Smooth eases the step
+        d.smooth();
+        let t = d.tables.unwrap()[0];
+        assert!(t[127] > 0 && t[128] < 255 && t[100] == 0 && t[200] == 255);
+        // Back to points: placed along the drawn curve
+        d.set_pencil(false);
+        assert!(d.tables.is_none());
+        assert_eq!(d.points[0].len(), 9);
+        assert_eq!(d.points[0][0], (0.0, 0.0));
+        assert_eq!(d.points[1], identity());
+        // Show Clipping while the black pin is dragged: black where every
+        // channel clips to 0, white elsewhere
+        let mut d = Dialog::new([[0; 256]; 3]);
+        d.points[0][0] = (50.0, 0.0);
+        d.clipping = Some(false);
+        let Adjustment::CurveTables(t) = d.adjustment() else {
+            panic!("tables");
+        };
+        assert_eq!((t[1][40], t[1][60]), (0, 255));
+    }
 
     #[test]
     fn photoshops_presets() {

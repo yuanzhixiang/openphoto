@@ -21,7 +21,8 @@ The dialog for Image › Adjustments › Levels... (⌘L), rebuilt pixel by pixe
 - Separator at y 277, x 20–286, `#3e3e3e`.
 - "Output Levels:" (20.5, 290.5); black-to-white gradient bar (24, 302)–(282, 315); output slider tips at y 315; output fields y 332–351, x 60–105, 240–285.
 - Right-side buttons x 313.5–402.5: OK (38.5), Cancel (73.5), Auto (115.5), Options... (157.5), each 26 high.
-- Three eyedroppers (327 / 357 / 387, 213) (black, gray, white; drawn only); "Preview" checkbox (312.5, 243).
+- Three eyedroppers (327 / 357 / 387, 213): Set Black, Gray and White Point (`appkit::eyedropper`, the chosen one pressed; clicking it again turns it off); "Preview" checkbox (312.5, 243).
+- With an eyedropper chosen, a click on the image outside the dialog samples the merged image as it was before adjusting (`sample`): Black (White) Point sets each channel's input black (white) to that channel's value (kept off the other end), Gray Point sets each channel's gamma so the color comes out at its channels' mean (neutral); the composite channel returns to its defaults.
 
 ## Interaction
 
@@ -33,9 +34,9 @@ The dialog for Image › Adjustments › Levels... (⌘L), rebuilt pixel by pixe
 
 ## Known limitations
 
-- Options... (Auto Color Correction Options), the eyedroppers, and the gear menu (save/load presets) have no behavior.
+- Options... (Auto Color Correction Options) and the gear menu (save/load presets) have no behavior.
 
 ## Test coverage
 
-- `channels_keep_their_levels`, `auto_stretches_each_channel`.
+- `channels_keep_their_levels`, `auto_stretches_each_channel`, `photoshops_presets`; `ui_tests::levels_and_curves_eyedroppers_sample_the_image` (see `curves.md`).
 - `ui_tests::levels_dialog_sets_the_black_point`, `ui_tests::levels_and_curves_edit_one_channel` (after ⌥3 only red changes). Screenshots `levels_dialog.png`, `levels_red.png`.

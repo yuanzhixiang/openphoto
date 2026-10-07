@@ -899,6 +899,75 @@ fn levels_dialog_sets_the_black_point() {
 }
 
 #[test]
+fn levels_and_curves_eyedroppers_sample_the_image() {
+    use crate::theme::pt;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // An orange patch
+    h.state_mut().state.foreground = Color::from_rgba8([200, 100, 50, 255]);
+    select_rect(&mut h, 0.0, 0.0, 734.0, 150.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.run_steps(2);
+    // Levels' Set White Point, then a click on the patch: each channel's
+    // input white becomes its value, so the patch turns white
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::L);
+    h.run_steps(3);
+    let corner = h.state().state.adjust_dialog.as_ref().unwrap().rect.min;
+    click(&mut h, corner + egui::vec2(pt(387.0), pt(213.0)));
+    let p = doc_point(&h, 50.0, 75.0);
+    click(&mut h, p);
+    h.run_steps(2);
+    assert_eq!(composite_pixel(&mut h, 200, 75), [255, 255, 255, 255]);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(composite_pixel(&mut h, 200, 75), [255, 255, 255, 255]);
+    assert_eq!(last_history(&h), "Levels");
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run_steps(2);
+    // Curves' Set Gray Point on the patch makes it neutral
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::M);
+    h.run_steps(3);
+    let corner = h.state().state.adjust_dialog.as_ref().unwrap().rect.min;
+    click(&mut h, corner + egui::vec2(pt(188.0), pt(411.5)));
+    assert!(h.state().state.adjust_dialog.as_ref().unwrap().sampling());
+    // (where the dialog doesn't cover the patch)
+    let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
+    let (x, y) = (0..=14)
+        .map(|k| (10.0 + 50.0 * k as f32, 20.0))
+        .find(|&(x, y)| !rect.contains(doc_point(&h, x, y)))
+        .expect("a corner of the patch is clear of the dialog");
+    let p = doc_point(&h, x, y);
+    click(&mut h, p);
+    h.run_steps(2);
+    let [r, g, b, _] = composite_pixel(&mut h, x as u32, y as u32);
+    assert!(r.abs_diff(g) <= 2 && g.abs_diff(b) <= 2, "{r} {g} {b}");
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+}
+
+#[test]
+fn photo_filter_picks_its_color_in_the_color_picker() {
+    use crate::theme::pt;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, crate::commands::Command::PhotoFilter);
+    let corner = h.state().state.adjust_dialog.as_ref().unwrap().rect.min;
+    click(&mut h, corner + egui::vec2(pt(103.0), pt(94.0)));
+    assert!(h.state().state.color_picker.is_some());
+    // The picker's hex field has the focus: type a green, then OK
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text("00ff00".into()));
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert!(h.state().state.color_picker.is_none());
+    // The filter dialog stayed open and uses that color
+    let d = h.state().state.adjust_dialog.as_ref().expect("still open");
+    assert_eq!(d.test_filter_color(), Some((true, [0, 255, 0])));
+}
+
+#[test]
 #[ignore]
 fn screenshot_adjustment_dialogs() {
     use crate::commands::Command;

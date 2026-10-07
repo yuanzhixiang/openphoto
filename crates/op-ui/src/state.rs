@@ -1168,6 +1168,8 @@ pub enum PickerTarget {
     FillColor,
     /// The Crop tool's custom shield color.
     CropShield,
+    /// Photo Filter's Color.
+    PhotoFilter([u8; 3]),
 }
 
 pub struct PickerSession {
@@ -1669,6 +1671,10 @@ impl AppState {
             PickerTarget::Background => ("Color Picker (Background Color)", self.background),
             PickerTarget::CanvasExtension => ("Color Picker", self.background),
             PickerTarget::FillColor => ("Color Picker (Fill Color)", self.foreground),
+            PickerTarget::PhotoFilter([r, g, b]) => (
+                "Color Picker (Photo Filter Color)",
+                Color::from_rgba8([r, g, b, 255]),
+            ),
             PickerTarget::CropShield => {
                 let c = self
                     .crop_options

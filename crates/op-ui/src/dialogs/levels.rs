@@ -37,6 +37,9 @@ pub struct Dialog {
     histograms: [[u64; 256]; 4],
     /// The pin being dragged: 0–2 input black/gamma/white, 3–4 output.
     drag: Option<usize>,
+    /// The Set Black, Gray or White Point eyedropper chosen: a click on
+    /// the image sets that point (`sample`).
+    pub eyedropper: Option<usize>,
 }
 
 impl Dialog {
@@ -57,6 +60,7 @@ impl Dialog {
             values: std::array::from_fn(|_| DEFAULTS.map(String::from)),
             histograms: [composite, channels[0], channels[1], channels[2]],
             drag: None,
+            eyedropper: None,
         }
     }
 
@@ -123,6 +127,37 @@ impl Dialog {
             .iter()
             .find(|(_, p)| same(&Self::preset_values(p)))
             .map_or("Custom", |(name, _)| name)
+    }
+
+    /// The chosen eyedropper's click on a pixel of color `rgb` (the image
+    /// before adjusting): Set Black Point makes each channel's value its
+    /// input black, Set White Point its input white, and Set Gray Point
+    /// sets each channel's gamma so the color comes out neutral (at its
+    /// mean), as Photoshop's eyedroppers do. The composite channel goes back
+    /// to its defaults.
+    pub fn sample(&mut self, rgb: [u8; 3]) {
+        let Some(k) = self.eyedropper else {
+            return;
+        };
+        let num = |s: &String, d: f32| s.trim().parse::<f32>().unwrap_or(d);
+        self.values[0] = DEFAULTS.map(String::from);
+        let target = rgb.iter().map(|&v| v as f32).sum::<f32>() / 3.0;
+        for (c, &value) in rgb.iter().enumerate() {
+            let v = value as f32;
+            let row = &mut self.values[c + 1];
+            match k {
+                0 => row[0] = format!("{}", v.min(253.0).round()),
+                2 => row[2] = format!("{}", v.max(2.0).round()),
+                _ => {
+                    let (black, white) = (num(&row[0], 0.0), num(&row[2], 255.0));
+                    let x = ((v - black) / (white - black).max(1.0)).clamp(0.001, 0.999);
+                    let t = (target / 255.0).clamp(0.001, 0.999);
+                    // out = x ^ (1 / gamma) = t
+                    let gamma = (x.ln() / t.ln()).clamp(0.01, 9.99);
+                    row[1] = format!("{gamma:.2}");
+                }
+            }
+        }
     }
 
     /// Auto: each channel's darkest and lightest 0.1% become black and
@@ -296,19 +331,18 @@ impl Dialog {
         let cancel = button(ui, 73.5, "Cancel", false);
         let auto = button(ui, 115.5, "Auto", false);
         button(ui, 157.5, "Options...", false);
-        for (x, icon) in [
+        for (k, (x, icon)) in [
             (328.5, Icon::EyedropperBlack),
             (358.5, Icon::EyedropperGray),
             (388.5, Icon::EyedropperWhite),
-        ] {
-            ps_icons::paint_scaled(
-                &painter,
-                at(x - 1.5, 213.0),
-                icon,
-                Color32::from_gray(0xdd),
-                color::PANEL,
-                1.1,
-            );
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let chosen = self.eyedropper == Some(k);
+            if appkit::eyedropper(ui, at(x - 1.5, 213.0), icon, chosen, 1.1) {
+                self.eyedropper = (!chosen).then_some(k);
+            }
         }
         appkit::checkbox(ui, at(312.5, 243.0), "Preview", preview);
 

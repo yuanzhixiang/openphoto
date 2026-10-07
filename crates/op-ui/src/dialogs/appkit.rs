@@ -359,3 +359,37 @@ pub fn blend_modes(chosen: op_core::BlendMode) -> (Vec<Entry>, Vec<Option<op_cor
     }
     (entries, modes)
 }
+
+/// One of the Set Black, Gray and White Point eyedroppers: the icon, with
+/// a pressed `#383838` box in a `#636363` edge while chosen. Returns
+/// whether it was clicked.
+pub fn eyedropper(ui: &mut Ui, center: Pos2, icon: Icon, chosen: bool, scale: f32) -> bool {
+    let rect = Rect::from_center_size(center, vec2(pt(26.0), pt(24.0)));
+    let response = ui.interact(
+        rect,
+        ui.id()
+            .with(("eyedropper", center.x.to_bits(), center.y.to_bits())),
+        Sense::click(),
+    );
+    let fill = if chosen {
+        ui.painter().rect(
+            rect,
+            pt(3.0),
+            Color32::from_gray(0x38),
+            Stroke::new(pt(1.0), Color32::from_gray(0x63)),
+            StrokeKind::Inside,
+        );
+        Color32::from_gray(0x38)
+    } else {
+        color::PANEL
+    };
+    ps_icons::paint_scaled(
+        ui.painter(),
+        center,
+        icon,
+        Color32::from_gray(0xdd),
+        fill,
+        scale,
+    );
+    response.clicked()
+}

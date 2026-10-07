@@ -25,6 +25,7 @@ use crate::theme::{self, pt};
 
 /// What a dialog applies: an adjustment or a filter.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(clippy::large_enum_variant)] // as `Adjustment`
 pub enum Effect {
     Adjustment(Adjustment),
     Filter(Filter),
@@ -503,6 +504,7 @@ fn zoom_controls(ui: &Ui, y: f32, left: f32) {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // as `Adjustment`
 pub enum Outcome {
     Open,
     Cancel,
@@ -528,6 +530,13 @@ pub struct AdjustDialog {
     pub pane: Option<egui::TextureHandle>,
     /// The Distort dialogs' diagram and the settings it was drawn for.
     diagram: Option<(Vec<String>, egui::TextureHandle)>,
+    /// Where the dialog was last drawn (clicks elsewhere may sample).
+    pub rect: Rect,
+    /// Another dialog (the Color Picker) is over this one: it is drawn but
+    /// takes no keys or clicks.
+    pub blocked: bool,
+    /// Where a targeted adjustment drag started (screen x).
+    pub target_from: Option<f32>,
 }
 
 /// An adjustment dialog's settings kept from its last OK.
@@ -583,6 +592,9 @@ impl AdjustDialog {
             before,
             pane: None,
             diagram: None,
+            rect: Rect::NOTHING,
+            blocked: false,
+            target_from: None,
             custom: match kind {
                 Kind::BrightnessContrast => Some(Custom::BrightnessContrast(Default::default())),
                 Kind::ColorBalance => Some(Custom::ColorBalance(Default::default())),
@@ -619,6 +631,70 @@ impl AdjustDialog {
         }
     }
 
+    /// Photo Filter's swatch asks for the Color Picker; returns its color
+    /// once.
+    pub fn take_color_request(&mut self) -> Option<[u8; 3]> {
+        match &mut self.custom {
+            Some(Custom::PhotoFilter(d)) => std::mem::take(&mut d.wants_picker).then_some(d.color),
+            _ => None,
+        }
+    }
+
+    /// The Color Picker's OK for Photo Filter: its color, chosen.
+    pub fn set_filter_color(&mut self, rgb: [u8; 3]) {
+        if let Some(Custom::PhotoFilter(d)) = &mut self.custom {
+            d.color = rgb;
+            d.use_color = true;
+        }
+    }
+
+    /// Whether an eyedropper is chosen (Levels, Curves): a click on the
+    /// image then samples.
+    pub fn sampling(&self) -> bool {
+        match &self.custom {
+            Some(Custom::Levels(d)) => d.eyedropper.is_some(),
+            Some(Custom::Curves(d)) => d.eyedropper.is_some(),
+            Some(Custom::HueSaturation(d)) => d.eyedropper.is_some(),
+            _ => false,
+        }
+    }
+
+    /// Whether Hue/Saturation's targeted adjustment hand is on: drags on
+    /// the image change the range under the pointer.
+    pub fn targeting(&self) -> bool {
+        matches!(&self.custom, Some(Custom::HueSaturation(d)) if d.targeting)
+    }
+
+    /// The hand pressed on a pixel of color `rgb` (Command: hue).
+    pub fn target_press(&mut self, rgb: [u8; 3], hue: bool) {
+        if let Some(Custom::HueSaturation(d)) = &mut self.custom {
+            d.target_press(rgb, hue);
+        }
+    }
+
+    /// The hand dragged `dx` points from where it was pressed.
+    pub fn target_drag(&mut self, dx: f32, hue: bool) {
+        if let Some(Custom::HueSaturation(d)) = &mut self.custom {
+            d.target_drag(dx, hue);
+        }
+    }
+
+    pub fn target_release(&mut self) {
+        if let Some(Custom::HueSaturation(d)) = &mut self.custom {
+            d.target_release();
+        }
+    }
+
+    /// The chosen eyedropper's click on a pixel of color `rgb`.
+    pub fn sample(&mut self, rgb: [u8; 3]) {
+        match &mut self.custom {
+            Some(Custom::Levels(d)) => d.sample(rgb),
+            Some(Custom::Curves(d)) => d.sample(rgb),
+            Some(Custom::HueSaturation(d)) => d.sample(rgb),
+            _ => {}
+        }
+    }
+
     /// The adjustment dialogs' settings at OK, to open with when the
     /// command is chosen with Option held (Photoshop's "last settings").
     pub fn remembered(&self) -> Option<Remembered> {
@@ -641,6 +717,15 @@ impl AdjustDialog {
         match &self.custom {
             Some(Custom::Exposure(d)) => d.values[0].clone(),
             _ => String::new(),
+        }
+    }
+
+    /// Photo Filter's Color choice and color (tests).
+    #[cfg(test)]
+    pub fn test_filter_color(&self) -> Option<(bool, [u8; 3])> {
+        match &self.custom {
+            Some(Custom::PhotoFilter(d)) => Some((d.use_color, d.color)),
+            _ => None,
         }
     }
 
@@ -884,6 +969,7 @@ impl AdjustDialog {
                     None => self.kind.size(),
                 };
                 let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+                self.rect = rect;
                 outcome = if self.custom.is_some() {
                     self.custom_ui(ui, rect)
                 } else if let Some(layout) = self.kind.layout() {
@@ -899,6 +985,9 @@ impl AdjustDialog {
                 };
             });
         self.first_frame = false;
+        if self.blocked {
+            return Outcome::Open;
+        }
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
             outcome = Outcome::Cancel;
         }

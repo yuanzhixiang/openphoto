@@ -43,6 +43,8 @@ pub struct Dialog {
     /// Color instead of Filter, and that color.
     pub use_color: bool,
     pub color: [u8; 3],
+    /// The swatch was clicked: the app opens the Color Picker.
+    pub wants_picker: bool,
     pub density: String,
     pub preserve_luminosity: bool,
 }
@@ -53,6 +55,7 @@ impl Default for Dialog {
             filter: 0,
             use_color: false,
             color: FILTERS[0].1,
+            wants_picker: false,
             density: "25".into(),
             preserve_luminosity: true,
         }
@@ -134,20 +137,13 @@ impl Dialog {
             Stroke::new(pt(1.0), Color32::from_gray(0xb0)),
             StrokeKind::Inside,
         );
-        let response = ui.interact(swatch, ui.id().with("photo-filter-color"), Sense::click());
-        egui::Popup::menu(&response)
-            .id(ui.id().with("photo-filter-picker"))
-            .show(|ui| {
-                let mut c = Color32::from_rgb(cr, cg, cb);
-                if egui::color_picker::color_picker_color32(
-                    ui,
-                    &mut c,
-                    egui::color_picker::Alpha::Opaque,
-                ) {
-                    self.color = [c.r(), c.g(), c.b()];
-                    self.use_color = true;
-                }
-            });
+        // Photoshop's Color Picker (the app opens it)
+        if ui
+            .interact(swatch, ui.id().with("photo-filter-color"), Sense::click())
+            .clicked()
+        {
+            self.wants_picker = true;
+        }
 
         uxp::label(ui, at(20.0, 131.5), "Density");
         let field = r(213.0, 118.5, 260.0, 142.5);

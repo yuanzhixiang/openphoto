@@ -6,6 +6,9 @@ use crate::fill::FillError;
 
 /// A pixel adjustment with its settings.
 #[derive(Clone, Copy, Debug, PartialEq)]
+// Copied around freely (dialogs, previews, history names): the pencil's
+// tables stay inline rather than boxed
+#[allow(clippy::large_enum_variant)]
 pub enum Adjustment {
     Invert,
     /// Gray at each pixel's HSL lightness, (max + min) / 2, like Photoshop.
@@ -89,6 +92,9 @@ pub enum Adjustment {
         points: [[(u8, u8); 16]; 4],
         counts: [u8; 4],
     },
+    /// Curves drawn with the pencil: a table for the composite RGB channel
+    /// and the red, green and blue channels (each channel's own first).
+    CurveTables([[u8; 256]; 4]),
     /// Channel Mixer: each output channel (or, with `monochrome`, the gray)
     /// is red, green and blue in percent (−200–200) plus a constant
     /// (−200–200 percent of white).
@@ -129,7 +135,7 @@ impl Adjustment {
             Self::AutoTone => "Auto Tone",
             Self::AutoContrast => "Auto Contrast",
             Self::AutoColor => "Auto Color",
-            Self::Curves { .. } => "Curves",
+            Self::Curves { .. } | Self::CurveTables(_) => "Curves",
             Self::ChannelMixer { .. } => "Channel Mixer",
             Self::SelectiveColor { .. } => "Selective Color",
         }
@@ -166,6 +172,7 @@ impl Adjustment {
                 };
                 Some(per_channel(table(0), [table(1), table(2), table(3)]))
             }
+            Self::CurveTables(t) => Some(per_channel(t[0], [t[1], t[2], t[3]])),
             Self::Levels(levels) => Some(per_channel(
                 levels[0].table(),
                 [levels[1].table(), levels[2].table(), levels[3].table()],
@@ -608,7 +615,11 @@ fn color_adjust(adjustment: Adjustment, px: [u8; 4]) -> [u8; 4] {
         } => {
             let [h, s, l] = rgb_to_hsl(rgb);
             let v = vibrance as f32 / 100.0;
-            // Vibrance acts most on muted colors (an approximation)
+            // Vibrance acts most on muted colors, and when raising
+            // saturation spares skin tones (oranges about 25°), as
+            // Photoshop's does (an approximation)
+            let skin = (-((h - 25.0) / 20.0).powi(2)).exp();
+            let v = if v > 0.0 { v * (1.0 - 0.7 * skin) } else { v };
             let s = (s * (1.0 + v * (1.0 - s))).clamp(0.0, 1.0);
             let rgb = hsl_to_rgb([h, s, l]);
             // Saturation scales the channels away from (or toward) a
@@ -1126,6 +1137,7 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
             | Adjustment::BrightnessContrast { .. }
             | Adjustment::ColorBalance { .. }
             | Adjustment::Curves { .. }
+            | Adjustment::CurveTables(_)
             | Adjustment::AutoTone
             | Adjustment::AutoContrast
             | Adjustment::AutoColor => {
@@ -1305,6 +1317,21 @@ mod tests {
         apply(&mut d, gm).unwrap();
         assert_eq!(first(&d), [255, 0, 0, 255]);
 
+        // ...and spares skin tones: a muted orange gains less than an
+        // equally muted blue
+        let gain = |rgb: [u8; 3]| {
+            let vib = Adjustment::Vibrance {
+                vibrance: 100,
+                saturation: 0,
+            };
+            let mut d = doc([rgb[0], rgb[1], rgb[2], 255]);
+            apply(&mut d, vib).unwrap();
+            let out = first(&d);
+            let s0 = rgb_to_hsl(rgb.map(|v| v as f32 / 255.0))[1];
+            let s1 = rgb_to_hsl([out[0], out[1], out[2]].map(|v| v as f32 / 255.0))[1];
+            s1 - s0
+        };
+        assert!(gain([200, 160, 140]) < gain([140, 160, 200]) * 0.6);
         // Vibrance saturates a muted color more than a vivid one
         let mut muted = doc([140, 120, 120, 255]);
         let vib = Adjustment::Vibrance {

@@ -5,7 +5,7 @@
 //! colorize color. Sizes are Photoshop points from the dialog's top-left
 //! corner.
 
-use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, Ui, vec2};
+use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, vec2};
 use op_core::adjust::{Adjustment, HUE_RANGES, HueRange, HueSaturation};
 
 use super::{common, uxp};
@@ -114,6 +114,14 @@ pub struct Dialog {
     pub colorize_values: [String; 3],
     /// The range bar handle being dragged (0–3), or 4 for the whole range.
     drag: Option<(usize, f32, [i32; 4])>,
+    /// The eyedropper chosen (0 pick a range, 1 add to it, 2 subtract):
+    /// a click on the image samples (`sample`).
+    pub eyedropper: Option<usize>,
+    /// The targeted adjustment hand: dragging on the image changes the
+    /// saturation (hue with Command) of the range under the pointer.
+    pub targeting: bool,
+    /// A hand drag: the range and its value when it started.
+    target: Option<(usize, i32)>,
 }
 
 impl Dialog {
@@ -127,6 +135,9 @@ impl Dialog {
             colorize: false,
             colorize_values: [hue.to_string(), "25".into(), "0".into()],
             drag: None,
+            eyedropper: None,
+            targeting: false,
+            target: None,
         }
     }
 }
@@ -249,6 +260,113 @@ impl Dialog {
         }
     }
 
+    /// The range (1–6) whose full-strength part holds `hue`, else the one
+    /// nearest it.
+    fn range_of(&self, hue: f32) -> usize {
+        let dist = |b: &[i32; 4]| {
+            let mid =
+                (b[1] as f32 + ((b[2] - b[1]).rem_euclid(360)) as f32 / 2.0).rem_euclid(360.0);
+            let d = (hue - mid).rem_euclid(360.0);
+            d.min(360.0 - d)
+        };
+        (0..6)
+            .min_by(|&a, &b| dist(&self.bounds[a]).total_cmp(&dist(&self.bounds[b])))
+            .map_or(1, |k| k + 1)
+    }
+
+    /// The chosen eyedropper's click on a pixel of color `rgb`: picking
+    /// centers the range (the nearest one, with Master selected) on its
+    /// hue with Photoshop's widths (30° full, 30° falloffs); adding widens
+    /// the full-strength part to take it in; subtracting narrows it to
+    /// leave it out.
+    pub fn sample(&mut self, rgb: [u8; 3]) {
+        let Some(k) = self.eyedropper else {
+            return;
+        };
+        if self.colorize {
+            return;
+        }
+        let h = op_core::adjust::hue_of(rgb);
+        if self.selected == 0 || k == 0 && self.selected == 0 {
+            self.selected = self.range_of(h);
+        }
+        let i = self.selected - 1;
+        let b = &mut self.bounds[i];
+        let wrap = |v: f32| (v.round() as i32).rem_euclid(360);
+        // Degrees from the range's start, so comparisons don't wrap
+        let off = |v: i32| (v - b[0]).rem_euclid(360) as f32;
+        match k {
+            0 => {
+                *b = [
+                    wrap(h - 45.0),
+                    wrap(h - 15.0),
+                    wrap(h + 15.0),
+                    wrap(h + 45.0),
+                ]
+            }
+            1 => {
+                let x = (h - b[0] as f32).rem_euclid(360.0);
+                let (s0, s1) = (off(b[1]), off(b[2]));
+                if x < s0 {
+                    let d = s0 - x;
+                    *b = [wrap(b[0] as f32 - d), wrap(h), b[2], b[3]];
+                } else if x > s1 {
+                    let d = x - s1;
+                    *b = [b[0], b[1], wrap(h), wrap(b[3] as f32 + d)];
+                }
+            }
+            _ => {
+                let x = (h - b[0] as f32).rem_euclid(360.0);
+                let (s0, s1) = (off(b[1]), off(b[2]));
+                if (s0..=s1).contains(&x) {
+                    // Off the nearer end of the full-strength part
+                    if x - s0 < s1 - x {
+                        let to = (x + 1.0).min(s1);
+                        b[1] = wrap(b[0] as f32 + to);
+                    } else {
+                        let to = (x - 1.0).max(s0);
+                        b[2] = wrap(b[0] as f32 + to);
+                    }
+                }
+            }
+        }
+    }
+
+    /// The targeted adjustment hand pressed on a pixel of color `rgb`:
+    /// the range of its hue is selected.
+    pub fn target_press(&mut self, rgb: [u8; 3], hue_mode: bool) {
+        if self.colorize {
+            return;
+        }
+        let i = self.range_of(op_core::adjust::hue_of(rgb));
+        self.selected = i;
+        let slot = if hue_mode { 0 } else { 1 };
+        let start = parse(&self.values[i][slot], HUE).unwrap_or(0);
+        self.target = Some((i, start));
+    }
+
+    /// The hand dragged `dx` points sideways: saturation (hue with
+    /// Command) of that range goes up to the right, a point per point.
+    pub fn target_drag(&mut self, dx: f32, hue_mode: bool) {
+        if let Some((i, start)) = self.target {
+            let (slot, range) = if hue_mode { (0, HUE) } else { (1, AMOUNT) };
+            let v = (start as f32 + dx).round().clamp(range.0, range.1) as i32;
+            self.values[i][slot] = v.to_string();
+        }
+    }
+
+    pub fn target_release(&mut self) {
+        self.target = None;
+    }
+
+    /// Invert: the selected range covers every other hue instead.
+    pub fn invert(&mut self) {
+        if self.selected > 0 {
+            let b = self.bounds[self.selected - 1];
+            self.bounds[self.selected - 1] = [b[2], b[3], b[0], b[1]];
+        }
+    }
+
     fn reset(&mut self) {
         let colorize = self.colorize_values.clone();
         *self = Self::new(0);
@@ -310,13 +428,29 @@ impl Dialog {
             uxp::TEXT,
             color::PANEL,
         );
-        ps_icons::paint(
-            &painter,
-            at(32.5, 95.0),
-            Icon::TargetedHand,
-            uxp::TEXT,
-            color::PANEL,
-        );
+        // The targeted adjustment hand: a toggle
+        let hand = Rect::from_center_size(at(32.5, 95.0), vec2(pt(26.0), pt(24.0)));
+        let fill = if self.targeting {
+            painter.rect(
+                hand,
+                pt(3.0),
+                Color32::from_gray(0x38),
+                Stroke::new(pt(1.0), Color32::from_gray(0x63)),
+                StrokeKind::Inside,
+            );
+            Color32::from_gray(0x38)
+        } else {
+            color::PANEL
+        };
+        ps_icons::paint(&painter, hand.center(), Icon::TargetedHand, uxp::TEXT, fill);
+        if !self.colorize
+            && ui
+                .interact(hand, ui.id().with("hs-hand"), Sense::click())
+                .clicked()
+        {
+            self.targeting = !self.targeting;
+            self.eyedropper = None;
+        }
 
         // Master, the six ranges, or the colorize color
         if self.colorize {
@@ -411,27 +545,59 @@ impl Dialog {
         if self.colorize != was {
             self.selected = 0;
         }
-        for (x, icon) in [
+        // The eyedroppers work with a range (or Master, which picks one);
+        // add and subtract need a range, as does Invert
+        let ranged = !self.colorize && self.selected > 0;
+        for (k, (x, icon)) in [
             (123.5, Icon::Eyedropper),
             (160.0, Icon::EyedropperPlus),
             (196.0, Icon::EyedropperMinus),
-        ] {
-            ps_icons::paint(
-                &painter,
-                at(x, 298.0),
-                icon,
-                Color32::from_gray(0x8e),
-                color::PANEL,
-            );
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let enabled = !self.colorize && (k == 0 || ranged);
+            let rect = Rect::from_center_size(at(x, 298.0), vec2(pt(26.0), pt(24.0)));
+            let chosen = enabled && self.eyedropper == Some(k);
+            let fill = if chosen {
+                painter.rect(
+                    rect,
+                    pt(3.0),
+                    Color32::from_gray(0x38),
+                    Stroke::new(pt(1.0), Color32::from_gray(0x63)),
+                    StrokeKind::Inside,
+                );
+                Color32::from_gray(0x38)
+            } else {
+                color::PANEL
+            };
+            let ink = if enabled {
+                uxp::TEXT
+            } else {
+                Color32::from_gray(0x8e)
+            };
+            ps_icons::paint(&painter, rect.center(), icon, ink, fill);
+            if enabled
+                && ui
+                    .interact(rect, ui.id().with(("hs-eyedropper", k)), Sense::click())
+                    .clicked()
+            {
+                self.eyedropper = (!chosen).then_some(k);
+                self.targeting = false;
+            }
         }
-        common::ps_button_with(
+        if common::ps_button_with(
             ui,
             r(233.0, 286.0, 296.0, 310.0),
             "Invert",
             false,
-            false,
+            ranged,
             crate::theme::uxp_bold(pt(12.0)),
-        );
+        )
+        .clicked()
+        {
+            self.invert();
+        }
 
         self.before_after(ui, frame);
         uxp::preview(ui, at(308.0, 127.0), preview);
@@ -675,6 +841,40 @@ fn swatch(painter: &egui::Painter, center: Pos2, fill: Option<[u8; 3]>, chosen: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn eyedroppers_invert_and_the_hand() {
+        let mut d = Dialog::new(0);
+        // Picking a blue with Master selected chooses Blues, centered there
+        d.eyedropper = Some(0);
+        d.sample([0, 0, 255]);
+        assert_eq!(d.selected, 5);
+        assert_eq!(d.bounds[4], [195, 225, 255, 285]);
+        // Adding a purple widens the full-strength part up to it
+        d.eyedropper = Some(1);
+        d.sample([128, 0, 255]);
+        let b = d.bounds[4];
+        assert_eq!((b[1], b[2]), (225, 270));
+        assert_eq!(b[3], 300);
+        // Subtracting the blue again cuts it out of the near end
+        d.eyedropper = Some(2);
+        d.sample([0, 0, 255]);
+        assert!(d.bounds[4][1] > 240, "{:?}", d.bounds[4]);
+        // Invert swaps the range for the rest of the hues
+        let before = d.bounds[4];
+        d.invert();
+        assert_eq!(d.bounds[4], [before[2], before[3], before[0], before[1]]);
+        // The hand on a red drags Reds' saturation up
+        let mut d = Dialog::new(0);
+        d.targeting = true;
+        d.target_press([220, 40, 40], false);
+        assert_eq!(d.selected, 1);
+        d.target_drag(30.0, false);
+        assert_eq!(d.values[1][1], "30");
+        d.target_drag(-500.0, false);
+        assert_eq!(d.values[1][1], "-100");
+        d.target_release();
+    }
 
     #[test]
     fn photoshops_presets() {

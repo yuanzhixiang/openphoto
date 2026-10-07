@@ -246,7 +246,12 @@ impl OpenPhotoApp {
         let Some(mut dialog) = self.state.adjust_dialog.take() else {
             return;
         };
+        dialog.blocked = self.state.color_picker.is_some();
         let outcome = dialog.show(ctx);
+        if let Some(rgb) = dialog.take_color_request() {
+            self.state
+                .open_color_picker(state::PickerTarget::PhotoFilter(rgb));
+        }
         let [r, g, b, _] = self.state.background.to_rgba8();
         let background = [r, g, b];
         let Some(state) = self
@@ -261,6 +266,52 @@ impl OpenPhotoApp {
                 state.doc.restore(&dialog.before);
             }
         };
+        // An eyedropper chosen in Levels or Curves: a click on the image
+        // (outside the dialog) samples it as it was before adjusting
+        let click = ctx.input(|i| {
+            i.pointer
+                .primary_pressed()
+                .then(|| i.pointer.interact_pos())
+                .flatten()
+        });
+        if let Some(p) = click
+            && (dialog.sampling() || dialog.targeting())
+            && !dialog.rect.contains(p)
+            && state.view.viewport.contains(p)
+        {
+            undo_preview(state, &mut dialog);
+            let d = document_view::to_doc(state, p, ctx.pixels_per_point());
+            let (w, h) = (state.doc.width as f32, state.doc.height as f32);
+            if (0.0..w).contains(&d.x) && (0.0..h).contains(&d.y) {
+                let pixels = state.doc.composite_rgba8();
+                let i = (d.y as usize * state.doc.width as usize + d.x as usize) * 4;
+                let rgb = [pixels[i], pixels[i + 1], pixels[i + 2]];
+                if dialog.targeting() {
+                    let hue = ctx.input(|i| i.modifiers.command);
+                    dialog.target_press(rgb, hue);
+                    dialog.target_from = Some(p.x);
+                } else {
+                    dialog.sample(rgb);
+                }
+            }
+        }
+        // The hand's drag: sideways changes the range's saturation (hue)
+        if let Some(from) = dialog.target_from {
+            let (down, x, hue) = ctx.input(|i| {
+                (
+                    i.pointer.primary_down(),
+                    i.pointer.interact_pos().map(|p| p.x),
+                    i.modifiers.command,
+                )
+            });
+            if let Some(x) = x {
+                dialog.target_drag((x - from) / theme::pt(1.0), hue);
+            }
+            if !down {
+                dialog.target_from = None;
+                dialog.target_release();
+            }
+        }
         match outcome {
             dialogs::AdjustOutcome::Open => {
                 let wanted = dialog.effect().filter(|_| dialog.preview);
@@ -670,6 +721,12 @@ impl OpenPhotoApp {
                 state::PickerTarget::FillColor => {
                     if let Some(dialog) = &mut self.state.fill_dialog {
                         dialog.set_color(color);
+                    }
+                }
+                state::PickerTarget::PhotoFilter(_) => {
+                    if let Some(dialog) = &mut self.state.adjust_dialog {
+                        let [r, g, b, _] = color.to_rgba8();
+                        dialog.set_filter_color([r, g, b]);
                     }
                 }
                 state::PickerTarget::CropShield => {

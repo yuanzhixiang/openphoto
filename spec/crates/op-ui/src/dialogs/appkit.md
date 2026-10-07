@@ -17,3 +17,4 @@ Controls shared by the classic adjustment dialogs that Photoshop 2026 draws with
 - `pin(painter, tip, kind)`: the slider "pin" below a histogram or gradient bar: a 12 × 10.5 pt house shape (pointed top, rounded bottom corners) with a 1 pt near-black outline; `Black` is hollow, `Gray` is filled with `#a0a0a0`, `White` with `#e6e6e6`.
 
 - `radio_with(ui, center, label, chosen, (gap, font))`: `radio` with the label's gap after the center and its font chosen (the plain filter dialogs). A radio button's id includes its center, so buttons with the same label in different groups (HSB/HSL's two RGB / HSB / HSL columns) stay apart.
+- `eyedropper(ui, center, icon, chosen, scale)`: a Set Black/Gray/White Point eyedropper button: the icon, on a pressed `#383838` box with a `#636363` edge while chosen; returns whether it was clicked (Levels, Curves).
