@@ -499,6 +499,14 @@ fn screenshot_color_picker() {
         .open_color_picker(crate::state::PickerTarget::Foreground);
     h.run_steps(4);
     shot(&mut h, "color_picker");
+    // White, as in the Photoshop capture it's compared with
+    h.state_mut().state.color_picker = None;
+    h.state_mut().state.foreground = Color::WHITE;
+    h.state_mut()
+        .state
+        .open_color_picker(crate::state::PickerTarget::Foreground);
+    h.run_steps(4);
+    shot_dialog(&mut h, "color_picker_dialog", 534.0, 374.0);
 }
 
 /// The document open in the Photoshop reference screenshots: 734×811,

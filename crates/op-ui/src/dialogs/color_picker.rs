@@ -19,7 +19,9 @@ const SWATCH: Rect = Rect::from_min_max(pos2(pt(310.0), pt(77.0)), pos2(pt(370.0
 const BUTTON_X: f32 = pt(408.0);
 const BUTTON_SIZE: Vec2 = vec2(pt(115.0), pt(25.0));
 const FIELD_H: f32 = pt(20.0);
-const FONT: f32 = pt(12.5);
+/// Photoshop's Color Picker is a classic AppKit dialog: 12 pt system
+/// text, 13 pt buttons.
+const FONT: f32 = pt(12.0);
 /// Resolution of the generated field and slider images.
 const TEXTURE_PX: usize = 256;
 
@@ -182,6 +184,9 @@ pub struct ColorPicker {
     slider_texture: Option<(TextureKey, TextureHandle)>,
     /// Colors chosen with "Add to Swatches", collected by the host.
     added_swatches: Vec<Color>,
+    /// Until the first frame is drawn: the hex field then takes the focus
+    /// with its text selected, as in Photoshop.
+    first_frame: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -204,6 +209,7 @@ impl ColorPicker {
             field_texture: None,
             slider_texture: None,
             added_swatches: Vec::new(),
+            first_frame: true,
         }
     }
 
@@ -240,8 +246,8 @@ impl ColorPicker {
 
     fn ui(&mut self, ui: &mut Ui, frame: Rect) -> Outcome {
         let at = |r: Rect| r.translate(frame.min.to_vec2());
-        let font = FontId::proportional(FONT);
-        common::frame(ui, frame, &self.title, theme::semibold(pt(13.0)));
+        let font = theme::dialog(FONT);
+        common::frame(ui, frame, &self.title, theme::dialog_bold(pt(13.0)));
 
         self.field(ui, at(FIELD));
         self.slider(ui, at(SLIDER));
@@ -366,7 +372,7 @@ impl ColorPicker {
 
         // Buttons
         let button = |y: f32| Rect::from_min_size(frame.min + vec2(BUTTON_X, pt(y)), BUTTON_SIZE);
-        let button_font = FontId::proportional(pt(13.0));
+        let button_font = theme::dialog(pt(13.0));
         let ok = common::pill_button(ui, button(39.0), "OK", button_font.clone(), true);
         let cancel = common::pill_button(ui, button(73.0), "Cancel", button_font.clone(), true);
         let add = common::pill_button(
@@ -443,7 +449,8 @@ impl ColorPicker {
         } else {
             Color32::WHITE
         };
-        ui.painter_at(rect.expand(pt(6.0)))
+        // Clipped to the field, as in Photoshop (a quarter at a corner)
+        ui.painter_at(rect)
             .circle_stroke(pos, pt(5.0), Stroke::new(1.0, ring));
         ui.painter().rect_stroke(
             rect,
@@ -700,13 +707,25 @@ impl ColorPicker {
         let response = egui::TextEdit::singleline(&mut text)
             .id(id)
             .frame(egui::Frame::NONE)
-            .font(FontId::proportional(FONT))
+            .font(theme::dialog(FONT))
             .vertical_align(Align::Center)
             .desired_width(rect.width() - pt(8.0))
             .min_size(vec2(0.0, rect.height()))
             .show(&mut child)
             .response;
 
+        if input == Input::Hex && self.first_frame {
+            self.first_frame = false;
+            response.request_focus();
+            if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), id) {
+                let all = egui::text::CCursorRange::two(
+                    egui::text::CCursor::new(0),
+                    egui::text::CCursor::new(text.chars().count()),
+                );
+                state.cursor.set_char_range(Some(all));
+                state.store(ui.ctx(), id);
+            }
+        }
         if response.changed() {
             self.apply_input(input, &text);
             self.editing = Some((input, text));
