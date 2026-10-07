@@ -2,7 +2,7 @@
 
 ## 职责
 
-重新导出 Phosphor（Regular）全部图标常量，并提供 `tool()`：工具到图标的映射。不使用 Adobe 的图标资源。
+重新导出 Phosphor（Regular）全部图标常量，并提供 `tool()`：工具到图标的映射。不使用 Adobe 的图标资源。工具栏与工具弹出列表现在用 `tool_icons.rs` 绘制的图标，`tool()` 只在没有绘制的工具（Remove Tool）上作为后备。
 
 ## 工具图标
 

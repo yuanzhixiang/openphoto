@@ -79,3 +79,4 @@
 - `layers_panel_footer_and_lock_buttons` 另外检查：Lock all 打开时只有锁按钮有按下底色，其余按钮没有；此时拖动 Opacity、Fill 不起作用，关掉后拖动 Opacity 生效。
 - `tool_flyout_matches_photoshop_and_switches_tools`：右键移动工具，弹出列表的外框在 (36, 92)，130 × 40（误差 1 pt）；点第二行切到 Artboard Tool 并关闭列表。`screenshot_tool_flyout`（`#[ignore]`）用于与 Photoshop 截图比对。
 - `align_buttons_line_up_selected_layers` 另外检查：⌘/ 锁定选中的图层后，Align 与 Distribute 变为不可用（缓存的可用状态随之更新）。
+- `tool_icons_match_photoshops_extents`：69 个工具图标的亮像素外框与 Photoshop 测得的外框相差不超过 2 px（见 `tool_icons.md`）。`compare_tool_icons_with_photoshop`（`#[ignore]`）逐个与本地的 Photoshop 截图比对。
