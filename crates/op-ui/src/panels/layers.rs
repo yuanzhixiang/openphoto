@@ -555,7 +555,91 @@ fn scroll_thumb<R>(
 /// whether it was let go.
 type FooterDrop = (LayerId, Pos2, bool);
 
+/// While the Crop tool's box is being changed, Photoshop 2026 lists only a
+/// temporary "Crop Preview" layer (selected, with the merged image as its
+/// thumbnail) until the crop is committed or cancelled.
+fn crop_preview_list(ui: &mut Ui, state: &mut DocState) {
+    let row_h = row_height(&state.doc) + pt(0.5);
+    let (alloc, _) = ui.allocate_exact_size(
+        Vec2::new(ui.available_width(), row_h + pt(1.0)),
+        Sense::hover(),
+    );
+    let painter = ui.painter();
+    let eye_right = alloc.left() + EYE_W;
+    painter.rect_filled(
+        Rect::from_min_max(alloc.min, Pos2::new(eye_right, alloc.top() + row_h)),
+        0,
+        color::PANEL,
+    );
+    painter.rect_filled(
+        Rect::from_min_max(
+            Pos2::new(eye_right + pt(1.0), alloc.top()),
+            Pos2::new(alloc.right() - GUTTER, alloc.top() + row_h),
+        ),
+        0,
+        color::ROW_SELECTED,
+    );
+    painter.rect_filled(
+        Rect::from_min_size(Pos2::new(eye_right, alloc.top()), Vec2::new(pt(1.0), row_h)),
+        0,
+        LINE,
+    );
+    painter.rect_filled(
+        Rect::from_min_size(
+            Pos2::new(alloc.left(), alloc.top() + row_h + pt(1.0)),
+            Vec2::new(alloc.width() - GUTTER, pt(1.0)),
+        ),
+        0,
+        LINE,
+    );
+    icon(
+        painter,
+        Pos2::new(
+            alloc.left() + pt(15.0),
+            alloc.top() + row_h / 2.0 + pt(0.25),
+        ),
+        Icon::Eye,
+        true,
+        color::PANEL,
+    );
+    let ts = thumb_size(&state.doc);
+    let thumb_box = Rect::from_min_size(
+        Pos2::new(alloc.left() + pt(34.0), alloc.top() + pt(4.0)),
+        ts,
+    );
+    if let Some(tex) = state.composite_texture(ui.ctx(), (THUMB_H * 3.0) as u32) {
+        let painter = ui.painter();
+        widgets::checkerboard(painter, thumb_box, pt(2.0));
+        painter.image(
+            tex.id(),
+            thumb_box,
+            Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+            egui::Color32::WHITE,
+        );
+        painter.rect_stroke(
+            thumb_box,
+            0,
+            Stroke::new(pt(1.0), egui::Color32::from_gray(0x2e)),
+            StrokeKind::Inside,
+        );
+    }
+    ui.painter().text(
+        Pos2::new(thumb_box.right() + pt(8.0), alloc.top() + row_h / 2.0),
+        Align2::LEFT_CENTER,
+        CROP_PREVIEW,
+        theme::body(),
+        color::TEXT_BRIGHT,
+    );
+}
+
+/// The temporary layer's name while cropping.
+pub const CROP_PREVIEW: &str = "Crop Preview";
+
 fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
+    if crate::crop_tool::previewing(state) {
+        crop_preview_list(ui, state);
+        return (false, None);
+    }
     let mut from_background = false;
     ui.spacing_mut().item_spacing.y = 0.0;
     // Top to bottom, as listed; layers in collapsed groups aren't

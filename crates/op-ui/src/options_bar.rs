@@ -228,7 +228,42 @@ fn measured_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) -> bool {
             None => return false,
         },
     }
+    if app.tool == Tool::PerspectiveCrop {
+        perspective_commit_buttons(ui, app, bar);
+    }
     true
+}
+
+/// The Perspective Crop tool's Cancel ⦸ and Commit ✓, at the Crop tool's
+/// places, while it has a box.
+fn perspective_commit_buttons(ui: &mut Ui, app: &mut AppState, bar: Rect) {
+    let options = crate::perspective_crop::PerspectiveOptions::from_app(app);
+    let Some(state) = app.active() else {
+        return;
+    };
+    if !state
+        .perspective_crop
+        .as_ref()
+        .is_some_and(|b| b.quad.is_some())
+    {
+        return;
+    }
+    let cy = bar.top() + CENTER_Y;
+    let at = |x: f32| bar.left() + pt(x);
+    let cancel = Rect::from_center_size(Pos2::new(at(1103.75), cy), Vec2::splat(pt(24.0)));
+    if ps_button(ui, cancel, Icon::CropCancel)
+        .on_hover_text("Cancel current crop operation (Esc)")
+        .clicked()
+    {
+        state.perspective_crop = None;
+    }
+    let commit = Rect::from_center_size(Pos2::new(at(1138.5), cy), Vec2::splat(pt(24.0)));
+    if ps_button(ui, commit, Icon::CropCommit)
+        .on_hover_text("Commit current crop operation (Return)")
+        .clicked()
+    {
+        crate::perspective_crop::commit(state, &options);
+    }
 }
 
 /// A number with its unit, as the fields show it ("0 px", "10%").
@@ -586,6 +621,7 @@ const CROP_BAR_END: f32 = 1366.5;
 /// overlay and gear menus, Delete Cropped Pixels, Fill, info and reset;
 /// Cancel and Commit once the box changed.
 fn crop_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
+    let mut chosen_user = false;
     let cy = bar.top() + CENTER_Y;
     let at = |x: f32| bar.left() + pt(x);
     let span = |x0: f32, x1: f32, h: f32| {
@@ -598,34 +634,105 @@ fn crop_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
     let background = app.background;
     let mut options = app.crop_options.clone();
     let sized = options.preset.sized();
-    let label = if options.preset == crate::crop_tool::CropPreset::SizeResolution {
-        "W x H x Reso..."
-    } else {
-        options.preset.label()
+    let user_name = options
+        .user
+        .and_then(|i| app.crop_presets.list().get(i))
+        .map(|p| p.name.clone());
+    let label = match &user_name {
+        // Cut short like Photoshop's "W x H x Reso..."
+        Some(name) if name.chars().count() > 15 => {
+            format!("{}...", name.chars().take(12).collect::<String>())
+        }
+        Some(name) => name.clone(),
+        None if options.preset == crate::crop_tool::CropPreset::SizeResolution => {
+            "W x H x Reso...".to_owned()
+        }
+        None => options.preset.label().to_owned(),
     };
-    let mut chosen = None;
+    // Photoshop's menu: the built-in groups, the saved presets, then New
+    // and Delete Crop Preset...
+    #[derive(Clone, Copy)]
+    enum Pick {
+        Builtin(crate::crop_tool::CropPreset),
+        User(usize),
+        New,
+        Delete,
+        Nothing,
+    }
+    let mut menu: Vec<(crate::native_popup::Entry, Pick)> = Vec::new();
+    let sep = || (crate::native_popup::Entry::Separator, Pick::Nothing);
+    for (g, group) in crate::crop_tool::PRESET_GROUPS.into_iter().enumerate() {
+        if g > 0 {
+            menu.push(sep());
+        }
+        for &p in group {
+            let on = options.user.is_none() && p == options.preset;
+            menu.push((
+                crate::native_popup::Entry::item(p.label(), on),
+                Pick::Builtin(p),
+            ));
+        }
+    }
+    if !app.crop_presets.list().is_empty() {
+        menu.push(sep());
+        for (i, p) in app.crop_presets.list().iter().enumerate() {
+            let on = options.user == Some(i);
+            menu.push((
+                crate::native_popup::Entry::item(p.name.clone(), on),
+                Pick::User(i),
+            ));
+        }
+    }
+    menu.push(sep());
+    menu.push((
+        crate::native_popup::Entry::item("New Crop Preset...", false),
+        Pick::New,
+    ));
+    menu.push((
+        crate::native_popup::Entry::item("Delete Crop Preset...", false)
+            .enabled(!app.crop_presets.list().is_empty()),
+        Pick::Delete,
+    ));
+    let entries: Vec<_> = menu.iter().map(|(e, _)| e.clone()).collect();
+    let mut picked = None;
     ui.scope_builder(
         egui::UiBuilder::new().max_rect(span(110.0, 201.0, 17.0)),
         |ui| {
-            widgets::dropdown_with(ui, "crop-preset", pt(91.0), label, true, |ui| {
-                for (g, group) in crate::crop_tool::PRESET_GROUPS.into_iter().enumerate() {
-                    if g > 0 {
-                        ui.separator();
-                    }
-                    for &p in group {
-                        let enabled = p != crate::crop_tool::CropPreset::FrontImage;
-                        let item = egui::Button::new(p.label()).selected(p == options.preset);
-                        if ui.add_enabled(enabled, item).clicked() {
-                            chosen = Some(p);
-                        }
-                    }
-                }
-                ui.separator();
-                ui.add_enabled(false, egui::Button::new("New Crop Preset..."));
-                ui.add_enabled(false, egui::Button::new("Delete Crop Preset..."));
-            });
+            picked = widgets::dropdown_entries(ui, "crop-preset", pt(91.0), &label, true, &entries)
+                .map(|k| menu[k].1);
         },
     );
+    let mut chosen = None;
+    match picked {
+        Some(Pick::Builtin(p)) => chosen = Some(p),
+        Some(Pick::User(i)) => {
+            if let Some(preset) = app.crop_presets.list().get(i).cloned() {
+                options.choose_user(&preset, i);
+                // Refit the box like any other ratio or size
+                chosen_user = true;
+            }
+        }
+        Some(Pick::New) => {
+            app.new_crop_preset = Some(crate::dialogs::new_preset::NewPresetDialog::new(
+                "New Crop Preset",
+                options.preset_name(),
+            ));
+        }
+        Some(Pick::Delete) => {
+            let names = app
+                .crop_presets
+                .list()
+                .iter()
+                .map(|p| p.name.clone())
+                .collect();
+            app.delete_crop_preset =
+                Some(crate::dialogs::size_presets::DeletePresetDialog::titled(
+                    "Delete Crop Preset",
+                    names,
+                ));
+        }
+        Some(Pick::Nothing) | None => {}
+    }
     // Width, swap, Height
     let w = widgets::text_box(
         ui,
@@ -659,17 +766,20 @@ fn crop_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
         )
         .changed();
         let unit = if options.per_cm { "px/cm" } else { "px/in" };
-        let mut per_cm = options.per_cm;
+        let units = [
+            crate::native_popup::Entry::item("px/in", !options.per_cm),
+            crate::native_popup::Entry::item("px/cm", options.per_cm),
+        ];
         ui.scope_builder(
             egui::UiBuilder::new().max_rect(span(442.5, 496.5, 17.0)),
             |ui| {
-                widgets::dropdown_with(ui, "crop-res-unit", pt(54.0), unit, true, |ui| {
-                    ui.selectable_value(&mut per_cm, false, "px/in");
-                    ui.selectable_value(&mut per_cm, true, "px/cm");
-                });
+                if let Some(k) =
+                    widgets::dropdown_entries(ui, "crop-res-unit", pt(54.0), unit, true, &units)
+                {
+                    options.per_cm = k == 1;
+                }
             },
         );
-        options.per_cm = per_cm;
         separator(&painter, bar, 500.5);
     }
     let edited = w.changed() || h.changed() || res_changed;
@@ -754,32 +864,49 @@ fn crop_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
         Icon::CropOverlay,
         "Set the overlay options for the Crop Tool",
     );
-    egui::Popup::menu(&overlay)
-        .id(ui.id().with("crop-overlay-menu"))
-        .show(|ui| {
-            use crate::crop_tool::{Overlay, OverlayShow};
-            for o in Overlay::ALL {
-                ui.selectable_value(&mut options.overlay, o, o.label());
-            }
-            ui.separator();
-            for (s, label) in [
-                (OverlayShow::Auto, "Auto Show Overlay"),
-                (OverlayShow::Always, "Always Show Overlay"),
-                (OverlayShow::Never, "Never Show Overlay"),
-            ] {
-                ui.selectable_value(&mut options.overlay_show, s, label);
-            }
-            ui.separator();
-            if ui.button("Cycle Overlay").clicked() {
-                let k = Overlay::ALL
+    {
+        use crate::crop_tool::{Overlay, OverlayShow};
+        use crate::native_popup::Entry;
+        let shows = [
+            (OverlayShow::Auto, "Auto Show Overlay"),
+            (OverlayShow::Always, "Always Show Overlay"),
+            (OverlayShow::Never, "Never Show Overlay"),
+        ];
+        let mut entries: Vec<Entry> = Overlay::ALL
+            .iter()
+            .map(|&o| Entry::item(o.label(), o == options.overlay))
+            .collect();
+        entries.push(Entry::Separator);
+        entries.extend(
+            shows
+                .iter()
+                .map(|&(s, label)| Entry::item(label, s == options.overlay_show)),
+        );
+        entries.push(Entry::Separator);
+        entries.push(Entry::item("Cycle Overlay", false));
+        entries.push(Entry::item("Cycle Orientation", false).enabled(false));
+        let picked = crate::native_popup::dropdown(
+            ui,
+            &overlay,
+            ui.id().with("crop-overlay-menu"),
+            &entries,
+        );
+        let n = Overlay::ALL.len();
+        match picked {
+            Some(k) if k < n => options.overlay = Overlay::ALL[k],
+            Some(k) if (n + 1..n + 4).contains(&k) => options.overlay_show = shows[k - n - 1].0,
+            Some(k) if k == n + 5 => {
+                let i = Overlay::ALL
                     .iter()
                     .position(|&o| o == options.overlay)
                     .unwrap_or(0);
-                options.overlay = Overlay::ALL[(k + 1) % Overlay::ALL.len()];
+                options.overlay = Overlay::ALL[(i + 1) % n];
             }
-            ui.add_enabled(false, egui::Button::new("Cycle Orientation"));
-        });
+            _ => {}
+        }
+    }
     let gear = icon_button(ui, 705.0, -0.75, Icon::Gear, "Set additional Crop options");
+    let mut pick_shield = false;
     egui::Popup::menu(&gear)
         .id(ui.id().with("crop-gear-menu"))
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
@@ -793,6 +920,41 @@ fn crop_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
             ui.separator();
             ui.checkbox(&mut options.shield, "Enable Crop Shield");
             ui.add_enabled_ui(options.shield, |ui| {
+                // Match Canvas, or a custom color picked in the Color
+                // Picker (also from the swatch)
+                ui.horizontal(|ui| {
+                    ui.label("Color:");
+                    let custom = options.shield_color.is_some();
+                    let label = if custom { "Custom" } else { "Match Canvas" };
+                    let entries = [
+                        crate::native_popup::Entry::item("Match Canvas", !custom),
+                        crate::native_popup::Entry::item("Custom", custom),
+                    ];
+                    let response = ui.button(label);
+                    match crate::native_popup::dropdown(
+                        ui,
+                        &response,
+                        ui.id().with("crop-shield-color"),
+                        &entries,
+                    ) {
+                        Some(0) => options.shield_color = None,
+                        Some(_) => pick_shield = true,
+                        None => {}
+                    }
+                    let swatch = options.shield_color.unwrap_or(color::PASTEBOARD);
+                    let (rect, response) =
+                        ui.allocate_exact_size(Vec2::splat(pt(17.0)), Sense::click());
+                    ui.painter().rect(
+                        rect,
+                        0.0,
+                        swatch,
+                        egui::Stroke::new(pt(1.0), Color32::from_gray(0x66)),
+                        egui::StrokeKind::Inside,
+                    );
+                    if response.clicked() {
+                        pick_shield = true;
+                    }
+                });
                 ui.horizontal(|ui| {
                     ui.label("Opacity:");
                     let mut percent = (options.shield_opacity * 100.0).round();
@@ -822,25 +984,33 @@ fn crop_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
         theme::body(),
         color::TEXT,
     );
-    let mut fill = options.fill;
     ui.scope_builder(
         egui::UiBuilder::new().max_rect(span(892.0 + dx, 1023.5 + dx, 17.0)),
         |ui| {
             use crate::crop_tool::CropFill;
-            widgets::dropdown_with(ui, "crop-fill", pt(131.5), fill.label(), true, |ui| {
-                ui.selectable_value(
-                    &mut fill,
-                    CropFill::Background,
+            use crate::native_popup::Entry;
+            // Both need Adobe's services or a content-aware engine
+            let fills = [
+                Entry::item(
                     CropFill::Background.label(),
-                );
-                // Both need Adobe's services or a content-aware engine
-                for f in [CropFill::GenerativeExpand, CropFill::ContentAware] {
-                    ui.add_enabled(false, egui::Button::new(f.label()));
-                }
-            });
+                    options.fill == CropFill::Background,
+                ),
+                Entry::item(CropFill::GenerativeExpand.label(), false).enabled(false),
+                Entry::item(CropFill::ContentAware.label(), false).enabled(false),
+            ];
+            if widgets::dropdown_entries(
+                ui,
+                "crop-fill",
+                pt(131.5),
+                options.fill.label(),
+                true,
+                &fills,
+            ) == Some(0)
+            {
+                options.fill = CropFill::Background;
+            }
         },
     );
-    options.fill = fill;
     icon_button(
         ui,
         1042.0,
@@ -849,12 +1019,22 @@ fn crop_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
         "Learn more about the Crop tool",
     );
 
+    if pick_shield {
+        app.crop_options = options.clone();
+        app.open_color_picker(crate::state::PickerTarget::CropShield);
+    }
     let Some(state) = app.active() else {
         app.crop_options = options;
         return;
     };
     if let Some(p) = chosen {
         options.choose(p);
+        if p == crate::crop_tool::CropPreset::FrontImage {
+            options.front_image(state.doc.width, state.doc.height, state.doc.resolution);
+        }
+    }
+    if swapped || clear || edited {
+        options.user = None;
     }
     if swapped {
         options.swap();
@@ -863,7 +1043,7 @@ fn crop_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
         options.clear();
     }
     // A new ratio or size refits the box to the image
-    if (chosen.is_some() || swapped || edited)
+    if (chosen.is_some() || chosen_user || swapped || edited)
         && let Some(a) = options.aspect((state.doc.width, state.doc.height))
     {
         state.crop = Some(crate::crop_tool::fitted(state, a));

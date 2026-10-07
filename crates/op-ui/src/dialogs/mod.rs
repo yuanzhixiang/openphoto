@@ -30,6 +30,7 @@ mod modify_selection;
 mod new_document;
 mod new_guide;
 mod new_layer;
+pub(crate) mod new_preset;
 mod photo_filter;
 mod plain_filter;
 mod rotate_canvas;

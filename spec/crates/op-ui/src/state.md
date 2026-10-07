@@ -45,6 +45,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `typing`: whether a text field had keyboard focus in the previous frame, updated each frame before commands run. Decides whether the menu's Cut/Copy/Paste act on the text field or the document.
 - `forward_events`: events to inject into egui's input for the next frame (used when the menu's Cut/Copy/Paste is handed to a text field; see `commands.md`).
 - `image_size_dialog`: the Image Size dialog, `Some` while open. `image_size_extra`: how far its window was last enlarged (Photoshop points), for the next opening.
+- `crop_presets`: the Crop tool's saved presets; `new_crop_preset` / `delete_crop_preset`: New Crop Preset... and Delete Crop Preset..., `Some` while open (both count in `modal_open`). `PickerTarget::CropShield`: the Color Picker for the crop shield's custom color.
 - `trim_dialog`: the Trim dialog, `Some` while open.
 - `adjust_dialog`: an adjustment or filter dialog (see `dialogs/adjust.md`), `Some` while open.
 - `last_transform`: the most recently applied transform mapping, used by Edit › Transform › Again; kept only for the current run and shared by all documents.
@@ -74,7 +75,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `movable_layers()`: the number of selected layers that Align / Distribute would move, cached by document revision, selection revision, and selected layers. The enabled state of the align buttons and menu items is queried a dozen or so times per frame, each time scanning the bounding box of layer pixels; without the cache, dragging in a large document stutters noticeably.
 - Histogram and composite thumbnail: `composite_histogram()`, `composite_texture(ctx, max_px)`, both cached by document revision, used by the Histogram and Navigator panels. Both take the canvas's existing composite (`canvas_image()`) instead of compositing again; when Quick Mask is on (the canvas has a red overlay), the Navigator thumbnail is still composited separately.
 - `guide_drag`: the guide being dragged (`index` is `None` when dragging out of a ruler, otherwise the index of the guide being moved).
-- `crop`: the Crop tool's crop box (see `crop_tool.md`).
+- `crop`: the Crop tool's crop box (see `crop_tool.md`). `perspective_crop`: the Perspective Crop tool's box (`perspective_crop.md`).
 - `free_transform`: the Free Transform session (see `free_transform.md`).
 - `lasso`: the lasso path being drawn (points in document pixel coordinates, combine mode, whether it is the Polygonal Lasso).
 - Canvas image (`canvas_image`): in Quick Mask mode, red is overlaid on the composite, 50% where unselected (Photoshop's default "Masked Areas" display), varying linearly with the gray value; affects display only.

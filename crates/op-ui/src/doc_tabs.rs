@@ -22,9 +22,15 @@ const CLOSE: Color32 = Color32::from_gray(0x8c);
 pub fn title(state: &DocState) -> String {
     let d = &state.doc;
     format!(
-        "{} @ {} ({}/{}{}){}",
+        "{} @ {} ({}{}/{}{}){}",
         d.title,
         document_view::zoom_label(state.view.zoom),
+        // Photoshop 2026 names its temporary layer while cropping
+        if crate::crop_tool::previewing(state) {
+            "Crop Preview, "
+        } else {
+            ""
+        },
         // Photoshop shows the channel being edited in Quick Mask
         if d.quick_mask.is_some() {
             "Quick Mask"

@@ -23,6 +23,9 @@ const DARK: Color32 = Color32::from_gray(0x32);
 const HANDLE_THICK: f32 = pt(4.0);
 const CORNER_ARM: f32 = pt(23.0);
 const SIDE_BAR: f32 = pt(47.0);
+/// Auto Adjust Opacity: the shield's share of its opacity while the box is
+/// dragged.
+const AUTO_OPACITY: f32 = 0.5;
 
 /// Units of the options bar's Width and Height in W x H x Resolution.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,7 +47,7 @@ impl SizeUnit {
     }
 
     /// Units per inch, for the printed units.
-    fn per_inch(self) -> Option<f32> {
+    pub(crate) fn per_inch(self) -> Option<f32> {
         match self {
             Self::Pixels => None,
             Self::Inches => Some(1.0),
@@ -212,6 +215,9 @@ pub struct CropOptions {
     pub auto_adjust_opacity: bool,
     /// Straighten: the next drag draws a line to make level.
     pub straightening: bool,
+    /// The saved preset (`CropPresets`) the fields came from, until they
+    /// change.
+    pub user: Option<usize>,
 }
 
 impl Default for CropOptions {
@@ -234,12 +240,116 @@ impl Default for CropOptions {
             shield_opacity: 0.75,
             auto_adjust_opacity: true,
             straightening: false,
+            user: None,
+        }
+    }
+}
+
+/// A preset saved with New Crop Preset...: the fields as they were.
+#[derive(Clone, Debug, PartialEq)]
+pub struct UserCropPreset {
+    pub name: String,
+    /// Width, height and resolution (W x H x Resolution) rather than a
+    /// ratio.
+    pub sized: bool,
+    pub width: String,
+    pub height: String,
+    pub resolution: String,
+    pub per_cm: bool,
+}
+
+/// The saved crop presets, kept in a file (one per line, tab-separated:
+/// name, `size` or `ratio`, width, height, resolution, `in` or `cm`).
+#[derive(Clone, Debug, Default)]
+pub struct CropPresets {
+    list: Vec<UserCropPreset>,
+    store: Option<std::path::PathBuf>,
+}
+
+impl CropPresets {
+    /// The presets kept at `store` (none when it can't be read).
+    pub fn load(store: std::path::PathBuf) -> Self {
+        let list = std::fs::read_to_string(&store)
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| {
+                let f: Vec<&str> = line.split('\t').collect();
+                let [name, kind, width, height, resolution, unit] = f[..] else {
+                    return None;
+                };
+                Some(UserCropPreset {
+                    name: name.to_owned(),
+                    sized: kind == "size",
+                    width: width.to_owned(),
+                    height: height.to_owned(),
+                    resolution: resolution.to_owned(),
+                    per_cm: unit == "cm",
+                })
+            })
+            .collect();
+        Self {
+            list,
+            store: Some(store),
+        }
+    }
+
+    /// `~/Library/Application Support/OpenPhoto/crop-presets.txt`.
+    pub fn default_store() -> Option<std::path::PathBuf> {
+        let home = std::env::var_os("HOME")?;
+        Some(
+            std::path::PathBuf::from(home)
+                .join("Library/Application Support/OpenPhoto/crop-presets.txt"),
+        )
+    }
+
+    pub fn list(&self) -> &[UserCropPreset] {
+        &self.list
+    }
+
+    /// Adds a preset at the end and saves the list.
+    pub fn add(&mut self, preset: UserCropPreset) {
+        self.list.push(preset);
+        self.save();
+    }
+
+    pub fn remove(&mut self, index: usize) {
+        if index < self.list.len() {
+            self.list.remove(index);
+            self.save();
+        }
+    }
+
+    fn save(&self) {
+        let Some(store) = &self.store else {
+            return;
+        };
+        let clean = |t: &str| t.replace(['\t', '\n'], " ");
+        let text: String = self
+            .list
+            .iter()
+            .map(|p| {
+                format!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\n",
+                    clean(&p.name),
+                    if p.sized { "size" } else { "ratio" },
+                    clean(&p.width),
+                    clean(&p.height),
+                    clean(&p.resolution),
+                    if p.per_cm { "cm" } else { "in" },
+                )
+            })
+            .collect();
+        if let Some(dir) = store.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if let Err(e) = std::fs::write(store, text) {
+            log::warn!("could not save crop presets: {e}");
         }
     }
 }
 
 /// A value typed in Width or Height: a number with an optional unit.
-fn parse_length(text: &str) -> Option<(f32, Option<SizeUnit>)> {
+pub(crate) fn parse_length(text: &str) -> Option<(f32, Option<SizeUnit>)> {
     let t = text.trim();
     let (number, unit) = [
         ("px", SizeUnit::Pixels),
@@ -303,9 +413,67 @@ impl CropOptions {
         }
     }
 
+    /// New Crop Preset...'s suggested name: "Unconstrained" with empty
+    /// fields, else what they hold ("16 : 9", "4 in x 5 in 300 ppi").
+    pub fn preset_name(&self) -> String {
+        let (w, h) = (self.width.trim(), self.height.trim());
+        if w.is_empty() && h.is_empty() {
+            return "Unconstrained".into();
+        }
+        if !self.preset.sized() {
+            return format!("{w} : {h}");
+        }
+        let res = self.resolution.trim();
+        if res.is_empty() {
+            format!("{w} x {h}")
+        } else {
+            let unit = if self.per_cm { "ppcm" } else { "ppi" };
+            format!("{w} x {h} {res} {unit}")
+        }
+    }
+
+    /// The fields as a preset named `name`.
+    pub fn to_user(&self, name: &str) -> UserCropPreset {
+        UserCropPreset {
+            name: name.to_owned(),
+            sized: self.preset.sized(),
+            width: self.width.clone(),
+            height: self.height.clone(),
+            resolution: self.resolution.clone(),
+            per_cm: self.per_cm,
+        }
+    }
+
+    /// Picks the saved preset `index`: its fields come back.
+    pub fn choose_user(&mut self, preset: &UserCropPreset, index: usize) {
+        self.preset = if preset.sized {
+            CropPreset::SizeResolution
+        } else {
+            CropPreset::Ratio
+        };
+        self.width = preset.width.clone();
+        self.height = preset.height.clone();
+        self.resolution = preset.resolution.clone();
+        self.per_cm = preset.per_cm;
+        self.user = Some(index);
+    }
+
+    /// Front Image: the size and resolution of the image in front (the
+    /// active document), to crop other images to.
+    pub fn front_image(&mut self, width: u32, height: u32, ppi: f32) {
+        self.preset = CropPreset::FrontImage;
+        self.width = format!("{width} px");
+        self.height = format!("{height} px");
+        let r = format!("{ppi:.3}");
+        self.resolution = r.trim_end_matches('0').trim_end_matches('.').to_owned();
+        self.per_cm = false;
+        self.user = None;
+    }
+
     /// Picks a preset: its numbers go into the fields.
     pub fn choose(&mut self, preset: CropPreset) {
         self.preset = preset;
+        self.user = None;
         match preset {
             CropPreset::Ratio | CropPreset::SizeResolution | CropPreset::OriginalRatio => {
                 self.width.clear();
@@ -396,15 +564,67 @@ fn turn(v: Vec2, a: f32) -> Vec2 {
 }
 
 /// The image turned under the box, for the canvas renderer: about the
-/// image's center, by the box's angle.
-pub fn rotation(state: &DocState) -> Option<([f32; 2], f32)> {
+/// image's center, by the box's angle. In Classic Mode the image stays and
+/// the box turns instead.
+pub fn rotation(state: &DocState, options: &CropOptions) -> Option<([f32; 2], f32)> {
     let c = state.crop.as_ref()?;
-    (c.angle != 0.0).then(|| {
+    (c.angle != 0.0 && !options.classic).then(|| {
         (
             [state.doc.width as f32 / 2.0, state.doc.height as f32 / 2.0],
             c.angle,
         )
     })
+}
+
+/// How far the box shows turned on screen: its angle in Classic Mode
+/// (the image stays upright), none otherwise (the image turns instead).
+fn tilt(state: &DocState, options: &CropOptions) -> f32 {
+    match &state.crop {
+        Some(c) if options.classic => c.angle,
+        _ => 0.0,
+    }
+}
+
+fn pivot(state: &DocState) -> Vec2 {
+    Vec2::new(state.doc.width as f32 / 2.0, state.doc.height as f32 / 2.0)
+}
+
+/// A point of box space on screen.
+fn box_to_screen(state: &DocState, options: &CropOptions, p: Pos2, ppp: f32) -> Pos2 {
+    let a = tilt(state, options);
+    if a == 0.0 {
+        return to_screen(state, p, ppp);
+    }
+    let c = pivot(state);
+    to_screen(state, (c + turn(p.to_vec2() - c, a)).to_pos2(), ppp)
+}
+
+/// A screen point in box space.
+fn screen_to_box(state: &DocState, options: &CropOptions, p: Pos2, ppp: f32) -> Pos2 {
+    let d = to_doc(state, p, ppp);
+    let a = tilt(state, options);
+    if a == 0.0 {
+        return d;
+    }
+    let c = pivot(state);
+    (c + turn(d.to_vec2() - c, -a)).to_pos2()
+}
+
+/// The box's screen rectangle before it is turned by `tilt` about its
+/// center.
+fn screen_box(state: &DocState, options: &CropOptions, rect: Rect, ppp: f32) -> Rect {
+    let r = Rect::from_two_pos(
+        to_screen(state, rect.min, ppp),
+        to_screen(state, rect.max, ppp),
+    );
+    r.translate(box_to_screen(state, options, rect.center(), ppp) - r.center())
+}
+
+/// Whether the image is shown as Photoshop's temporary "Crop Preview"
+/// (in the tab title and the Layers panel): while the box is dragged or
+/// differs from the whole canvas.
+pub fn previewing(state: &DocState) -> bool {
+    modified(state) || state.crop.as_ref().is_some_and(|c| c.drag.is_some())
 }
 
 /// Whether the box differs from the whole canvas (the options bar then
@@ -417,11 +637,15 @@ pub fn modified(state: &DocState) -> bool {
 }
 
 /// The handle (−1, 0 or 1 per axis) under screen point `p`, if any.
-fn handle_at(state: &DocState, rect: Rect, p: Pos2, ppp: f32) -> Option<(i8, i8)> {
-    let screen = Rect::from_two_pos(
-        to_screen(state, rect.min, ppp),
-        to_screen(state, rect.max, ppp),
-    );
+fn handle_at(
+    state: &DocState,
+    options: &CropOptions,
+    rect: Rect,
+    p: Pos2,
+    ppp: f32,
+) -> Option<(i8, i8)> {
+    let screen = screen_box(state, options, rect, ppp);
+    let (center, a) = (screen.center(), tilt(state, options));
     for hy in -1i8..=1 {
         for hx in -1i8..=1 {
             if hx == 0 && hy == 0 {
@@ -437,7 +661,8 @@ fn handle_at(state: &DocState, rect: Rect, p: Pos2, ppp: f32) -> Option<(i8, i8)
                 0 => screen.center().y,
                 _ => screen.bottom(),
             };
-            if Pos2::new(x, y).distance(p) <= GRAB {
+            let handle = center + turn(Pos2::new(x, y) - center, a);
+            if handle.distance(p) <= GRAB {
                 return Some((hx, hy));
             }
         }
@@ -556,7 +781,7 @@ pub fn input(
     let double_inside = response.double_clicked()
         && response
             .interact_pointer_pos()
-            .is_some_and(|p| rect.contains(to_doc(state, p, ppp)));
+            .is_some_and(|p| rect.contains(screen_to_box(state, options, p, ppp)));
     if enter || double_inside {
         commit(state, options, background);
         center_on_box(state, ppp);
@@ -569,8 +794,8 @@ pub fn input(
     if response.drag_started_by(egui::PointerButton::Primary)
         && let Some(p) = ui.input(|i| i.pointer.press_origin())
     {
-        let d = to_doc(state, p, ppp);
-        let handle = handle_at(state, rect, p, ppp);
+        let d = screen_to_box(state, options, p, ppp);
+        let handle = handle_at(state, options, rect, p, ppp);
         let angle = state.crop.as_ref().map_or(0.0, |c| c.angle);
         let start = |handle, rect, kind| CropDrag {
             handle,
@@ -601,11 +826,20 @@ pub fn input(
         if let Some(p) = pointer
             && drag.kind == CropDragKind::Rotate
         {
-            // The image turns with the pointer about the box's center
-            let center = to_screen(state, drag.rect.center(), ppp);
+            // The image turns with the pointer about the box's center (in
+            // Classic Mode the box turns with it instead)
+            let center = if options.classic {
+                // The box's center on the still image
+                let c = pivot(state);
+                let on_image = c + turn(drag.rect.center().to_vec2() - c, drag.angle);
+                to_screen(state, on_image.to_pos2(), ppp)
+            } else {
+                to_screen(state, drag.rect.center(), ppp)
+            };
             let a0 = (drag.pointer - center).angle();
             let a1 = (p - center).angle();
-            let mut angle = drag.angle - (a1 - a0);
+            let turned = if options.classic { a1 - a0 } else { a0 - a1 };
+            let mut angle = drag.angle + turned;
             if mods.shift {
                 let step = 15f32.to_radians();
                 angle = (angle / step).round() * step;
@@ -619,8 +853,8 @@ pub fn input(
         {
             straightened = Some((drag.pointer, p));
         } else if let Some(p) = pointer {
-            // Screen movement since the press, in document pixels
-            let d = (p - drag.pointer) * ppp / zoom;
+            // Screen movement since the press, in box-space pixels
+            let d = turn((p - drag.pointer) * ppp / zoom, -tilt(state, options));
             let new_rect = match (drag.handle, centered) {
                 // The image moves under the box
                 (None, true) => drag.rect.translate(-d),
@@ -749,19 +983,19 @@ pub fn commit(state: &mut DocState, options: &CropOptions, background: op_core::
     changed
 }
 
-pub fn cursor(state: &DocState, p: Pos2, ppp: f32) -> CursorIcon {
+pub fn cursor(state: &DocState, options: &CropOptions, p: Pos2, ppp: f32) -> CursorIcon {
     let Some(c) = &state.crop else {
         return CursorIcon::Crosshair;
     };
     let handle = c
         .drag
-        .map_or_else(|| handle_at(state, c.rect, p, ppp), |d| d.handle);
+        .map_or_else(|| handle_at(state, options, c.rect, p, ppp), |d| d.handle);
     match handle {
         Some((0, _)) => CursorIcon::ResizeVertical,
         Some((_, 0)) => CursorIcon::ResizeHorizontal,
         Some((hx, hy)) if hx == hy => CursorIcon::ResizeNwSe,
         Some(_) => CursorIcon::ResizeNeSw,
-        None if c.rect.contains(to_doc(state, p, ppp)) => CursorIcon::Move,
+        None if c.rect.contains(screen_to_box(state, options, p, ppp)) => CursorIcon::Move,
         // Outside the box the drag turns the image
         None => CursorIcon::Alias,
     }
@@ -776,15 +1010,22 @@ pub fn shield(state: &DocState, options: &CropOptions) -> Option<op_render::Shie
         return None;
     }
     let rgb = options.shield_color.unwrap_or(color::PASTEBOARD);
-    let opacity = if options.show_cropped_area {
-        options.shield_opacity
-    } else {
+    // Auto Adjust Opacity: lighter while the box is being changed
+    let dragging = options.auto_adjust_opacity && c.drag.is_some();
+    let opacity = if !options.show_cropped_area {
         1.0
+    } else if dragging {
+        options.shield_opacity * AUTO_OPACITY
+    } else {
+        options.shield_opacity
     };
+    // In Classic Mode the box lies turned on the upright image
+    let a = tilt(state, options);
+    let center = pivot(state) + turn(c.rect.center().to_vec2() - pivot(state), a);
     Some(op_render::Shield {
-        center: [c.rect.center().x, c.rect.center().y],
+        center: [center.x, center.y],
         half: [c.rect.width() / 2.0, c.rect.height() / 2.0],
-        angle: 0.0,
+        angle: a,
         color: [
             rgb.r() as f32 / 255.0,
             rgb.g() as f32 / 255.0,
@@ -802,17 +1043,19 @@ pub fn draw(ui: &Ui, state: &DocState, options: &CropOptions, canvas: Rect, ppp:
         return;
     };
     let painter = ui.painter_at(canvas);
-    let r = Rect::from_two_pos(
-        to_screen(state, c.rect.min, ppp),
-        to_screen(state, c.rect.max, ppp),
-    );
+    let r = screen_box(state, options, c.rect, ppp);
+    let a = tilt(state, options);
     let show = match options.overlay_show {
         OverlayShow::Always => true,
         OverlayShow::Auto => c.drag.is_some(),
         OverlayShow::Never => false,
     };
     if show {
-        overlay(&painter, r, options.overlay);
+        overlay(&painter, r, options.overlay, a);
+    }
+    if a != 0.0 {
+        draw_turned(&painter, r, a);
+        return;
     }
     let one = pt(1.0);
     painter.rect_stroke(r, 0, Stroke::new(one, DARK), egui::StrokeKind::Outside);
@@ -857,9 +1100,77 @@ pub fn draw(ui: &Ui, state: &DocState, options: &CropOptions, canvas: Rect, ppp:
     }
 }
 
-/// The overlay's lines in `r` (screen): light 1 pt lines with a faint
-/// shadow, which shows on light images, as Photoshop draws them.
-fn overlay(painter: &egui::Painter, r: Rect, kind: Overlay) {
+/// The box's lines and handles as [`draw`] draws them, turned clockwise by
+/// `a` about the center of `r` (Classic Mode's turned box).
+fn draw_turned(painter: &egui::Painter, r: Rect, a: f32) {
+    let c = r.center();
+    let quad = |q: Rect| -> Vec<Pos2> {
+        [
+            q.left_top(),
+            q.right_top(),
+            q.right_bottom(),
+            q.left_bottom(),
+        ]
+        .into_iter()
+        .map(|p| c + turn(p - c, a))
+        .collect()
+    };
+    let one = pt(1.0);
+    painter.add(Shape::closed_line(
+        quad(r.expand(one / 2.0)),
+        Stroke::new(one, DARK),
+    ));
+    painter.add(Shape::closed_line(
+        quad(r.expand(one * 1.5)),
+        Stroke::new(one, LIGHT),
+    ));
+    let t = HANDLE_THICK;
+    let outer = r.expand(t);
+    let mut bars = Vec::new();
+    for (hx, hy) in [(-1.0f32, -1.0f32), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
+        let corner = Pos2::new(
+            if hx < 0.0 {
+                outer.left()
+            } else {
+                outer.right()
+            },
+            if hy < 0.0 {
+                outer.top()
+            } else {
+                outer.bottom()
+            },
+        );
+        bars.push(Rect::from_two_pos(
+            corner,
+            corner + Vec2::new(-hx * CORNER_ARM, -hy * t),
+        ));
+        bars.push(Rect::from_two_pos(
+            corner,
+            corner + Vec2::new(-hx * t, -hy * CORNER_ARM),
+        ));
+    }
+    for (center, horizontal) in [
+        (Pos2::new(r.center().x, r.top() - t / 2.0), true),
+        (Pos2::new(r.center().x, r.bottom() + t / 2.0), true),
+        (Pos2::new(r.left() - t / 2.0, r.center().y), false),
+        (Pos2::new(r.right() + t / 2.0, r.center().y), false),
+    ] {
+        let size = if horizontal {
+            Vec2::new(SIDE_BAR, t)
+        } else {
+            Vec2::new(t, SIDE_BAR)
+        };
+        bars.push(Rect::from_center_size(center, size));
+    }
+    for bar in bars {
+        painter.add(Shape::convex_polygon(quad(bar), LIGHT, Stroke::NONE));
+    }
+}
+
+/// The overlay's lines in `r` (screen), turned clockwise by `a` about its
+/// center: light 1 pt lines with a faint shadow, which shows on light
+/// images, as Photoshop draws them.
+fn overlay(painter: &egui::Painter, r: Rect, kind: Overlay, a: f32) {
     let mut lines: Vec<[Pos2; 2]> = Vec::new();
     let at = |fx: f32, fy: f32| Pos2::new(r.left() + r.width() * fx, r.top() + r.height() * fy);
     let verticals = |fs: &[f32], lines: &mut Vec<[Pos2; 2]>| {
@@ -955,6 +1266,18 @@ fn overlay(painter: &egui::Painter, r: Rect, kind: Overlay) {
                 }
             }
             curves.push(points);
+        }
+    }
+    if a != 0.0 {
+        let c = r.center();
+        let spin = |p: Pos2| c + turn(p - c, a);
+        for l in &mut lines {
+            *l = [spin(l[0]), spin(l[1])];
+        }
+        for curve in &mut curves {
+            for p in curve.iter_mut() {
+                *p = spin(*p);
+            }
         }
     }
     let shadow = Stroke::new(pt(2.0), Color32::from_black_alpha(28));

@@ -91,7 +91,7 @@ When the current tool is the Horizontal Type tool, canvas input is handed to `ty
 
 ## Crop tool
 
-When the current tool is the Crop tool, canvas input is handed to `crop_tool::input`, the cursor is determined by `crop_tool::cursor`, and the crop box and shield are drawn after the transform box (see `crop_tool.md`). When the current tool is not the Crop tool, the document's crop box is discarded.
+When the current tool is the Crop tool, canvas input is handed to `crop_tool::input`, the cursor is determined by `crop_tool::cursor`, and the crop box and shield are drawn after the transform box (see `crop_tool.md`). When the current tool is not the Crop tool, a changed crop box is committed first and the box is dropped. The Perspective Crop tool is wired the same way (`perspective_crop::input`, `cursor`, `draw`; its box is committed when another tool is picked, see `perspective_crop.md`). Neither tool takes input while a dialog is open (`AppState::modal_open`), so Enter and Escape reach the dialog.
 
 ## Free Transform
 

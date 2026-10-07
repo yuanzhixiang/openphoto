@@ -28,6 +28,10 @@ When the Background layer, or a layer in a Lock all group, is selected, the blen
 - Lock icon at the right end of the row (21.5 from the scrollbar position, vertically centered; Photoshop 2026 measurements, checked pixel by pixel against screenshots): a Lock all layer shows a solid lock (with keyhole, `LayerLockFull`); a partially locked layer and the Background layer show a hollow lock (a dot inside the frame, `LayerLock`), both `#dddddd`; a layer that has no locks of its own but sits in a group with locks shows a dimmer `#a6a6a6` lock (solid when the group is Lock all, otherwise hollow). When a lock icon is shown, the link icon is not shown.
 - Link icon: layers linked to any selected layer (including the selected layer itself) show a link icon in the same position (the same as the footer bar's link icon); when only unlinked layers are selected, none is shown (the union of `link::link_set` of the selected layers, so disabled partners still show it; Photoshop 2026 measurement). ⇧-click on a linked row's link icon toggles the link's temporary disable (`link::toggle_disabled`, no history); a disabled link has a red `#e32b2b` × (1.5 pt strokes, ±4 pt) drawn over the icon.
 
+## While cropping
+
+While the Crop tool's box is being changed (`crop_tool::previewing`), the list shows only Photoshop 2026's temporary layer: one selected row named "Crop Preview" with the eye and the merged image as its thumbnail (laid out as a layer row), until the crop is committed or cancelled (`crop_preview_list`).
+
 ## Layer Groups
 
 Per Photoshop 2026 measurements:

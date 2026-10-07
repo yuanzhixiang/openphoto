@@ -778,7 +778,7 @@ impl ImageSizeDialog {
         self.first_frame = false;
         // A sheet takes the keys while it's open
         if let Some(delete) = &mut self.delete {
-            match delete.show(ctx, self.corner) {
+            match delete.show(ctx, Some(self.corner)) {
                 DeleteOutcome::Open => {}
                 DeleteOutcome::Cancel => self.delete = None,
                 DeleteOutcome::Delete(i) => {

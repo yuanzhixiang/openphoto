@@ -4,7 +4,7 @@
 
 Defines `OpenPhotoApp` (implements `eframe::App`), which:
 
-- At startup installs fonts and styles, registers the canvas renderer, on macOS installs the native menu bar (and, once the window's view is known, enables native dialog menus with `native_popup::set_available`) and marks the window as sRGB color space, then opens the files passed on the command line.
+- At startup installs fonts and styles, registers the canvas renderer, reads the Crop tool's saved presets (`CropPresets::default_store`), on macOS installs the native menu bar (and, once the window's view is known, enables native dialog menus with `native_popup::set_available`) and marks the window as sRGB color space, then opens the files passed on the command line.
 - Each frame, processes input, lays out the regions and shows overlays in a fixed order.
 - Lays out the document tab bar (`doc_tabs.rs`) and the current document's view (`document_view.rs`).
 
@@ -75,6 +75,10 @@ When the dialog returns OK, if the new size differs from the current size, `resi
 - OK / Enter: first restores the snapshot, then applies for real (`Effect::apply`; the background color a filter needs is the current background color) and records the adjustment or filter name (e.g. "Levels", "Gaussian Blur"); when a filter is applied, it is recorded as `last_filter`. A filter dialog's settings (`settings()`) are stored in `filter_settings` by dialog kind and restored the next time it opens. On failure an alert is shown.
 - The preview pane of classic filter dialogs (`wants_pane()`): when there is no texture, `pane_texture` generates one from the central part of the document composite, at most 392 × 392 pixels, with nearest-neighbor sampling; each time the preview changes, the old texture is discarded and regenerated, so the preview pane shows the document with the preview effect.
 - If the current document disappears while the dialog is open, the dialog is simply discarded.
+
+## Crop preset dialogs
+
+`crop_preset_dialogs` shows New Crop Preset... (`dialogs/new_preset.md`; OK adds the options' fields as a preset under that name and chooses it) and Delete Crop Preset... (`dialogs/size_presets.md`, centered; a confirmed delete removes the preset and keeps the chosen one pointing at the same preset). The Color Picker's `CropShield` target sets the crop shield's custom color.
 
 ## Wiring the Image Size dialog
 

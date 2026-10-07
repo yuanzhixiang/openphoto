@@ -124,6 +124,8 @@ pub struct DocState {
     pub picking_clone_source: bool,
     /// The Crop tool's box, while the Crop tool is in use.
     pub crop: Option<CropBox>,
+    /// The Perspective Crop tool's box, while it is in use.
+    pub perspective_crop: Option<crate::perspective_crop::PerspectiveBox>,
     /// Edit > Free Transform, while in progress.
     pub free_transform: Option<FreeTransform>,
     /// A Gradient tool drag: start and current point, in document pixels.
@@ -240,6 +242,7 @@ impl DocState {
             origin_drag: None,
             free_transform: None,
             crop: None,
+            perspective_crop: None,
             guide_drag: None,
             pointer: None,
             histogram: None,
@@ -1138,6 +1141,8 @@ pub enum PickerTarget {
     CanvasExtension,
     /// "Color..." in the Fill dialog.
     FillColor,
+    /// The Crop tool's custom shield color.
+    CropShield,
 }
 
 pub struct PickerSession {
@@ -1255,6 +1260,11 @@ pub struct AppState {
     pub move_options: MoveOptions,
     /// The Crop tool's options.
     pub crop_options: crate::crop_tool::CropOptions,
+    /// Presets saved with New Crop Preset...
+    pub crop_presets: crate::crop_tool::CropPresets,
+    /// New Crop Preset... and Delete Crop Preset..., while open.
+    pub new_crop_preset: Option<crate::dialogs::new_preset::NewPresetDialog>,
+    pub delete_crop_preset: Option<crate::dialogs::size_presets::DeletePresetDialog>,
     pub type_options: TypeOptions,
     /// Whether the Color panel edits the background or the foreground color.
     pub editing_background: bool,
@@ -1409,6 +1419,9 @@ impl Default for AppState {
             shape: ShapeOptions::default(),
             move_options: MoveOptions::default(),
             crop_options: Default::default(),
+            crop_presets: Default::default(),
+            new_crop_preset: None,
+            delete_crop_preset: None,
             type_options: TypeOptions::default(),
             editing_background: false,
             picker_hsb: Hsb::from_color(foreground),
@@ -1581,6 +1594,8 @@ impl AppState {
             || self.trim_dialog.is_some()
             || self.equalize_dialog.is_some()
             || self.image_size_dialog.is_some()
+            || self.new_crop_preset.is_some()
+            || self.delete_crop_preset.is_some()
             || self.new_guide_dialog.is_some()
             || self.new_layer_dialog.is_some()
             || self.flatten_prompt.is_some()
@@ -1624,6 +1639,16 @@ impl AppState {
             PickerTarget::Background => ("Color Picker (Background Color)", self.background),
             PickerTarget::CanvasExtension => ("Color Picker", self.background),
             PickerTarget::FillColor => ("Color Picker (Fill Color)", self.foreground),
+            PickerTarget::CropShield => {
+                let c = self
+                    .crop_options
+                    .shield_color
+                    .unwrap_or(crate::theme::color::PASTEBOARD);
+                (
+                    "Color Picker",
+                    Color::from_rgba8([c.r(), c.g(), c.b(), 255]),
+                )
+            }
         };
         self.color_picker = Some(PickerSession {
             picker: crate::dialogs::ColorPicker::new(title, color),

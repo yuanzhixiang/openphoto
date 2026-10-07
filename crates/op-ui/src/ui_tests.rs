@@ -126,6 +126,36 @@ pub fn drag(harness: &mut Harness<'_, OpenPhotoApp>, from: Pos2, to: Pos2, modif
     harness.run_steps(3);
 }
 
+/// A drag along `path` (pressed at its first point, released at its last).
+pub fn drag_path(harness: &mut Harness<'_, OpenPhotoApp>, path: &[Pos2], modifiers: Modifiers) {
+    let (first, last) = (path[0], path[path.len() - 1]);
+    harness.hover_at(first);
+    harness.event_modifiers(
+        egui::Event::PointerButton {
+            pos: first,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers,
+        },
+        modifiers,
+    );
+    harness.step();
+    for &p in &path[1..] {
+        harness.event_modifiers(egui::Event::PointerMoved(p), modifiers);
+        harness.step();
+    }
+    harness.event_modifiers(
+        egui::Event::PointerButton {
+            pos: last,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers,
+        },
+        modifiers,
+    );
+    harness.run_steps(3);
+}
+
 fn active<'a>(h: &'a Harness<'_, OpenPhotoApp>) -> &'a crate::state::DocState {
     let app = &h.state().state;
     &app.docs[&app.active_doc.unwrap()]
@@ -1321,6 +1351,9 @@ fn crop_tool_crops_to_the_box() {
         "{r:?}"
     );
     assert_eq!(r.min, egui::Pos2::ZERO);
+    // Photoshop shows its temporary "Crop Preview" layer meanwhile
+    assert!(crate::doc_tabs::title(active(&h)).contains("(Crop Preview, RGB/8"));
+    shot(&mut h, "crop_preview");
     // ...and the view follows: the box is centered
     let state = active(&h);
     let center = crate::document_view::to_screen(state, r.center(), 2.0 * crate::theme::UI_SCALE);
@@ -1342,13 +1375,216 @@ fn crop_tool_crops_to_the_box() {
     let d = &active(&h).doc;
     assert!((d.width as i32 - 500).abs() <= 2 && (d.height as i32 - 500).abs() <= 2);
     assert_eq!(last_history(&h), "Crop");
+    assert!(!crate::doc_tabs::title(active(&h)).contains("Crop Preview"));
     // The box covers the new canvas again
     let r = active(&h).crop.unwrap().rect;
     assert_eq!(r.size(), egui::vec2(d.width as f32, d.height as f32));
-    // Another tool drops the box
+    // Another tool drops an unchanged box...
     h.key_press(egui::Key::M);
     h.run_steps(2);
     assert!(active(&h).crop.is_none());
+    let entries = active(&h).history.states().len();
+    // ...and crops to a changed one first (Photoshop 2026 doesn't ask)
+    h.key_press(egui::Key::C);
+    h.run_steps(2);
+    let (a, b) = (doc_point(&h, 500.0, 500.0), doc_point(&h, 400.0, 300.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    h.key_press(egui::Key::M);
+    h.run_steps(2);
+    let d = &active(&h).doc;
+    assert!((d.width as i32 - 400).abs() <= 2 && (d.height as i32 - 300).abs() <= 2);
+    assert_eq!(active(&h).history.states().len(), entries + 1);
+    assert!(active(&h).crop.is_none());
+}
+
+#[test]
+fn crop_presets_front_image_and_shield_color() {
+    use crate::crop_tool::CropPreset;
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.key_press(egui::Key::C);
+    h.run_steps(2);
+    let options = |h: &Harness<'_, OpenPhotoApp>| h.state().state.crop_options.clone();
+    let menu = |h: &mut Harness<'_, OpenPhotoApp>, item: &str| {
+        click(h, at_pt(155.0, 45.25));
+        h.get_by_label(item).click();
+        h.run_steps(3);
+    };
+    // Front Image: the front document's size and resolution
+    menu(&mut h, "Front Image");
+    let o = options(&h);
+    assert_eq!(o.preset, CropPreset::FrontImage);
+    assert_eq!(
+        (o.width.as_str(), o.height.as_str(), o.resolution.as_str()),
+        ("734 px", "811 px", "72")
+    );
+    // 16 : 9, then New Crop Preset... suggests "16 : 9"; OK saves it
+    menu(&mut h, "16 : 9");
+    menu(&mut h, "New Crop Preset...");
+    let name = h
+        .state()
+        .state
+        .new_crop_preset
+        .as_ref()
+        .unwrap()
+        .name
+        .clone();
+    assert_eq!(name, "16 : 9");
+    shot(&mut h, "new_crop_preset");
+    h.event(egui::Event::Text("Wide".into()));
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert!(h.state().state.new_crop_preset.is_none());
+    assert_eq!(h.state().state.crop_presets.list()[0].name, "Wide");
+    assert_eq!(options(&h).user, Some(0));
+    // Another preset, then the saved one from the menu brings 16 : 9 back
+    menu(&mut h, "1 : 1 (Square)");
+    assert_eq!(options(&h).user, None);
+    menu(&mut h, "Wide");
+    let o = options(&h);
+    assert_eq!(
+        (o.width.as_str(), o.height.as_str(), o.user),
+        ("16", "9", Some(0))
+    );
+    let r = active(&h).crop.unwrap().rect;
+    assert!((r.width() / r.height() - 16.0 / 9.0).abs() < 0.01);
+    // Delete Crop Preset...: Delete, then Yes
+    menu(&mut h, "Delete Crop Preset...");
+    assert!(h.state().state.delete_crop_preset.is_some());
+    h.key_press(egui::Key::Enter);
+    h.run_steps(2);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert!(h.state().state.crop_presets.list().is_empty());
+    assert_eq!(options(&h).user, None);
+    // A custom shield color shows in the shield
+    h.state_mut().state.crop_options.shield_color = Some(egui::Color32::from_rgb(200, 0, 0));
+    h.run_steps(2);
+    let shield = crate::crop_tool::shield(active(&h), &options(&h)).unwrap();
+    assert!((shield.color[0] - 200.0 / 255.0).abs() < 1e-3 && shield.color[1] == 0.0);
+    // Auto Adjust Opacity lightens it while the box is dragged
+    assert_eq!(shield.opacity, 0.75);
+    {
+        let state = h.state_mut().state.active().unwrap();
+        let c = state.crop.as_mut().unwrap();
+        c.drag = Some(crate::state::CropDrag {
+            handle: Some((1, 1)),
+            pointer: egui::Pos2::ZERO,
+            rect: c.rect,
+            angle: 0.0,
+            kind: crate::state::CropDragKind::Box,
+        });
+    }
+    let shield = crate::crop_tool::shield(active(&h), &options(&h)).unwrap();
+    assert_eq!(shield.opacity, 0.75 * 0.5);
+}
+
+#[test]
+fn perspective_crop_straightens_a_box() {
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.select_tool(Tool::PerspectiveCrop);
+    h.run_steps(2);
+    let quad =
+        |h: &Harness<'_, OpenPhotoApp>| active(h).perspective_crop.as_ref().and_then(|b| b.quad);
+    // Drawing a box from (100, 100) to (500, 400)
+    let (a, b) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 500.0, 400.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let q = quad(&h).unwrap();
+    assert!((q[0] - egui::pos2(100.0, 100.0)).length() < 1.0);
+    assert!((q[2] - egui::pos2(500.0, 400.0)).length() < 1.0);
+    // The top-right corner moved in by 50 px on its own
+    let (a, b) = (doc_point(&h, 500.0, 100.0), doc_point(&h, 450.0, 150.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let q = quad(&h).unwrap();
+    assert!((q[1] - egui::pos2(450.0, 150.0)).length() < 1.0, "{q:?}");
+    assert!((q[0] - egui::pos2(100.0, 100.0)).length() < 1.0);
+    shot(&mut h, "perspective_crop");
+    // Enter crops to the box's mean side lengths
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    let d = &active(&h).doc;
+    let expect = op_core::image_ops::perspective_size([
+        (100.0, 100.0),
+        (450.0, 150.0),
+        (500.0, 400.0),
+        (100.0, 400.0),
+    ]);
+    assert_eq!((d.width, d.height), expect);
+    assert_eq!(last_history(&h), "Perspective Crop");
+    assert!(quad(&h).is_none());
+    // Four clicks place a box; a typed size crops to it; Escape removes one
+    for (x, y) in [(10.0, 10.0), (200.0, 20.0), (190.0, 200.0), (20.0, 190.0)] {
+        let p = doc_point(&h, x, y);
+        click(&mut h, p);
+    }
+    assert!(quad(&h).is_some());
+    *h.state_mut().state.setting("pcrop.w", "") = "120".into();
+    *h.state_mut().state.setting("pcrop.h", "") = "80 px".into();
+    h.run_steps(1);
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!((active(&h).doc.width, active(&h).doc.height), (120, 80));
+    let (a, b) = (doc_point(&h, 10.0, 10.0), doc_point(&h, 60.0, 60.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert!(quad(&h).is_none());
+    assert_eq!(active(&h).doc.width, 120);
+}
+
+#[test]
+fn classic_mode_turns_the_box() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.crop_options.classic = true;
+    h.key_press(egui::Key::C);
+    h.run_steps(2);
+    let crop = |h: &Harness<'_, OpenPhotoApp>| active(h).crop.unwrap();
+    // A smaller box, then a quarter turn clockwise outside it with Shift:
+    // in Classic Mode the box turns clockwise on the still image
+    {
+        let state = h.state_mut().state.active().unwrap();
+        state.crop.as_mut().unwrap().rect =
+            egui::Rect::from_min_max(egui::pos2(200.0, 200.0), egui::pos2(500.0, 400.0));
+    }
+    h.run_steps(1);
+    let c = doc_point(&h, 350.0, 300.0);
+    let path: Vec<_> = (0..=8)
+        .map(|k| {
+            let t = k as f32 / 8.0 * std::f32::consts::FRAC_PI_2;
+            c + egui::vec2(t.sin(), -t.cos()) * pt(150.0)
+        })
+        .collect();
+    drag_path(&mut h, &path, Modifiers::SHIFT);
+    let angle = crop(&h).angle.to_degrees();
+    assert!((angle - 90.0).abs() < 0.5, "{angle}");
+    // The image is not turned under it, and the box's center stays put
+    assert!(crate::crop_tool::rotation(active(&h), &h.state().state.crop_options).is_none());
+    let r = crop(&h).rect;
+    let pivot = egui::vec2(367.0, 405.5);
+    let on_image = pivot + {
+        let v = r.center().to_vec2() - pivot;
+        let (s, k) = crop(&h).angle.sin_cos();
+        egui::vec2(v.x * k - v.y * s, v.x * s + v.y * k)
+    };
+    assert!(
+        (on_image - egui::vec2(350.0, 300.0)).length() < 0.5,
+        "{on_image:?}"
+    );
+    shot(&mut h, "crop_classic_turned");
+    // Committing turns the image so the box is upright: 200 × 300
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    let d = &active(&h).doc;
+    assert!(
+        (d.width as i32 - 300).abs() <= 2 && (d.height as i32 - 200).abs() <= 2,
+        "{}x{}",
+        d.width,
+        d.height
+    );
 }
 
 #[test]

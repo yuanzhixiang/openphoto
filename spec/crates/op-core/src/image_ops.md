@@ -50,6 +50,8 @@ Implements the Image menu operations that change the whole canvas: Image Size re
 
 `reveal_all(doc, background)`: Image › Reveal All. Uses `Document::content_bounds` to find the union of the canvas and all layer pixels (including those outside the canvas), enlarges the canvas to that range (`place_canvas`, with the old canvas placed at the corresponding offset), and fills the extended area of the background layer with `background` (the background color). When no pixel is outside the canvas, it does nothing and returns `false`. Test `reveal_all_grows_the_canvas_to_the_hidden_pixels` covers: pixels off the left and off the bottom right both appear on the new canvas, the background is extended with the background color, and a second call returns `false`.
 
+`perspective_crop(doc, quad, w, h)`: the Perspective Crop tool's crop. The projective map taking the w × h canvas's corners to `quad` (top-left, top-right, bottom-right, bottom-left, document pixels; `Projective::rect_to_quad`) gives each output pixel's center its source point; layers, masks and Quick Mask are sampled bilinearly (premultiplied) from the region around the quad (transparent outside the layers' pixels), the selection likewise. `perspective_size(quad)`: the size used when none is typed, the mean lengths of opposite sides, rounded. Test: `perspective_crop_maps_the_quad_onto_the_canvas` (each corner of the result shows the colored quarter its quad corner lies in; a quad equal to the canvas keeps the image).
+
 ## Known limitations
 
 - Cropping always deletes pixels outside the new canvas (`clipped`, equivalent to Photoshop with "Delete Cropped Pixels" on); Photoshop's Crop tool can turn it off and keep pixels outside the canvas.

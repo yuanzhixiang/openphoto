@@ -149,6 +149,17 @@ pub fn dropdown_with(
     enabled: bool,
     menu: impl FnOnce(&mut Ui),
 ) -> Response {
+    let response = dropdown_button(ui, width, text, enabled);
+    if enabled {
+        egui::Popup::menu(&response)
+            .id(egui::Id::new(id))
+            .show(menu);
+    }
+    response
+}
+
+/// The dropdown's box, value and chevron.
+fn dropdown_button(ui: &mut Ui, width: f32, text: &str, enabled: bool) -> Response {
     use theme::pt;
     let sense = if enabled {
         Sense::click()
@@ -199,12 +210,25 @@ pub fn dropdown_with(
             fill,
         );
     }
-    if enabled {
-        egui::Popup::menu(&response)
-            .id(egui::Id::new(id))
-            .show(menu);
-    }
     response
+}
+
+/// [`dropdown_with`] opening `entries` as a native macOS menu, as
+/// Photoshop's options bar does (`native_popup`); returns the index of the
+/// entry picked.
+pub fn dropdown_entries(
+    ui: &mut Ui,
+    id: impl std::hash::Hash + std::fmt::Debug,
+    width: f32,
+    text: &str,
+    enabled: bool,
+    entries: &[crate::native_popup::Entry],
+) -> Option<usize> {
+    let response = dropdown_button(ui, width, text, enabled);
+    if !enabled {
+        return None;
+    }
+    crate::native_popup::dropdown(ui, &response, egui::Id::new(id), entries)
 }
 
 /// An options-bar button drawing one of the traced Photoshop icons.

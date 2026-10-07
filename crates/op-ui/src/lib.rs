@@ -23,6 +23,7 @@ mod options_bar;
 mod options_kit;
 mod options_tools;
 mod panels;
+mod perspective_crop;
 mod ps_icons;
 mod recent;
 mod rulers;
@@ -64,6 +65,9 @@ impl OpenPhotoApp {
     pub fn new(cc: &eframe::CreationContext<'_>, files: Vec<PathBuf>) -> Self {
         let mut app = Self::new_headless(cc, files);
         app.state.clipboard = clipboard::Clipboard::new(true);
+        if let Some(store) = crop_tool::CropPresets::default_store() {
+            app.state.crop_presets = crop_tool::CropPresets::load(store);
+        }
         if let Some(store) = recent::RecentFiles::default_store() {
             app.state.recent = recent::RecentFiles::load(store);
             // The files opened from the command line, before the list was read
@@ -330,6 +334,38 @@ impl OpenPhotoApp {
         }
         if self.state.quit_approved {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+    }
+
+    /// The Crop tool's New Crop Preset... and Delete Crop Preset... dialogs.
+    fn crop_preset_dialogs(&mut self, ctx: &egui::Context) {
+        use dialogs::new_preset::Outcome;
+        use dialogs::size_presets::DeleteOutcome;
+        if let Some(mut dialog) = self.state.new_crop_preset.take() {
+            match dialog.show(ctx) {
+                Outcome::Open => self.state.new_crop_preset = Some(dialog),
+                Outcome::Cancel => {}
+                Outcome::Ok(name) => {
+                    let preset = self.state.crop_options.to_user(&name);
+                    self.state.crop_presets.add(preset);
+                    self.state.crop_options.user = Some(self.state.crop_presets.list().len() - 1);
+                }
+            }
+        }
+        if let Some(mut dialog) = self.state.delete_crop_preset.take() {
+            match dialog.show(ctx, None) {
+                DeleteOutcome::Open => self.state.delete_crop_preset = Some(dialog),
+                DeleteOutcome::Cancel => {}
+                DeleteOutcome::Delete(i) => {
+                    self.state.crop_presets.remove(i);
+                    let options = &mut self.state.crop_options;
+                    options.user = match options.user {
+                        Some(u) if u == i => None,
+                        Some(u) if u > i => Some(u - 1),
+                        u => u,
+                    };
+                }
+            }
         }
     }
 
@@ -633,6 +669,10 @@ impl OpenPhotoApp {
                         dialog.set_color(color);
                     }
                 }
+                state::PickerTarget::CropShield => {
+                    let [r, g, b, _] = color.to_rgba8();
+                    self.state.crop_options.shield_color = Some(egui::Color32::from_rgb(r, g, b));
+                }
             },
         }
     }
@@ -807,6 +847,7 @@ impl eframe::App for OpenPhotoApp {
         self.fade_dialog(&ctx);
         self.equalize_dialog(&ctx);
         self.image_size_dialog(&ctx);
+        self.crop_preset_dialogs(&ctx);
         self.new_guide_dialog(&ctx);
         self.new_layer_dialog(&ctx);
         self.duplicate_dialog(&ctx);

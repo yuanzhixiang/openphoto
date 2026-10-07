@@ -28,7 +28,9 @@ The layout of Photoshop 2026's files (decoded from files it saved), 46 bytes, bi
 
 ## Delete Preset sheet (measured in Photoshop 2026, 356 × 110 pt)
 
-- Shown 11 pt right and 28 pt down from the Image Size window's corner, with the shared frame and the title "Delete Preset".
+`DeletePresetDialog::new` titles it "Delete Preset" (Image Size); `titled(title, names)` reuses it for other presets (the Crop tool's "Delete Crop Preset"). `show(ctx, corner)`: over the window whose corner is given, or centered on the screen with `None`.
+
+- Shown 11 pt right and 28 pt down from the Image Size window's corner (or centered), with the shared frame and its title.
 - "Preset:" right-aligned to x 49.5 at y 48.5; the pop-up (55, 38)–(264, 59) lists the presets (a native menu), the first one chosen.
 - Delete (279.5, 38.5)–(345.5, 64.5), the default button; Cancel (279.5, 73.5)–(345.5, 99.5).
 - Delete or Enter asks "Do you really want to delete the preset '<name>'?" in an alert with No and Yes (Yes is the default, as in Photoshop). Yes returns `DeleteOutcome::Delete(index)`; No goes back to the sheet; Cancel or Escape closes it.

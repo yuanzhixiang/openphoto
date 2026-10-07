@@ -153,6 +153,7 @@ pub fn write(path: &Path, preset: &SizePreset) -> std::io::Result<()> {
 /// right and 28 pt down from the Image Size window's corner): a menu of the
 /// presets, Delete and Cancel; Delete asks again in an alert.
 pub struct DeletePresetDialog {
+    pub title: &'static str,
     pub names: Vec<String>,
     pub chosen: usize,
     confirm: Option<Alert>,
@@ -170,20 +171,30 @@ pub enum DeleteOutcome {
 
 impl DeletePresetDialog {
     pub fn new(names: Vec<String>) -> Self {
+        Self::titled("Delete Preset", names)
+    }
+
+    /// The same sheet for other presets (Delete Crop Preset).
+    pub fn titled(title: &'static str, names: Vec<String>) -> Self {
         Self {
+            title,
             names,
             chosen: 0,
             confirm: None,
         }
     }
 
-    pub fn show(&mut self, ctx: &egui::Context, corner: Pos2) -> DeleteOutcome {
+    /// Shows the sheet over the window whose corner is `corner`, or in the
+    /// middle of the screen.
+    pub fn show(&mut self, ctx: &egui::Context, corner: Option<Pos2>) -> DeleteOutcome {
         let mut outcome = DeleteOutcome::Open;
-        egui::Modal::new(egui::Id::new("delete-size-preset"))
-            .area(
-                egui::Modal::default_area(egui::Id::new("delete-size-preset-area"))
-                    .anchor(Align2::LEFT_TOP, (corner + DELETE_OFFSET).to_vec2()),
-            )
+        let area = egui::Modal::default_area(egui::Id::new(("delete-preset-area", self.title)));
+        let area = match corner {
+            Some(corner) => area.anchor(Align2::LEFT_TOP, (corner + DELETE_OFFSET).to_vec2()),
+            None => area,
+        };
+        egui::Modal::new(egui::Id::new(("delete-preset", self.title)))
+            .area(area)
             .frame(egui::Frame::NONE)
             .backdrop_color(egui::Color32::TRANSPARENT)
             .show(ctx, |ui| {
@@ -207,7 +218,7 @@ impl DeletePresetDialog {
     fn ui(&mut self, ui: &mut Ui, frame: Rect) -> DeleteOutcome {
         let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
         let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(at(x0, y0), at(x1, y1));
-        common::frame(ui, frame, "Delete Preset", theme::dialog_bold(pt(13.0)));
+        common::frame(ui, frame, self.title, theme::dialog_bold(pt(13.0)));
         appkit::text(
             ui,
             at(49.5, 48.5),

@@ -9,6 +9,7 @@ The document tab bar above the canvas, with one tab per open document. Dimension
 - Bar height 30 (including a 1 pt `#363636` divider at the bottom), background `#424242`.
 - Tabs are laid out in sequence starting from the far left of the bar. Each tab:
   - In Quick Mask mode, the color mode in parentheses shows as "Quick Mask" (e.g. "(Quick Mask/8)"), matching Photoshop.
+  - While the Crop tool's box is being changed (`crop_tool::previewing`), Photoshop 2026's temporary layer is named first: "(Crop Preview, RGB/8#)".
 - When there are unsaved changes, " *" is appended to the end of the title, matching Photoshop (`title()`).
 - The close button "×" is centered 11 from the tab's left edge; it is a 6 pt cross made of two 1 pt thin lines, color `#8c8c8c`, brightening on hover.
   - The title starts 24 from the left edge, semibold 12 pt; a right margin of 12 is left after the title.

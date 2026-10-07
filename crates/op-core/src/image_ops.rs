@@ -679,6 +679,116 @@ fn reduce_noise(buf: &mut [f32], w: usize, h: usize, amount: f32) {
     }
 }
 
+/// The Perspective Crop tool's output size for `quad` (top-left, top-right,
+/// bottom-right, bottom-left) when none is typed: the mean lengths of its
+/// opposite sides.
+pub fn perspective_size(quad: [(f32, f32); 4]) -> (u32, u32) {
+    let len = |a: (f32, f32), b: (f32, f32)| ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
+    let [tl, tr, br, bl] = quad;
+    let w = (len(tl, tr) + len(bl, br)) / 2.0;
+    let h = (len(tl, bl) + len(tr, br)) / 2.0;
+    (w.round().max(1.0) as u32, h.round().max(1.0) as u32)
+}
+
+/// The Perspective Crop tool: the area inside `quad` (top-left, top-right,
+/// bottom-right, bottom-left, document pixels) becomes a `width` × `height`
+/// canvas, every layer, mask and the selection mapped through the
+/// projective map that takes the canvas's corners to the quad's (bilinear
+/// samples, premultiplied). Pixels around the image read as transparent.
+pub fn perspective_crop(doc: &mut Document, quad: [(f32, f32); 4], width: u32, height: u32) {
+    use crate::transform::Projective;
+    assert!(width > 0 && height > 0);
+    let m = Projective::rect_to_quad((0.0, 0.0, width as f32, height as f32), quad);
+    let x0 = quad.iter().map(|p| p.0).fold(f32::MAX, f32::min).floor() as i64 - 1;
+    let y0 = quad.iter().map(|p| p.1).fold(f32::MAX, f32::min).floor() as i64 - 1;
+    let x1 = quad.iter().map(|p| p.0).fold(f32::MIN, f32::max).ceil() as i64 + 1;
+    let y1 = quad.iter().map(|p| p.1).fold(f32::MIN, f32::max).ceil() as i64 + 1;
+    let (rw, rh) = ((x1 - x0) as usize, (y1 - y0) as usize);
+    let (dw, dh) = (width as usize, height as usize);
+    // Where each output pixel's center comes from, relative to the region
+    let sources: Vec<(f32, f32)> = (0..dw * dh)
+        .map(|i| {
+            let (x, y) = ((i % dw) as f32 + 0.5, (i / dw) as f32 + 0.5);
+            let (sx, sy) = m.apply((x, y));
+            (sx - 0.5 - x0 as f32, sy - 0.5 - y0 as f32)
+        })
+        .collect();
+    let bilinear = |src: &[f32], ch: usize, (sx, sy): (f32, f32), out: &mut [f32]| {
+        let (fx, fy) = (sx.floor(), sy.floor());
+        let (tx, ty) = (sx - fx, sy - fy);
+        out.iter_mut().for_each(|v| *v = 0.0);
+        for (dy, wy) in [(0, 1.0 - ty), (1, ty)] {
+            for (dx, wx) in [(0, 1.0 - tx), (1, tx)] {
+                let (px, py) = (fx as i64 + dx, fy as i64 + dy);
+                if px < 0 || py < 0 || px >= rw as i64 || py >= rh as i64 {
+                    continue;
+                }
+                let k = (py as usize * rw + px as usize) * ch;
+                for c in 0..ch {
+                    out[c] += src[k + c] * wx * wy;
+                }
+            }
+        }
+    };
+    doc.transform_canvas(
+        width,
+        height,
+        |image| {
+            let raw = image.region_rgba8(x0, y0, rw as u32, rh as u32);
+            let src: Vec<f32> = raw
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .flat_map(|&[r, g, b, a]| {
+                    let k = a as f32 / 255.0;
+                    [r as f32 * k, g as f32 * k, b as f32 * k, a as f32]
+                })
+                .collect();
+            let mut px = [0.0f32; 4];
+            let pixels: Vec<u8> = sources
+                .iter()
+                .flat_map(|&s| {
+                    bilinear(&src, 4, s, &mut px);
+                    let a = px[3].clamp(0.0, 255.0);
+                    if a < 0.5 {
+                        return [0; 4];
+                    }
+                    let k = 255.0 / a;
+                    [
+                        (px[0] * k).round().clamp(0.0, 255.0) as u8,
+                        (px[1] * k).round().clamp(0.0, 255.0) as u8,
+                        (px[2] * k).round().clamp(0.0, 255.0) as u8,
+                        a.round() as u8,
+                    ]
+                })
+                .collect();
+            crate::tile::TiledImage::from_rgba8(width, height, &pixels)
+        },
+        |selection| {
+            let (sw, sh) = (selection.width() as i64, selection.height() as i64);
+            let src: Vec<f32> = (0..rw * rh)
+                .map(|i| {
+                    let (x, y) = (x0 + (i % rw) as i64, y0 + (i / rw) as i64);
+                    if x < 0 || y < 0 || x >= sw || y >= sh {
+                        0.0
+                    } else {
+                        selection.get(x as u32, y as u32) as f32
+                    }
+                })
+                .collect();
+            let mut v = [0.0f32];
+            let mask = sources
+                .iter()
+                .map(|&s| {
+                    bilinear(&src, 1, s, &mut v);
+                    v[0].round().clamp(0.0, 255.0) as u8
+                })
+                .collect();
+            crate::selection::Selection::from_mask(width, height, mask, false)
+        },
+    );
+}
+
 /// What Image > Trim removes ("Based On").
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrimBasis {
@@ -1075,6 +1185,42 @@ mod tests {
         resize(&mut a, 32, 16, Resample::Bicubic);
         resize_reducing_noise(&mut b, 32, 16, Resample::Bicubic, 1.0);
         assert_eq!(pixel(&a, 4, 4), pixel(&b, 4, 4));
+    }
+
+    #[test]
+    fn perspective_crop_maps_the_quad_onto_the_canvas() {
+        // Four colored quarters
+        let mut d = Document::new_with_background("t", 100, 100, Color::WHITE);
+        let id = d.active_layer.unwrap();
+        let image = d.layer_mut(id).unwrap().image_mut().unwrap();
+        let colors = [
+            [255, 0, 0, 255],
+            [0, 255, 0, 255],
+            [0, 0, 255, 255],
+            [255, 255, 0, 255],
+        ];
+        for y in 0..100 {
+            for x in 0..100 {
+                let k = (x >= 50) as usize + 2 * (y >= 50) as usize;
+                image.set_pixel(x, y, colors[k]);
+            }
+        }
+        let quad = [(10.0, 10.0), (90.0, 20.0), (80.0, 90.0), (20.0, 80.0)];
+        assert_eq!(perspective_size(quad), (71, 71));
+        perspective_crop(&mut d, quad, 60, 40);
+        assert_eq!((d.width, d.height), (60, 40));
+        // Each corner of the result shows the quarter its quad corner is in
+        assert_eq!(pixel(&d, 1, 1), colors[0]);
+        assert_eq!(pixel(&d, 58, 1), colors[1]);
+        assert_eq!(pixel(&d, 1, 38), colors[2]);
+        assert_eq!(pixel(&d, 58, 38), colors[3]);
+        // A quad that is the canvas keeps the image
+        let mut e = doc();
+        let before = pixel(&e, 1, 0);
+        let (ew, eh) = (e.width, e.height);
+        let (w, h) = (ew as f32, eh as f32);
+        perspective_crop(&mut e, [(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)], ew, eh);
+        assert_eq!(pixel(&e, 1, 0), before);
     }
 
     #[test]

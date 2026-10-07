@@ -161,6 +161,9 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let move_options = app.move_options;
     let type_options = app.type_options;
     let crop_options = app.crop_options.clone();
+    let perspective_options = crate::perspective_crop::PerspectiveOptions::from_app(app);
+    // A dialog over the window takes Enter and Escape
+    let modal = app.modal_open();
     // The Brush's and Pencil's Mode, and the Eraser's (Brush, Pencil, Block)
     let paint_mode = crate::options_tools::paint_mode(app, tool);
     let eraser_mode = crate::options_tools::eraser_mode(app);
@@ -507,9 +510,12 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
-            Tool::Crop => {
+            Tool::Crop if !modal => {
                 straightened =
                     crate::crop_tool::input(ui, &response, state, &crop_options, background, ppp);
+            }
+            Tool::PerspectiveCrop if !modal => {
+                crate::perspective_crop::input(ui, &response, state, &perspective_options, ppp);
             }
             Tool::HorizontalType => {
                 let [r, g, b, _] = foreground.to_rgba8();
@@ -664,7 +670,10 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
             crate::free_transform::cursor(state, p, ppp)
         } else if tool == Tool::Crop {
             let p = response.hover_pos().unwrap_or_default();
-            crate::crop_tool::cursor(state, p, ppp)
+            crate::crop_tool::cursor(state, &crop_options, p, ppp)
+        } else if tool == Tool::PerspectiveCrop {
+            let p = response.hover_pos().unwrap_or_default();
+            crate::perspective_crop::cursor(state, p, ppp)
         } else {
             match tool {
                 Tool::Zoom if alt != zoom_out => CursorIcon::ZoomOut,
@@ -720,7 +729,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
         shield: crate::crop_tool::shield(state, &crop_options),
         // The crop's own turn, or the view's (the shader maps screen points
         // to the image by the opposite angle)
-        rotation: crate::crop_tool::rotation(state).or_else(|| {
+        rotation: crate::crop_tool::rotation(state, &crop_options).or_else(|| {
             let a = view_angle(state);
             (a != 0.0).then(|| {
                 (
@@ -768,9 +777,18 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     {
         crate::free_transform::draw_controls(ui, state, bounds, canvas_rect, ppp);
     }
-    // The crop box belongs to the Crop tool; picking another tool drops it
-    if tool != Tool::Crop {
+    // The crop box belongs to the Crop tool: picking another tool crops to
+    // a changed box (Photoshop 2026 doesn't ask) and drops it
+    if tool != Tool::Crop && state.crop.is_some() {
+        if crate::crop_tool::modified(state) {
+            crate::crop_tool::commit(state, &crop_options, background);
+        }
         state.crop = None;
+    }
+    // ...and the Perspective Crop tool's box likewise
+    if tool != Tool::PerspectiveCrop && state.perspective_crop.is_some() {
+        crate::perspective_crop::commit(state, &perspective_options);
+        state.perspective_crop = None;
     }
     // Picking another tool keeps the text being typed
     if tool != Tool::HorizontalType && state.text_edit.is_some() {
@@ -778,6 +796,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
     crate::type_tool::draw_caret(ui, state, type_options, canvas_rect, ppp);
     crate::crop_tool::draw(ui, state, &crop_options, canvas_rect, ppp);
+    crate::perspective_crop::draw(ui, state, &perspective_options, canvas_rect, ppp);
     let transforming = state.free_transform.is_some();
     if let (Some(opts), Some(p), false) = (paint, response.hover_pos(), transforming) {
         brush_cursor(ui, canvas_rect, p, opts.size * state.view.zoom / ppp);
