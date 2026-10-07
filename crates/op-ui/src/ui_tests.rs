@@ -2949,6 +2949,25 @@ fn link_layers_from_the_panel_and_the_menu() {
     run_command(&mut h, Command::SelectLinkedLayers);
     assert_eq!(active(&h).doc.selected_layers().len(), 2);
     assert_eq!(active(&h).doc.active_layer, Some(l1));
+    // Shift-clicking Layer 3's link icon disables its link: Layer 1 moves
+    // alone, and the icon shows Photoshop's red ×
+    let red = |h: &mut Harness<'_, OpenPhotoApp>| {
+        let image = h.render().unwrap();
+        image
+            .enumerate_pixels()
+            .filter(|(x, y, p)| {
+                *x > 2000 && *y > 1250 && p.0[0] > 200 && p.0[1] < 80 && p.0[2] < 80
+            })
+            .count()
+    };
+    h.state_mut().state.active().unwrap().doc.select_layer(l1);
+    h.run_steps(2);
+    assert_eq!(red(&mut h), 0);
+    op_core::link::toggle_disabled(&mut h.state_mut().state.active().unwrap().doc, l3);
+    h.run_steps(2);
+    assert!(red(&mut h) > 10);
+    assert!(op_core::link::linked_with(&active(&h).doc, l1).is_empty());
+    op_core::link::toggle_disabled(&mut h.state_mut().state.active().unwrap().doc, l3);
     // Unlinking Layer 1 leaves Layer 3 linked to nothing
     h.state_mut().state.active().unwrap().doc.select_layer(l1);
     run_command(&mut h, Command::LinkLayers);
@@ -6405,4 +6424,41 @@ fn smart_guides_line_up_a_moved_layer() {
     drag(&mut h, from, to, Modifiers::NONE);
     let (x0, _, _, _) = bounds(&h);
     assert_eq!(x0, 314);
+}
+
+#[test]
+fn a_group_gets_a_mask_and_shows_it() {
+    use crate::commands::Command;
+    use op_tools::Tool;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    // A white layer in a group
+    run_command(&mut h, Command::NewLayerNoDialog);
+    h.state_mut().state.foreground = Color::from_rgba8([255, 255, 255, 255]);
+    run_command(&mut h, Command::FillForeground);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::G);
+    h.run_steps(2);
+    let group = active(&h).doc.active_layer.unwrap();
+    assert!(active(&h).doc.layer(group).unwrap().is_group());
+    // Layer › Layer Mask › Reveal All on the group: its mask is the target
+    run_command(&mut h, Command::MaskRevealAll);
+    assert!(active(&h).doc.layer(group).unwrap().mask.is_some());
+    assert!(active(&h).doc.editing_mask());
+    // Painting black on it hides the group there
+    h.state_mut().state.foreground = Color::from_rgba8([0, 0, 0, 255]);
+    h.state_mut().state.select_tool(Tool::Brush);
+    h.state_mut().state.brush.size = 40.0;
+    h.state_mut().state.brush.hardness = 1.0;
+    h.run_steps(1);
+    let (a, b) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 200.0, 100.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let composite = |h: &Harness<'_, OpenPhotoApp>, x: usize, y: usize| {
+        let doc = &active(h).doc;
+        let px = doc.composite_rgba8();
+        let i = (y * doc.width as usize + x) * 4;
+        [px[i], px[i + 1], px[i + 2]]
+    };
+    assert_eq!(composite(&h, 150, 100), [0x14, 0x14, 0x14]);
+    assert_eq!(composite(&h, 150, 300), [255, 255, 255]);
+    shot(&mut h, "group_mask");
 }

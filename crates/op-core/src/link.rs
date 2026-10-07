@@ -7,15 +7,48 @@ use crate::document::Document;
 use crate::layer::LayerId;
 
 /// The other layers linked to `id`.
+/// A layer whose link is disabled moves on its own, and its partners move
+/// without it.
 pub fn linked_with(doc: &Document, id: LayerId) -> Vec<LayerId> {
-    let Some(link) = doc.layer(id).and_then(|l| l.link) else {
+    let Some(link) = doc
+        .layer(id)
+        .filter(|l| !l.link_disabled)
+        .and_then(|l| l.link)
+    else {
         return Vec::new();
     };
     doc.layers
         .iter()
-        .filter(|l| l.id != id && l.link == Some(link))
+        .filter(|l| l.id != id && l.link == Some(link) && !l.link_disabled)
         .map(|l| l.id)
         .collect()
+}
+
+/// The layers in `id`'s link set, disabled ones included (the Layers panel
+/// shows their icons).
+pub fn link_set(doc: &Document, id: LayerId) -> Vec<LayerId> {
+    let Some(link) = doc.layer(id).and_then(|l| l.link) else {
+        return Vec::new();
+    };
+    let set: Vec<LayerId> = doc
+        .layers
+        .iter()
+        .filter(|l| l.link == Some(link))
+        .map(|l| l.id)
+        .collect();
+    if set.len() > 1 { set } else { Vec::new() }
+}
+
+/// Shift-click on a layer's link icon: disables its link, or enables it
+/// again. Returns whether the layer is linked at all.
+pub fn toggle_disabled(doc: &mut Document, id: LayerId) -> bool {
+    if link_set(doc, id).is_empty() {
+        return false;
+    }
+    if let Some(l) = doc.layer_mut(id) {
+        l.link_disabled = !l.link_disabled;
+    }
+    true
 }
 
 pub fn is_linked(doc: &Document, id: LayerId) -> bool {
@@ -200,5 +233,23 @@ mod tests {
         link_selected(&mut doc);
         doc.layers.retain(|l| l.id != b);
         assert!(!is_linked(&doc, a));
+    }
+
+    #[test]
+    fn a_disabled_link_moves_on_its_own() {
+        let (mut doc, [_, a, b, c, _]) = doc();
+        select(&mut doc, &[a, b, c]);
+        assert!(link_selected(&mut doc));
+        assert!(toggle_disabled(&mut doc, b));
+        // B is out of the set for now; A and C stay linked
+        assert!(linked(&doc, b).is_empty());
+        assert_eq!(linked(&doc, a), [c]);
+        assert_eq!(link_set(&doc, a).len(), 3);
+        // Enabled again
+        assert!(toggle_disabled(&mut doc, b));
+        assert_eq!(linked(&doc, a), [b, c]);
+        // An unlinked layer has nothing to disable
+        let (mut lone, [_, x, ..]) = super::tests::doc();
+        assert!(!toggle_disabled(&mut lone, x));
     }
 }

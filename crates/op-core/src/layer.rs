@@ -258,6 +258,9 @@ pub struct Layer {
     /// Layer > Link Layers: layers with the same number are linked (a
     /// number no other layer has links nothing; see `link`).
     pub link: Option<u32>,
+    /// Shift-clicking the link icon: the link set aside for now (a red ×
+    /// on the icon); the layer moves on its own until enabled again.
+    pub link_disabled: bool,
 }
 
 impl Layer {
@@ -280,6 +283,7 @@ impl Layer {
             color: LayerColor::None,
             parent: None,
             link: None,
+            link_disabled: false,
         }
     }
 

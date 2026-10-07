@@ -47,6 +47,7 @@ Public fields:
 - `is_background`: the "Background" layer flag. By Photoshop semantics, the background layer is locked, opaque and always at the bottom.
 - `lock_transparency`, `lock_pixels`, `lock_position`, `lock_nesting` (prevents auto-nesting into and out of artboards and frames): the four individual locks.
 - `link`: link number (`Option<u32>`). Layers with the same number are linked together; a number no other layer shares is the same as not linked, so nothing needs tidying after deleting or unlinking (see `link.md`).
+- `link_disabled`: the link is temporarily disabled (⇧-click on the link icon); the layer keeps its number but is not carried along with its partners. Not saved.
 - `lock_all`: lock all. It is a separate flag rather than turning on all four individual locks, so turning it off restores the individual locks as they were (measured in Photoshop 2026: lock position, then click "Lock all" twice, and the position lock is still there). In PSD it is also a separate bit (see `psd.md` in `op-io`).
 - `kind`: layer content.
 - `mask`: layer mask (`Option<LayerMask>`); none for a new layer.

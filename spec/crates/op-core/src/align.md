@@ -12,13 +12,15 @@ Layer › Align, Layer › Distribute, and the align/distribute buttons in the M
 - `can_align(doc)` / `align(doc, how)`: with a pixel selection, the selected layers align to the selection's bounding box (one layer is enough); with no selection, at least two layers are required, and they align to their combined bounding box. Center alignment offsets are rounded to whole pixels.
 - `can_distribute(doc)` / `distribute(doc, how)`: requires at least three layers. Layers are sorted by the chosen edge or center; the two outermost stay put and the ones in between are spaced evenly by the chosen edge or center; `Horizontally`/`Vertically` instead make the gaps between adjacent layers equal.
 
-Participating layers: those that are selected, not the background, have neither position nor pixels locked, and have opaque pixels. Pixel extents use `TiledImage::content_bounds` (including pixels outside the canvas); moving uses a `with_canvas` translation, and pixels outside the canvas are preserved.
+Participating layers: those that are selected or linked with a selected layer (`link::with_linked`; a disabled link does not count), not the background, have neither position nor pixels locked, and have opaque pixels. Pixel extents use `TiledImage::content_bounds` (including pixels outside the canvas); moving uses a `with_canvas` translation, and pixels outside the canvas are preserved.
 
 ## Layer groups
 
 A selected group counts as a single unit: its extent is the union of all pixel layers in the group, and when moved, all pixel layers in the group move together.
 
 ## Test coverage
+
+- `linked_layers_align_with_the_selection`: a layer linked with the selected one moves with it when aligning.
 
 - `matches_photoshop`: three squares are successively left-aligned, vertically center-aligned, bottom-aligned and distributed by vertical centers; the results match exactly the layer extents after the same operations in Photoshop 2026.
 - `equal_gaps_and_selection_alignment`: after equal-spacing distribution, the gaps on both sides of the middle strip are equal; with a pixel selection, a single layer right-aligns to the selection.

@@ -572,17 +572,28 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
     let seen = (state.doc.active_layer, state.doc.layers.len());
     let reveal = ui.data(|d| d.get_temp::<(Option<LayerId>, usize)>(seen_id)) != Some(seen);
     ui.data_mut(|d| d.insert_temp(seen_id, seen));
-    let linked: Vec<LayerId> = op_core::link::with_linked(&state.doc)
-        .into_iter()
-        .filter(|&id| op_core::link::is_linked(&state.doc, id))
-        .collect();
+    // The link sets of the selected layers, disabled links included
+    let linked: Vec<LayerId> = {
+        let mut ids: Vec<LayerId> = state
+            .doc
+            .selected_layers()
+            .into_iter()
+            .flat_map(|id| op_core::link::link_set(&state.doc, id))
+            .collect();
+        ids.sort_by_key(|id| id.0);
+        ids.dedup();
+        ids
+    };
     for (row, &(id, depth)) in rows.iter().enumerate() {
         let is_group = state.doc.layer(id).is_some_and(|l| l.is_group());
-        // Group rows are 24 pt (Photoshop 2026), layers fit their thumbnail
+        let has_mask = state.doc.layer(id).is_some_and(|l| l.mask.is_some());
+        // Group rows are 24 pt (Photoshop 2026), layers fit their thumbnail;
+        // a group with a mask is as tall as a layer row, for its thumbnail
+        let short_group = is_group && !has_mask;
         let first = row == 0;
         let last = row + 1 == rows.len();
         // The highlighted height, then the line (1 pt lower on the last row)
-        let lit_h = if is_group {
+        let lit_h = if short_group {
             GROUP_ROW
         } else {
             row_height(&state.doc)
@@ -600,7 +611,7 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
         // Contents are laid out in a row as tall as a layer row is when
         // first (its extra half point on top) or a group row is otherwise,
         // so they sit the same in every row
-        let (row_h, top) = match (is_group, first) {
+        let (row_h, top) = match (short_group, first) {
             (true, true) => (GROUP_ROW, alloc.top() + pt(0.5)),
             (true, false) => (GROUP_ROW, alloc.top()),
             (false, true) => (row_height(&state.doc) + pt(0.5), alloc.top()),
@@ -620,7 +631,6 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
         let lock_center = Pos2::new(row_rect.right() - pt(21.5), rect.top() + row_h / 2.0);
         let lock_rect = Rect::from_center_size(lock_center, Vec2::splat(pt(16.0)));
         let is_background = state.doc.layer(id).is_some_and(|l| l.is_background);
-        let has_mask = state.doc.layer(id).is_some_and(|l| l.mask.is_some());
         // The layer thumbnail, then the mask's (with a link icon between)
         // The layer thumbnail as drawn, then the mask's (with a link icon
         // between); the name starts 8 pt right of the last one
@@ -628,14 +638,31 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
             Pos2::new(rect.left() + pt(34.0) + indent, rect.top() + pt(4.0)),
             ts,
         );
-        let mask_box = has_mask.then(|| thumb_box.translate(Vec2::new(ts.x + MASK_GAP, 0.0)));
-        let name_x = if is_group {
-            rect.left() + pt(71.0) + indent
-        } else {
-            mask_box.unwrap_or(thumb_box).right() + pt(8.0)
+        // A group's mask sits after its folder icon and a link icon
+        // (Photoshop 2026: the box 24 pt right of the folder's center)
+        let mask_box = has_mask.then(|| {
+            if is_group {
+                Rect::from_min_size(
+                    Pos2::new(rect.left() + pt(77.0) + indent, rect.top() + pt(4.0)),
+                    ts,
+                )
+            } else {
+                thumb_box.translate(Vec2::new(ts.x + MASK_GAP, 0.0))
+            }
+        });
+        let name_x = match (is_group, mask_box) {
+            (true, None) => rect.left() + pt(71.0) + indent,
+            (_, Some(b)) => b.right() + pt(8.0),
+            (false, None) => thumb_box.right() + pt(8.0),
         };
-        // A group's expand/collapse arrow
-        let arrow_center = Pos2::new(rect.left() + pt(38.0) + indent, rect.top() + pt(11.75));
+        // A group's expand/collapse arrow (and folder) on the row's
+        // middle line in a tall row
+        let group_y = if short_group {
+            rect.top() + pt(11.75)
+        } else {
+            rect.top() + row_h / 2.0
+        };
+        let arrow_center = Pos2::new(rect.left() + pt(38.0) + indent, group_y);
         let arrow = is_group.then(|| {
             ui.interact(
                 Rect::from_center_size(arrow_center, Vec2::splat(pt(16.0))),
@@ -646,6 +673,14 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
         // Clicking the background's lock turns it into a regular layer
         let lock = is_background
             .then(|| ui.interact(lock_rect, ui.id().with(("lock", id.0)), Sense::click()));
+        // Shift-clicking a link icon disables (or enables) that layer's link
+        if !is_background && linked.contains(&id) {
+            let link = ui.interact(lock_rect, ui.id().with(("link", id.0)), Sense::click());
+            if link.clicked() && ui.input(|i| i.modifiers.shift) {
+                op_core::link::toggle_disabled(&mut state.doc, id);
+                state.doc.mark_dirty();
+            }
+        }
 
         if arrow.as_ref().is_some_and(|a| a.clicked()) {
             // Not a history state, as in Photoshop; with Alt the groups
@@ -818,8 +853,14 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
                 Stroke::new(1.0, color::SEPARATOR),
                 StrokeKind::Outside,
             );
+            // The link icon between the thumbnail (or folder) and the mask
+            let link_x = if layer.is_group() {
+                rect.left() + pt(71.0) + indent
+            } else {
+                thumb_box.right() + MASK_GAP / 2.0
+            };
             painter.text(
-                Pos2::new(thumb_box.right() + MASK_GAP / 2.0, rect.center().y),
+                Pos2::new(link_x, rect.center().y),
                 Align2::CENTER_CENTER,
                 icons::LINK_SIMPLE,
                 theme::icon(12.0),
@@ -836,17 +877,21 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
         // 1.5 pt white frame 0.5 pt outside its thumbnail; Photoshop 2026
         // leaves it off the background layer and draws none while several
         // layers are selected
+        // (a group has only its mask's to frame)
         if active && !layer.is_background && single {
             let target = match mask_box {
-                Some(mbox) if state.doc.mask_target => mbox,
-                _ => thumb_box,
+                Some(mbox) if state.doc.mask_target => Some(mbox),
+                _ if layer.is_group() => None,
+                _ => Some(thumb_box),
             };
-            painter.rect_stroke(
-                target.expand(pt(0.5)),
-                0,
-                Stroke::new(pt(1.5), egui::Color32::WHITE),
-                StrokeKind::Outside,
-            );
+            if let Some(target) = target {
+                painter.rect_stroke(
+                    target.expand(pt(0.5)),
+                    0,
+                    Stroke::new(pt(1.5), egui::Color32::WHITE),
+                    StrokeKind::Outside,
+                );
+            }
         }
 
         if let op_core::LayerKind::Group { collapsed } = layer.kind {
@@ -864,7 +909,7 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
             );
             icon(
                 painter,
-                Pos2::new(rect.left() + pt(53.0) + indent, rect.top() + pt(11.5)),
+                Pos2::new(rect.left() + pt(53.0) + indent, group_y - pt(0.25)),
                 Icon::Folder,
                 true,
                 color::PANEL,
@@ -916,8 +961,24 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
         if let Some((i, tint)) = lock_icon {
             crate::ps_icons::paint(painter, lock_center, i, tint, bg);
         } else if linked.contains(&layer.id) {
-            // The layers linked to a selected one show the link icon
+            // The layers linked to a selected one show the link icon, with
+            // a red × while the link is disabled
             icon(painter, lock_center, Icon::LinkLayers, true, bg);
+            if layer.link_disabled {
+                let r = pt(4.0);
+                let red = egui::Stroke::new(pt(1.5), egui::Color32::from_rgb(0xe3, 0x2b, 0x2b));
+                painter.line_segment(
+                    [lock_center - Vec2::splat(r), lock_center + Vec2::splat(r)],
+                    red,
+                );
+                painter.line_segment(
+                    [
+                        lock_center + Vec2::new(-r, r),
+                        lock_center + Vec2::new(r, -r),
+                    ],
+                    red,
+                );
+            }
         }
     }
     if let Some((from_row, pointer, released)) = dragged {

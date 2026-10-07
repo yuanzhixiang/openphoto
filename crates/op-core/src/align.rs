@@ -116,10 +116,11 @@ impl Distribute {
 
 type Bounds = (i64, i64, i64, i64);
 
-/// The selected layers that can move and have pixels, with their bounds.
-/// A group counts as one, with the box around its layers' pixels.
+/// The selected layers, and the layers linked to them, that can move and
+/// have pixels, with their bounds. A group counts as one, with the box
+/// around its layers' pixels.
 fn movable(doc: &Document) -> Vec<(LayerId, Bounds)> {
-    doc.selected_layers()
+    crate::link::with_linked(doc)
         .into_iter()
         .filter_map(|id| doc.layer(id))
         .filter(|l| !l.is_background && !doc.position_locked(l.id) && !doc.pixels_locked(l.id))
@@ -346,5 +347,36 @@ mod tests {
         )));
         assert!(align(&mut doc, Align::Right));
         assert_eq!(bounds(&doc, ids[0]).2, 70);
+    }
+
+    #[test]
+    fn linked_layers_align_with_the_selection() {
+        let mut doc = Document::new_with_background("t", 100, 10, Color::WHITE);
+        let mut ids = Vec::new();
+        for (x0, x1) in [(10, 20), (40, 50), (70, 80)] {
+            let mut image = TiledImage::new(100, 10);
+            for x in x0..x1 {
+                image.set_pixel(x, 0, [0, 0, 0, 255]);
+            }
+            let id = doc.new_layer_id();
+            doc.layers.push(Layer::raster(id, "bar", image));
+            ids.push(id);
+        }
+        // The middle bar linked to the right one; only the left and the
+        // middle selected
+        doc.set_selected_layers(vec![ids[1], ids[2]]);
+        crate::link::link_selected(&mut doc);
+        doc.set_selected_layers(vec![ids[0], ids[1]]);
+        assert!(align(&mut doc, Align::Left));
+        let x0 = |doc: &Document, id| {
+            doc.layer(id)
+                .unwrap()
+                .image()
+                .unwrap()
+                .content_bounds()
+                .unwrap()
+                .0
+        };
+        assert_eq!((x0(&doc, ids[1]), x0(&doc, ids[2])), (10, 10));
     }
 }

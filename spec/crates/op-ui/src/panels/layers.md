@@ -26,7 +26,7 @@ When the Background layer, or a layer in a Lock all group, is selected, the blen
 - When exactly one regular layer (not the Background layer) is selected, the thumbnail of the current editing target (pixels or mask) has a 1.5 pt white frame 0.5 pt outside it; when multiple layers are selected, none is drawn (Photoshop 2026 measurement).
 - The layer name is 8 pt to the right of the last thumbnail, vertically centered, color `#f0f0f0`.
 - Lock icon at the right end of the row (21.5 from the scrollbar position, vertically centered; Photoshop 2026 measurements, checked pixel by pixel against screenshots): a Lock all layer shows a solid lock (with keyhole, `LayerLockFull`); a partially locked layer and the Background layer show a hollow lock (a dot inside the frame, `LayerLock`), both `#dddddd`; a layer that has no locks of its own but sits in a group with locks shows a dimmer `#a6a6a6` lock (solid when the group is Lock all, otherwise hollow). When a lock icon is shown, the link icon is not shown.
-- Link icon: layers linked to any selected layer (including the selected layer itself) show a link icon in the same position (the same as the footer bar's link icon); when only unlinked layers are selected, none is shown (`link::with_linked`, Photoshop 2026 measurement).
+- Link icon: layers linked to any selected layer (including the selected layer itself) show a link icon in the same position (the same as the footer bar's link icon); when only unlinked layers are selected, none is shown (the union of `link::link_set` of the selected layers, so disabled partners still show it; Photoshop 2026 measurement). ⇧-click on a linked row's link icon toggles the link's temporary disable (`link::toggle_disabled`, no history); a disabled link has a red `#e32b2b` × (1.5 pt strokes, ±4 pt) drawn over the icon.
 
 ## Layer Groups
 
@@ -39,6 +39,7 @@ Per Photoshop 2026 measurements:
   - "Add mask": when exactly one layer is selected, adds a mask to it (from the selection if there is one), recording "Add Layer Mask";
   - Trash: without asking, deletes the selected layers directly, groups together with their contents (unlike clicking the trash, which asks), recording "Delete Layer", or "Delete Group" when a group is dragged;
   - Other buttons: no response.
+- A group with a layer mask (Photoshop 2026 measurement): the row grows to a layer row's height; the arrow and folder stay at their columns, centered on the row; the link icon is at x 71 and the mask thumbnail box at x 77 (4 pt from the row top, the layer thumbnail size), with the name 8 pt right of it. Clicking the mask thumbnail targets the group's mask (white frame around it), so painting and fills edit the mask; clicking the rest of the row targets the group.
 - ⌥-click on a group's arrow: expands or collapses this group together with all groups inside it (Photoshop's behavior).
 - When the active layer changes (or layers are added or removed), the list automatically scrolls to its row (`scroll_to_rect`), e.g. after switching layers with ⌥[ / ⌥] or creating a new layer.
 - Dragging a selected row moves all selected layers together (`layer_ops::move_blocks`); dragging an unselected row moves only that row.
@@ -76,7 +77,8 @@ The Background layer's blending mode, opacity, lock and Fill controls are all gr
 
 - `layers_rows_and_scrollbar_match_photoshop`: a 200 × 200 document with three layers A/B/C, A and C linked and selected; after rendering, compared point by point against Photoshop 2026 screenshots at 2x device pixels: the y of row highlights and row lines, the start of the thumbnail border, and the extent of the scrollbar track and thumb.
 - `thumbnails_are_sized_like_photoshop`: the thumbnail frames for 12 document sizes match Photoshop measurements (including the rounding up for 811, 812, 1622).
-- `link_layers_from_the_panel_and_the_menu`: see `op-core`'s `link.md`.
+- `link_layers_from_the_panel_and_the_menu`: see `op-core`'s `link.md`; also checks the red × after disabling a link and that the disabled layer is no longer moved with its partners.
+- `a_group_gets_a_mask_and_shows_it`: Reveal All on a group targets its mask; brushing black on it hides the group's content there while the rest stays white.
 - `dragging_layers_onto_the_footer_buttons`: uses real drag events to drag rows onto the new layer, trash, new group, trash (group, no prompt) and mask buttons, checking layers and history names.
 - `lock_icons_on_the_rows_match_photoshop`: the solid lock, hollow lock and dim lock of a layer in a group match Photoshop screenshots at 2x device pixels; a layer in the group cannot be deleted.
 - `alt_click_opens_nested_groups_and_the_list_follows_the_active_layer`: ⌥-click expands/collapses nested groups; with enough layers to need scrolling, selecting the background scrolls its row into view (verified: the test fails when auto-scrolling is turned off).

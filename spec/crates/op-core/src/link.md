@@ -10,8 +10,10 @@ The rules for Layer › Link Layers / Unlink Layers / Select Linked Layers. Laye
 
 ## Rules (tested in Photoshop 2026)
 
-- `linked_with(doc, id)`: the other layers linked with `id`. `is_linked`: whether there are any.
-- `with_linked(doc)`: the selected layers, plus the layers linked with any selected layer (bottom to top). The panel shows the link icon on the linked layers among them; these are what the Move tool moves.
+- `linked_with(doc, id)`: the other layers linked with `id` that take part in moves: empty when `id`'s link is disabled, and partners whose link is disabled are left out. `is_linked`: whether there are any.
+- `link_set(doc, id)`: every layer in `id`'s link group, including `id` and disabled partners (empty when nothing else shares the number). The Layers panel uses it to decide which rows show the link icon.
+- `with_linked(doc)`: the selected layers, plus the layers linked with any selected layer (bottom to top). These are what the Move tool, Free Transform and Align/Distribute move.
+- `toggle_disabled(doc, id)`: ⇧-clicking a linked layer's link icon in the Layers panel flips `Layer::link_disabled`. A disabled layer keeps its link number (it is still shown as linked, with a red ×) but moves on its own, and its partners move without it. Like Photoshop, no history is recorded; the flag is not saved to PSD.
 - `can_unlink(doc)`: every selected layer is linked (to anything, not necessarily the same group). In that case the menu item and panel button act as "Unlink Layers".
 - `can_link(doc)`: two or more layers are selected and `can_unlink` does not hold.
 - `link_selected(doc)`: the selected layers and the layers already linked with them are merged into one group (using a new number). For example, with A and C linked, selecting B and A and linking makes A, B and C all linked.
@@ -25,7 +27,8 @@ The rules for Layer › Link Layers / Unlink Layers / Select Linked Layers. Laye
 
 - `matches_photoshop`: checks step by step in the order walked through in Photoshop 2026 (a single layer cannot be linked; link A, C; B selected alone shows no link; linking B, A brings in C; unlink C alone; link C with the background; with A linked and D unlinked it is Link; A and C in two different groups give Unlink; availability and results of Select Linked Layers).
 - `deleting_a_linked_layer_leaves_no_stale_link`: after deleting one of two linked layers, the other no longer counts as linked.
+- `a_disabled_link_moves_on_its_own`: with a disabled link, neither side is carried along by the other, `link_set` still lists both, and toggling again restores the link.
 
 ## Known limitations
 
-- Free Transform and Align/Distribute do not yet carry linked layers along; ⇧-clicking the link icon to temporarily disable a link is not implemented.
+- The disabled state is not written to PSD (Photoshop stores it in its layer records; reopened files come back enabled).
