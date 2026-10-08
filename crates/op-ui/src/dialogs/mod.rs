@@ -52,7 +52,7 @@ mod vibrance;
 #[cfg(test)]
 pub use adjust::lens_image_rect as adjust_lens_image;
 pub use adjust::{
-    AdjustDialog, Effect, Kind as AdjustKind, Outcome as AdjustOutcome, Remembered,
+    AdjustDialog, Effect, Kind as AdjustKind, MatchSource, Outcome as AdjustOutcome, Remembered,
     lens_blur_source, thumbnail as adjust_thumbnail,
 };
 pub use canvas_size::{CanvasSizeDialog, Outcome};

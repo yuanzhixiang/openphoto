@@ -719,51 +719,6 @@ pub const HDR_TONING: &Layout = &Layout {
     ],
 };
 
-pub const MATCH_COLOR: &Layout = &Layout {
-    size: (324.0, 248.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: false,
-    rows: &[
-        number(
-            "Luminance:",
-            135.0,
-            [140.0, 38.0, 200.5, 57.0],
-            "",
-            205.5,
-            Some((21.0, 206.0, 64.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Color Intensity:",
-            135.0,
-            [140.0, 87.0, 200.5, 106.0],
-            "",
-            205.5,
-            Some((21.0, 206.0, 113.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Fade:",
-            135.0,
-            [140.0, 136.0, 200.5, 155.0],
-            "",
-            205.5,
-            Some((21.0, 206.0, 162.0)),
-            Scale::Linear,
-        ),
-        Row::Check {
-            label: "Neutralize",
-            min: (10.0, 185.0),
-        },
-        Row::Popup {
-            label: "Source:",
-            label_right: 135.0,
-            rect: [140.0, 212.0, 230.0, 233.0],
-        },
-    ],
-};
-
 #[cfg(test)]
 mod tests {
     use super::*;

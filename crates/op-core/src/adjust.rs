@@ -123,13 +123,16 @@ pub enum Adjustment {
         shift: [i32; 3],
     },
     /// Match Color: from the target's Lab statistics to the source's,
-    /// with Luminance and Color Intensity (1–200 %) and Fade (0–100 %).
+    /// with Luminance and Color Intensity (1–200 %) and Fade (0–100 %);
+    /// `ignore_selection` (Ignore Selection when Applying Adjustment)
+    /// changes the whole layer.
     MatchColor {
         target: [f32; 6],
         source: [f32; 6],
         luminance: f32,
         intensity: f32,
         fade: f32,
+        ignore_selection: bool,
     },
     /// Color Lookup through the cube registered as this number
     /// (`color_match::register`); with Dither, up to half a level of noise
@@ -1114,9 +1117,7 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
     // Localized Color Clusters needs the whole layer's selection first
     let localized = match adjustment {
         Adjustment::ReplaceColor {
-            samples,
-            fuzziness,
-            ..
+            samples, fuzziness, ..
         } if samples.localized => doc
             .active_layer
             .and_then(|id| doc.layer(id))
@@ -1187,6 +1188,7 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
                 luminance,
                 intensity,
                 fade,
+                ..
             } => {
                 let [r, g, b] = crate::color_match::match_color(
                     [r, g, b],
@@ -1231,6 +1233,10 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
     };
     let selection = match adjustment {
         Adjustment::EqualizeEntireImage => None,
+        Adjustment::MatchColor {
+            ignore_selection: true,
+            ..
+        } => None,
         _ => doc.selection().cloned(),
     };
     let (w, h) = (doc.width, doc.height);

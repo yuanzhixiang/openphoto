@@ -30,9 +30,13 @@ impl AdjustDialog {
 
         // The eyedropper, add and subtract tools, 30 pt apart; the chosen
         // one in a dark box
-        for (k, icon) in [Icon::Eyedropper, Icon::EyedropperPlus, Icon::EyedropperMinus]
-            .into_iter()
-            .enumerate()
+        for (k, icon) in [
+            Icon::Eyedropper,
+            Icon::EyedropperPlus,
+            Icon::EyedropperMinus,
+        ]
+        .into_iter()
+        .enumerate()
         {
             let center = at(24.75 + 30.0 * k as f32, 51.0);
             let rect = Rect::from_center_size(center, vec2(pt(29.5), pt(25.5)));
@@ -44,7 +48,11 @@ impl AdjustDialog {
             }
             let chosen = self.extra.rc_tool == k;
             if chosen {
-                painter.rect_filled(rect, CornerRadius::same(pt(3.0) as u8), Color32::from_gray(0x38));
+                painter.rect_filled(
+                    rect,
+                    CornerRadius::same(pt(3.0) as u8),
+                    Color32::from_gray(0x38),
+                );
             }
             let fill = if chosen {
                 Color32::from_gray(0x38)
@@ -67,7 +75,13 @@ impl AdjustDialog {
         self.values[LOCALIZED] = (localized as u8).to_string();
 
         // Color: the last color picked
-        appkit::text(ui, at(281.0, 64.25), Align2::RIGHT_CENTER, "Color:", appkit::TEXT);
+        appkit::text(
+            ui,
+            at(281.0, 64.25),
+            Align2::RIGHT_CENTER,
+            "Color:",
+            appkit::TEXT,
+        );
         let [cr, cg, cb] = self.extra.replace.shown();
         painter.rect(
             r(290.5, 44.5, 330.0, 84.0),
@@ -78,11 +92,22 @@ impl AdjustDialog {
         );
 
         // Fuzziness, the label at the left edge
-        self.rc_row(ui, frame, FUZZINESS, "Fuzziness:", (287.0, 108.5), (89.5, 267.5, 103.0), true);
+        self.rc_row(
+            ui,
+            frame,
+            FUZZINESS,
+            "Fuzziness:",
+            (287.0, 108.5),
+            (89.5, 267.5, 103.0),
+            true,
+        );
 
         // The selection preview and Selection / Image
         self.replace_preview(ui, r(PREVIEW[0], PREVIEW[1], PREVIEW[2], PREVIEW[3]));
-        for (k, (label, x)) in [("Selection", 92.25), ("Image", 189.75)].into_iter().enumerate() {
+        for (k, (label, x)) in [("Selection", 92.25), ("Image", 189.75)]
+            .into_iter()
+            .enumerate()
+        {
             let chosen = self.extra.show_image == (k == 1);
             if appkit::radio_with(ui, at(x, 354.0), label, chosen, (17.5, appkit::font())) {
                 self.extra.show_image = k == 1;
@@ -91,19 +116,32 @@ impl AdjustDialog {
         painter.rect_filled(r(10.0, 381.0, 330.0, 382.0), 0, Color32::from_gray(0x3e));
 
         // Hue, Saturation, Lightness
-        for (k, (label, y)) in [("Hue:", 400.5), ("Saturation:", 427.5), ("Lightness:", 454.5)]
-            .into_iter()
-            .enumerate()
+        for (k, (label, y)) in [
+            ("Hue:", 400.5),
+            ("Saturation:", 427.5),
+            ("Lightness:", 454.5),
+        ]
+        .into_iter()
+        .enumerate()
         {
-            self.rc_row(ui, frame, 1 + k, label, (239.0, y), (92.0, 219.5, y - 5.5), false);
+            self.rc_row(
+                ui,
+                frame,
+                1 + k,
+                label,
+                (239.0, y),
+                (92.0, 219.5, y - 5.5),
+                false,
+            );
         }
         // Result: the color picked as replaced
         let result = self
             .effect()
             .and_then(|e| match e {
-                super::Effect::Adjustment(op_core::adjust::Adjustment::ReplaceColor { shift, .. }) => {
-                    Some(shift)
-                }
+                super::Effect::Adjustment(op_core::adjust::Adjustment::ReplaceColor {
+                    shift,
+                    ..
+                }) => Some(shift),
                 _ => None,
             })
             .map_or([cr, cg, cb], |[h, s, l]| {
@@ -117,7 +155,13 @@ impl AdjustDialog {
             Stroke::new(pt(1.0), Color32::from_gray(0x36)),
             StrokeKind::Inside,
         );
-        appkit::text(ui, at(310.5, 451.25), Align2::CENTER_CENTER, "Result", appkit::TEXT);
+        appkit::text(
+            ui,
+            at(310.5, 451.25),
+            Align2::CENTER_CENTER,
+            "Result",
+            appkit::TEXT,
+        );
 
         // OK, Cancel, Load..., Save... and Preview
         let button = |ui: &mut egui::Ui, y: f32, label: &str, default: bool, enabled: bool| {
@@ -139,13 +183,18 @@ impl AdjustDialog {
             && let (Some(fuzz), Some(h), Some(s), Some(l)) =
                 (self.value(0), self.value(1), self.value(2), self.value(3))
         {
-            let bytes = preset_files::encode_replace_color(
-                fuzz as i32,
-                [h as i32, s as i32, l as i32],
-            );
+            let bytes =
+                preset_files::encode_replace_color(fuzz as i32, [h as i32, s as i32, l as i32]);
             preset_files::REPLACE_COLOR.save(&bytes);
         }
-        appkit::checkbox_with(ui, at(345.5, 181.0), (12.0, 11.0), "Preview", &mut self.preview, true);
+        appkit::checkbox_with(
+            ui,
+            at(345.5, 181.0),
+            (12.0, 11.0),
+            "Preview",
+            &mut self.preview,
+            true,
+        );
         self.legacy_outcome(ui, (ok, cancel))
     }
 
@@ -195,7 +244,9 @@ impl AdjustDialog {
                 .is_none_or(|(k, _)| *k != key)
         {
             let pixels: Vec<Color32> = if self.extra.show_image {
-                px.iter().map(|p| Color32::from_rgb(p[0], p[1], p[2])).collect()
+                px.iter()
+                    .map(|p| Color32::from_rgb(p[0], p[1], p[2]))
+                    .collect()
             } else {
                 // Localized clusters grow from the picked points, moved
                 // onto the thumbnail

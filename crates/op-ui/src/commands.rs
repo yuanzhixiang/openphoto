@@ -1598,24 +1598,52 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
             };
             let colors = (rgb(app.foreground), rgb(app.background));
             // Match Color's sources: the other open documents' statistics
-            let lab_stats = |px: &[u8]| {
+            // (sampled), of all the pixels or of those at least half
+            // selected
+            let stats_of = |px: &[u8], width: usize, sel: Option<&op_core::Selection>| {
                 let step = (px.len() / 4 / 20_000).max(1);
                 op_core::color_match::lab_stats(
                     px.as_chunks::<4>()
                         .0
                         .iter()
+                        .enumerate()
                         .step_by(step)
-                        .filter(|p| p[3] > 0)
-                        .map(|p| [p[0], p[1], p[2]]),
+                        .filter(|(k, p)| {
+                            p[3] > 0
+                                && sel.is_none_or(|s| {
+                                    s.get((k % width) as u32, (k / width) as u32) >= 128
+                                })
+                        })
+                        .map(|(_, p)| [p[0], p[1], p[2]]),
                 )
             };
+            let both = |px: &[u8], doc: &op_core::Document| {
+                let w = doc.width as usize;
+                let sel = doc.selection();
+                (stats_of(px, w, None), sel.map(|s| stats_of(px, w, Some(s))))
+            };
             let auto_defaults = app.auto_defaults();
-            let match_sources: Vec<(String, [f32; 6])> = if kind == AdjustKind::MatchColor {
+            let match_sources: Vec<crate::dialogs::MatchSource> = if kind == AdjustKind::MatchColor
+            {
                 app.doc_order
                     .iter()
                     .filter(|&&id| Some(id) != app.active_doc)
                     .filter_map(|id| app.docs.get(id))
-                    .map(|d| (d.doc.title.clone(), lab_stats(&d.doc.composite_rgba8())))
+                    .map(|d| {
+                        let (all, sel) = both(&d.doc.composite_rgba8(), &d.doc);
+                        let mut layers = vec![("Merged".to_owned(), all, sel)];
+                        for layer in d.doc.layers.iter().rev() {
+                            if let Some(image) = layer.image() {
+                                let (all, sel) = both(&image.to_rgba8(), &d.doc);
+                                layers.push((layer.name.clone(), all, sel));
+                            }
+                        }
+                        crate::dialogs::MatchSource {
+                            name: d.doc.title.clone(),
+                            layers,
+                            thumb: crate::dialogs::adjust_thumbnail(&d.doc, (200, 200)),
+                        }
+                    })
                     .collect()
             } else {
                 Vec::new()
@@ -1651,14 +1679,19 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                                 crate::dialogs::adjust_thumbnail(&state.doc, (642, 408));
                         }
                         if kind == AdjustKind::MatchColor {
-                            let layer = state
-                                .doc
-                                .active_layer
-                                .and_then(|id| state.doc.layer(id))
+                            dialog.extra.thumb =
+                                crate::dialogs::adjust_thumbnail(&state.doc, (200, 200));
+                            let active = state.doc.active_layer.and_then(|id| state.doc.layer(id));
+                            let pixels = active
                                 .and_then(|l| l.image())
                                 .map(|image| image.to_rgba8())
                                 .unwrap_or_default();
-                            dialog.set_match_sources(lab_stats(&layer), match_sources.clone());
+                            let layer_name = active.map(|l| l.name.clone()).unwrap_or_default();
+                            dialog.set_match_sources(
+                                both(&pixels, &state.doc),
+                                (state.doc.title.clone(), layer_name),
+                                match_sources.clone(),
+                            );
                         }
                         // Colorize starts from the foreground color's hue
                         dialog.set_colorize_hue(adjust::hue_of(colors.0).round() as i32);

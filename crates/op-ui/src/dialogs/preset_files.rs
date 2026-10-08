@@ -45,6 +45,12 @@ pub const REPLACE_COLOR: Kind = Kind {
     folder: "Replace Color",
     ext: "axt",
 };
+/// Match Color's Load Statistics... and Save Statistics... (OpenPhoto's
+/// own layout; see `encode_match_statistics`).
+pub const MATCH_STATISTICS: Kind = Kind {
+    folder: "Match Color",
+    ext: "sta",
+};
 /// Shadows/Highlights' Load... and Save... (Photoshop's own `.shh`
 /// layout hasn't been compared yet; see `encode_shadows_highlights`).
 pub const SHADOWS_HIGHLIGHTS: Kind = Kind {
@@ -530,6 +536,29 @@ pub fn decode_replace_color(b: &[u8]) -> Option<(i32, [i32; 3])> {
         return None;
     }
     Some((get16(b, 6)?, [get16(b, 8)?, get16(b, 10)?, get16(b, 12)?]))
+}
+
+/// Match Color statistics: "OPMS", version 1, then the six Lab
+/// statistics (the means and spreads of L, a, b) as 32-bit floats.
+pub fn encode_match_statistics(stats: [f32; 6]) -> Vec<u8> {
+    let mut out = b"OPMS".to_vec();
+    put16(&mut out, 1);
+    for x in stats {
+        out.extend_from_slice(&x.to_be_bytes());
+    }
+    out
+}
+
+pub fn decode_match_statistics(b: &[u8]) -> Option<[f32; 6]> {
+    if b.get(0..4)? != b"OPMS" || get16(b, 4)? != 1 {
+        return None;
+    }
+    let mut v = [0f32; 6];
+    for (k, x) in v.iter_mut().enumerate() {
+        let s = b.get(6 + 4 * k..10 + 4 * k)?;
+        *x = f32::from_be_bytes([s[0], s[1], s[2], s[3]]);
+    }
+    Some(v)
 }
 
 /// Black & White (.blw): an action descriptor (version 16): the six

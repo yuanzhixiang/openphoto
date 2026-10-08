@@ -31,7 +31,7 @@ impl AdjustDialog {
         let source = self.value(SOURCE).unwrap_or(0.0) as usize;
         let labels = self
             .extra
-            .labels(self.kind, FILE)
+            .labels(self.kind, FILE, None)
             .unwrap_or_else(|| vec!["Load 3D LUT...".to_owned()]);
         let file = self.value(FILE).unwrap_or(0.0) as usize;
         let mut picked = None;
@@ -122,8 +122,11 @@ const OFF: Color32 = Color32::from_gray(0x80);
 
 /// A radio button drawn off: a dim ring and dim label.
 fn dimmed_radio(ui: &egui::Ui, center: Pos2, label: &str) {
-    ui.painter()
-        .circle_stroke(center, pt(6.0), Stroke::new(pt(1.0), Color32::from_gray(0x6a)));
+    ui.painter().circle_stroke(
+        center,
+        pt(6.0),
+        Stroke::new(pt(1.0), Color32::from_gray(0x6a)),
+    );
     ui.painter().text(
         center + vec2(pt(15.5), pt(0.75)),
         Align2::LEFT_CENTER,

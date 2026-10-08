@@ -14,6 +14,8 @@ The preset gear menus of the Levels, Curves, Hue/Saturation, Channel Mixer, Blac
 | `CHANNEL_MIXER` | Channel Mixer | `.cha` |
 | `BLACK_WHITE` | Black and White | `.blw` |
 | `EXPOSURE` | Exposure | `.eap` |
+| `REPLACE_COLOR` | Replace Color | `.axt` (OpenPhoto's own layout: "OPRC", version 1, Fuzziness and the shift as 16-bit values) |
+| `MATCH_STATISTICS` | Match Color | `.sta` (OpenPhoto's own layout: "OPMS", version 1, the six Lab statistics as 32-bit floats) |
 | `SHADOWS_HIGHLIGHTS` | Shadows Highlights | `.shh` (OpenPhoto's own layout, for Shadows/Highlights' Load... and Save...) |
 
 Saved presets live in `~/Library/Application Support/OpenPhoto/Presets/<folder>` (`Kind::dir`). `Kind::saved` lists the files there with the kind's extension, by name (the file name without the extension, case-insensitive order).

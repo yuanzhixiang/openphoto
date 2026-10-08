@@ -8320,6 +8320,8 @@ fn more_filters_and_adjustments_apply() {
         .as_mut()
         .unwrap()
         .test_set_value(3, "1");
+    h.run_steps(2);
+    shot_dialog(&mut h, "match_color", 481.0, 559.0);
     h.key_press(egui::Key::Enter);
     h.run_steps(3);
     assert_eq!(last_history(&h), "Match Color");

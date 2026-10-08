@@ -421,6 +421,10 @@ const MATCH_COLOR: &[Param] = &[
     param("Fade:", 0.0, 100.0, 0.0, 0),
     check("Neutralize", false),
     choice("Source:", &["None"], 0),
+    choice("Layer:", &["Merged"], 0),
+    check("Ignore Selection when Applying Adjustment", false),
+    check("Use Selection in Source to Calculate Colors", false),
+    check("Use Selection in Target to Calculate Adjustment", false),
 ];
 
 const COLOR_LOOKUP: &[Param] = &[
@@ -658,7 +662,6 @@ impl Kind {
             Self::Diffuse => l::DIFFUSE,
             Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
             Self::HdrToning => l::HDR_TONING,
-            Self::MatchColor => l::MATCH_COLOR,
             _ => return None,
         })
     }
@@ -853,6 +856,17 @@ pub struct AdjustDialog {
 /// Fuzziness (as bits) and whether it shows the image.
 type PreviewKey = (op_core::color_match::ReplaceSamples, u32, bool);
 
+/// A Match Color source: an open document (or loaded statistics) and the
+/// Lab statistics of its merged image and of each layer (name, all of it,
+/// inside the document's selection when it has one).
+#[derive(Clone, Default, Debug)]
+pub struct MatchSource {
+    pub name: String,
+    pub layers: Vec<(String, [f32; 6], Option<[f32; 6]>)>,
+    /// Its merged image made small, for the dialog's thumbnail.
+    pub thumb: Option<(usize, usize, Vec<[u8; 3]>)>,
+}
+
 /// What some filter and adjustment dialogs need besides their fields.
 #[derive(Clone, Default)]
 pub struct Extra {
@@ -865,9 +879,14 @@ pub struct Extra {
     /// chosen eyedropper (0 pick, 1 add, 2 subtract).
     pub replace: op_core::color_match::ReplaceSamples,
     pub rc_tool: usize,
-    /// Match Color: the layer's Lab statistics and each source's.
+    /// Match Color: the layer's Lab statistics (all of it, and inside the
+    /// selection when there is one), its document's title and layer name,
+    /// and each source's.
     pub target: Option<[f32; 6]>,
-    pub sources: Vec<(String, [f32; 6])>,
+    pub target_selected: Option<[f32; 6]>,
+    pub target_name: String,
+    pub target_layer: String,
+    pub sources: Vec<MatchSource>,
     /// Color Lookup's cube files (name, path) and the ones loaded.
     pub luts: Vec<(String, std::path::PathBuf)>,
     pub lut_ids: std::collections::HashMap<usize, u32>,
@@ -957,13 +976,23 @@ pub fn thumbnail(
 impl Extra {
     /// The popup labels a dialog fills in itself (Match Color's sources,
     /// Color Lookup's files), for the field at `i`.
-    fn labels(&self, kind: Kind, i: usize) -> Option<Vec<String>> {
+    /// `source_pick` is Match Color's Source choice (its Layer pop-up
+    /// lists that source's layers).
+    fn labels(&self, kind: Kind, i: usize, source_pick: Option<usize>) -> Option<Vec<String>> {
         match (kind, i) {
             (Kind::MatchColor, 4) => Some(
                 std::iter::once("None".to_owned())
-                    .chain(self.sources.iter().map(|(n, _)| n.clone()))
+                    .chain(self.sources.iter().map(|s| s.name.clone()))
                     .collect(),
             ),
+            (Kind::MatchColor, 5) => Some(match source_pick {
+                Some(k) if k > 0 => self
+                    .sources
+                    .get(k - 1)
+                    .map(|s| s.layers.iter().map(|l| l.0.clone()).collect())
+                    .unwrap_or_default(),
+                _ => vec![self.target_layer.clone()],
+            }),
             (Kind::ColorLookup, 0) => Some(
                 std::iter::once("Load 3D LUT...".to_owned())
                     .chain(self.luts.iter().map(|(n, _)| n.clone()))
@@ -1211,8 +1240,19 @@ impl AdjustDialog {
     }
 
     /// Match Color's statistics: the layer's and the other documents'.
-    pub fn set_match_sources(&mut self, target: [f32; 6], sources: Vec<(String, [f32; 6])>) {
+    /// Match Color's statistics: the target layer's (all of it, and inside
+    /// the selection), its document's title and layer's name, and the
+    /// other documents'.
+    pub fn set_match_sources(
+        &mut self,
+        (target, selected): ([f32; 6], Option<[f32; 6]>),
+        (name, layer): (String, String),
+        sources: Vec<MatchSource>,
+    ) {
         self.extra.target = Some(target);
+        self.extra.target_selected = selected;
+        self.extra.target_name = name;
+        self.extra.target_layer = layer;
         self.extra.sources = sources;
     }
 
@@ -1438,6 +1478,19 @@ impl AdjustDialog {
         }
     }
 
+    /// Match Color's Source choice, as typed (no range check).
+    fn source_pick(&self) -> Option<usize> {
+        if self.kind != Kind::MatchColor {
+            return None;
+        }
+        self.values
+            .get(4)?
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(|v| v as usize)
+    }
+
     fn value(&self, i: usize) -> Option<f32> {
         let p = &self.kind.params()[i];
         // (a field may show its unit, as Shadows/Highlights' "35%")
@@ -1448,7 +1501,7 @@ impl AdjustDialog {
             .parse()
             .ok()?;
         // Popups whose choices the dialog fills in itself
-        if let Some(labels) = self.extra.labels(self.kind, i) {
+        if let Some(labels) = self.extra.labels(self.kind, i, self.source_pick()) {
             return (v >= 0.0 && (v as usize) < labels.len()).then_some(v);
         }
         (p.min..=p.max).contains(&v).then_some(v)
@@ -1658,10 +1711,21 @@ impl AdjustDialog {
                 }));
             }
             Kind::MatchColor => {
-                let target = e.target?;
+                // Use Selection in Target / Source: the statistics inside
+                // the selection, where there is one
+                let target = match (v[8] != 0.0, e.target_selected) {
+                    (true, Some(t)) => t,
+                    _ => e.target?,
+                };
                 let mut source = match pick(v[4]) {
                     0 => target,
-                    k => e.sources.get(k - 1)?.1,
+                    k => {
+                        let layer = e.sources.get(k - 1)?.layers.get(pick(v[5]))?;
+                        match (v[7] != 0.0, layer.2) {
+                            (true, Some(s)) => s,
+                            _ => layer.1,
+                        }
+                    }
                 };
                 if v[3] == 1.0 {
                     // Neutralize: the color cast's mean taken out
@@ -1674,6 +1738,7 @@ impl AdjustDialog {
                     luminance: v[0],
                     intensity: v[1],
                     fade: v[2],
+                    ignore_selection: v[6] != 0.0,
                 }));
             }
             Kind::ColorLookup => {
@@ -1846,6 +1911,7 @@ impl AdjustDialog {
                     None if self.kind == Kind::ShapeBlur => shape_blur::SIZE,
                     None if self.kind == Kind::ColorLookup => color_lookup::SIZE,
                     None if self.kind == Kind::ReplaceColor => replace_color::SIZE,
+                    None if self.kind == Kind::MatchColor => match_color::SIZE,
                     None if self.kind == Kind::ShadowsHighlights
                         && self.shadows_highlights_short() =>
                     {
@@ -1875,6 +1941,8 @@ impl AdjustDialog {
                     self.color_lookup_ui(ui, rect)
                 } else if self.kind == Kind::ReplaceColor {
                     self.replace_color_ui(ui, rect)
+                } else if self.kind == Kind::MatchColor {
+                    self.match_color_ui(ui, rect)
                 } else if self.kind == Kind::ShadowsHighlights && self.shadows_highlights_short() {
                     self.shadows_highlights_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
@@ -2070,7 +2138,7 @@ impl AdjustDialog {
                     if let ParamKind::Choice(options) = p.kind {
                         let labels: Vec<String> = self
                             .extra
-                            .labels(self.kind, i)
+                            .labels(self.kind, i, self.source_pick())
                             .unwrap_or_else(|| options.iter().map(|o| o.to_string()).collect());
                         let chosen = (self.value(i).unwrap_or(0.0) as usize).min(labels.len() - 1);
                         let id = format!("filter-popup-{i}");
@@ -3042,10 +3110,11 @@ fn auto_brightness_contrast(histogram: &[u64; 256]) -> (i32, i32) {
 
 mod color_lookup;
 mod legacy;
-mod replace_color;
 mod lens_blur;
+mod match_color;
 mod oil_paint;
 mod reduce_noise;
+mod replace_color;
 mod shadows_highlights;
 mod shape_blur;
 mod smart_sharpen;
