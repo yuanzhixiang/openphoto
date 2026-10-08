@@ -214,6 +214,12 @@ impl Lut {
 
     /// The color for `rgb`, interpolated trilinearly.
     pub fn apply(&self, rgb: [u8; 3]) -> [u8; 3] {
+        self.apply_exact(rgb)
+            .map(|c| c.round().clamp(0.0, 255.0) as u8)
+    }
+
+    /// [`apply`](Self::apply) before rounding (0–255).
+    pub fn apply_exact(&self, rgb: [u8; 3]) -> [f32; 3] {
         let n = self.size;
         let pos = rgb.map(|v| v as f32 / 255.0 * (n - 1) as f32);
         let i0 = pos.map(|p| (p.floor() as usize).min(n - 2));
@@ -231,7 +237,7 @@ impl Lut {
                 }
             }
         }
-        out.map(|c| (c * 255.0).round().clamp(0.0, 255.0) as u8)
+        out.map(|c| c * 255.0)
     }
 }
 

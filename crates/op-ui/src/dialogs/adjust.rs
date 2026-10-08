@@ -422,7 +422,11 @@ const MATCH_COLOR: &[Param] = &[
     choice("Source:", &["None"], 0),
 ];
 
-const COLOR_LOOKUP: &[Param] = &[choice("3DLUT File:", &["Load 3D LUT..."], 0)];
+const COLOR_LOOKUP: &[Param] = &[
+    choice("3DLUT File:", &["Load 3D LUT..."], 0),
+    choice("Source:", &["3DLUT File", "Abstract", "Device Link"], 0),
+    check("Dither", true),
+];
 
 const DUST_AND_SCRATCHES: &[Param] = &[
     param("Radius (pixels):", 1.0, 500.0, 1.0, 0),
@@ -655,7 +659,6 @@ impl Kind {
             Self::HdrToning => l::HDR_TONING,
             Self::ReplaceColor => l::REPLACE_COLOR,
             Self::MatchColor => l::MATCH_COLOR,
-            Self::ColorLookup => l::COLOR_LOOKUP,
             _ => return None,
         })
     }
@@ -1650,8 +1653,12 @@ impl AdjustDialog {
                 }));
             }
             Kind::ColorLookup => {
+                // Only 3DLUT files apply (Abstract and Device Link are off)
+                if v[1] != 0.0 {
+                    return None;
+                }
                 let id = *e.lut_ids.get(&pick(v[0]))?;
-                return Some(Effect::Adjustment(Adjustment::ColorLookup(id)));
+                return Some(Effect::Adjustment(Adjustment::ColorLookup(id, v[2] != 0.0)));
             }
             Kind::GaussianBlur => Filter::GaussianBlur { radius: v[0] },
             Kind::BoxBlur => Filter::BoxBlur {
@@ -1813,6 +1820,7 @@ impl AdjustDialog {
                     None if self.kind == Kind::SmartSharpen => self.smart_sharpen_size(),
                     None if self.kind == Kind::OilPaint => oil_paint::SIZE,
                     None if self.kind == Kind::ShapeBlur => shape_blur::SIZE,
+                    None if self.kind == Kind::ColorLookup => color_lookup::SIZE,
                     None if self.kind == Kind::ShadowsHighlights
                         && self.shadows_highlights_short() =>
                     {
@@ -1838,6 +1846,8 @@ impl AdjustDialog {
                     self.oil_paint_ui(ui, rect)
                 } else if self.kind == Kind::ShapeBlur {
                     self.shape_blur_ui(ui, rect)
+                } else if self.kind == Kind::ColorLookup {
+                    self.color_lookup_ui(ui, rect)
                 } else if self.kind == Kind::ShadowsHighlights && self.shadows_highlights_short() {
                     self.shadows_highlights_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
@@ -3076,6 +3086,7 @@ fn auto_brightness_contrast(histogram: &[u64; 256]) -> (i32, i32) {
     best.1
 }
 
+mod color_lookup;
 mod legacy;
 mod lens_blur;
 mod oil_paint;

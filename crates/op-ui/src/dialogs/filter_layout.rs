@@ -816,18 +816,6 @@ pub const MATCH_COLOR: &Layout = &Layout {
     ],
 };
 
-pub const COLOR_LOOKUP: &Layout = &Layout {
-    size: (324.0, 160.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: false,
-    rows: &[Row::Popup {
-        label: "3DLUT File:",
-        label_right: 135.0,
-        rect: [140.0, 38.0, 230.0, 59.0],
-    }],
-};
-
 #[cfg(test)]
 mod tests {
     use super::*;

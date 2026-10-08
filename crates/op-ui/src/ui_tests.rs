@@ -8308,6 +8308,8 @@ fn more_filters_and_adjustments_apply() {
             .effect()
             .is_none()
     );
+    h.run_steps(2);
+    shot_dialog(&mut h, "color_lookup", 519.0, 186.0);
     h.key_press(egui::Key::Escape);
     h.run_steps(2);
     // Match Color with no source and Neutralize: the cast goes

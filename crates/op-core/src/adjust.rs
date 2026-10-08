@@ -131,8 +131,9 @@ pub enum Adjustment {
         fade: f32,
     },
     /// Color Lookup through the cube registered as this number
-    /// (`color_match::register`).
-    ColorLookup(u32),
+    /// (`color_match::register`); with Dither, up to half a level of noise
+    /// before rounding, as Gradient Map's.
+    ColorLookup(u32, bool),
     /// Gradient Map with a gradient of any stops: luminosity (0–255) to
     /// color; Dither adds up to half a level of noise.
     GradientTable {
@@ -167,7 +168,7 @@ impl Adjustment {
             Self::SelectiveColor { .. } => "Selective Color",
             Self::ReplaceColor { .. } => "Replace Color",
             Self::MatchColor { .. } => "Match Color",
-            Self::ColorLookup(_) => "Color Lookup",
+            Self::ColorLookup(..) => "Color Lookup",
             Self::GradientTable { .. } => "Gradient Map",
         }
     }
@@ -1106,7 +1107,7 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
         other => other.tables(),
     };
     let lut = match adjustment {
-        Adjustment::ColorLookup(id) => crate::color_match::lut(id),
+        Adjustment::ColorLookup(id, _) => crate::color_match::lut(id),
         _ => None,
     };
     let map = |px: [u8; 4], x: u32, y: u32| -> [u8; 4] {
@@ -1194,9 +1195,16 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
                 });
                 [out[0], out[1], out[2], a]
             }
-            Adjustment::ColorLookup(_) => match &lut {
+            Adjustment::ColorLookup(_, dither) => match &lut {
                 Some(l) => {
-                    let [r, g, b] = l.apply([r, g, b]);
+                    let noise = if dither {
+                        dither_noise(x, y) - 0.5
+                    } else {
+                        0.0
+                    };
+                    let [r, g, b] = l
+                        .apply_exact([r, g, b])
+                        .map(|c| (c + noise).round().clamp(0.0, 255.0) as u8);
                     [r, g, b, a]
                 }
                 None => px,

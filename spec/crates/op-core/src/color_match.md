@@ -21,7 +21,7 @@ The color math of Image › Adjustments › Replace Color, Match Color and Color
 
 - `Lut { size, data }`: a 3D table, red varying fastest, values 0–1; `apply` interpolates trilinearly.
 - `parse_cube`: `.cube` files (`LUT_3D_SIZE`, optional `DOMAIN_MIN` / `DOMAIN_MAX`, comments and titles skipped); refuses a wrong count. `parse_3dl`: `.3dl` files (a line of input levels, then rows with blue varying fastest; 10-, 12- or 16-bit by their largest value).
-- Tables are kept in a registry (`register` returns a number, the same one for an identical table; `lut(id)`), so `Adjustment::ColorLookup(id)` stays a small copyable value.
+- Tables are kept in a registry (`register` returns a number, the same one for an identical table; `lut(id)`), so `Adjustment::ColorLookup(id, dither)` stays a small copyable value. `apply_exact` is `apply` before rounding, for Dither's noise.
 
 ## Test coverage
 
