@@ -1416,7 +1416,12 @@ impl AdjustDialog {
     fn value(&self, i: usize) -> Option<f32> {
         let p = &self.kind.params()[i];
         // (a field may show its unit, as Shadows/Highlights' "35%")
-        let v: f32 = self.values[i].trim().trim_end_matches('%').trim().parse().ok()?;
+        let v: f32 = self.values[i]
+            .trim()
+            .trim_end_matches('%')
+            .trim()
+            .parse()
+            .ok()?;
         // Popups whose choices the dialog fills in itself
         if let Some(labels) = self.extra.labels(self.kind, i) {
             return (v >= 0.0 && (v as usize) < labels.len()).then_some(v);

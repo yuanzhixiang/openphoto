@@ -80,7 +80,10 @@ pub struct Dialog {
 }
 
 /// The graph's mappings: curve values to the screen, and back.
-type Mapping<'a> = (&'a dyn Fn((f32, f32)) -> Pos2, &'a dyn Fn(Pos2) -> (f32, f32));
+type Mapping<'a> = (
+    &'a dyn Fn((f32, f32)) -> Pos2,
+    &'a dyn Fn(Pos2) -> (f32, f32),
+);
 
 fn identity() -> Vec<(f32, f32)> {
     vec![(0.0, 0.0), (255.0, 255.0)]

@@ -15,21 +15,26 @@ The computing itself is done by `op_core::auto` (see `auto.md`). The dialog only
 
 The dialog opens with the Levels or Curves dialog's current options (`AdjustDialog::extra.auto_options`). "Save as defaults" starts unchecked.
 
-The dialog is 400 × 350 pt, centered, and titled "Auto Color Correction Options". The arrangement follows Photoshop's, but it has **not been measured against Photoshop 2026**, so the positions below are provisional (pt from the dialog's top-left corner).
+The dialog is 346 × 385 pt, centered, and titled "Auto Color Correction Options", measured from 2x captures of Photoshop 2026's dialog (pt from the dialog's top-left corner, title bar included).
 
-- **"Algorithms" group** (18, 45)–(300, 180):
-  - four radio buttons centered at x 36 and y 66, 88, 110, 132:
+- **Group boxes:** 1 pt `#424242` lines; the title at x 30.5 on the top edge, which breaks 6 pt before it and 5 pt after it.
+- **"Algorithms" group** (10.75, 46.75)–(259.75, 206.75):
+  - four radio buttons centered at x 27.25 and y 71.25, 98.25, 125.25, 152.25 (27 pt apart), labels 16.25 pt after the center:
     - Enhance Monochromatic Contrast
     - Enhance Per Channel Contrast
     - Find Dark & Light Colors
     - Enhance Brightness and Contrast
-  - the "Snap Neutral Midtones" checkbox at (29.5, 150).
-- **"Target Colors & Clipping" group** (18, 200)–(300, 302):
-  - Rows at y 222, 252 and 282 for Shadows:, Midtones: and Highlights:.
-  - Each row has its label right-aligned at x 100 and a color swatch x 106–152.
-  - The Shadows and Highlights rows also have "Clip:" right-aligned at x 200, a field x 206–256 taking 0–9.99 with two decimals and arrow steps of 0.01, and "%" after it.
-- **"Save as defaults"** checkbox at (18, 318).
-- **Buttons:** OK (312, 38.5)–(382, 64.5) is the default; Cancel (312, 73.5)–(382, 99.5).
+  - a 1 pt `#3e3e3e` rule at y 169.75 from x 20 to 251;
+  - the "Snap Neutral Midtones" checkbox, its 12.5 pt box at (20, 182), the label 10 pt after.
+- **"Target Colors & Clipping" group** (10.75, 231.75)–(259.75, 339.75):
+  - Rows centered on y 257.25, 288.25 and 319.25 for Shadows:, Midtones: and Highlights:, the labels (`#d6d6d6`) right-aligned at x 81.
+  - Each row has a color swatch x 85.5–128, 22.5 pt tall, with a 1 pt `#363636` border.
+  - The Shadows and Highlights rows also have "Clip:" right-aligned at x 178, a field x 182–236, 18.5 pt tall, taking 0–9.99 with two decimals and arrow steps of 0.01, and "%" at x 239.5.
+- **"Save as defaults"** checkbox, its 12.5 pt box at (10, 359), the label 11 pt after.
+- **Buttons:** OK (276, 45)–(336.5, 71) is the default; Cancel (276, 80)–(336.5, 106).
+- **Enabled states:** with Enhance Brightness and Contrast chosen, Snap Neutral Midtones and the whole Target Colors & Clipping group are off, as in Photoshop: the labels dim, the swatches are empty frames that don't open the Color Picker, and the Clip fields are `#4e4e4e` boxes with dimmed text.
+
+Compared side by side with Photoshop's capture (`auto_color_options_dark_light.png`), boxes, radios, swatches and fields land within about a point; the text differs by the stand-in font.
 
 ## Interactions
 
@@ -44,7 +49,6 @@ The dialog is 400 × 350 pt, centered, and titled "Auto Color Correction Options
 
 ## Known Limitations
 
-- The layout is provisional (not measured).
 - Choices don't update the document preview live, as they do in Photoshop. They take effect on OK.
 - Saved defaults last only for the session; Photoshop keeps them across launches.
 
@@ -52,6 +56,7 @@ The dialog is 400 × 350 pt, centered, and titled "Auto Color Correction Options
 
 - `ui_tests::auto_color_correction_options_from_levels` checks that:
   - Options... opens the dialog with Enhance Brightness and Contrast chosen;
+  - Find Dark & Light Colors is cropped to `auto_color_options_dark_light.png` for comparing with Photoshop's capture;
   - choosing Per Channel with Save as defaults and clicking OK stores the options in the Levels dialog and as the defaults;
   - Curves then opens with them.
 - Screenshot `auto_color_options.png`.

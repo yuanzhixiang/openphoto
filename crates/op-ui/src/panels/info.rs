@@ -227,7 +227,12 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
             .iter()
             .map(|r| Entry::item(r.label(), *r == readout))
             .collect();
-        if let Some(i) = icon_menu(ui, at(x + pt(14.25), pt(33.75)), ("info-readout", k), &entries) {
+        if let Some(i) = icon_menu(
+            ui,
+            at(x + pt(14.25), pt(33.75)),
+            ("info-readout", k),
+            &entries,
+        ) {
             if k == 0 {
                 picked.first = Readout::ALL[i];
             } else {
@@ -235,7 +240,11 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
             }
         }
         // Opacity reads the active layer, the others the composite
-        let shown = if readout == Readout::Opacity { layer_color } else { color };
+        let shown = if readout == Readout::Opacity {
+            layer_color
+        } else {
+            color
+        };
         for (i, (label, value)) in readout.lines(shown).iter().enumerate() {
             pair(label, value, x + COLON, READOUT_Y + i as f32 * LINE);
         }

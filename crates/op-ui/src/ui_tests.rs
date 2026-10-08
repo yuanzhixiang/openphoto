@@ -918,9 +918,27 @@ fn auto_color_correction_options_from_levels() {
     // Enhance Per Channel Contrast, Save as defaults, OK
     let corner = h.ctx.content_rect().center() - crate::dialogs::auto_options::SIZE / 2.0;
     let at = |x: f32, y: f32| corner + egui::vec2(pt(x), pt(y));
-    click(&mut h, at(36.0, 88.0));
-    click(&mut h, at(24.0, 324.0));
-    click(&mut h, at(347.0, 51.5));
+    // Find Dark & Light Colors, for comparing with Photoshop's capture
+    click(&mut h, at(27.25, 125.25));
+    let image = h.render().expect("render frame");
+    // (two image pixels a Photoshop point)
+    let px = 2.0 / pt(1.0);
+    let crop = image::imageops::crop_imm(
+        &image,
+        (corner.x * px).round() as u32,
+        (corner.y * px).round() as u32,
+        346 * 2,
+        385 * 2,
+    );
+    crop.to_image()
+        .save(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../target/ui-shots/auto_color_options_dark_light.png"),
+        )
+        .unwrap();
+    click(&mut h, at(27.25, 98.25));
+    click(&mut h, at(16.0, 365.0));
+    click(&mut h, at(306.0, 58.0));
     assert!(h.state().state.auto_options_dialog.is_none());
     let saved = h.state().state.auto_saved.expect("saved as defaults");
     assert_eq!(saved.algorithm, op_core::auto::Algorithm::PerChannel);
@@ -8056,7 +8074,12 @@ fn shadows_highlights_more_options_and_replace_color_preview() {
     shot_dialog(&mut h, "shadows_highlights", 449.0, 236.0);
     // Dragging the Shadows thumb to the track's right end gives 100%
     let thumb = rect.min + egui::vec2(pt(134.9), pt(59.75));
-    drag(&mut h, thumb, rect.min + egui::vec2(pt(240.0), pt(59.75)), Modifiers::NONE);
+    drag(
+        &mut h,
+        thumb,
+        rect.min + egui::vec2(pt(240.0), pt(59.75)),
+        Modifiers::NONE,
+    );
     assert_eq!(
         h.state().state.adjust_dialog.as_ref().unwrap().value_of(0),
         Some(100.0)

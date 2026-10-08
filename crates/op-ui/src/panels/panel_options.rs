@@ -184,7 +184,10 @@ mod tests {
     #[test]
     fn opacity_reads_the_alpha() {
         let c = op_core::Color::from_rgba8([10, 20, 30, 128]);
-        assert_eq!(Readout::Opacity.lines(Some(c)), vec![("Op:", "50%".to_string())]);
+        assert_eq!(
+            Readout::Opacity.lines(Some(c)),
+            vec![("Op:", "50%".to_string())]
+        );
         assert_eq!(Readout::Opacity.lines(None), vec![("Op:", String::new())]);
     }
 
