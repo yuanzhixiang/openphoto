@@ -405,6 +405,7 @@ const HDR_TONING: &[Param] = &[
     param("Highlight:", -100.0, 100.0, 0.0, 0),
     param("Vibrance:", -100.0, 100.0, 0.0, 0),
     param("Saturation:", -100.0, 100.0, 20.0, 0),
+    check("Smooth Edges", false),
 ];
 
 const REPLACE_COLOR: &[Param] = &[
@@ -661,7 +662,6 @@ impl Kind {
             Self::TraceContour => l::TRACE_CONTOUR,
             Self::Diffuse => l::DIFFUSE,
             Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
-            Self::HdrToning => l::HDR_TONING,
             _ => return None,
         })
     }
@@ -879,6 +879,8 @@ pub struct Extra {
     /// chosen eyedropper (0 pick, 1 add, 2 subtract).
     pub replace: op_core::color_match::ReplaceSamples,
     pub rc_tool: usize,
+    /// HDR Toning's Toning Curve and sections (`hdr_toning.rs`).
+    pub hdr: hdr_toning::HdrExtra,
     /// Match Color: the layer's Lab statistics (all of it, and inside the
     /// selection when there is one), its document's title and layer name,
     /// and each source's.
@@ -1700,6 +1702,21 @@ impl AdjustDialog {
                 highlight: v[7],
                 vibrance: v[8],
                 saturation: v[9],
+                smooth_edges: v[10] != 0.0,
+                curve: {
+                    let mut c = [(0, 0); 16];
+                    for (d, &p) in c.iter_mut().zip(&e.hdr.curve) {
+                        *d = p;
+                    }
+                    c
+                },
+                curve_len: e.hdr.curve.len().min(16) as u8,
+                corners: e
+                    .hdr
+                    .corners
+                    .iter()
+                    .enumerate()
+                    .fold(0, |m, (k, &c)| if c { m | 1 << k } else { m }),
             }),
             Kind::ReplaceColor => {
                 let mut samples = e.replace;
@@ -1912,6 +1929,7 @@ impl AdjustDialog {
                     None if self.kind == Kind::ColorLookup => color_lookup::SIZE,
                     None if self.kind == Kind::ReplaceColor => replace_color::SIZE,
                     None if self.kind == Kind::MatchColor => match_color::SIZE,
+                    None if self.kind == Kind::HdrToning => self.hdr_size(),
                     None if self.kind == Kind::ShadowsHighlights
                         && self.shadows_highlights_short() =>
                     {
@@ -1943,6 +1961,8 @@ impl AdjustDialog {
                     self.replace_color_ui(ui, rect)
                 } else if self.kind == Kind::MatchColor {
                     self.match_color_ui(ui, rect)
+                } else if self.kind == Kind::HdrToning {
+                    self.hdr_toning_ui(ui, rect)
                 } else if self.kind == Kind::ShadowsHighlights && self.shadows_highlights_short() {
                     self.shadows_highlights_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
@@ -3109,6 +3129,7 @@ fn auto_brightness_contrast(histogram: &[u64; 256]) -> (i32, i32) {
 }
 
 mod color_lookup;
+mod hdr_toning;
 mod legacy;
 mod lens_blur;
 mod match_color;

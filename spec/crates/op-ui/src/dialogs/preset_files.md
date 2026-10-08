@@ -16,6 +16,7 @@ The preset gear menus of the Levels, Curves, Hue/Saturation, Channel Mixer, Blac
 | `EXPOSURE` | Exposure | `.eap` |
 | `REPLACE_COLOR` | Replace Color | `.axt` (OpenPhoto's own layout: "OPRC", version 1, Fuzziness and the shift as 16-bit values) |
 | `MATCH_STATISTICS` | Match Color | `.sta` (OpenPhoto's own layout: "OPMS", version 1, the six Lab statistics as 32-bit floats) |
+| `HDR_TONING` | HDR Toning | `.hdt` |
 | `SHADOWS_HIGHLIGHTS` | Shadows Highlights | `.shh` (OpenPhoto's own layout, for Shadows/Highlights' Load... and Save...) |
 
 Saved presets live in `~/Library/Application Support/OpenPhoto/Presets/<folder>` (`Kind::dir`). `Kind::saved` lists the files there with the kind's extension, by name (the file name without the extension, case-insensitive order).
@@ -43,6 +44,7 @@ All numbers are big-endian.
 - **Channel Mixer (.cha)**: version 1, Monochrome, then four output channels of four source amounts and a constant (RGB uses the first three of each). With Monochrome the gray's mix is the first channel and the dialog's color rows go back to identity. 44 bytes.
 - **Black & White (.blw)**: an action descriptor (version 16, class "null", ten items): the six weights as longs (`Rd  `, `Yllw`, `Grn `, `Cyn `, `Bl  `, `Mgnt`), `useTint` (bool), `tintColor` (an RGBC object of three doubles), `bwPresetKind` (long 3) and an empty `blackAndWhitePresetFileName`. Reading looks the keys up wherever they are. The dialog turns the tint color into the hue and saturation that make it (`black_white::tint_of`, the color's HSB hue and saturation).
 - **Exposure (.eap)**: version 1, then exposure, offset and gamma as 32-bit floats. 14 bytes.
+- **HDR Toning (.hdt)**: "hdrt", version 3, Strength, the method (2 is Local Adaptation), the curve's name ("Default" as a Unicode string), 2, the point count and the points (input, output as 16-bit values), a flag byte a point (1 at corners), 8 zero bytes, Radius, 3, two floats (0 and 1 in most presets), "hdra", 6, Exposure, Vibrance, Detail, Shadow, Highlight, Gamma, Saturation (32-bit floats) and two zero bytes. Decoded from Photoshop's sixteen presets: which color value is Vibrance and which Saturation, what the corner flag means and what the two trailing floats hold are inferred from their values, not documented; our files are the same size as Photoshop's.
 - **Shadows/Highlights (.shh)**: "OPSH", version 1, then the ten settings as 32-bit floats. This is OpenPhoto's own layout; Photoshop's `.shh` hasn't been decoded (no sample ships with Photoshop).
 
 ## Test coverage

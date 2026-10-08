@@ -76,6 +76,41 @@ pub struct HdrToning {
     pub highlight: f32,
     pub vibrance: f32,
     pub saturation: f32,
+    /// Edge Glow's Smooth Edges: the glow keeps to edges (the base
+    /// follows the image across strong steps).
+    pub smooth_edges: bool,
+    /// The Toning Curve: its points (input, output 0–255, by input), the
+    /// first `curve_len` used, and which are corners (bit k for point k).
+    pub curve: [(u8, u8); 16],
+    pub curve_len: u8,
+    pub corners: u16,
+}
+
+impl HdrToning {
+    /// The Toning Curve as a table: smooth through its points, and bent
+    /// sharply at corner points (each run between corners its own curve).
+    pub fn curve_table(&self) -> [u8; 256] {
+        let pts = &self.curve[..(self.curve_len as usize).clamp(0, 16)];
+        if pts.len() < 2 {
+            return std::array::from_fn(|i| i as u8);
+        }
+        let mut table = [0u8; 256];
+        let mut start = 0;
+        for k in 1..pts.len() {
+            let corner = self.corners & (1 << k) != 0;
+            if corner || k == pts.len() - 1 {
+                let part = crate::adjust::curve_table(&pts[start..=k]);
+                let (a, b) = (pts[start].0 as usize, pts[k].0 as usize);
+                table[a..=b].copy_from_slice(&part[a..=b]);
+                start = k;
+            }
+        }
+        // Outside the end points the curve stays level
+        let (first, last) = (pts[0], pts[pts.len() - 1]);
+        table[..first.0 as usize].fill(first.1);
+        table[last.0 as usize + 1..].fill(last.1);
+        table
+    }
 }
 
 impl Default for HdrToning {
@@ -92,6 +127,14 @@ impl Default for HdrToning {
             highlight: 0.0,
             vibrance: 0.0,
             saturation: 20.0,
+            smooth_edges: false,
+            curve: {
+                let mut c = [(0, 0); 16];
+                c[1] = (255, 255);
+                c
+            },
+            curve_len: 2,
+            corners: 0,
         }
     }
 }
@@ -282,7 +325,16 @@ pub fn hdr_toning(px: &mut [[u8; 4]], w: usize, h: usize, t: HdrToning) {
                 .collect()
         }
         HdrMethod::LocalAdaptation => {
-            let base = blur(&lum, w, h, t.radius / 2.0);
+            let mut base = blur(&lum, w, h, t.radius / 2.0);
+            // Smooth Edges: across a strong step the base keeps to the
+            // pixel's own level, so the glow doesn't spill over edges
+            if t.smooth_edges {
+                for (b, &l) in base.iter_mut().zip(&lum) {
+                    let d = *b - l;
+                    *b = l + d * (-(d * d) / 0.02).exp();
+                }
+            }
+            let table = t.curve_table();
             let detail = 1.0 + t.detail / 100.0;
             let squeeze = 1.0 / (1.0 + t.strength);
             lum.iter()
@@ -296,7 +348,11 @@ pub fn hdr_toning(px: &mut [[u8; 4]], w: usize, h: usize, t: HdrToning) {
                     let v = v
                         + t.shadow / 100.0 * (1.0 - v).powi(3) * 0.5
                         + t.highlight / 100.0 * v.powi(3) * 0.5;
-                    v.clamp(0.0, 1.0)
+                    // The Toning Curve, between table entries
+                    let x = v.clamp(0.0, 1.0) * 255.0;
+                    let (i, f) = ((x.floor() as usize).min(254), x - x.floor());
+                    let c = table[i] as f32 + (table[i + 1] as f32 - table[i] as f32) * f;
+                    (c / 255.0).clamp(0.0, 1.0)
                 })
                 .collect()
         }
@@ -390,6 +446,33 @@ mod tests {
         };
         hdr_toning(&mut px, 2, 2, t);
         assert!((px[0][0] as i32 - 100).abs() <= 1, "{:?}", px[0]);
+    }
+
+    #[test]
+    fn toning_curve_table_and_corners() {
+        let mut t = HdrToning::default();
+        assert_eq!(t.curve_table()[100], 100);
+        // An inverting curve
+        t.curve[0] = (0, 255);
+        t.curve[1] = (255, 0);
+        assert_eq!(t.curve_table()[0], 255);
+        assert_eq!(t.curve_table()[255], 0);
+        // A corner bends sharply: straight lines either side of it
+        t.curve = [(0, 0); 16];
+        t.curve[1] = (128, 200);
+        t.curve[2] = (255, 255);
+        t.curve_len = 3;
+        t.corners = 0b010;
+        let table = t.curve_table();
+        assert!((table[64] as i32 - 100).abs() <= 1, "{}", table[64]);
+        assert_eq!(table[128], 200);
+        // Toning with the inverting curve turns a light gray dark
+        let mut px = vec![[200, 200, 200, 255]; 4];
+        let mut inv = HdrToning::default();
+        inv.curve[0] = (0, 255);
+        inv.curve[1] = (255, 0);
+        hdr_toning(&mut px, 2, 2, inv);
+        assert!(px[0][0] < 100, "{:?}", px[0]);
     }
 
     #[test]

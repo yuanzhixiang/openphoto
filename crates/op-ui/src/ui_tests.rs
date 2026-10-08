@@ -6635,6 +6635,44 @@ fn zoom_tool_drags_and_view_tools_act_on_all_windows() {
 }
 
 #[test]
+fn hdr_toning_sections_and_curve() {
+    use crate::commands::Command;
+    use crate::theme::pt;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    run_command(&mut h, Command::HdrToning);
+    h.run_steps(3);
+    let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
+    // Photoshop's size with the curve folded
+    assert!((rect.height() - pt(479.0)).abs() < 1.0, "{rect:?}");
+    shot_dialog(&mut h, "hdr_toning", 441.0, 479.0);
+    // Its title opens the Toning Curve and Histogram section
+    click(&mut h, rect.min + egui::vec2(pt(60.0), pt(446.0)));
+    h.run_steps(2);
+    let rect = h.state().state.adjust_dialog.as_ref().unwrap().rect;
+    assert!((rect.height() - pt(802.0)).abs() < 1.0, "{rect:?}");
+    shot_dialog(&mut h, "hdr_toning_curve", 441.0, 802.0);
+    // A click in the graph adds a point
+    click(&mut h, rect.min + egui::vec2(pt(177.0), pt(560.0)));
+    h.run_steps(2);
+    assert_eq!(
+        h.state()
+            .state
+            .adjust_dialog
+            .as_ref()
+            .unwrap()
+            .extra
+            .hdr
+            .curve
+            .len(),
+        3
+    );
+    h.key_press(egui::Key::Enter);
+    h.run_steps(3);
+    assert_eq!(last_history(&h), "HDR Toning");
+}
+
+#[test]
 fn magnetic_lasso_follows_edges() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);

@@ -51,6 +51,10 @@ pub const MATCH_STATISTICS: Kind = Kind {
     folder: "Match Color",
     ext: "sta",
 };
+pub const HDR_TONING: Kind = Kind {
+    folder: "HDR Toning",
+    ext: "hdt",
+};
 /// Shadows/Highlights' Load... and Save... (Photoshop's own `.shh`
 /// layout hasn't been compared yet; see `encode_shadows_highlights`).
 pub const SHADOWS_HIGHLIGHTS: Kind = Kind {
@@ -561,6 +565,119 @@ pub fn decode_match_statistics(b: &[u8]) -> Option<[f32; 6]> {
     Some(v)
 }
 
+/// HDR Toning's settings as its preset files hold them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct HdrPreset {
+    /// Local Adaptation (the only method Photoshop's presets use).
+    pub local: bool,
+    pub radius: f32,
+    pub strength: f32,
+    pub gamma: f32,
+    pub exposure: f32,
+    pub detail: f32,
+    pub shadow: f32,
+    pub highlight: f32,
+    pub vibrance: f32,
+    pub saturation: f32,
+    /// The Toning Curve's points (input, output) and corner flags.
+    pub curve: Vec<(u8, u8)>,
+    pub corners: Vec<bool>,
+}
+
+/// HDR Toning (.hdt), as decoded from Photoshop 2026's presets: "hdrt",
+/// version 3, Strength (f32), the method (2 is Local Adaptation), the
+/// curve's name (a Unicode string, "Default"), 2, the point count and the
+/// points (input, output as 16-bit values), a flag byte a point (1 at
+/// corners), 8 zero bytes, Radius (f32), 3, two floats (0 and 1 in most
+/// presets), then "hdra", 6, and Exposure, Vibrance, Detail, Shadow,
+/// Highlight, Gamma and Saturation (f32) and two zero bytes. Which of the two color values is
+/// Vibrance and which Saturation, and what the trailing floats mean, are
+/// read from the presets' values, not documented.
+pub fn decode_hdr(b: &[u8]) -> Option<HdrPreset> {
+    if b.get(0..4)? != b"hdrt" {
+        return None;
+    }
+    let u32_at = |at: usize| Some(u32::from_be_bytes(b.get(at..at + 4)?.try_into().ok()?));
+    let f32_at = |at: usize| Some(f32::from_be_bytes(b.get(at..at + 4)?.try_into().ok()?));
+    let strength = f32_at(8)?;
+    let local = u32_at(12)? == 2;
+    let name_len = u32_at(16)? as usize;
+    let mut at = 20 + 2 * name_len + 2;
+    let count = getu16(b, at)?;
+    at += 2;
+    let mut curve = Vec::with_capacity(count);
+    for _ in 0..count {
+        curve.push((
+            getu16(b, at)?.min(255) as u8,
+            getu16(b, at + 2)?.min(255) as u8,
+        ));
+        at += 4;
+    }
+    let corners = b.get(at..at + count)?.iter().map(|&f| f != 0).collect();
+    at += count + 8;
+    let radius = f32_at(at)?;
+    let hdra = b.windows(4).position(|w| w == b"hdra")? + 8;
+    let v: Vec<f32> = (0..7)
+        .map(|k| f32_at(hdra + 4 * k))
+        .collect::<Option<_>>()?;
+    Some(HdrPreset {
+        local,
+        radius,
+        strength,
+        exposure: v[0],
+        vibrance: v[1],
+        detail: v[2],
+        shadow: v[3],
+        highlight: v[4],
+        gamma: v[5],
+        saturation: v[6],
+        curve,
+        corners,
+    })
+}
+
+pub fn encode_hdr(p: &HdrPreset) -> Vec<u8> {
+    let mut out = b"hdrt".to_vec();
+    out.extend_from_slice(&3u32.to_be_bytes());
+    out.extend_from_slice(&p.strength.to_be_bytes());
+    out.extend_from_slice(&(if p.local { 2u32 } else { 0 }).to_be_bytes());
+    let name: Vec<u16> = "Default\0".encode_utf16().collect();
+    out.extend_from_slice(&(name.len() as u32).to_be_bytes());
+    for c in name {
+        out.extend_from_slice(&c.to_be_bytes());
+    }
+    put16(&mut out, 2);
+    put16(&mut out, p.curve.len() as i32);
+    for &(i, o) in &p.curve {
+        put16(&mut out, i as i32);
+        put16(&mut out, o as i32);
+    }
+    for k in 0..p.curve.len() {
+        out.push(p.corners.get(k).copied().unwrap_or(false) as u8);
+    }
+    out.extend_from_slice(&[0; 8]);
+    out.extend_from_slice(&p.radius.to_be_bytes());
+    out.extend_from_slice(&3u32.to_be_bytes());
+    out.extend_from_slice(&0f32.to_be_bytes());
+    out.extend_from_slice(&1f32.to_be_bytes());
+    out.extend_from_slice(b"hdra");
+    out.extend_from_slice(&6u32.to_be_bytes());
+    for x in [
+        p.exposure,
+        p.vibrance,
+        p.detail,
+        p.shadow,
+        p.highlight,
+        p.gamma,
+        p.saturation,
+    ] {
+        out.extend_from_slice(&x.to_be_bytes());
+    }
+    // (Photoshop's files end with two zero bytes)
+    out.extend_from_slice(&[0, 0]);
+    out
+}
+
 /// Black & White (.blw): an action descriptor (version 16): the six
 /// weights as longs (Rd, Yllw, Grn, Cyn, Bl, Mgnt), useTint, the tint
 /// color as an RGBC object of doubles, bwPresetKind 3 and an empty
@@ -734,6 +851,19 @@ mod tests {
             let (_, gray, mono) = decode_channel_mixer(&b).unwrap();
             assert!(mono);
             assert_eq!(gray, [0, 0, 100, 0]);
+        }
+        if let Some(b) = photoshop("HDR Toning/Monochromatic High Contrast.hdt") {
+            let p = decode_hdr(&b).unwrap();
+            assert!(p.local);
+            assert_eq!(p.curve, vec![(0, 0), (5, 48), (230, 203), (255, 255)]);
+            assert_eq!(p.corners, vec![true, false, false, true]);
+            assert_eq!(
+                (p.strength, p.radius, p.detail, p.saturation),
+                (2.0, 240.0, 200.0, -100.0)
+            );
+            // Ours reads back the same, and in the same layout
+            assert_eq!(decode_hdr(&encode_hdr(&p)), Some(p));
+            assert_eq!(encode_hdr(&decode_hdr(&b).unwrap()).len(), b.len());
         }
         if let Some(b) = photoshop("Exposure/Minus 1.0.eap") {
             assert_eq!(decode_exposure(&b), Some([-1.0, 0.0, 1.0]));
