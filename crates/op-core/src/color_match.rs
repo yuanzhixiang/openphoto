@@ -129,6 +129,162 @@ pub fn replace_weight(rgb: [u8; 3], sample: [u8; 3], fuzziness: f32) -> f32 {
     }
 }
 
+/// Replace Color's sampled colors: the colors picked with the eyedropper
+/// and added with the plus eyedropper (up to eight), the colors taken out
+/// with the minus eyedropper, and where they were picked (Localized Color
+/// Clusters grows the selection from there).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ReplaceSamples {
+    pub colors: [[u8; 3]; 8],
+    pub count: u8,
+    pub minus: [[u8; 3]; 8],
+    pub minus_count: u8,
+    pub seeds: [(u32, u32); 8],
+    pub seed_count: u8,
+    /// Localized Color Clusters: only the parts of the selection connected
+    /// to the picked points.
+    pub localized: bool,
+}
+
+impl Default for ReplaceSamples {
+    fn default() -> Self {
+        Self::single([0; 3])
+    }
+}
+
+impl ReplaceSamples {
+    /// One color, picked nowhere in particular.
+    pub fn single(color: [u8; 3]) -> Self {
+        Self {
+            colors: [color; 8],
+            count: 1,
+            minus: [[0; 3]; 8],
+            minus_count: 0,
+            seeds: [(0, 0); 8],
+            seed_count: 0,
+            localized: false,
+        }
+    }
+
+    /// The eyedropper: `color` (picked at `at`) alone.
+    pub fn pick(&mut self, color: [u8; 3], at: Option<(u32, u32)>) {
+        let localized = self.localized;
+        *self = Self::single(color);
+        self.localized = localized;
+        if let Some(p) = at {
+            self.seeds[0] = p;
+            self.seed_count = 1;
+        }
+    }
+
+    /// The plus eyedropper: `color` joins (the oldest added one gives way
+    /// once there are eight).
+    pub fn add(&mut self, color: [u8; 3], at: Option<(u32, u32)>) {
+        let n = self.count as usize;
+        if n < 8 {
+            self.colors[n] = color;
+            self.count += 1;
+        } else {
+            self.colors.copy_within(2.., 1);
+            self.colors[7] = color;
+        }
+        if let Some(p) = at {
+            let k = self.seed_count as usize;
+            if k < 8 {
+                self.seeds[k] = p;
+                self.seed_count += 1;
+            }
+        }
+    }
+
+    /// The minus eyedropper: pixels like `color` leave the selection.
+    pub fn subtract(&mut self, color: [u8; 3]) {
+        let n = self.minus_count as usize;
+        if n < 8 {
+            self.minus[n] = color;
+            self.minus_count += 1;
+        } else {
+            self.minus.copy_within(1.., 0);
+            self.minus[7] = color;
+        }
+    }
+
+    /// The color shown in the dialog's Color swatch: the last one picked.
+    pub fn shown(&self) -> [u8; 3] {
+        self.colors[(self.count.max(1) - 1) as usize]
+    }
+
+    /// How much `rgb` belongs to the selection (0–1): its weight for the
+    /// nearest added color, less its weight for the nearest taken-out one.
+    pub fn weight(&self, rgb: [u8; 3], fuzziness: f32) -> f32 {
+        let plus = self.colors[..self.count.max(1) as usize]
+            .iter()
+            .map(|&c| replace_weight(rgb, c, fuzziness))
+            .fold(0.0, f32::max);
+        let minus = self.minus[..self.minus_count as usize]
+            .iter()
+            .map(|&c| replace_weight(rgb, c, fuzziness))
+            .fold(0.0, f32::max);
+        plus * (1.0 - minus)
+    }
+}
+
+/// Localized Color Clusters: the selection's weights over `image`, kept
+/// only where they connect (through pixels of some weight, 4-neighbors)
+/// to a picked point. Without picked points, the plain weights.
+pub fn localized_weights(
+    image: &crate::tile::TiledImage,
+    samples: &ReplaceSamples,
+    fuzziness: f32,
+) -> Vec<f32> {
+    let (w, h) = (image.width() as usize, image.height() as usize);
+    let weights: Vec<f32> = (0..w * h)
+        .map(|k| {
+            let [r, g, b, _] = image.pixel((k % w) as u32, (k / w) as u32);
+            samples.weight([r, g, b], fuzziness)
+        })
+        .collect();
+    if samples.seed_count == 0 {
+        return weights;
+    }
+    let mut keep = vec![false; w * h];
+    let mut stack: Vec<usize> = samples.seeds[..samples.seed_count as usize]
+        .iter()
+        .filter(|&&(x, y)| (x as usize) < w && (y as usize) < h)
+        .map(|&(x, y)| y as usize * w + x as usize)
+        .filter(|&k| weights[k] > 0.0)
+        .collect();
+    for &k in &stack {
+        keep[k] = true;
+    }
+    while let Some(k) = stack.pop() {
+        let (x, y) = (k % w, k / w);
+        let mut visit = |n: usize| {
+            if !keep[n] && weights[n] > 0.0 {
+                keep[n] = true;
+                stack.push(n);
+            }
+        };
+        if x > 0 {
+            visit(k - 1);
+        }
+        if x + 1 < w {
+            visit(k + 1);
+        }
+        if y > 0 {
+            visit(k - w);
+        }
+        if y + 1 < h {
+            visit(k + w);
+        }
+    }
+    weights
+        .into_iter()
+        .zip(keep)
+        .map(|(v, k)| if k { v } else { 0.0 })
+        .collect()
+}
+
 /// A 3D lookup table (Color Lookup): `size`³ RGB entries, red varying
 /// fastest (as `.cube` files list them), values 0–1.
 #[derive(Clone, Debug, PartialEq)]
@@ -321,5 +477,32 @@ mod tests {
         // Registering twice gives the same number
         let a = register(lut.clone());
         assert_eq!(register(lut), a);
+    }
+
+    #[test]
+    fn replace_samples_add_subtract_and_localize() {
+        let red = [220, 30, 30];
+        let mut s = ReplaceSamples::single(red);
+        assert!(s.weight([220, 30, 30], 40.0) > 0.99);
+        assert_eq!(s.weight([30, 30, 220], 40.0), 0.0);
+        // Adding blue selects it too; taking blue out again removes it
+        s.add([30, 30, 220], None);
+        assert!(s.weight([30, 30, 220], 40.0) > 0.99);
+        s.subtract([30, 30, 220]);
+        assert_eq!(s.weight([30, 30, 220], 40.0), 0.0);
+        assert_eq!(s.shown(), [30, 30, 220]);
+        // Two red squares apart: localized from a point in the first keeps
+        // only that one
+        let mut image = crate::tile::TiledImage::new(10, 1);
+        for x in 0..10 {
+            let c = if x < 3 || x > 6 { red } else { [255, 255, 255] };
+            image.set_pixel(x, 0, [c[0], c[1], c[2], 255]);
+        }
+        let mut s = ReplaceSamples::single(red);
+        s.pick(red, Some((1, 0)));
+        s.localized = true;
+        let w = localized_weights(&image, &s, 40.0);
+        assert!(w[0] > 0.99 && w[2] > 0.99);
+        assert_eq!(w[8], 0.0);
     }
 }

@@ -1648,7 +1648,7 @@ fn run_command(command: Command, ctx: &egui::Context, app: &mut AppState) {
                             .is_some_and(|l| l.is_background);
                         if kind == AdjustKind::ReplaceColor {
                             dialog.extra.thumb =
-                                crate::dialogs::adjust_thumbnail(&state.doc, (370, 280));
+                                crate::dialogs::adjust_thumbnail(&state.doc, (642, 408));
                         }
                         if kind == AdjustKind::MatchColor {
                             let layer = state

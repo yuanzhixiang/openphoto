@@ -378,6 +378,11 @@ impl OpenPhotoApp {
                     let hue = ctx.input(|i| i.modifiers.command);
                     dialog.target_press(rgb, hue);
                     dialog.target_from = Some(p);
+                } else if dialog.kind == dialogs::AdjustKind::ReplaceColor {
+                    // Replace Color's eyedroppers (Shift adds, Option takes
+                    // out)
+                    let mods = ctx.input(|i| (i.modifiers.shift, i.modifiers.alt));
+                    dialog.sample_at(rgb, Some((d.x as u32, d.y as u32)), mods);
                 } else {
                     dialog.sample(rgb);
                 }

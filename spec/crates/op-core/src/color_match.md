@@ -17,6 +17,9 @@ The color math of Image › Adjustments › Replace Color, Match Color and Color
 
 `replace_weight(rgb, sample, fuzziness)`: 1 within half the Fuzziness (Lab distance), falling linearly to 0 at the full Fuzziness. The adjustment mixes the Hue/Saturation master shift of the pixel in by that weight.
 
+- `ReplaceSamples`: the colors picked (`pick`: one color, and where; `add`: up to eight, the oldest added one giving way after), taken out (`subtract`, up to eight) and the points they were picked at, with `localized` (Localized Color Clusters). `weight` is the largest `replace_weight` over the added colors times one minus the largest over the taken-out ones; `shown` is the last color picked.
+- `localized_weights(image, samples, fuzziness)`: the weights over a whole image, kept only where they connect (through pixels of some weight, 4-neighbors) to a picked point; with no points, the plain weights. The adjustment computes it once per application when `localized` is on.
+
 ## Color Lookup
 
 - `Lut { size, data }`: a 3D table, red varying fastest, values 0–1; `apply` interpolates trilinearly.
@@ -25,4 +28,4 @@ The color math of Image › Adjustments › Replace Color, Match Color and Color
 
 ## Test coverage
 
-`lab_round_trips`, `match_color_moves_toward_the_source` (a bluish image matched to reddish stats turns warmer; Fade 100 keeps it), `replace_weight_falls_off_with_fuzziness`, `cube_and_3dl_luts` (identity and inverting cubes, a 10-bit 3dl identity, a short cube refused, registering twice gives one number).
+`lab_round_trips`, `replace_samples_add_subtract_and_localize` (added blue is selected, taken out again it isn't; localized from a point keeps only the connected red run), `match_color_moves_toward_the_source` (a bluish image matched to reddish stats turns warmer; Fade 100 keeps it), `replace_weight_falls_off_with_fuzziness`, `cube_and_3dl_luts` (identity and inverting cubes, a 10-bit 3dl identity, a short cube refused, registering twice gives one number).

@@ -8101,8 +8101,8 @@ fn shadows_highlights_more_options_and_replace_color_preview() {
     assert!(dialog.extra.preview_texture.is_some());
     assert!(!dialog.extra.show_image);
     let rect = dialog.rect;
-    shot(&mut h, "replace_color_preview");
-    click(&mut h, rect.min + egui::vec2(pt(117.0), pt(238.0)));
+    shot_dialog(&mut h, "replace_color", 436.0, 474.0);
+    click(&mut h, rect.min + egui::vec2(pt(189.75), pt(354.0)));
     assert!(
         h.state()
             .state

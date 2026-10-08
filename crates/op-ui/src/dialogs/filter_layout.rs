@@ -719,58 +719,6 @@ pub const HDR_TONING: &Layout = &Layout {
     ],
 };
 
-/// Replace Color: Fuzziness, then the selection preview (drawn by the
-/// dialog itself in `REPLACE_PREVIEW`), then the replacement.
-pub const REPLACE_COLOR: &Layout = &Layout {
-    size: (324.0, 410.0),
-    button_width: 59.5,
-    preview_y: 118.5,
-    pane: false,
-    rows: &[
-        number(
-            "Fuzziness:",
-            135.0,
-            [140.0, 38.0, 200.5, 57.0],
-            "",
-            205.5,
-            Some((21.0, 206.0, 64.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Hue:",
-            135.0,
-            [140.0, 260.0, 200.5, 279.0],
-            "",
-            205.5,
-            Some((21.0, 206.0, 286.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Saturation:",
-            135.0,
-            [140.0, 309.0, 200.5, 328.0],
-            "",
-            205.5,
-            Some((21.0, 206.0, 335.0)),
-            Scale::Linear,
-        ),
-        number(
-            "Lightness:",
-            135.0,
-            [140.0, 358.0, 200.5, 377.0],
-            "",
-            205.5,
-            Some((21.0, 206.0, 384.0)),
-            Scale::Linear,
-        ),
-    ],
-};
-
-/// Replace Color's preview box, and the centers of its Selection and
-/// Image radio buttons below it.
-pub const REPLACE_PREVIEW: [f32; 4] = [21.0, 82.0, 206.0, 222.0];
-pub const REPLACE_RADIOS: [(f32, f32); 2] = [(27.0, 238.0), (117.0, 238.0)];
-
 pub const MATCH_COLOR: &Layout = &Layout {
     size: (324.0, 248.0),
     button_width: 59.5,

@@ -114,10 +114,11 @@ pub enum Adjustment {
     /// Image > Auto Color: Find Dark & Light Colors with Snap Neutral
     /// Midtones (`auto.rs`).
     AutoColor(crate::auto::Targets),
-    /// Replace Color: pixels near `color` (by Fuzziness, 0–200) get the
-    /// hue (−180–180), saturation and lightness (−100–100) shift.
+    /// Replace Color: pixels near the sampled colors (by Fuzziness,
+    /// 0–200; `color_match::ReplaceSamples`) get the hue (−180–180),
+    /// saturation and lightness (−100–100) shift.
     ReplaceColor {
-        color: [u8; 3],
+        samples: crate::color_match::ReplaceSamples,
         fuzziness: u8,
         shift: [i32; 3],
     },
@@ -1110,6 +1111,20 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
         Adjustment::ColorLookup(id, _) => crate::color_match::lut(id),
         _ => None,
     };
+    // Localized Color Clusters needs the whole layer's selection first
+    let localized = match adjustment {
+        Adjustment::ReplaceColor {
+            samples,
+            fuzziness,
+            ..
+        } if samples.localized => doc
+            .active_layer
+            .and_then(|id| doc.layer(id))
+            .and_then(|l| l.image())
+            .map(|image| crate::color_match::localized_weights(image, &samples, fuzziness as f32)),
+        _ => None,
+    };
+    let width = doc.width as usize;
     let map = |px: [u8; 4], x: u32, y: u32| -> [u8; 4] {
         let [r, g, b, a] = px;
         match adjustment {
@@ -1150,11 +1165,14 @@ pub fn apply(doc: &mut Document, adjustment: Adjustment) -> Result<(), FillError
             | Adjustment::GradientMap { .. } => color_adjust(adjustment, px),
             Adjustment::HueSaturation(hs) => hs.apply(px),
             Adjustment::ReplaceColor {
-                color,
+                samples,
                 fuzziness,
                 shift,
             } => {
-                let w = crate::color_match::replace_weight([r, g, b], color, fuzziness as f32);
+                let w = match &localized {
+                    Some(m) => m[y as usize * width + x as usize],
+                    None => samples.weight([r, g, b], fuzziness as f32),
+                };
                 if w <= 0.0 {
                     return px;
                 }

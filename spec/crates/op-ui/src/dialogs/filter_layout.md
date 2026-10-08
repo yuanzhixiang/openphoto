@@ -36,10 +36,9 @@ Most of Photoshop's sliders are not uniform. The scales were measured by enterin
 
 ## Unmeasured layouts
 
-`SHADOWS_HIGHLIGHTS`, `HDR_TONING`, `REPLACE_COLOR`, `MATCH_COLOR` are laid out by one rule, not from Photoshop: 324 pt wide; with the preview pane the rows start at y 287, without it at 38; number rows 49 pt apart (label right-aligned to 135, field 140–200.5, unit at 205.5, track from 21 to 303 with the pane or 206 without, 26 pt under the field's top); popups 33 pt apart (140 to 300 or 230); radio groups full width (no higher than y 146.5 without the pane, clear of the buttons), first radio 25 pt under the group's top and 27 pt apart; checkboxes 27 pt apart.
+`SHADOWS_HIGHLIGHTS`, `HDR_TONING`, `MATCH_COLOR` are laid out by one rule, not from Photoshop: 324 pt wide; with the preview pane the rows start at y 287, without it at 38; number rows 49 pt apart (label right-aligned to 135, field 140–200.5, unit at 205.5, track from 21 to 303 with the pane or 206 without, 26 pt under the field's top); popups 33 pt apart (140 to 300 or 230); radio groups full width (no higher than y 146.5 without the pane, clear of the buttons), first radio 25 pt under the group's top and 27 pt apart; checkboxes 27 pt apart.
 
 - `SHADOWS_HIGHLIGHTS` (324 × 560) is Shadows/Highlights' full layout: all ten settings, with the "Show More Options" checkbox at (21, 530). Its short layout is Photoshop's own UXP one (`adjust/shadows_highlights.md`); the dialog picks by that checkbox (`adjust.md`).
-- `REPLACE_COLOR` (324 × 410): Fuzziness (field y 38), then the selection preview box `REPLACE_PREVIEW` (21, 82)–(206, 222) with the Selection and Image radio buttons centered at (27, 238) and (117, 238) (`REPLACE_RADIOS`), then Hue (y 260), Saturation (309) and Lightness (358).
 
 ## Test coverage
 

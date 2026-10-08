@@ -39,6 +39,12 @@ pub const EXPOSURE: Kind = Kind {
     folder: "Exposure",
     ext: "eap",
 };
+/// Replace Color's Load... and Save... (Photoshop's own `.axt` layout
+/// hasn't been decoded; see `encode_replace_color`).
+pub const REPLACE_COLOR: Kind = Kind {
+    folder: "Replace Color",
+    ext: "axt",
+};
 /// Shadows/Highlights' Load... and Save... (Photoshop's own `.shh`
 /// layout hasn't been compared yet; see `encode_shadows_highlights`).
 pub const SHADOWS_HIGHLIGHTS: Kind = Kind {
@@ -505,6 +511,25 @@ pub fn decode_shadows_highlights(b: &[u8]) -> Option<[f32; 10]> {
         *x = f32::from_be_bytes([s[0], s[1], s[2], s[3]]);
     }
     Some(v)
+}
+
+/// Replace Color's settings file: "OPRC", version 1, then Fuzziness and
+/// the hue, saturation and lightness shift as 16-bit values. OpenPhoto's
+/// own layout: Photoshop's .axt hasn't been decoded.
+pub fn encode_replace_color(fuzziness: i32, shift: [i32; 3]) -> Vec<u8> {
+    let mut out = b"OPRC".to_vec();
+    put16(&mut out, 1);
+    for v in [fuzziness, shift[0], shift[1], shift[2]] {
+        put16(&mut out, v);
+    }
+    out
+}
+
+pub fn decode_replace_color(b: &[u8]) -> Option<(i32, [i32; 3])> {
+    if b.get(0..4)? != b"OPRC" || get16(b, 4)? != 1 {
+        return None;
+    }
+    Some((get16(b, 6)?, [get16(b, 8)?, get16(b, 10)?, get16(b, 12)?]))
 }
 
 /// Black & White (.blw): an action descriptor (version 16): the six

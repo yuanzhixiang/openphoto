@@ -412,6 +412,7 @@ const REPLACE_COLOR: &[Param] = &[
     param("Hue:", -180.0, 180.0, 0.0, 0),
     param("Saturation:", -100.0, 100.0, 0.0, 0),
     param("Lightness:", -100.0, 100.0, 0.0, 0),
+    check("Localized Color Clusters", false),
 ];
 
 const MATCH_COLOR: &[Param] = &[
@@ -657,7 +658,6 @@ impl Kind {
             Self::Diffuse => l::DIFFUSE,
             Self::ShadowsHighlights => l::SHADOWS_HIGHLIGHTS,
             Self::HdrToning => l::HDR_TONING,
-            Self::ReplaceColor => l::REPLACE_COLOR,
             Self::MatchColor => l::MATCH_COLOR,
             _ => return None,
         })
@@ -851,7 +851,7 @@ pub struct AdjustDialog {
 
 /// What Replace Color's preview picture was made from: the sampled color,
 /// Fuzziness (as bits) and whether it shows the image.
-type PreviewKey = ([u8; 3], u32, bool);
+type PreviewKey = (op_core::color_match::ReplaceSamples, u32, bool);
 
 /// What some filter and adjustment dialogs need besides their fields.
 #[derive(Clone, Default)]
@@ -860,9 +860,11 @@ pub struct Extra {
     pub seed: u32,
     /// The foreground and background colors (Fibers).
     pub colors: ([u8; 3], [u8; 3]),
-    /// Replace Color's color (the foreground at first; the eyedropper
-    /// picks from the image).
-    pub sample: [u8; 3],
+    /// Replace Color's sampled colors (the foreground at first; the
+    /// eyedroppers pick, add and take out colors from the image) and the
+    /// chosen eyedropper (0 pick, 1 add, 2 subtract).
+    pub replace: op_core::color_match::ReplaceSamples,
+    pub rc_tool: usize,
     /// Match Color: the layer's Lab statistics and each source's.
     pub target: Option<[f32; 6]>,
     pub sources: Vec<(String, [f32; 6])>,
@@ -1205,7 +1207,7 @@ impl AdjustDialog {
     /// Fibers' colors, and Replace Color's first color (the foreground).
     pub fn set_colors(&mut self, colors: ([u8; 3], [u8; 3])) {
         self.extra.colors = colors;
-        self.extra.sample = colors.0;
+        self.extra.replace = op_core::color_match::ReplaceSamples::single(colors.0);
     }
 
     /// Match Color's statistics: the layer's and the other documents'.
@@ -1283,10 +1285,30 @@ impl AdjustDialog {
         false
     }
 
+    /// Replace Color's eyedropper click on a pixel of color `rgb` at `at`
+    /// (document pixels): the chosen tool picks, adds or takes out the
+    /// color; Shift adds and Option subtracts whatever tool is chosen, as
+    /// in Photoshop.
+    pub fn sample_at(&mut self, rgb: [u8; 3], at: Option<(u32, u32)>, (shift, alt): (bool, bool)) {
+        let tool = if alt {
+            2
+        } else if shift {
+            1
+        } else {
+            self.extra.rc_tool
+        };
+        let r = &mut self.extra.replace;
+        match tool {
+            1 => r.add(rgb, at),
+            2 => r.subtract(rgb),
+            _ => r.pick(rgb, at),
+        }
+    }
+
     /// The chosen eyedropper's click on a pixel of color `rgb`.
     pub fn sample(&mut self, rgb: [u8; 3]) {
         if self.kind == Kind::ReplaceColor {
-            self.extra.sample = rgb;
+            self.sample_at(rgb, None, (false, false));
             return;
         }
         match &mut self.custom {
@@ -1627,8 +1649,10 @@ impl AdjustDialog {
                 saturation: v[9],
             }),
             Kind::ReplaceColor => {
+                let mut samples = e.replace;
+                samples.localized = v[4] != 0.0;
                 return Some(Effect::Adjustment(Adjustment::ReplaceColor {
-                    color: e.sample,
+                    samples,
                     fuzziness: v[0] as u8,
                     shift: [v[1] as i32, v[2] as i32, v[3] as i32],
                 }));
@@ -1821,6 +1845,7 @@ impl AdjustDialog {
                     None if self.kind == Kind::OilPaint => oil_paint::SIZE,
                     None if self.kind == Kind::ShapeBlur => shape_blur::SIZE,
                     None if self.kind == Kind::ColorLookup => color_lookup::SIZE,
+                    None if self.kind == Kind::ReplaceColor => replace_color::SIZE,
                     None if self.kind == Kind::ShadowsHighlights
                         && self.shadows_highlights_short() =>
                     {
@@ -1848,6 +1873,8 @@ impl AdjustDialog {
                     self.shape_blur_ui(ui, rect)
                 } else if self.kind == Kind::ColorLookup {
                     self.color_lookup_ui(ui, rect)
+                } else if self.kind == Kind::ReplaceColor {
+                    self.replace_color_ui(ui, rect)
                 } else if self.kind == Kind::ShadowsHighlights && self.shadows_highlights_short() {
                     self.shadows_highlights_ui(ui, rect)
                 } else if let Some(layout) = self.layout() {
@@ -1953,76 +1980,6 @@ impl AdjustDialog {
             Some(uxp::Button::Ok) => self.effect().map_or(Outcome::Open, Outcome::Apply),
             Some(uxp::Button::Cancel) => Outcome::Cancel,
             _ => Outcome::Open,
-        }
-    }
-
-    /// Replace Color's preview box: the selection (white where the sampled
-    /// color is replaced, by Fuzziness) or the image, with the Selection
-    /// and Image radio buttons under it.
-    fn replace_preview(&mut self, ui: &mut Ui, frame: Rect) {
-        let at = |x: f32, y: f32| frame.min + vec2(pt(x), pt(y));
-        let b = filter_layout::REPLACE_PREVIEW;
-        let rect = Rect::from_min_max(at(b[0], b[1]), at(b[2], b[3]));
-        let painter = ui.painter().clone();
-        painter.rect_filled(rect, 0, Color32::BLACK);
-        let fuzziness = self.value(0).unwrap_or(40.0);
-        let key = (
-            self.extra.sample,
-            fuzziness.to_bits(),
-            self.extra.show_image,
-        );
-        if let Some((w, h, px)) = &self.extra.thumb
-            && self
-                .extra
-                .preview_texture
-                .as_ref()
-                .is_none_or(|(k, _)| *k != key)
-        {
-            let pixels: Vec<Color32> = px
-                .iter()
-                .map(|&p| {
-                    if self.extra.show_image {
-                        Color32::from_rgb(p[0], p[1], p[2])
-                    } else {
-                        let v =
-                            op_core::color_match::replace_weight(p, self.extra.sample, fuzziness);
-                        Color32::from_gray((v * 255.0).round() as u8)
-                    }
-                })
-                .collect();
-            let image = egui::ColorImage::new([*w, *h], pixels);
-            let texture =
-                ui.ctx()
-                    .load_texture("replace-color-preview", image, egui::TextureOptions::LINEAR);
-            self.extra.preview_texture = Some((key, texture));
-        }
-        if let Some((_, texture)) = &self.extra.preview_texture {
-            // Fitted into the box, centered
-            let size = texture.size_vec2();
-            let k = (rect.width() / size.x).min(rect.height() / size.y);
-            let shown = Rect::from_center_size(rect.center(), size * k);
-            painter.image(
-                texture.id(),
-                shown,
-                Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
-        }
-        painter.rect_stroke(
-            rect,
-            0,
-            Stroke::new(pt(1.0), Color32::from_gray(0x30)),
-            egui::StrokeKind::Outside,
-        );
-        for (k, (label, (x, y))) in ["Selection", "Image"]
-            .into_iter()
-            .zip(filter_layout::REPLACE_RADIOS)
-            .enumerate()
-        {
-            let chosen = self.extra.show_image == (k == 1);
-            if appkit::radio(ui, at(x, y), label, chosen) {
-                self.extra.show_image = k == 1;
-            }
         }
     }
 
@@ -2164,9 +2121,6 @@ impl AdjustDialog {
                     self.values[i] = (on as u8).to_string();
                 }
             }
-        }
-        if self.kind == Kind::ReplaceColor {
-            self.replace_preview(ui, frame);
         }
 
         // OK, Cancel and Preview at the top right
@@ -3088,6 +3042,7 @@ fn auto_brightness_contrast(histogram: &[u64; 256]) -> (i32, i32) {
 
 mod color_lookup;
 mod legacy;
+mod replace_color;
 mod lens_blur;
 mod oil_paint;
 mod reduce_noise;
