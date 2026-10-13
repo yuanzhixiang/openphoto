@@ -42,3 +42,11 @@ OpenPhoto is a Rust native application; its UI verification uses egui_kittest an
 native app interaction. The browser plugin is relevant only if a web surface is
 introduced. Development app processes are stopped after verification, with their
 PIDs recorded. No server or listening port is needed for the native application.
+
+The current native UI interface can read Photoshop's accessibility tree, capture
+its window and operate AX controls/keyboard shortcuts. Coordinate clicks fail
+with `-10005 noWindowsAvailable`; raising the reference window did not fix that
+failure. A working coordinate-input route is required before certifying live
+Photoshop drag parity. REA's native UI scenario command requires an exact PID
+and window ID and exposes AX actions, so it has not been treated as an equivalent
+unverified substitute for pixel-based drag input.

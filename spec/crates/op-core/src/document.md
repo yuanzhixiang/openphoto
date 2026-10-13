@@ -63,11 +63,16 @@ Public fields: `id`, `title`, `width`, `height`, `resolution` (ppi), `color_mode
   - `select_layer(id)`: click, selecting only it. `toggle_layer_selection(id)`: ⌘-click, adds it (and makes it the active layer) or removes it (when removing the active layer, the last selected one becomes the active layer; when only one remains it is not removed). `select_layer_range(id)`: ⇧-click, selects all layers between the active layer and `id` (in layer order), and `id` becomes the active layer.
   - `select_all_layers()`: Select › All Layers, selects all layers except the background (returns false when there are none). `deselect_layers()`: Select › Deselect Layers, selects none.
 - `layer_at(x, y)`: used by the Move tool's Auto-Select. Searches from top to bottom for the first layer showing a pixel at (x, y): the layer is visible, its opacity and fill are not 0, the pixel's alpha is greater than 0, and it is not hidden by an enabled layer mask with value 0. `None` when the coordinate is outside the canvas or there is no such layer.
+- `move_target_at(x, y, group)`: reuses `layer_at`; Layer mode returns the hit layer, Group mode follows its parent groups to the outermost group. Ungrouped layers remain selectable in Group mode. Parent traversal is bounded by the layer count and stops at missing or non-group parents. Hit visibility and outside-canvas behavior follow `layer_at`.
 - `composite_rgba8()`: composites into a tightly packed straight RGBA8 buffer of length `width * height * 4`.
 - `sample_source(scope)`: a tool's "Sample:" source (`SampleScope`): `Current` is the current layer's pixels, `CurrentAndBelow` is the composite of the layer list up to the current layer, `All` is the full composite; `None` when there is no current layer.
 - `composite_layers_rgba8(layers)`: composites only the given layer list by the same rules (bottom to top, same size as the document), used for merging layers; `composite_rgba8` is just this called on all of the document's layers.
 
 ## Behavior rules
+
+`move_target_selects_outermost_group_and_moves_its_children` covers nested group
+hit-testing, ungrouped and outside-canvas hits, moving all group descendants, and
+falling through a hidden group.
 
 ### Canvas resizing
 

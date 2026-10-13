@@ -26,7 +26,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `type_options`: Type tool options (see `type_tool.md`).
 - `typing_text()`: true when the current document has text being typed; `modal_open()` is also true then.
 - `shape`: shape tool options (`ShapeOptions`: polygon sides 5, line weight 1 px, Photoshop's defaults).
-- `move_options`: Move tool options (`MoveOptions`: `auto_select`, `show_transform_controls`, both off by default, matching Photoshop).
+- `move_options`: Move tool options (`MoveOptions`: `auto_select`, `show_transform_controls`, both off by default; `auto_select_group`, false by default for Layer mode). The mode is shared by all documents and retained for the current run.
 - `gradient`: Gradient tool options (`op_core::gradient::GradientOptions`: type, blend mode, opacity, reverse).
 - `gradient_preset`: the Gradient tool's gradient (None: Foreground to Background with the current colors); `gradient_made`: gradients added with the Gradient Editor's New this session; `gradient_editor`: the open Gradient Editor and what it edits (`EditorTarget::Tool` / `GradientMap`), counted by `modal_open`.
 - `tool_gradient()`: the tool's gradient with the options bar's Method (`gradient.method`); `gradient_presets()`: the editor's presets for the current colors plus `gradient_made`.

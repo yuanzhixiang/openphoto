@@ -14,6 +14,11 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 
 ## Tests
 
+- `move_auto_select_group_and_shift_select_layers`: selects Group and Layer
+  through the options dropdown, moves both children of an auto-selected group,
+  undoes the move, Shift-selects two layers, preserves their selection while
+  dragging one member, and removes one member without adding history.
+
 - Regular tests (run by `cargo test`): verify interaction and state:
   - Clicking the foreground color swatch in the toolbar opens the Color Picker; Esc cancels without changing the color.
   - Dragging with the Rectangular Marquee produces a selection of the matching extent and records history; Shift-drag adds to the selection; a single click deselects; ⇧⌘D reselects, ⌘A selects all, ⌘D deselects.

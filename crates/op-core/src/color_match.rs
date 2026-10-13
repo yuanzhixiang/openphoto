@@ -495,7 +495,11 @@ mod tests {
         // only that one
         let mut image = crate::tile::TiledImage::new(10, 1);
         for x in 0..10 {
-            let c = if x < 3 || x > 6 { red } else { [255, 255, 255] };
+            let c = if !(3..=6).contains(&x) {
+                red
+            } else {
+                [255, 255, 255]
+            };
             image.set_pixel(x, 0, [c[0], c[1], c[2], 255]);
         }
         let mut s = ReplaceSamples::single(red);

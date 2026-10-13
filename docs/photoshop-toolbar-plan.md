@@ -89,5 +89,37 @@ that those additional controls are absent.
 | Stage | State | Evidence |
 | --- | --- | --- |
 | Environment and plan | Verified | REA 6.4.0 setup reports `ready`; Hopper scoped doctor healthy; Rust 1.99.0; baseline workspace tests: 547 passed, 0 failed, 51 ignored; bounded runner verified for success and timeout |
-| Move | Audit in progress | Existing core/UI implementation; checking missing modifier behavior against Photoshop |
+| Move | Partial repair; full acceptance pending | Group/Layer native dropdown, Shift multi-selection, preserving selected members while dragging, group-child movement and undo tested; live Photoshop exposes Group then Layer |
 | Artboard through Zoom and auxiliary controls | Pending | Tool definitions/options exist to varying degrees; per-tool acceptance has not run |
+
+### Move audit boundary
+
+The repaired Group/Layer behavior follows Adobe's
+[Move, stack, and lock layers](https://helpx.adobe.com/photoshop/using/moving-stacking-locking-layers.html)
+and the dropdown observed in installed Photoshop 27.8.0. Nested-group selection
+uses the outermost parent; it has a deterministic model regression test, but
+that nested case has not yet been compared by clicking the running Photoshop.
+
+Full Move acceptance still needs: Shift-constrained 45-degree dragging,
+Option-duplicate dragging (whole layers and selected pixels), linked layer-mask
+movement, hover layer bounds and the additional-options gear, More alignment
+options, cross-document dragging, and reference pixel fixtures for these cases.
+Passing the repaired cases does not close those items.
+
+Native Photoshop AX observation, menu selection and keyboard shortcuts work.
+Coordinate clicks repeatedly fail with `Computer Use server error -10005:
+noWindowsAvailable`, including after raising the exact reference window. This
+path was stopped rather than repeatedly retrying captures. The disposable
+reference document was closed without saving; the original document and its
+Marquee tool were restored. No reference pixel-drag experiment is claimed.
+
+The ordered sequence remains at Move until its remaining behaviors and live
+comparison pass; Artboard is not marked complete or skipped.
+
+Move repair validation on 2026-10-13: the two targeted egui interaction tests
+and the nested-group model test pass. Workspace tests: 549 passed, 0 failed,
+51 ignored (the existing opt-in screenshot/fixture tests remain ignored).
+`cargo fmt --all -- --check`, `git diff --check` and
+`cargo clippy --workspace --all-targets -- -D warnings` pass. The strict lint
+check also required an equivalent range predicate in an existing color-match
+test; that changes test construction syntax, not editor behavior.

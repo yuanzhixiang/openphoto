@@ -1764,16 +1764,31 @@ fn warp_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
     }
 }
 
-/// Move: Auto-Select (Layer), Show Transform Controls, and the align and
+/// Move: Auto-Select (Group / Layer), Show Transform Controls, and the align and
 /// distribute buttons (disabled: they need two or more layers selected).
 fn move_options(ui: &mut Ui, app: &mut AppState) {
     let opts = &mut app.move_options;
     ui.spacing_mut().item_spacing.x = 0.0;
     widgets::checkbox(ui, &mut opts.auto_select, "Auto-Select:");
     ui.add_space(pt(8.5));
-    widgets::dropdown(ui, "move-auto-select", pt(55.0), "Layer", |ui| {
-        let _ = ui.selectable_label(true, "Layer");
-    });
+    let entries = [
+        crate::native_popup::Entry::item("Group", opts.auto_select_group),
+        crate::native_popup::Entry::item("Layer", !opts.auto_select_group),
+    ];
+    if let Some(index) = widgets::dropdown_entries(
+        ui,
+        "move-auto-select",
+        pt(55.0),
+        if opts.auto_select_group {
+            "Group"
+        } else {
+            "Layer"
+        },
+        true,
+        &entries,
+    ) {
+        opts.auto_select_group = index == 0;
+    }
     ui.add_space(pt(4.5));
     sep(ui);
     ui.add_space(pt(4.0));

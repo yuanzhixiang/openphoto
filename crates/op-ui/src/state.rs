@@ -898,6 +898,8 @@ pub struct MoveOptions {
     /// Clicking picks the topmost layer with a pixel under the pointer
     /// (Cmd inverts this while held).
     pub auto_select: bool,
+    /// Group selects the outermost containing group; false selects layers.
+    pub auto_select_group: bool,
     /// Draw the transform box around the active layer; dragging one of its
     /// handles starts Free Transform.
     pub show_transform_controls: bool,

@@ -450,9 +450,18 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
         let d = to_doc(state, p, ppp);
         if d.x >= 0.0
             && d.y >= 0.0
-            && let Some(id) = state.doc.layer_at(d.x as u32, d.y as u32)
+            && let Some(id) =
+                state
+                    .doc
+                    .move_target_at(d.x as u32, d.y as u32, move_options.auto_select_group)
         {
-            state.doc.active_layer = Some(id);
+            if ui.input(|i| i.modifiers.shift) {
+                state.doc.toggle_layer_selection(id);
+            } else if !state.doc.is_layer_selected(id) {
+                // Clicking a selected member keeps the multi-selection for
+                // dragging; selecting a different target replaces it.
+                state.doc.select_layer(id);
+            }
         }
     }
     let hover = response.hover_pos();

@@ -722,6 +722,25 @@ impl Document {
             .map(|l| l.id)
     }
 
+    /// Move Auto-Select: the hit layer, or its outermost containing group.
+    /// An ungrouped layer is selected in either mode.
+    pub fn move_target_at(&self, x: u32, y: u32, group: bool) -> Option<LayerId> {
+        let mut id = self.layer_at(x, y)?;
+        if group {
+            // Bound traversal even if a caller constructs invalid parent data.
+            for _ in 0..self.layers.len() {
+                let Some(parent) = self.layer(id)?.parent else {
+                    break;
+                };
+                if !self.layer(parent).is_some_and(Layer::is_group) {
+                    break;
+                }
+                id = parent;
+            }
+        }
+        Some(id)
+    }
+
     /// The pixels a tool samples ("Sample:" in its bar): the active layer,
     /// the layers up to and including it, or all of them merged. `None`
     /// without an active pixel layer (for the current layer only).
@@ -1014,6 +1033,50 @@ mod tests {
         doc.layers.push(layer);
         let px = doc.composite_rgba8();
         assert_eq!(&px[0..4], &[128, 128, 128, 255]);
+    }
+
+    #[test]
+    fn move_target_selects_outermost_group_and_moves_its_children() {
+        let mut doc = Document::new_with_background("t", 20, 20, Color::WHITE);
+        let outer = doc.new_layer_id();
+        let inner = doc.new_layer_id();
+        let red = doc.new_layer_id();
+        let blue = doc.new_layer_id();
+        let mut inner_layer = Layer::group(inner, "Inner");
+        inner_layer.parent = Some(outer);
+        let mut red_image = TiledImage::new(20, 20);
+        red_image.set_pixel(2, 2, [255, 0, 0, 255]);
+        let mut red_layer = Layer::raster(red, "Red", red_image);
+        red_layer.parent = Some(inner);
+        let mut blue_image = TiledImage::new(20, 20);
+        blue_image.set_pixel(8, 8, [0, 0, 255, 255]);
+        let mut blue_layer = Layer::raster(blue, "Blue", blue_image);
+        blue_layer.parent = Some(outer);
+        doc.layers.extend([
+            red_layer,
+            inner_layer,
+            blue_layer,
+            Layer::group(outer, "Outer"),
+        ]);
+        assert_eq!(doc.move_target_at(2, 2, false), Some(red));
+        assert_eq!(doc.move_target_at(2, 2, true), Some(outer));
+        assert_eq!(doc.move_target_at(8, 8, true), Some(outer));
+        assert_eq!(doc.move_target_at(0, 0, true), Some(doc.layers[0].id));
+        assert_eq!(doc.move_target_at(20, 2, true), None);
+        doc.select_layer(outer);
+        let movement = crate::move_tool::Move::begin(&doc, [255; 3]).unwrap();
+        movement.apply(&mut doc, 3, 4);
+        assert_eq!(
+            doc.layer(red).unwrap().image().unwrap().pixel(5, 6),
+            [255, 0, 0, 255]
+        );
+        assert_eq!(
+            doc.layer(blue).unwrap().image().unwrap().pixel(11, 12),
+            [0, 0, 255, 255]
+        );
+        assert_eq!(doc.layer(red).unwrap().image().unwrap().pixel(2, 2)[3], 0);
+        doc.layer_mut(outer).unwrap().visible = false;
+        assert_eq!(doc.move_target_at(5, 6, true), Some(doc.layers[0].id));
     }
 
     #[test]

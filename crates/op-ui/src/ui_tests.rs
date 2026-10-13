@@ -480,6 +480,78 @@ fn move_auto_select_and_transform_controls() {
 }
 
 #[test]
+fn move_auto_select_group_and_shift_select_layers() {
+    use egui_kittest::kittest::Queryable;
+
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let (red, blue, group) = {
+        let state = h.state_mut().state.active().unwrap();
+        let mut ids = Vec::new();
+        for (x, color) in [(100, [255, 0, 0, 255]), (300, [0, 0, 255, 255])] {
+            let id = state.doc.new_layer_id();
+            let mut image = op_core::TiledImage::new(734, 811);
+            for y in 100..140 {
+                for x in x..x + 40 {
+                    image.set_pixel(x, y, color);
+                }
+            }
+            state
+                .doc
+                .layers
+                .push(op_core::Layer::raster(id, "Square", image));
+            ids.push(id);
+        }
+        state.doc.set_selected_layers(ids.clone());
+        let group = op_core::layer_ops::group_selected(&mut state.doc).unwrap();
+        state.doc.mark_dirty();
+        state.record("Group Layers");
+        (ids[0], ids[1], group)
+    };
+    h.state_mut().state.select_tool(op_tools::Tool::Move);
+    h.state_mut().state.move_options.auto_select = true;
+    h.run_steps(3);
+    // Pick the actual dropdown entry rather than changing its state directly.
+    click(&mut h, at_pt(220.0, 45.0));
+    h.get_by_label("Group").click();
+    h.run_steps(3);
+    assert!(h.state().state.move_options.auto_select_group);
+    let a = doc_point(&h, 120.0, 120.0);
+    let b = doc_point(&h, 220.0, 170.0);
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(active(&h).doc.active_layer, Some(group));
+    assert_eq!(composite_pixel(&mut h, 220, 170), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 420, 170), [0, 0, 255, 255]);
+    assert_eq!(last_history(&h), "Move");
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run_steps(2);
+    assert_eq!(composite_pixel(&mut h, 120, 120), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 320, 120), [0, 0, 255, 255]);
+
+    click(&mut h, at_pt(220.0, 45.0));
+    h.get_by_label("Layer").click();
+    h.run_steps(3);
+    assert!(!h.state().state.move_options.auto_select_group);
+    let red_point = doc_point(&h, 120.0, 120.0);
+    click(&mut h, red_point);
+    let blue_point = doc_point(&h, 320.0, 120.0);
+    click_with(&mut h, blue_point, Modifiers::SHIFT);
+    assert_eq!(active(&h).doc.selected_layers(), [red, blue]);
+    // Dragging a selected member preserves both selected layers.
+    let a = doc_point(&h, 120.0, 120.0);
+    let b = doc_point(&h, 220.0, 170.0);
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(active(&h).doc.selected_layers(), [red, blue]);
+    assert_eq!(composite_pixel(&mut h, 220, 170), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 420, 170), [0, 0, 255, 255]);
+    let count = active(&h).history.states().len();
+    let blue_point = doc_point(&h, 420.0, 170.0);
+    click_with(&mut h, blue_point, Modifiers::SHIFT);
+    assert_eq!(active(&h).doc.selected_layers(), [red]);
+    assert_eq!(active(&h).history.states().len(), count);
+}
+
+#[test]
 fn moving_the_background_without_selection_is_refused() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);
