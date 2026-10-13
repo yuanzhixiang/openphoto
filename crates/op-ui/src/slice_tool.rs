@@ -10,15 +10,20 @@ pub struct Options {
     pub height: f32,
 }
 impl Options {
-    pub fn read(app: &mut AppState) -> Self {
+    pub fn read(app: &AppState) -> Self {
         let style = app
-            .setting("slice.style", "0")
-            .parse::<usize>()
+            .tool_settings
+            .get("slice.style")
+            .and_then(|v| v.parse::<usize>().ok())
             .unwrap_or(0)
             .min(2);
-        let default = if style == 1 { "1" } else { "64" };
-        let mut size = |key| {
-            let v = app.setting(key, default).parse::<f32>().unwrap_or(1.0);
+        let default = if style == 1 { 1.0 } else { 64.0 };
+        let size = |key| {
+            let v = app
+                .tool_settings
+                .get(key)
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(default);
             if v.is_finite() && v > 0.0 { v } else { 1.0 }
         };
         Self {
@@ -116,6 +121,24 @@ pub fn draw(ui: &Ui, state: &DocState, options: Options, ppp: f32) {
             ),
             state.selected_slices.contains(&s.id),
         );
+        if state.selected_slices.contains(&s.id) {
+            for p in [
+                r.min,
+                egui::pos2(r.center().x, r.top()),
+                r.right_top(),
+                egui::pos2(r.right(), r.center().y),
+                r.max,
+                egui::pos2(r.center().x, r.bottom()),
+                r.left_bottom(),
+                egui::pos2(r.left(), r.center().y),
+            ] {
+                painter.rect_filled(
+                    Rect::from_center_size(p, egui::vec2(5.0, 5.0)),
+                    0,
+                    egui::Color32::WHITE,
+                );
+            }
+        }
         painter.text(
             r.min,
             egui::Align2::LEFT_TOP,
@@ -126,5 +149,168 @@ pub fn draw(ui: &Ui, state: &DocState, options: Options, ppp: f32) {
     }
     if let Some(d) = state.slice_drag {
         outline(options.rect(d.start, d.current), true);
+    }
+}
+
+pub struct SelectDrag {
+    before: op_core::Snapshot,
+    slices: Vec<op_core::slice::Slice>,
+    start: Pos2,
+    handle: Option<(u64, i8, i8)>,
+}
+pub fn cancel_select(state: &mut DocState) {
+    if let Some(d) = state.slice_select_drag.take() {
+        state.doc.restore(&d.before);
+    }
+}
+fn handle(bounds: (u32, u32, u32, u32), p: Pos2, scale: f32) -> Option<(i8, i8)> {
+    let (x0, y0, x1, y1) = bounds;
+    let rect = Rect::from_min_max(
+        egui::pos2(x0 as f32, y0 as f32),
+        egui::pos2(x1 as f32, y1 as f32),
+    );
+    for (hx, hy) in [
+        (-1, -1),
+        (0, -1),
+        (1, -1),
+        (1, 0),
+        (1, 1),
+        (0, 1),
+        (-1, 1),
+        (-1, 0),
+    ] {
+        let q = rect.center()
+            + egui::vec2(
+                hx as f32 * rect.width() / 2.0,
+                hy as f32 * rect.height() / 2.0,
+            );
+        if q.distance(p) * scale <= 8.0 {
+            return Some((hx, hy));
+        }
+    }
+    None
+}
+pub fn select_input(ui: &mut Ui, response: &Response, state: &mut DocState, ppp: f32) {
+    if ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+        cancel_select(state);
+        return;
+    }
+    if state.slice_select_drag.is_none()
+        && ui.input_mut(|i| {
+            i.consume_key(Modifiers::NONE, Key::Delete)
+                || i.consume_key(Modifiers::NONE, Key::Backspace)
+        })
+    {
+        let count = state.doc.slices.len();
+        state
+            .doc
+            .slices
+            .retain(|s| !state.selected_slices.contains(&s.id));
+        if state.doc.slices.len() != count {
+            state.doc.mark_dirty();
+            state.selected_slices.clear();
+            state.record("Delete Slice");
+        }
+    }
+    if response.contains_pointer()
+        && ui.input(|i| i.pointer.primary_pressed())
+        && let Some(p) = response.interact_pointer_pos()
+    {
+        let p = to_doc(state, p, ppp);
+        let hit = state.doc.slices.iter().rev().find_map(|s| {
+            let h = state
+                .selected_slices
+                .contains(&s.id)
+                .then(|| handle(s.bounds, p, state.view.zoom / ppp))
+                .flatten();
+            let (x0, y0, x1, y1) = s.bounds;
+            let inside =
+                p.x >= x0 as f32 && p.x <= x1 as f32 && p.y >= y0 as f32 && p.y <= y1 as f32;
+            (h.is_some() || inside).then_some((s.id, h))
+        });
+        if let Some((id, h)) = hit {
+            let shift = ui.input(|i| i.modifiers.shift);
+            if shift && state.selected_slices.contains(&id) && h.is_none() {
+                state.selected_slices.retain(|&s| s != id);
+            } else {
+                if !state.selected_slices.contains(&id) {
+                    if !shift {
+                        state.selected_slices.clear();
+                    }
+                    state.selected_slices.push(id);
+                }
+                state.slice_select_drag = Some(SelectDrag {
+                    before: state.doc.snapshot(),
+                    slices: state.doc.slices.clone(),
+                    start: p,
+                    handle: h.map(|(x, y)| (id, x, y)),
+                });
+            }
+        } else if !ui.input(|i| i.modifiers.shift) {
+            state.selected_slices.clear();
+        }
+    }
+    if let Some(p) = ui.input(|i| i.pointer.interact_pos()) {
+        let p = to_doc(state, p, ppp);
+        if let Some(d) = &state.slice_select_drag {
+            let delta = p - d.start;
+            let dx = delta.x.round() as i64;
+            let dy = delta.y.round() as i64;
+            let mut slices = d.slices.clone();
+            if let Some((id, hx, hy)) = d.handle {
+                if let Some(s) = slices.iter_mut().find(|s| s.id == id) {
+                    let (mut x0, mut y0, mut x1, mut y1) = s.bounds;
+                    if hx < 0 {
+                        x0 = (x0 as i64 + dx).clamp(0, x1 as i64 - 1) as u32;
+                    }
+                    if hx > 0 {
+                        x1 = (x1 as i64 + dx).clamp(x0 as i64 + 1, state.doc.width as i64) as u32;
+                    }
+                    if hy < 0 {
+                        y0 = (y0 as i64 + dy).clamp(0, y1 as i64 - 1) as u32;
+                    }
+                    if hy > 0 {
+                        y1 = (y1 as i64 + dy).clamp(y0 as i64 + 1, state.doc.height as i64) as u32;
+                    }
+                    s.bounds = (x0, y0, x1, y1);
+                }
+            } else {
+                let chosen: Vec<_> = slices
+                    .iter()
+                    .filter(|s| state.selected_slices.contains(&s.id))
+                    .collect();
+                let lo_x = chosen.iter().map(|s| s.bounds.0).min().unwrap_or(0) as i64;
+                let lo_y = chosen.iter().map(|s| s.bounds.1).min().unwrap_or(0) as i64;
+                let hi_x = chosen.iter().map(|s| s.bounds.2).max().unwrap_or(0) as i64;
+                let hi_y = chosen.iter().map(|s| s.bounds.3).max().unwrap_or(0) as i64;
+                let dx = dx.clamp(-lo_x, (state.doc.width as i64 - hi_x).max(-lo_x));
+                let dy = dy.clamp(-lo_y, (state.doc.height as i64 - hi_y).max(-lo_y));
+                for s in &mut slices {
+                    if state.selected_slices.contains(&s.id) {
+                        let (x0, y0, x1, y1) = s.bounds;
+                        s.bounds = (
+                            (x0 as i64 + dx) as u32,
+                            (y0 as i64 + dy) as u32,
+                            (x1 as i64 + dx) as u32,
+                            (y1 as i64 + dy) as u32,
+                        );
+                    }
+                }
+            }
+            if state.doc.slices != slices {
+                state.doc.slices = slices;
+                state.doc.mark_dirty();
+            }
+        }
+    }
+    if ui.input(|i| i.pointer.primary_released())
+        && let Some(d) = state.slice_select_drag.take()
+        && state.doc.slices != d.slices
+    {
+        state.record(if d.handle.is_some() {
+            "Resize Slice"
+        } else {
+            "Move Slice"
+        });
     }
 }

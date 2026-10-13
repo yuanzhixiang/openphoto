@@ -269,3 +269,5 @@ Quick Selection Escape restores its initial snapshot without history or switchin
 Magic Wand uses its configured Point/3/5/11/31/51/101 sampling window. Combination modifiers latch at press, and unchanged selections do not add history.
 
 Slice input is delegated to slice_tool; Slice and Slice Select display numbered user slice overlays. Switching away cancels creation preview.
+
+Slice Select delegates selection, drag, resize, deletion and Escape to slice_tool. Switching away cancels any unfinished slice selection gesture.

@@ -29,3 +29,5 @@ Perspective Crop CPU regression covers crossing-box rejection, valid drawn-box c
 Slice CPU regression verifies all three drawing styles, exported dimensions/pixels, Escape cancellation, undo and untouched source pixels.
 
 Guide-grid CPU test covers horizontal/vertical division, duplicate guides and repeated no-op creation.
+
+Slice Select CPU regression covers moving, corner resizing, multi-selection/group movement, Escape, deletion, undo and unchanged image pixels.

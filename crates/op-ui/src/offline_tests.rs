@@ -727,3 +727,56 @@ fn slice_guide_grid_replaces_user_slices_and_deduplicates_cpu() {
     assert_eq!(d.slices[3].bounds, (128, 64, 256, 256));
     assert!(!op_core::slice::from_guides(d));
 }
+
+#[test]
+fn slice_select_move_resize_multiselect_cancel_delete_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::Slice);
+    h.drag((20.0, 20.0), (100.0, 100.0), Modifiers::NONE);
+    h.drag((150.0, 20.0), (220.0, 100.0), Modifiers::NONE);
+    let pixels = h.state().doc.composite_rgba8();
+    h.app.tool = Tool::SliceSelect;
+    h.drag((60.0, 60.0), (80.0, 80.0), Modifiers::NONE);
+    assert_eq!(h.state().doc.slices[0].bounds, (40, 40, 120, 120));
+    h.drag((120.0, 120.0), (140.0, 130.0), Modifiers::NONE);
+    assert_eq!(h.state().doc.slices[0].bounds, (40, 40, 140, 130));
+    let p = h.point(180.0, 60.0);
+    h.button(p, true, Modifiers::SHIFT);
+    h.button(p, false, Modifiers::SHIFT);
+    assert_eq!(h.state().selected_slices.len(), 2);
+    h.drag((80.0, 80.0), (90.0, 90.0), Modifiers::NONE);
+    assert_eq!(h.state().doc.slices[0].bounds, (50, 50, 150, 140));
+    assert_eq!(h.state().doc.slices[1].bounds, (160, 30, 230, 110));
+    let original = h.state().doc.slices.clone();
+    let count = h.state().history.states().len();
+    let p = h.point(90.0, 90.0);
+    h.button(p, true, Modifiers::NONE);
+    let q = h.point(120.0, 130.0);
+    h.step(vec![Event::PointerMoved(q)], Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    h.button(q, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.slices, original);
+    assert_eq!(h.state().history.states().len(), count);
+    h.step(
+        vec![Event::Key {
+            key: Key::Delete,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    assert!(h.state().doc.slices.is_empty());
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.slices, original);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}

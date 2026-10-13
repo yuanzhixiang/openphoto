@@ -199,3 +199,5 @@ Quick Selection offline follow-up adds snapshot cancellation, no-op history supp
 - Perspective Crop: convex-plane validation preserves invalid editable boxes; finite resolution/size validation and CPU draw/commit/undo test pass, as does strict op-ui clippy. Native shield/output-size parity remains unmeasured.
 
 - Slice: user regions, three size styles, guide-grid generation, numbered overlays, undo and composite pixel export API are implemented. Version-6 PSD resource 1050 retains names/URLs/target/alt/bounds. Two CPU regressions, PSD Unicode round-trip and strict workspace clippy pass. Auto slices, modern descriptor import, export dialog and transform remapping remain outstanding; this is not full native parity.
+
+- Slice Select: user slice selection/multi-selection, move, edge/corner resize, cancellation, delete and undo pass CPU testing. A regression from eagerly stored Slice defaults was repaired. Workspace regression: 597 passed, 0 failed, 51 ignored; strict workspace clippy passes. Auto slices, arrange/align/divide/promote and slice option dialogs remain outstanding.

@@ -780,6 +780,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 magnetic_input(ui, &response, state, options, magnetic, ppp);
             }
             Tool::Slice => crate::slice_tool::input(ui, &response, state, slice_options, ppp),
+            Tool::SliceSelect => crate::slice_tool::select_input(ui, &response, state, ppp),
             Tool::Artboard => {
                 crate::artboard_tool::input(ui, &response, state, artboard_options, ppp)
             }
@@ -1102,6 +1103,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         crate::slice_tool::draw(ui, state, slice_options, ppp);
     } else {
         state.slice_drag = None;
+    }
+    if tool != Tool::SliceSelect {
+        crate::slice_tool::cancel_select(state);
     }
     let transforming = state.free_transform.is_some();
     if let (Some(opts), Some(p), false) = (paint, response.hover_pos(), transforming) {

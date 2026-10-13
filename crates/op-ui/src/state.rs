@@ -97,6 +97,7 @@ pub struct DocState {
     pub wand_op: Option<op_core::SelectionOp>,
     pub slice_drag: Option<crate::slice_tool::Drag>,
     pub selected_slices: Vec<u64>,
+    pub slice_select_drag: Option<crate::slice_tool::SelectDrag>,
     /// The Object Selection tool's rectangle being dragged (document
     /// pixels).
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
@@ -199,7 +200,7 @@ impl DocState {
     /// Whether a tool is in the middle of something Escape would cancel
     /// (so Escape is not taken to leave Full Screen Mode).
     pub fn busy(&self) -> bool {
-        if self.slice_drag.is_some() {
+        if self.slice_drag.is_some() || self.slice_select_drag.is_some() {
             return true;
         }
         self.crop.is_some()
@@ -288,6 +289,7 @@ impl DocState {
             wand_op: None,
             slice_drag: None,
             selected_slices: Vec::new(),
+            slice_select_drag: None,
             object_drag: None,
             object_path: None,
             object_op: None,
