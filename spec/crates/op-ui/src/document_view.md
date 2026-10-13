@@ -287,3 +287,5 @@ Patch outline drags accept Escape before pixel changes; releasing the cancelled 
 Clone Stamp samples the active layer/Quick Mask when that target is selected, independent of the pixel-layer Sample scope; it writes into the same target. Pixel-layer sampling scopes are unchanged.
 
 History Brush reads the corresponding image, layer mask or Quick Mask from its selected history source. A missing mask source rejects the stroke rather than restoring layer pixels into a mask.
+
+Gradient Escape clears the pending line without committing pixels; release after cancellation does nothing. A subsequent valid line remains undoable. The editable Gradient layer mode remains unimplemented.

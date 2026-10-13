@@ -173,3 +173,5 @@ count_group selects a transient count group ID; count_drag previews marker movem
 count_name_edit holds staged count-group name editing; changes to the name contribute to dirty status.
 
 DocState::busy includes Patch/Content-Aware Move outline drags, so Escape cancels the operation before leaving Full Screen Mode.
+
+DocState::busy includes pending gradient lines so Escape cancels them before exiting Full Screen Mode.

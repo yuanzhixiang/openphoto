@@ -57,3 +57,5 @@ Patch cancellation regression covers drag state, busy state, release after Escap
 Clone Stamp canvas regression checks mask source sampling, destination coverage, untouched pixels, one history state and undo.
 
 History Brush regression restores a mask pixel from a selected state on both mask targets, leaves image pixels unchanged and verifies undo.
+
+Gradient regression checks pending busy state, Escape/release preserving pixels/history and a subsequent valid gradient with undo. The CPU harness key helper synthesizes key-down events without host input.

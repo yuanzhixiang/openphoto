@@ -68,6 +68,18 @@ impl CanvasHarness {
             mods,
         );
     }
+    fn key(&mut self, key: Key) {
+        self.step(
+            vec![Event::Key {
+                key,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: Modifiers::NONE,
+            }],
+            Modifiers::NONE,
+        );
+    }
     fn drag(&mut self, a: (f32, f32), b: (f32, f32), mods: Modifiers) {
         let a = self.point(a.0, a.1);
         let b = self.point(b.0, b.1);
@@ -1390,4 +1402,27 @@ fn history_brush_restores_the_corresponding_mask_and_undoes_cpu() {
             [255, 255, 255, 255]
         );
     }
+}
+
+#[test]
+fn gradient_escape_cancels_before_pixels_and_valid_release_undoes_cpu() {
+    let mut h = CanvasHarness::new(Tool::Gradient);
+    let pixels = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    let a = h.point(30.5, 100.5);
+    let b = h.point(200.5, 100.5);
+    h.button(a, true, Modifiers::NONE);
+    h.step(vec![Event::PointerMoved(b)], Modifiers::NONE);
+    assert!(h.state().gradient_drag.is_some());
+    assert!(h.state().busy());
+    h.key(Key::Escape);
+    assert!(h.state().gradient_drag.is_none());
+    h.button(b, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    assert_eq!(h.state().history.states().len(), count);
+    h.drag((30.5, 100.5), (200.5, 100.5), Modifiers::NONE);
+    assert_ne!(h.state().doc.composite_rgba8(), pixels);
+    assert_eq!(h.state().history.states().len(), count + 1);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }

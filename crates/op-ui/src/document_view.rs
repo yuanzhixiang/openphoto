@@ -1478,6 +1478,10 @@ fn gradient_input(
     options: op_core::gradient::GradientOptions,
     ppp: f32,
 ) -> Option<String> {
+    if state.gradient_drag.is_some() && ui.input(|i| i.key_pressed(Key::Escape)) {
+        state.gradient_drag = None;
+        return None;
+    }
     if response.drag_started_by(PointerButton::Primary)
         && let Some(p) = ui.input(|i| i.pointer.press_origin())
     {
