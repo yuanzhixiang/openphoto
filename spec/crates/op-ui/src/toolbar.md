@@ -17,7 +17,7 @@ The toolbar is 42 pt wide; the right 3 pt is the divider against the canvas, and
    - Swap colors icon: a quarter-circle arc with an arrow at each end (pointing left and down), at (21.5, 631.5)–(34, 643).
    - Foreground color swatch (4, 648)–(24, 668), background color swatch (14, 658)–(34, 678), foreground on top.
    - Quick Mask button: a ring of 12 small square dots inside a rounded rectangle (9, 689)–(27, 702); shown pressed while in Quick Mask.
-   - Change Screen Mode button: two overlapping window shapes (the top-right one in front), with a small gray triangle at the bottom right; appearance only.
+   - Change Screen Mode button: two overlapping window shapes (the top-right one in front), with a small gray triangle at the bottom right. Click cycles the screen mode through set_screen_mode, retaining the Full Screen warning; the context menu selects any of the three modes.
    Icon color `#dddddd`; the buttons' hover hit areas are the same size as the tool buttons'.
 4. The 3 pt divider on the right (`#383838`, `#474747`, `#383838`), against the canvas.
 
@@ -47,3 +47,5 @@ The Quick Mask button ("Edit in Quick Mask Mode (Q)") enters/exits Quick Mask fo
 ## Tool Icons
 
 The icons in the buttons are drawn in Photoshop's style by `tool_icons.rs` (see `tool_icons.md`), with icon centers computed from Photoshop's row pitch; tools for which `paint` returns false (currently none) fall back to Phosphor font icons.
+
+The screen-mode control changes view/window state only, without editing the document or recording history. Toolbar customization and two-column collapse remain unimplemented.

@@ -68,6 +68,38 @@ impl CanvasHarness {
             mods,
         );
     }
+    fn toolbar_step(&mut self, events: Vec<Event>) -> Pos2 {
+        self.frame += 1;
+        let raw = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                Pos2::ZERO,
+                egui::vec2(1024.0, 1400.0),
+            )),
+            time: Some(self.frame as f64 / 60.0),
+            events,
+            ..Default::default()
+        };
+        let mut origin = Pos2::ZERO;
+        let mut output = self.ctx.run_ui(raw, |ui| {
+            origin = ui.max_rect().min;
+            crate::toolbar::show(ui, &mut self.app);
+        });
+        output.textures_delta.clear();
+        origin
+    }
+    fn toolbar_click(&mut self, p: Pos2) {
+        for pressed in [true, false] {
+            self.toolbar_step(vec![
+                Event::PointerMoved(p),
+                Event::PointerButton {
+                    pos: p,
+                    button: PointerButton::Primary,
+                    pressed,
+                    modifiers: Modifiers::NONE,
+                },
+            ]);
+        }
+    }
     fn key(&mut self, key: Key) {
         self.step(
             vec![Event::Key {
@@ -1511,4 +1543,27 @@ fn zoom_escape_restores_scrubby_view_and_discards_zoom_boxes_cpu() {
         assert_eq!(h.state().doc.composite_rgba8(), pixels);
         assert_eq!(h.state().history.states().len(), count);
     }
+}
+
+#[test]
+fn toolbar_screen_mode_button_cycles_and_preserves_the_full_screen_prompt_cpu() {
+    use crate::state::ScreenMode;
+    let mut h = CanvasHarness::new(Tool::Hand);
+    let pixels = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    let origin = h.toolbar_step(Vec::new());
+    let p = origin + egui::vec2(crate::theme::pt(18.0), crate::theme::pt(721.5));
+    h.toolbar_click(p);
+    assert_eq!(h.app.screen_mode, ScreenMode::FullWithMenus);
+    h.toolbar_click(p);
+    assert!(h.app.full_screen_prompt.is_some());
+    assert_eq!(h.app.screen_mode, ScreenMode::FullWithMenus);
+    h.app.full_screen_prompt = None;
+    h.app.enter_screen_mode(ScreenMode::Full);
+    assert!(h.app.hide_tools && h.app.hide_panels);
+    h.key(Key::F);
+    assert_eq!(h.app.screen_mode, ScreenMode::Standard);
+    assert!(!h.app.hide_tools && !h.app.hide_panels);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    assert_eq!(h.state().history.states().len(), count);
 }

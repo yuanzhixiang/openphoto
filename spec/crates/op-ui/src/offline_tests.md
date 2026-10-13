@@ -65,3 +65,5 @@ Shape cancellation regression exercises each supported shape tool, releasing aft
 Rotate View regression checks a quarter-turn drag, Escape while pressed, continued movement/release staying at zero, unchanged pixels and history.
 
 Zoom cancellation regression covers scrubby scale/anchor restoration and box discard, post-Escape movement/release, unchanged document pixels and history.
+
+Toolbar CPU frames construct the Tools panel directly, without a native window. The screen-mode regression clicks its real hit area, checks the warning before Full Screen, simulates confirmation, returns with F and preserves pixels/history.

@@ -253,7 +253,23 @@ fn bottom(ui: &mut Ui, app: &mut AppState, full: Rect, button: Vec2) {
 
     // Change Screen Mode: two overlapping windows, the back one on top
     let sm_center = p(36.0, 1443.0);
-    button_at(ui, sm_center, "screen-mode").on_hover_text("Change Screen Mode (F)");
+    let screen = button_at(ui, sm_center, "screen-mode").on_hover_text("Change Screen Mode (F)");
+    if screen.clicked() {
+        app.set_screen_mode(app.screen_mode.cycle(false));
+    }
+    screen.context_menu(|ui| {
+        use crate::state::ScreenMode;
+        for (mode, label) in [
+            (ScreenMode::Standard, "Standard Screen Mode"),
+            (ScreenMode::FullWithMenus, "Full Screen Mode With Menu Bar"),
+            (ScreenMode::Full, "Full Screen Mode"),
+        ] {
+            if ui.radio(app.screen_mode == mode, label).clicked() {
+                app.set_screen_mode(mode);
+                ui.close();
+            }
+        }
+    });
     let window = |rect: Rect, fill: bool| {
         if fill {
             painter.rect_filled(rect, 0, color::PANEL);
