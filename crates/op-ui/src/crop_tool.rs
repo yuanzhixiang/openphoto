@@ -361,7 +361,7 @@ pub(crate) fn parse_length(text: &str) -> Option<(f32, Option<SizeUnit>)> {
     .find_map(|(s, u)| t.strip_suffix(s).map(|n| (n, Some(u))))
     .unwrap_or((t, None));
     let v: f32 = number.trim().parse().ok()?;
-    (v > 0.0).then_some((v, unit))
+    (v.is_finite() && v > 0.0).then_some((v, unit))
 }
 
 fn format_length(v: f32, unit: SizeUnit) -> String {
@@ -374,7 +374,8 @@ impl CropOptions {
     /// Pixels per inch typed, if any.
     fn ppi(&self) -> Option<f32> {
         let v: f32 = self.resolution.trim().parse().ok()?;
-        (v > 0.0).then_some(if self.per_cm { v * 2.54 } else { v })
+        let v = if self.per_cm { v * 2.54 } else { v };
+        (v.is_finite() && v > 0.0).then_some(v)
     }
 
     /// The size typed, in pixels (W x H x Resolution and the sizes).
@@ -386,7 +387,10 @@ impl CropOptions {
             let (v, unit) = parse_length(text)?;
             match unit.unwrap_or(SizeUnit::Pixels).per_inch() {
                 None => Some(v),
-                Some(k) => Some(v / k * self.ppi()?),
+                Some(k) => {
+                    let pixels = v / k * self.ppi()?;
+                    (pixels.is_finite() && pixels > 0.0).then_some(pixels)
+                }
             }
         };
         Some((px(&self.width)?, px(&self.height)?))
@@ -1020,9 +1024,13 @@ pub fn commit(state: &mut DocState, options: &CropOptions, background: op_core::
             );
             changed = true;
         }
-        if let Some(ppi) = options.ppi() {
-            state.doc.resolution = ppi;
-        }
+    }
+    if options.preset.sized()
+        && let Some(ppi) = options.ppi()
+        && state.doc.resolution != ppi
+    {
+        state.doc.resolution = ppi;
+        changed = true;
     }
     if changed {
         state.record("Crop");

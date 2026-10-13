@@ -563,3 +563,45 @@ fn magic_wand_sampling_latched_add_noop_and_undo_cpu() {
     assert_eq!(h.state().doc.selection(), before.as_ref());
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn crop_resolution_only_commit_cancel_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::Crop);
+    let pixels = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    h.app.crop_options.resolution = "300".into();
+    h.step(
+        vec![Event::Key {
+            key: Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    assert_eq!(h.state().doc.resolution, 300.0);
+    assert_eq!(h.state().history.states().len(), count + 1);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.resolution, 72.0);
+    h.app.crop_options.classic = true;
+    h.drag((256.0, 256.0), (180.0, 180.0), Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    assert_eq!((h.state().doc.width, h.state().doc.height), (256, 256));
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    assert!(crate::crop_tool::parse_length("inf px").is_none());
+    h.app.crop_options.width = "4 in".into();
+    h.app.crop_options.height = "5 in".into();
+    h.app.crop_options.resolution = "inf".into();
+    assert!(h.app.crop_options.output_size().is_none());
+}

@@ -21,3 +21,5 @@ Object Selection CPU regression tests freehand ROI selection on a contrasting ob
 Quick Selection CPU regression checks live segmentation, cancel, New-to-Add transition, no-op suppression, Alt subtraction, undo, unchanged pixels and invalid size fallback.
 
 Magic Wand CPU regression checks average versus point sampling, pointer-down Add, no-op history, undo and pixel preservation.
+
+Crop CPU regression verifies resolution-only commit/history/undo, Escape preserving pixels/dimensions and invalid infinite inputs.

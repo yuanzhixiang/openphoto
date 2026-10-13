@@ -193,3 +193,5 @@ Object Selection offline input follow-up makes Lasso ROI functional and adds pre
 Quick Selection offline follow-up adds snapshot cancellation, no-op history suppression and validated options. Its region growth remains the documented color/edge approximation, not learned Photoshop selection.
 
 - Magic Wand: sampling-window mean, press-latched operation and no-op suppression pass the CPU integration test; workspace strict clippy passes. Native average sampling/connectivity remain unmeasured.
+
+- Crop: resolution-only edits are undoable; non-finite size/resolution conversion is rejected. CPU crop regression and strict op-ui clippy pass. Existing Generative Expand/Content-Aware Fill remain disabled.
