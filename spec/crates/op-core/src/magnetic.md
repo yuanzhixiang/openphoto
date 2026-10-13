@@ -14,3 +14,5 @@ The edge model behind the Magnetic Lasso: a per-pixel cost that is low along str
 ## Tests
 
 - `the_path_follows_an_edge`: on a black/white image split at x = 20, a path between two points left of the edge runs mostly along x 19–20, and the pointer snaps to the edge.
+
+Empty maps return no trace and a neutral snap position. Snap/trace endpoints outside the map are clamped before indexing; snap radius is bounded to the map extent. A regression covers empty maps and far-outside endpoints.

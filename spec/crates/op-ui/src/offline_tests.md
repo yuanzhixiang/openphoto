@@ -13,3 +13,5 @@ Selection Brush CPU regression covers live selection, cancellation, zero opacity
 The Lasso regression covers degenerate paths, polygon-shaped freehand closure, pointer-down mode latching, cancellation, addition, untouched pixels and undo.
 
 Polygonal Lasso CPU tests check constrained vertices, Backspace removing one corner, Enter closing, Escape preserving selection/history and undo with unchanged pixels.
+
+Magnetic Lasso CPU tests verify auto/manual anchors, anchor deletion, closure, initial mode latching, cancellation, undo and untouched pixels.

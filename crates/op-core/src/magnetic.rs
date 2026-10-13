@@ -69,7 +69,11 @@ impl EdgeMap {
     /// The pixel with the strongest edge within `radius` of `p` (the
     /// pointer snaps to it); `p` itself when nothing there is an edge.
     pub fn snap(&self, (px, py): (u32, u32), radius: u32) -> (u32, u32) {
-        let r = radius as i64;
+        if self.width == 0 || self.height == 0 {
+            return (0, 0);
+        }
+        let (px, py) = (px.min(self.width - 1), py.min(self.height - 1));
+        let r = radius.min(self.width.max(self.height)) as i64;
         let mut best = ((px, py), 0.0f32);
         for y in (py as i64 - r).max(0)..=(py as i64 + r).min(self.height as i64 - 1) {
             for x in (px as i64 - r).max(0)..=(px as i64 + r).min(self.width as i64 - 1) {
@@ -89,6 +93,12 @@ impl EdgeMap {
     /// The cheapest 8-connected path from `from` to `to`, searched within
     /// their bounding box widened by `margin` pixels; both ends included.
     pub fn trace(&self, from: (u32, u32), to: (u32, u32), margin: u32) -> Vec<(u32, u32)> {
+        if self.width == 0 || self.height == 0 {
+            return Vec::new();
+        }
+        let from = (from.0.min(self.width - 1), from.1.min(self.height - 1));
+        let to = (to.0.min(self.width - 1), to.1.min(self.height - 1));
+
         let clampx = |v: i64| v.clamp(0, self.width as i64 - 1) as u32;
         let clampy = |v: i64| v.clamp(0, self.height as i64 - 1) as u32;
         let m = margin as i64;
@@ -180,6 +190,18 @@ impl Ord for Node {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn empty_maps_and_outside_endpoints_are_safe() {
+        let map = EdgeMap::new(0, 0, &[], 0.1);
+        assert_eq!(map.snap((10, 10), 256), (0, 0));
+        assert!(map.trace((1, 1), (10, 10), 10).is_empty());
+        let map = EdgeMap::new(3, 3, &[255; 36], 0.1);
+        assert_eq!(map.snap((500, 500), 10), (2, 2));
+        let path = map.trace((0, 0), (500, 500), 10);
+        assert_eq!(path.first(), Some(&(0, 0)));
+        assert_eq!(path.last(), Some(&(2, 2)));
+    }
 
     #[test]
     fn the_path_follows_an_edge() {

@@ -185,3 +185,5 @@ Selection Brush offline follow-up adds snapshot cancellation and no-op history s
 Freehand Lasso offline follow-up adds Escape cancellation, Enter closure and pointer-down combination modifiers; real native curve/feather comparison is still pending.
 
 Polygonal Lasso offline follow-up adds Shift-constrained vertices and initial-press modifier latching, and verifies anchor removal, explicit closure, cancellation and undo.
+
+Magnetic Lasso offline follow-up bounds empty/outside edge-map inputs, rejects outside-image starts and latches pointer-down combination modes. Edge tracking is the existing Sobel/live-wire implementation; matching Photoshop's exact algorithm remains unverified.

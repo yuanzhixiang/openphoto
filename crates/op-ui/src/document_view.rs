@@ -1638,6 +1638,25 @@ fn magnetic_input(
         .input(|i| i.pointer.hover_pos())
         .map(|p| to_doc(state, p, ppp));
     let (w, h) = (state.doc.width, state.doc.height);
+    if state.lasso.is_none()
+        && response.contains_pointer()
+        && ui.input(|i| i.pointer.button_pressed(PointerButton::Primary))
+    {
+        let pressed = ui
+            .input(|i| {
+                i.events.iter().find_map(|event| match event {
+                    egui::Event::PointerButton {
+                        button: PointerButton::Primary,
+                        pressed: true,
+                        modifiers,
+                        ..
+                    } => Some(*modifiers),
+                    _ => None,
+                })
+            })
+            .unwrap_or_else(|| ui.input(|i| i.modifiers));
+        state.lasso_press = Some((pressed, state.doc.selection().is_some()));
+    }
     let cell = |p: Pos2| {
         (
             (p.x.max(0.0) as u32).min(w.saturating_sub(1)),
@@ -1663,12 +1682,16 @@ fn magnetic_input(
             && let Some(p) = pointer
             && p.x >= 0.0
             && p.y >= 0.0
+            && p.x < w as f32
+            && p.y < h as f32
         {
             let image = state.canvas_image();
             let edges = op_core::magnetic::EdgeMap::new(w, h, &image.pixels, contrast);
             let start = edges.snap(cell(p), width);
-            let mods = ui.input(|i| i.modifiers);
-            let (op, _, _) = selection_op(mods, state.doc.selection().is_some(), mode);
+            let (mods, selected) = state
+                .lasso_press
+                .unwrap_or_else(|| (ui.input(|i| i.modifiers), state.doc.selection().is_some()));
+            let (op, _, _) = selection_op(mods, selected, mode);
             state.lasso = Some(LassoPath {
                 points: vec![center(start)],
                 op,
@@ -1688,6 +1711,7 @@ fn magnetic_input(
         return;
     };
     if escape {
+        state.lasso_press = None;
         state.lasso = None;
         return;
     }
@@ -1725,6 +1749,7 @@ fn magnetic_input(
         magnetic.anchors.push(magnetic.fixed - 1);
     }
     if close {
+        state.lasso_press = None;
         let lasso = state.lasso.take().expect("checked");
         finish_lasso(state, lasso, (feather, anti_alias), "Magnetic Lasso");
         return;
