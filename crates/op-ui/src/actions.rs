@@ -696,7 +696,10 @@ fn paint_key(app: &mut AppState, key: Key, shift: bool) -> bool {
 
 /// Arrow keys nudge with the Move tool (1 pixel, 10 with Shift).
 fn nudge_key(app: &mut AppState, key: Key, shift: bool) -> bool {
-    let marquee = app.tool == op_tools::Tool::RectangularMarquee;
+    let marquee = matches!(
+        app.tool,
+        op_tools::Tool::RectangularMarquee | op_tools::Tool::EllipticalMarquee
+    );
     if app.tool != op_tools::Tool::Move && !marquee {
         return false;
     }

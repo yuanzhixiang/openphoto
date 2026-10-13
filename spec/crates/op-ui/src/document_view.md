@@ -249,3 +249,5 @@ Artboard canvas input and board outlines are delegated to artboard_tool; space/m
 Marquee combination modifiers are latched from the actual pointer-down event, rather than the delayed egui drag-start frame. Escape discards a live marquee without history or selection changes. Holding Space during a rectangular/elliptical drag translates the preview while retaining its dimensions; it does not pan the document. Fixed Size continues to track its pointer anchor. These are offline interaction contracts; native modifier timing parity is unverified.
 
 Rectangular Marquee in New/Normal mode moves the existing selection outline when dragged from its selected interior, leaving all layer pixels untouched. Each preview is recomputed from the original selection; Escape restores the original snapshot and release records one Move Selection state.
+
+Elliptical Marquee also moves an existing outline from its selected interior in New/Normal mode, with the same absolute preview and cancel contract as Rectangular Marquee. Circle/center modifiers, operation modes, anti-alias and feather act on the ellipse mask.

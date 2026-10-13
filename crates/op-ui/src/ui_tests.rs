@@ -9839,3 +9839,61 @@ fn rectangular_marquee_moves_outline_and_nudges_without_pixels_offline() {
     );
     assert_eq!(active(&h).doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn elliptical_marquee_circle_combinations_feather_and_outline_offline() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.tool = op_tools::Tool::EllipticalMarquee;
+    h.state_mut().state.view.snap = false;
+    h.state_mut().state.view.smart_guides = false;
+    let (a, b) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 120.0, 130.0));
+    drag(
+        &mut h,
+        a,
+        b,
+        Modifiers {
+            shift: true,
+            alt: true,
+            ..Modifiers::NONE
+        },
+    );
+    let selection = active(&h).doc.selection().unwrap();
+    assert_eq!(selection.bounds(), Some((70, 70, 130, 130)));
+    assert_eq!(selection.get(100, 100), 255);
+    assert_eq!(selection.get(70, 70), 0);
+    assert!((70..130).any(|x| {
+        let v = selection.get(x, 72);
+        v > 0 && v < 255
+    }));
+    let pixels = active(&h).doc.composite_rgba8();
+    let (a, b) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 110.0, 120.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(
+        active(&h).doc.selection().unwrap().bounds(),
+        Some((80, 90, 140, 150))
+    );
+    assert_eq!(active(&h).doc.composite_rgba8(), pixels);
+    h.key_press(egui::Key::ArrowRight);
+    h.run_steps(2);
+    assert_eq!(
+        active(&h).doc.selection().unwrap().bounds(),
+        Some((81, 90, 141, 150))
+    );
+    h.state_mut().state.marquee.mode = crate::state::SelectionMode::Intersect;
+    h.state_mut().state.marquee.anti_alias = false;
+    let (a, b) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 150.0, 150.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let selection = active(&h).doc.selection().unwrap();
+    assert_eq!(selection.get(85, 120), 0);
+    assert!(selection.get(120, 120) > 0);
+    h.state_mut().state.marquee.mode = crate::state::SelectionMode::New;
+    h.state_mut().state.marquee.feather = 3.0;
+    let (a, b) = (doc_point(&h, 250.0, 250.0), doc_point(&h, 310.0, 290.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let selection = active(&h).doc.selection().unwrap();
+    assert!(selection.get(250, 270) > 0 && selection.get(250, 270) < 255);
+    assert_eq!(last_history(&h), "Elliptical Marquee");
+    assert!(h.state_mut().state.active().unwrap().undo());
+    assert!(active(&h).doc.selection().unwrap().get(120, 120) > 0);
+}

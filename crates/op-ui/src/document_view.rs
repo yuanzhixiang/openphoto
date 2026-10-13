@@ -1730,7 +1730,7 @@ fn marquee_input(
             })
             .unwrap_or(mods);
         state.marquee_press = Some((pressed, has_selection));
-        if tool == Tool::RectangularMarquee
+        if matches!(tool, Tool::RectangularMarquee | Tool::EllipticalMarquee)
             && fixed.is_none()
             && mode == crate::state::SelectionMode::New
             && !pressed.shift
