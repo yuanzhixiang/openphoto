@@ -311,3 +311,5 @@ Add Anchor Point dispatches active-path hit testing and exact insertion.
 Delete Anchor Point dispatches active-path anchor picking and topology deletion.
 
 Convert Point handles transactional knot/control editing. Leaving Pen/Convert Point cancels unfinished path pointer edits.
+
+Path Selection routes whole-path selection/move transactions and participates in path drag cancellation.

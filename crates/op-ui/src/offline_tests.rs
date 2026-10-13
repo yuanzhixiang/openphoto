@@ -2087,3 +2087,50 @@ fn convert_point_corner_smooth_independent_handle_cancel_and_undo_cpu() {
     assert_eq!(h.state().history.states().len(), count);
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn path_selection_moves_all_controls_duplicates_cancels_and_undoes_cpu() {
+    use op_core::path::{Knot, Path, Subpath};
+    let mut h = CanvasHarness::new(Tool::PathSelection);
+    h.app.active().unwrap().doc.paths.push(Path {
+        name: "Outline".into(),
+        subpaths: vec![Subpath {
+            closed: false,
+            knots: vec![
+                Knot {
+                    incoming: (20., 20.),
+                    anchor: (40., 40.),
+                    outgoing: (60., 60.),
+                    linked: true,
+                },
+                Knot::corner((140., 120.)),
+            ],
+        }],
+    });
+    h.app.active().unwrap().record("Path");
+    let original = h.state().doc.paths.clone();
+    let pixels = h.state().doc.composite_rgba8();
+    h.drag((40., 40.), (60., 70.), Modifiers::NONE);
+    let moved = h.state().doc.paths.clone();
+    let k = &moved[0].subpaths[0].knots[0];
+    assert!((k.anchor.0 - 60.).abs() < 0.001 && (k.anchor.1 - 70.).abs() < 0.001);
+    assert!((k.incoming.0 - 40.).abs() < 0.001 && (k.outgoing.0 - 80.).abs() < 0.001);
+    h.drag((60., 70.), (90., 100.), Modifiers::ALT);
+    assert_eq!(h.state().doc.paths.len(), 2);
+    assert_eq!(h.state().doc.paths[0], moved[0]);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.paths, moved);
+    h.app.select_tool(Tool::PathSelection);
+    let p = h.point(60., 70.);
+    h.button(p, true, Modifiers::NONE);
+    h.step(
+        vec![Event::PointerMoved(h.point(120., 160.))],
+        Modifiers::NONE,
+    );
+    h.key(Key::Escape);
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.paths, moved);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.paths, original);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}

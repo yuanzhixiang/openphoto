@@ -91,3 +91,5 @@ Add Anchor Point regression targets a known cubic midpoint, checks unchanged pix
 Delete Anchor Point regression removes three closed-path anchors through the empty-path state, restores geometry with undo, checks misses and unchanged pixels.
 
 Convert Point verifies smooth-to-corner, undo, Shift constrained symmetric controls, independent handle editing, Escape rollback, no extra history and unchanged pixels.
+
+Path Selection regression checks all controls translate, Alt-copy preserves its source, Escape restores live drags, undo restores original paths and pixels remain unchanged.

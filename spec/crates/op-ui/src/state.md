@@ -187,3 +187,5 @@ TextEdit also stores vertical orientation, separate from whether it creates a ty
 pen_session holds Pen continuation and an in-flight pointer snapshot. In-flight edits count as busy; undo/redo discard this transient session.
 
 pen_session also tracks Convert Point pointer transactions and treats them as busy.
+
+pen_session stores transient selected path indexes and a whole-path drag snapshot; it is busy during movement.

@@ -758,6 +758,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
+            Tool::PathSelection if !modal => {
+                crate::pen_tool::select_path(ui, &response, state, ppp);
+            }
             Tool::ConvertPoint if !modal => {
                 crate::pen_tool::convert_point(ui, &response, state, ppp);
             }
@@ -1166,7 +1169,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     {
         crate::type_tool::commit(state);
     }
-    if !matches!(tool, Tool::Pen | Tool::ConvertPoint) {
+    if !matches!(tool, Tool::Pen | Tool::ConvertPoint | Tool::PathSelection) {
         crate::pen_tool::cancel_inflight(state);
     }
     crate::pen_tool::draw(ui, state, canvas_rect, ppp);

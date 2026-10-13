@@ -10,6 +10,8 @@ pub struct Session {
     pub continuation: Option<(usize, usize)>,
     drag: Option<Drag>,
     convert: Option<ConvertDrag>,
+    selected_paths: Vec<usize>,
+    move_path: Option<PathDrag>,
 }
 struct Drag {
     before: op_core::Snapshot,
@@ -20,7 +22,7 @@ struct Drag {
 }
 impl Session {
     pub fn busy(&self) -> bool {
-        self.drag.is_some() || self.convert.is_some()
+        self.drag.is_some() || self.convert.is_some() || self.move_path.is_some()
     }
 }
 pub fn input(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
@@ -280,6 +282,9 @@ fn handle_hit(state: &DocState, pointer: Pos2, ppp: f32) -> Option<(usize, usize
     hit
 }
 pub fn cancel_inflight(state: &mut DocState) {
+    if let Some(d) = state.pen_session.move_path.take() {
+        state.doc.restore(&d.before);
+    }
     if let Some(d) = state.pen_session.drag.take() {
         state.doc.restore(&d.before);
     }
@@ -355,6 +360,107 @@ pub fn convert_point(ui: &Ui, response: &egui::Response, state: &mut DocState, p
         if *k != d.original {
             state.doc.mark_dirty();
             state.record("Convert Point");
+        }
+    }
+}
+
+struct PathDrag {
+    before: op_core::Snapshot,
+    original: Vec<Path>,
+    initial: Vec<Path>,
+    selected: Vec<usize>,
+    start: Pos2,
+}
+fn path_hit(state: &mut DocState, p: Pos2, ppp: f32) -> Option<usize> {
+    let active = state.doc.active_path;
+    let mut hit = None;
+    for path in (0..state.doc.paths.len()).rev() {
+        state.doc.active_path = Some(path);
+        if anchor_hit(state, p, ppp).is_some() || curve_hit(state, p, ppp).is_some() {
+            hit = Some(path);
+            break;
+        }
+    }
+    state.doc.active_path = active;
+    hit
+}
+pub fn select_path(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
+    if ui.input(|i| i.key_pressed(Key::Escape)) {
+        cancel_inflight(state);
+        return;
+    }
+    if response.hovered()
+        && ui.input(|i| i.pointer.primary_pressed())
+        && let Some(p) = ui.input(|i| i.pointer.interact_pos())
+    {
+        let Some(path) = path_hit(state, p, ppp) else {
+            state.doc.active_path = None;
+            state.pen_session.selected_paths.clear();
+            return;
+        };
+        let before = state.doc.snapshot();
+        let original = state.doc.paths.clone();
+        let shift = ui.input(|i| i.modifiers.shift);
+        if shift && state.pen_session.selected_paths.contains(&path) {
+            state.pen_session.selected_paths.retain(|&i| i != path);
+            return;
+        }
+        if !shift && !state.pen_session.selected_paths.contains(&path) {
+            state.pen_session.selected_paths = vec![path];
+        } else if !state.pen_session.selected_paths.contains(&path) {
+            state.pen_session.selected_paths.push(path);
+        }
+        state
+            .pen_session
+            .selected_paths
+            .retain(|&i| i < state.doc.paths.len());
+        if ui.input(|i| i.modifiers.alt) {
+            let mut selected = vec![];
+            for &index in &state.pen_session.selected_paths {
+                let mut copy = state.doc.paths[index].clone();
+                copy.name = format!("{} copy", copy.name);
+                selected.push(state.doc.paths.len());
+                state.doc.paths.push(copy);
+            }
+            state.pen_session.selected_paths = selected;
+        }
+        state.doc.active_path = state.pen_session.selected_paths.last().copied();
+        state.pen_session.continuation = None;
+        state.pen_session.move_path = Some(PathDrag {
+            before,
+            original,
+            initial: state.doc.paths.clone(),
+            selected: state.pen_session.selected_paths.clone(),
+            start: to_doc(state, p, ppp),
+        });
+    }
+    let Some(d) = state.pen_session.move_path.as_ref() else {
+        return;
+    };
+    if let Some(p) = ui.input(|i| i.pointer.interact_pos()) {
+        let p = to_doc(state, p, ppp);
+        let mut delta = p - d.start;
+        if ui.input(|i| i.modifiers.shift) {
+            if delta.x.abs() > delta.y.abs() {
+                delta.y = 0.;
+            } else {
+                delta.x = 0.;
+            }
+        }
+        for &index in &d.selected {
+            state.doc.paths[index] = d.initial[index].clone();
+            for sub in &mut state.doc.paths[index].subpaths {
+                for k in &mut sub.knots {
+                    k.translate((delta.x, delta.y));
+                }
+            }
+        }
+    }
+    if !ui.input(|i| i.pointer.primary_down()) {
+        let d = state.pen_session.move_path.take().unwrap();
+        if state.doc.paths != d.original {
+            state.doc.mark_dirty();
+            state.record("Drag Path");
         }
     }
 }
