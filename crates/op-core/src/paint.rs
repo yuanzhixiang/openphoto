@@ -1340,7 +1340,7 @@ impl Stroke {
         let preserve = self.preserve_alpha;
         let flow = self.flow;
         let sample = self.sample.as_mut();
-        let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
+        let Some(image) = self.target.image_mut(doc, self.layer) else {
             return;
         };
         // The canvas's paint under the tip (the merged image's with Sample
@@ -1406,7 +1406,7 @@ impl Stroke {
             }
         }
         for (x, y, p) in updates {
-            image.set_pixel(x, y, p);
+            image.set_pixel(x, y, self.target.color(p));
         }
         // The merged image takes the same paint, so later dabs pick it up
         if let Some(m) = sample {
@@ -2562,6 +2562,66 @@ mod healing_mask_tests {
             stroke.add_point(&mut doc, 32.5, 32.5);
             assert!(target.image(&doc, id).unwrap().pixel(32, 32)[0] > 240);
             assert_eq!(target.image(&doc, id).unwrap().pixel(32, 32)[3], 255);
+            assert_eq!(doc.layer(id).unwrap().image().unwrap().to_rgba8(), pixels);
+        }
+    }
+}
+
+#[cfg(test)]
+mod masked_special_stroke_tests {
+    use super::*;
+    const TIP: BrushTip = BrushTip {
+        diameter: 12.0,
+        hardness: 1.0,
+        aliased: false,
+        square: false,
+        angle: 0.0,
+        roundness: 1.0,
+        spacing: 0.25,
+    };
+    fn masked(quick: bool) -> (Document, LayerId, Target) {
+        let mut doc = Document::new_with_background("mask", 64, 64, crate::Color::WHITE);
+        let id = doc.active_layer.unwrap();
+        if quick {
+            doc.enter_quick_mask();
+        } else {
+            doc.layer_mut(id).unwrap().mask = Some(crate::layer::LayerMask::filled(64, 64, 255));
+            doc.mask_target = true;
+        }
+        (
+            doc,
+            id,
+            if quick {
+                Target::QuickMask
+            } else {
+                Target::LayerMask
+            },
+        )
+    }
+    #[test]
+    fn mixer_paints_opaque_grayscale_masks_without_changing_pixels() {
+        for quick in [false, true] {
+            let (mut doc, id, target) = masked(quick);
+            let pixels = doc.layer(id).unwrap().image().unwrap().to_rgba8();
+            let mut stroke = Stroke::begin(
+                &doc,
+                TIP,
+                StrokeKind::Mix {
+                    color: Some([255, 0, 0]),
+                    wet: 0.0,
+                    load: 1.0,
+                    mix: 0.0,
+                },
+                1.0,
+                1.0,
+            )
+            .unwrap();
+            stroke.add_point(&mut doc, 32.5, 32.5);
+            let p = target.image(&doc, id).unwrap().pixel(32, 32);
+            assert!(p[0] < 200);
+            assert_eq!(p[0], p[1]);
+            assert_eq!(p[1], p[2]);
+            assert_eq!(p[3], 255);
             assert_eq!(doc.layer(id).unwrap().image().unwrap().to_rgba8(), pixels);
         }
     }
