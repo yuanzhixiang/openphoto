@@ -2011,3 +2011,41 @@ fn add_anchor_preserves_curve_and_undo_geometry_cpu() {
     assert!(h.app.active().unwrap().redo());
     assert_eq!(h.state().doc.paths[0].subpaths[0].knots.len(), 3);
 }
+
+#[test]
+fn delete_anchor_reconnects_removes_empty_and_undoes_cpu() {
+    use op_core::path::{Knot, Path, Subpath};
+    let mut h = CanvasHarness::new(Tool::DeleteAnchorPoint);
+    h.app.active().unwrap().doc.paths.push(Path {
+        name: "Path 1".into(),
+        subpaths: vec![Subpath {
+            closed: true,
+            knots: vec![
+                Knot::corner((40., 40.)),
+                Knot::corner((120., 40.)),
+                Knot::corner((120., 120.)),
+            ],
+        }],
+    });
+    h.app.active().unwrap().doc.active_path = Some(0);
+    h.app.active().unwrap().record("Path");
+    let before = h.state().doc.paths.clone();
+    let pixels = h.state().doc.composite_rgba8();
+    for pos in [(120., 40.), (120., 120.), (40., 40.)] {
+        let p = h.point(pos.0, pos.1);
+        h.button(p, true, Modifiers::NONE);
+        h.button(p, false, Modifiers::NONE);
+    }
+    assert!(h.state().doc.paths.is_empty());
+    assert!(h.state().doc.active_path.is_none());
+    for _ in 0..3 {
+        assert!(h.app.active().unwrap().undo());
+    }
+    assert_eq!(h.state().doc.paths, before);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    let count = h.state().history.states().len();
+    let p = h.point(240., 240.);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(h.state().history.states().len(), count);
+}

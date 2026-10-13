@@ -758,6 +758,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
+            Tool::DeleteAnchorPoint if !modal => {
+                crate::pen_tool::delete_anchor(ui, &response, state, ppp);
+            }
             Tool::AddAnchorPoint if !modal => {
                 crate::pen_tool::add_anchor(ui, &response, state, ppp);
             }

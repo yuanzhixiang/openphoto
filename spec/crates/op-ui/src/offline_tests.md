@@ -87,3 +87,5 @@ Vertical Type Mask checks two columns of selection coverage, orientation switchi
 Pen CPU regression covers corner creation, symmetric cubic control dragging, in-flight Escape cancellation, closing, undo/redo, and unchanged pixel layers. Native parity is not asserted.
 
 Add Anchor Point regression targets a known cubic midpoint, checks unchanged pixels, insertion position, miss/no-op history and geometry undo/redo.
+
+Delete Anchor Point regression removes three closed-path anchors through the empty-path state, restores geometry with undo, checks misses and unchanged pixels.

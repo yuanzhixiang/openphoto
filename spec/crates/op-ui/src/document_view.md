@@ -307,3 +307,5 @@ All four Type tools dispatch to the text editor. Vertical Type Mask creates sele
 Pen dispatches to transactional path creation. Active path geometry draws as an overlay independent of the pixel composite.
 
 Add Anchor Point dispatches active-path hit testing and exact insertion.
+
+Delete Anchor Point dispatches active-path anchor picking and topology deletion.

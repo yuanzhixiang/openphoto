@@ -205,3 +205,44 @@ pub fn add_anchor(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp:
         state.record("Add Anchor Point");
     }
 }
+
+fn anchor_hit(state: &DocState, pointer: Pos2, ppp: f32) -> Option<(usize, usize, usize)> {
+    let path = state.doc.active_path?;
+    let geometry = state.doc.paths.get(path)?;
+    let mut nearest = 36.;
+    let mut hit = None;
+    for (si, sub) in geometry.subpaths.iter().enumerate() {
+        for (ki, knot) in sub.knots.iter().enumerate() {
+            let d =
+                to_screen(state, Pos2::new(knot.anchor.0, knot.anchor.1), ppp).distance_sq(pointer);
+            if d < nearest {
+                nearest = d;
+                hit = Some((path, si, ki));
+            }
+        }
+    }
+    hit
+}
+pub fn delete_anchor(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
+    if !response.clicked() {
+        return;
+    }
+    let Some(pointer) = ui.input(|i| i.pointer.interact_pos()) else {
+        return;
+    };
+    let Some((path, sub, knot)) = anchor_hit(state, pointer, ppp) else {
+        return;
+    };
+    let geometry = &mut state.doc.paths[path];
+    geometry.subpaths[sub].knots.remove(knot);
+    if geometry.subpaths[sub].knots.is_empty() {
+        geometry.subpaths.remove(sub);
+    }
+    if geometry.subpaths.is_empty() {
+        state.doc.paths.remove(path);
+        state.doc.active_path = None;
+    }
+    state.pen_session.continuation = None;
+    state.doc.mark_dirty();
+    state.record("Delete Anchor Point");
+}
