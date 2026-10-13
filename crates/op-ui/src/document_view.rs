@@ -1455,7 +1455,8 @@ fn lasso_input(
         state.lasso_press = None;
         return;
     }
-    if tool == Tool::Lasso
+    if matches!(tool, Tool::Lasso | Tool::PolygonalLasso)
+        && state.lasso.is_none()
         && response.contains_pointer()
         && ui.input(|i| i.pointer.button_pressed(PointerButton::Primary))
     {
@@ -1474,9 +1475,15 @@ fn lasso_input(
             .unwrap_or(mods);
         state.lasso_press = Some((pressed, has_selection));
     }
-    let pointer = ui
+    let mut pointer = ui
         .input(|i| i.pointer.interact_pos())
         .map(|p| to_doc(state, p, ppp));
+    if tool == Tool::PolygonalLasso
+        && mods.shift
+        && let Some(last) = state.lasso.as_ref().and_then(|l| l.points.last()).copied()
+    {
+        pointer = pointer.map(|p| snap_45(last, p));
+    }
     let mut close = false;
 
     if tool == Tool::Lasso {
@@ -1562,7 +1569,8 @@ fn lasso_input(
         } else if response.clicked()
             && let Some(p) = pointer
         {
-            let (op, _, _) = selection_op(mods, has_selection, mode);
+            let (pressed, selection) = state.lasso_press.unwrap_or((mods, has_selection));
+            let (op, _, _) = selection_op(pressed, selection, mode);
             state.lasso = Some(LassoPath {
                 points: vec![p],
                 op,
@@ -2996,6 +3004,13 @@ fn draw_selection(
         if (lasso.polygonal || lasso.held)
             && let Some(p) = ui.input(|i| i.pointer.hover_pos())
         {
+            let p = if tool == Tool::PolygonalLasso && ui.input(|i| i.modifiers.shift) {
+                lasso.points.last().map_or(p, |last| {
+                    to_screen(state, snap_45(*last, to_doc(state, p, ppp)), ppp)
+                })
+            } else {
+                p
+            };
             pts.push(p);
         }
         for w in pts.windows(2) {

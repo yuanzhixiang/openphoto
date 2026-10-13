@@ -276,3 +276,66 @@ fn lasso_cancel_press_modifier_close_and_undo_cpu() {
     assert_eq!(h.state().doc.selection(), before.as_ref());
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn polygonal_lasso_shift_backspace_enter_cancel_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::PolygonalLasso);
+    let pixels = h.state().doc.composite_rgba8();
+    for point in [(30.0, 30.0), (80.0, 34.0)] {
+        let p = h.point(point.0, point.1);
+        h.button(p, true, Modifiers::SHIFT);
+        h.button(p, false, Modifiers::SHIFT);
+    }
+    assert!((h.state().lasso.as_ref().unwrap().points[1].y - 30.0).abs() < 0.001);
+    let p = h.point(80.0, 80.0);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(h.state().lasso.as_ref().unwrap().points.len(), 3);
+    h.step(
+        vec![Event::Key {
+            key: Key::Backspace,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    assert_eq!(h.state().lasso.as_ref().unwrap().points.len(), 2);
+    let p = h.point(80.0, 80.0);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    assert!(h.state().lasso.is_none());
+    assert!(h.state().doc.selection().unwrap().get(65, 45) > 0);
+    let before = h.state().doc.selection().cloned();
+    let count = h.state().history.states().len();
+    let p = h.point(150.0, 150.0);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    assert!(h.state().lasso.is_none());
+    assert_eq!(h.state().doc.selection(), before.as_ref());
+    assert_eq!(h.state().history.states().len(), count);
+    assert!(h.app.active().unwrap().undo());
+    assert!(h.state().doc.selection().is_none());
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}

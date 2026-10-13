@@ -183,3 +183,5 @@ Single Row CPU-only regression passed after cleanup. Single Column adds full-hei
 Selection Brush offline follow-up adds snapshot cancellation and no-op history suppression, with live add/subtract and undo exercised through the CPU harness.
 
 Freehand Lasso offline follow-up adds Escape cancellation, Enter closure and pointer-down combination modifiers; real native curve/feather comparison is still pending.
+
+Polygonal Lasso offline follow-up adds Shift-constrained vertices and initial-press modifier latching, and verifies anchor removal, explicit closure, cancellation and undo.

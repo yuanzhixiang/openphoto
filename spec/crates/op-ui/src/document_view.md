@@ -257,3 +257,5 @@ Single Row Marquee starts a one-pixel, full-width live preview on a valid image 
 Single Column Marquee shares the transactional line input: a one-pixel, full-height preview tracks and clamps the pointer column. It supports Feather, latched combination modes, Escape cancellation and one release history state. Its style does not inherit fixed ratio/size from other marquees.
 
 Freehand Lasso latches combine modifiers at pointer-down; Escape discards its live path without changing selection/history. Enter closes the current path, including while held. Release continues to close ordinary freehand paths.
+
+Polygonal Lasso latches its combination operation at the initial pointer-down. Holding Shift snaps newly committed segments to 45-degree directions using the line constraint geometry; Backspace, Enter and Escape retain their existing anchor/closure/cancel roles. Exact Photoshop angle rounding remains unverified.
