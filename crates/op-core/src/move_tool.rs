@@ -37,11 +37,21 @@ pub struct Move {
     /// Other selected layers moving along (without a pixel selection),
     /// with their pixels when the move started.
     others: Vec<(LayerId, TiledImage)>,
+    masks: Vec<(LayerId, TiledImage)>,
+    copy_selection: bool,
 }
 
 impl Move {
     /// Starts moving the active layer (or its selected pixels).
     pub fn begin(doc: &Document, background: [u8; 3]) -> Result<Self, MoveError> {
+        Self::begin_with_links(doc, background, true)
+    }
+
+    fn begin_with_links(
+        doc: &Document,
+        background: [u8; 3],
+        include_links: bool,
+    ) -> Result<Self, MoveError> {
         let id = doc.active_layer.ok_or(MoveError::NoLayer)?;
         let layer = doc.layer(id).ok_or(MoveError::NoLayer)?;
         if !doc.is_shown(id) {
@@ -63,7 +73,12 @@ impl Move {
         // linked to them and the layers in selected groups that can move go
         // along, as in Photoshop
         let mut moving: Vec<(LayerId, TiledImage)> = if selection.is_none() {
-            doc.pixel_layers(&crate::link::with_linked(doc))
+            let selected = if include_links {
+                crate::link::with_linked(doc)
+            } else {
+                doc.selected_layers()
+            };
+            doc.pixel_layers(&selected)
                 .into_iter()
                 .filter_map(|other| doc.layer(other))
                 .filter(|l| {
@@ -87,13 +102,38 @@ impl Move {
             None => moving.remove(0),
         };
         let others = moving;
+        let masks = if selection.is_none() {
+            std::iter::once(main)
+                .chain(others.iter().map(|(id, _)| *id))
+                .filter_map(|id| Some((id, doc.layer(id)?.mask.as_ref()?.image.clone())))
+                .collect()
+        } else {
+            Vec::new()
+        };
         Ok(Self {
             layer: main,
             base: image,
             selection,
             background_fill: layer.is_background.then_some(background),
             others,
+            masks,
+            copy_selection: false,
         })
+    }
+
+    /// Option-drag: duplicate layers, or copy selected pixels in place.
+    /// Validate first so refused operations never leave an extra layer.
+    pub fn begin_copy(doc: &mut Document, background: [u8; 3]) -> Result<Self, MoveError> {
+        let mut movement = Self::begin(doc, background)?;
+        if movement.selection.is_some() {
+            movement.copy_selection = true;
+            return Ok(movement);
+        }
+        crate::layer_ops::duplicate_selected(doc);
+        // Copies retain link metadata; moving only the selected copies
+        // keeps their linked originals in place, including group contents.
+        movement = Self::begin_with_links(doc, background, false)?;
+        Ok(movement)
     }
 
     /// Shows the layer moved by (`dx`, `dy`) pixels from where it started.
@@ -110,7 +150,7 @@ impl Move {
                 for y in 0..h {
                     for x in 0..w {
                         let s = sel.get(x, y) as f32 / 255.0;
-                        if s <= 0.0 {
+                        if s <= 0.0 || self.copy_selection {
                             continue;
                         }
                         let px = self.base.pixel(x, y);
@@ -152,6 +192,11 @@ impl Move {
         for (id, base) in &self.others {
             if let Some(image) = doc.layer_mut(*id).and_then(|l| l.image_mut()) {
                 *image = base.with_canvas(w, h, dx, dy, [0; 4]);
+            }
+        }
+        for (id, base) in &self.masks {
+            if let Some(mask) = doc.layer_mut(*id).and_then(|l| l.mask.as_mut()) {
+                mask.image = base.with_canvas(w, h, dx, dy, [0, 0, 0, 255]);
             }
         }
         if let Some(sel) = &self.selection {
@@ -198,6 +243,60 @@ mod tests {
     fn px(doc: &Document, id: LayerId, x: u32, y: u32) -> [u8; 4] {
         let img = doc.layer(id).unwrap().image().unwrap();
         img.pixel(x, y)
+    }
+
+    #[test]
+    fn option_copy_keeps_original_pixels_and_linked_layers() {
+        let (mut doc, id) = doc_with_dot();
+        doc.select_layer(id);
+        let other = crate::layer_ops::duplicate(&mut doc).unwrap();
+        doc.layer_mut(id).unwrap().link = Some(7);
+        doc.layer_mut(other).unwrap().link = Some(7);
+        doc.select_layer(id);
+        let m = Move::begin_copy(&mut doc, [0; 3]).unwrap();
+        let copy = doc.active_layer.unwrap();
+        m.apply(&mut doc, 3, 0);
+        assert_eq!(px(&doc, id, 2, 2), [255, 0, 0, 255]);
+        assert_eq!(px(&doc, other, 2, 2), [255, 0, 0, 255]);
+        assert_eq!(px(&doc, copy, 5, 2), [255, 0, 0, 255]);
+        doc.select_layer(id);
+        doc.set_selection(Some(Selection::rect(10, 10, Rect::new(0.0, 0.0, 5.0, 5.0))));
+        let count = doc.layers.len();
+        let m = Move::begin_copy(&mut doc, [0; 3]).unwrap();
+        m.apply(&mut doc, 1, 0);
+        assert_eq!(doc.layers.len(), count);
+        assert_eq!(px(&doc, id, 2, 2), [255, 0, 0, 255]);
+        assert_eq!(px(&doc, id, 3, 2), [255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn option_copy_group_moves_only_its_copied_children() {
+        let (mut doc, id) = doc_with_dot();
+        doc.select_layer(id);
+        let group = crate::layer_ops::group_selected(&mut doc).unwrap();
+        doc.layer_mut(group).unwrap().link = Some(9);
+        let m = Move::begin_copy(&mut doc, [0; 3]).unwrap();
+        let copy = doc.active_layer.unwrap();
+        let child = doc.pixel_layers(&[copy])[0];
+        m.apply(&mut doc, 3, 0);
+        assert_eq!(px(&doc, id, 2, 2), [255, 0, 0, 255]);
+        assert_eq!(px(&doc, child, 5, 2), [255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn layer_mask_follows_whole_layer_from_original_position() {
+        let (mut doc, id) = doc_with_dot();
+        doc.layer_mut(id).unwrap().mask =
+            Some(crate::layer::LayerMask::from_values(10, 10, |x, y| {
+                if (x, y) == (2, 2) { 255 } else { 0 }
+            }));
+        let m = Move::begin(&doc, [0; 3]).unwrap();
+        m.apply(&mut doc, 1, 0);
+        m.apply(&mut doc, 3, 0);
+        let mask = doc.layer(id).unwrap().mask.as_ref().unwrap();
+        assert_eq!(mask.value(5, 2), 255);
+        assert_eq!(mask.value(2, 2), 0);
+        assert_eq!(doc.composite_rgba8()[((2 * 10 + 5) * 4 + 3) as usize], 255);
     }
 
     #[test]

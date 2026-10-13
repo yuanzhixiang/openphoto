@@ -43,10 +43,18 @@ native app interaction. The browser plugin is relevant only if a web surface is
 introduced. Development app processes are stopped after verification, with their
 PIDs recorded. No server or listening port is needed for the native application.
 
-The current native UI interface can read Photoshop's accessibility tree, capture
-its window and operate AX controls/keyboard shortcuts. Coordinate clicks fail
-with `-10005 noWindowsAvailable`; raising the reference window did not fix that
-failure. A working coordinate-input route is required before certifying live
-Photoshop drag parity. REA's native UI scenario command requires an exact PID
-and window ID and exposes AX actions, so it has not been treated as an equivalent
-unverified substitute for pixel-based drag input.
+Native input investigation (2026-10-13): coordinate clicks became usable after
+capturing the target window screenshot immediately before the click. This
+successfully selected Move, selected the test layer, and opened its gear menu.
+The gear menu shows three checked defaults: Show layer bounds on hover, Expand
+layer group on click, and Show hover bounds from Layers. This is direct UI
+observation, not drag parity evidence.
+
+Native `drag` returned success without changing the reference layer's X/Y
+position. Longer drags, Retina-coordinate checks and turning transform controls
+off did not produce a move. A keyboard Right nudge changed X from 60 to 61 px.
+A later coordinate action failed with ScreenCaptureKit error -3811 (audio/video
+capture failure). The disposable reference document was closed without saving;
+the user's original image remained unmodified. The tool documentation requires
+explicit user authorization for alternative native input technologies; a request
+to use CGEvent is pending. No security permissions were changed.

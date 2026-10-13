@@ -123,3 +123,12 @@ and the nested-group model test pass. Workspace tests: 549 passed, 0 failed,
 `cargo clippy --workspace --all-targets -- -D warnings` pass. The strict lint
 check also required an equivalent range predicate in an existing color-match
 test; that changes test construction syntax, not editor behavior.
+
+### Move implementation follow-up
+
+Option-drag now copies selected layer blocks or selected pixels on the active
+layer. Copies preserve the originals, including linked originals and nested
+group children. Whole-raster-layer movement carries its mask. Core regression
+tests and an egui drag/undo test verify these changes. These are implementation
+checks; native drag comparison remains pending due to the input-service failure
+recorded in `local-analysis.md`. Move has not passed the full 1:1 acceptance gate.

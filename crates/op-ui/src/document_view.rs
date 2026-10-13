@@ -1720,7 +1720,12 @@ fn move_input(
         let start = ui
             .input(|i| i.pointer.press_origin())
             .map(|p| to_doc(state, p, ppp))?;
-        match Move::begin(&state.doc, background) {
+        let movement = if ui.input(|i| i.modifiers.alt) {
+            Move::begin_copy(&mut state.doc, background)
+        } else {
+            Move::begin(&state.doc, background)
+        };
+        match movement {
             Ok(m) => state.move_drag = Some((m, start)),
             Err(e) => return Some(e.message().to_owned()),
         }

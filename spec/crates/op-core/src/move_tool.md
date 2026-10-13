@@ -43,3 +43,9 @@ Without a pixel selection, a selected group moves together with all the pixel la
 - `moves_whole_layer_from_its_start`: repeated `apply` calls are all computed relative to the starting position.
 - `moves_only_selected_pixels`: only pixels inside the selection move, those outside stay put, and the selection moves along.
 - `background_needs_a_selection_and_leaves_background_color`: the background layer refuses without a selection; with a selection, the original position is filled with the background color.
+
+## Copying and masks
+
+- `Move::begin_copy`: validates before mutation. Without a pixel selection it duplicates the selected layer blocks, selects their copies, and translates only copies even when they inherit links to original layers. With a selection it leaves source pixels intact and places selected pixels over the destination on the same layer. The selection follows the copied pixels.
+- Whole-layer movement carries each raster layer's mask from its original position, including disabled masks. Pixel-selection movement leaves the layer mask in place.
+- Tests `option_copy_keeps_original_pixels_and_linked_layers`, `option_copy_group_moves_only_its_copied_children`, and `layer_mask_follows_whole_layer_from_original_position` cover unchanged originals, inherited links, selection copying, and repeated mask movement.

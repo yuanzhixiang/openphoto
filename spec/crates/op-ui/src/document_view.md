@@ -145,6 +145,8 @@ Applies to the Rectangular, Elliptical, Single Row, and Single Column Marquee:
 
 ## Move tool
 
+- Option held when a drag starts copies the selected layers, or the selected pixels within the active layer, using `Move::begin_copy`.
+
 - Smart guides: while dragging, the move lines up with the canvas's and other layers' edges and centers, shown by magenta lines (`smart_guides.md`).
 
 - Drag: moves the pixels of the current layer; with a selection, only the selected pixels move (rules in `crates/op-core/src/move_tool.md`). The offset is the drag distance rounded to whole pixels, and each step is recomputed from the pixels at the start. On release, "Move" is recorded if anything actually moved.

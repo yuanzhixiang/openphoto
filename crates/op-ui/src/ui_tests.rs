@@ -445,6 +445,33 @@ fn move_tool_drags_and_nudges() {
 }
 
 #[test]
+fn move_option_drag_copies_layer_and_undo_restores_structure() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    crate::panels::new_layer(h.state_mut().state.active().unwrap());
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    select_rect(&mut h, 100.0, 100.0, 140.0, 140.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.key_press(egui::Key::V);
+    h.run_steps(2);
+    let original = active(&h).doc.active_layer;
+    let count = active(&h).doc.layers.len();
+    let (a, b) = (doc_point(&h, 120.0, 120.0), doc_point(&h, 220.0, 170.0));
+    drag(&mut h, a, b, Modifiers::ALT);
+    assert_eq!(active(&h).doc.layers.len(), count + 1);
+    assert_ne!(active(&h).doc.active_layer, original);
+    assert_eq!(composite_pixel(&mut h, 110, 110), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 220, 170), [255, 0, 0, 255]);
+    assert_eq!(active(&h).history.states().last().unwrap().name, "Move");
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run_steps(2);
+    assert_eq!(active(&h).doc.layers.len(), count);
+    assert_eq!(active(&h).doc.active_layer, original);
+    assert_eq!(composite_pixel(&mut h, 220, 170), [0x14, 0x14, 0x14, 255]);
+}
+
+#[test]
 fn move_auto_select_and_transform_controls() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);

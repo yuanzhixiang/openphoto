@@ -128,3 +128,5 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 - `option_opens_adjustments_with_their_last_settings`: Exposure set to +1 and OK; opened again it starts at 0, opened with Option held (a `ModifiersChanged` event) it has +1.
 - `levels_and_curves_eyedroppers_sample_the_image`, `photo_filter_picks_its_color_in_the_color_picker`: see `dialogs/curves.md` and `dialogs/photo_filter.md`.
 - `more_filters_and_adjustments_apply`: see `dialogs/adjust.md` ("The dialogs added after the measured ones"); also writes `dialog_Shadows_Highlights` and `dialog_Wave` screenshots.
+
+- `move_option_drag_copies_layer_and_undo_restores_structure`: Option-drag preserves the original, moves a selected copy, records one Move state, and undo restores layer structure and pixels.
