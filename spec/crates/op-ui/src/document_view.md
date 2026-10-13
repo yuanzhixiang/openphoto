@@ -297,3 +297,5 @@ Rotate View Escape resets to zero and removes the cached drag origin immediately
 Zoom Escape removes the drag session. Scrubby zoom returns to its start scale around the original anchor, recovering the prior offset; a pending zoom box is discarded. Continued movement/release does not resume it.
 
 Remove dispatches to remove_tool input and draws its staged area in document space; the document selection remains independent.
+
+Horizontal Type Mask routes through the shared text editor, has a text cursor and commits/cancels its selection preview without creating pixel layers.

@@ -2,7 +2,7 @@
 
 ## Component responsibilities
 
-Input, live preview, commit, and cancel for the Horizontal Type tool (T) on the canvas. For rasterization, see `op-core`'s `text.md`.
+Input, live preview, commit, and cancel for Horizontal Type and Horizontal Type Mask (T) on the canvas. For rasterization, see `op-core`'s `text.md`.
 
 ## State
 
@@ -17,10 +17,12 @@ Text in progress is stored in `DocState::text_edit` (`TextEdit`): the start of t
   - ⌘Enter, the ✓ in the options bar, clicking elsewhere on the canvas, or switching to another tool: commits. When the text is empty (or only whitespace), nothing is left behind; otherwise the text layer is kept and "Type Tool" is recorded.
   - The ⦸ in the options bar: cancels.
   - When an input field (such as the font size field in the options bar) has focus, typed content does not go into the text on the canvas.
-- Preview: when the text changes, the snapshot from before it started is restored, and the text layer is then generated with the current options (foreground color, font size converted to pixels: `pt × resolution / 72`), so what is seen on the document is the final result. The preview records no history.
+- Preview: when text, font, size or color changes, the snapshot from before it started is restored, and the text layer is then generated with the current options (foreground color, font size converted to pixels: `pt × resolution / 72`), so what is seen on the document is the final result. The preview records no history.
 - Cursor: after the last character a blinking (every 0.5 seconds) insertion line is drawn, 3 pt black plus 1 pt white outside, visible on any background. The mouse cursor over the canvas is the text cursor.
 
 ## Known limitations
 
 - The insertion point cannot be moved into the middle of the text, text cannot be selected or moved with the arrow keys; committed text layers cannot be edited.
 - Only Source Sans 3 Regular and Semibold (the fonts bundled with the application) are available; there is no system font list.
+
+Horizontal Type Mask uses glyph coverage as a selection and creates no layer. Shift adds, Alt subtracts and both intersect, latched when editing starts. Preview restores the original snapshot before recomputing; Escape and empty/no-change commits restore it. A changed commit records Type Mask. Font/size/color changes refresh previews even with unchanged text. The red editing overlay covers unselected pixels proportionally, mapped through rotation/flip; it is display-only. Native glyph rasterization, overlay color/opacity and UI parity remain unmeasured.

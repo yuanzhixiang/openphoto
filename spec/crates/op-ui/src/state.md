@@ -179,3 +179,5 @@ DocState::busy includes pending gradient lines so Escape cancels them before exi
 remove_session stores session-local Remove marks/stroke state and counts as busy while pending.
 
 DocState undo/redo first handles staged Remove marks; committed removal uses normal document history. Only pending marks/strokes count as busy, not an empty redo archive.
+
+TextEdit records whether it creates a selection mask, the latched selection operation, whether the preview changes the document, and its last font/size/color settings.

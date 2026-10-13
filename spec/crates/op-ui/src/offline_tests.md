@@ -75,3 +75,7 @@ Remove CPU regressions cover accumulating and subtracting areas, Escape, Enter, 
 Remove also verifies pen size pressure, Escape restoring the prior staged area during a stroke, tool-switch cleanup and unchanged pixels/history.
 
 Remove mark undo/redo regression verifies local area restoration, unchanged document history/pixels, commit and subsequent document undo.
+
+Horizontal Type Mask regression types glyphs, refreshes size without changing text, preserves layers/pixels, cancels, commits with Command-Enter and undoes the selection.
+
+Horizontal Type Mask also checks latched Shift addition to an existing selection, Escape restoring it and empty commit leaving selection/history unchanged.

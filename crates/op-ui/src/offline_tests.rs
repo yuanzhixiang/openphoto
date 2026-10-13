@@ -1772,3 +1772,83 @@ fn remove_pending_undo_redo_changes_marks_and_not_document_history_cpu() {
     assert!(h.app.active().unwrap().undo());
     assert_eq!(h.state().doc.composite_rgba8(), before);
 }
+
+#[test]
+fn horizontal_type_mask_selects_glyphs_updates_size_cancels_and_undoes_cpu() {
+    let mut h = CanvasHarness::new(Tool::HorizontalTypeMask);
+    h.app.type_options.size_pt = 32.;
+    let before = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    let layers = h.state().doc.layers.len();
+    let p = h.point(40., 80.);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    assert!(h.state().text_edit.as_ref().unwrap().mask);
+    h.step(vec![Event::Text("Ab".into())], Modifiers::NONE);
+    let small = h.state().doc.selection().cloned().unwrap();
+    h.app.type_options.size_pt = 64.;
+    h.step(Vec::new(), Modifiers::NONE);
+    assert_ne!(h.state().doc.selection(), Some(&small));
+    assert_eq!(h.state().doc.layers.len(), layers);
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+    h.key(Key::Escape);
+    assert!(h.state().doc.selection().is_none());
+    assert_eq!(h.state().history.states().len(), count);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    h.step(vec![Event::Text("Ab".into())], Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::COMMAND,
+        }],
+        Modifiers::COMMAND,
+    );
+    assert!(h.state().text_edit.is_none());
+    assert!(h.state().doc.selection().is_some());
+    assert_eq!(h.state().history.states().len(), count + 1);
+    assert!(h.app.active().unwrap().undo());
+    assert!(h.state().doc.selection().is_none());
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+}
+
+#[test]
+fn horizontal_type_mask_add_empty_commit_and_cancel_preserve_prior_selection_cpu() {
+    let mut h = CanvasHarness::new(Tool::HorizontalTypeMask);
+    h.app.type_options.size_pt = 24.;
+    let selection =
+        op_core::Selection::rect(256, 256, op_core::selection::Rect::new(5., 5., 20., 20.));
+    h.app
+        .active()
+        .unwrap()
+        .doc
+        .set_selection(Some(selection.clone()));
+    h.app.active().unwrap().record("Selection");
+    let p = h.point(50., 80.);
+    h.button(p, true, Modifiers::SHIFT);
+    h.button(p, false, Modifiers::SHIFT);
+    h.step(vec![Event::Text("A".into())], Modifiers::NONE);
+    assert_eq!(h.state().doc.selection().unwrap().get(10, 10), 255);
+    let area = h.state().doc.selection().unwrap();
+    assert_ne!(area, &selection);
+    h.key(Key::Escape);
+    assert_eq!(h.state().doc.selection(), Some(&selection));
+    let count = h.state().history.states().len();
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::COMMAND,
+        }],
+        Modifiers::COMMAND,
+    );
+    assert_eq!(h.state().doc.selection(), Some(&selection));
+    assert_eq!(h.state().history.states().len(), count);
+}

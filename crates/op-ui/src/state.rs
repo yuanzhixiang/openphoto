@@ -976,6 +976,10 @@ pub struct TextEdit {
     pub before: op_core::Snapshot,
     /// The text as last shown on the document.
     pub shown: String,
+    pub mask: bool,
+    pub selection_op: op_core::SelectionOp,
+    pub changed: bool,
+    pub shown_options: Option<(TypeOptions, [u8; 3])>,
 }
 
 /// Move tool options shared across documents.

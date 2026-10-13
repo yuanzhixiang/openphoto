@@ -20,11 +20,15 @@ pub fn input(
     ui: &Ui,
     response: &egui::Response,
     state: &mut DocState,
+    mask: bool,
     options: TypeOptions,
     color: [u8; 3],
     ppp: f32,
 ) -> bool {
     let mut committed = false;
+    if state.text_edit.as_ref().is_some_and(|e| e.mask != mask) {
+        committed = commit(state);
+    }
     if response.clicked()
         && let Some(p) = response.interact_pointer_pos()
     {
@@ -37,6 +41,18 @@ pub fn input(
                 text: String::new(),
                 before: state.doc.snapshot(),
                 shown: String::new(),
+                mask,
+                selection_op: {
+                    let m = ui.input(|i| i.modifiers);
+                    match (m.shift, m.alt) {
+                        (true, true) => op_core::SelectionOp::Intersect,
+                        (true, false) => op_core::SelectionOp::Add,
+                        (false, true) => op_core::SelectionOp::Subtract,
+                        _ => op_core::SelectionOp::Replace,
+                    }
+                },
+                changed: false,
+                shown_options: None,
             });
         }
     }
@@ -94,21 +110,49 @@ pub fn preview(state: &mut DocState, options: TypeOptions, color: [u8; 3]) {
     let Some(edit) = &state.text_edit else {
         return;
     };
-    if edit.text == edit.shown {
+    if edit.text == edit.shown && edit.shown_options == Some((options, color)) {
         return;
     }
-    let (text, origin) = (edit.text.clone(), edit.origin);
+    let (text, origin, mask, op) = (edit.text.clone(), edit.origin, edit.mask, edit.selection_op);
     state.doc.restore(&edit.before);
-    let _ = op_core::text::add_text_layer(
-        &mut state.doc,
-        options.font(),
-        &text,
-        size,
-        (origin.x, origin.y),
-        color,
-    );
+    let changed = if mask {
+        let previous = state.doc.selection().cloned();
+        match op_core::text::coverage(
+            options.font(),
+            &text,
+            size,
+            (origin.x, origin.y),
+            state.doc.width,
+            state.doc.height,
+        ) {
+            Ok(coverage) => {
+                let shape = op_core::Selection::from_mask(
+                    state.doc.width,
+                    state.doc.height,
+                    coverage,
+                    false,
+                );
+                let selection = op_core::Selection::combine(previous.as_ref(), shape, op);
+                state.doc.set_selection(Some(selection));
+                state.doc.selection() != previous.as_ref()
+            }
+            Err(_) => false,
+        }
+    } else {
+        op_core::text::add_text_layer(
+            &mut state.doc,
+            options.font(),
+            &text,
+            size,
+            (origin.x, origin.y),
+            color,
+        )
+        .is_ok_and(|id| id.is_some())
+    };
     if let Some(edit) = &mut state.text_edit {
         edit.shown = text;
+        edit.shown_options = Some((options, color));
+        edit.changed = changed;
     }
 }
 
@@ -117,11 +161,11 @@ pub fn commit(state: &mut DocState) -> bool {
     let Some(edit) = state.text_edit.take() else {
         return false;
     };
-    if edit.shown.trim().is_empty() {
+    if edit.shown.trim().is_empty() || !edit.changed {
         state.doc.restore(&edit.before);
         return false;
     }
-    state.record("Type Tool");
+    state.record(if edit.mask { "Type Mask" } else { "Type Tool" });
     true
 }
 
@@ -129,6 +173,36 @@ pub fn commit(state: &mut DocState) -> bool {
 pub fn cancel(state: &mut DocState) {
     if let Some(edit) = state.text_edit.take() {
         state.doc.restore(&edit.before);
+    }
+}
+
+/// Red editing overlay; the document pixels stay untouched.
+pub fn draw_mask_overlay(ui: &Ui, state: &DocState, canvas: Rect, ppp: f32) {
+    if !state.text_edit.as_ref().is_some_and(|e| e.mask) {
+        return;
+    }
+    let painter = ui.painter_at(canvas);
+    for y in 0..state.doc.height {
+        let value = |x| 255 - state.doc.selection().map_or(0, |s| s.get(x, y));
+        let mut x = 0;
+        while x < state.doc.width {
+            let v = value(x);
+            let start = x;
+            x += 1;
+            while x < state.doc.width && value(x) == v {
+                x += 1;
+            }
+            if v == 0 {
+                continue;
+            }
+            let points = [(start, y), (x, y), (x, y + 1), (start, y + 1)]
+                .map(|(a, b)| to_screen(state, Pos2::new(a as f32, b as f32), ppp));
+            painter.add(egui::Shape::convex_polygon(
+                points.to_vec(),
+                Color32::from_rgba_unmultiplied(255, 0, 0, v / 2),
+                Stroke::NONE,
+            ));
+        }
     }
 }
 

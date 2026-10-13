@@ -764,9 +764,17 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
             Tool::PerspectiveCrop if !modal => {
                 crate::perspective_crop::input(ui, &response, state, &perspective_options, ppp);
             }
-            Tool::HorizontalType => {
+            Tool::HorizontalType | Tool::HorizontalTypeMask => {
                 let [r, g, b, _] = foreground.to_rgba8();
-                crate::type_tool::input(ui, &response, state, type_options, [r, g, b], ppp);
+                crate::type_tool::input(
+                    ui,
+                    &response,
+                    state,
+                    tool == Tool::HorizontalTypeMask,
+                    type_options,
+                    [r, g, b],
+                    ppp,
+                );
             }
             Tool::Rectangle | Tool::Ellipse | Tool::Triangle | Tool::Polygon | Tool::Line => {
                 let [r, g, b, _] = foreground.to_rgba8();
@@ -1023,7 +1031,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 | Tool::SingleColumnMarquee => CursorIcon::Crosshair,
                 Tool::Move => CursorIcon::Move,
                 Tool::Artboard => CursorIcon::Crosshair,
-                Tool::HorizontalType => CursorIcon::Text,
+                Tool::HorizontalType | Tool::HorizontalTypeMask => CursorIcon::Text,
                 _ => CursorIcon::Default,
             }
         };
@@ -1126,9 +1134,11 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         state.perspective_crop = None;
     }
     // Picking another tool keeps the text being typed
-    if tool != Tool::HorizontalType && state.text_edit.is_some() {
+    if !matches!(tool, Tool::HorizontalType | Tool::HorizontalTypeMask) && state.text_edit.is_some()
+    {
         crate::type_tool::commit(state);
     }
+    crate::type_tool::draw_mask_overlay(ui, state, canvas_rect, ppp);
     crate::type_tool::draw_caret(ui, state, type_options, canvas_rect, ppp);
     crate::crop_tool::draw(ui, state, &crop_options, canvas_rect, ppp);
     crate::perspective_crop::draw(ui, state, &perspective_options, canvas_rect, ppp);
