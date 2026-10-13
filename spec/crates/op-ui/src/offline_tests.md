@@ -35,3 +35,5 @@ Slice Select CPU regression covers moving, corner resizing, multi-selection/grou
 Frame CPU regression verifies rectangle clipping, moving/undo, cancelled movement, elliptical clipping, synthetic file-drop replacement, no new document and undo. It writes/removes one temporary PNG; no native input or screenshot is used.
 
 Frame resize/Move CPU regression verifies independent clipping geometry, retained child pixels, grouped Move geometry/clamping and cancellation.
+
+Eyedropper CPU regression verifies alpha-weighted averaging, Alt background selection, transparent/outside no-op, no document/history changes, zero-size fallback and all three sample scopes.

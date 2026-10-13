@@ -664,7 +664,7 @@ impl DocState {
             SampleScope::CurrentAndBelow => Some(below.as_ref()?),
             SampleScope::All => None,
         };
-        let half = (size / 2) as i64;
+        let half = (size.clamp(1, 101) / 2) as i64;
         let mut sum = [0u64; 3];
         let mut alpha = 0u64;
         for sy in (y as i64 - half).max(0)..=(y as i64 + half).min(h as i64 - 1) {

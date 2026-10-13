@@ -155,3 +155,5 @@ slice_drag retains a live Slice creation gesture and counts as busy; selected_sl
 slice_select_drag retains the starting snapshot, bounds and selected handle for transactional slice movement/resizing; it counts as busy.
 
 frame_drag stores a transactional Frame gesture and counts as busy.
+
+Sample-average windows clamp to the supported 1–101 pixel range before iteration; zero uses a point sample. Alpha-weighted opaque output and Current/Current & Below/All scope behavior remain unchanged.

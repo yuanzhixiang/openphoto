@@ -887,3 +887,65 @@ fn frame_resize_preserves_content_and_move_tool_tracks_geometry_cpu() {
         (40, 40, 170, 150)
     );
 }
+
+#[test]
+fn eyedropper_alpha_average_scope_alt_and_transparent_noop_cpu() {
+    let mut h = CanvasHarness::new(Tool::Eyedropper);
+    let state = h.app.active().unwrap();
+    let id = state.doc.active_layer.unwrap();
+    let l = state.doc.layer_mut(id).unwrap();
+    l.is_background = false;
+    *l.image_mut().unwrap() = op_core::TiledImage::new(256, 256);
+    l.image_mut().unwrap().set_pixel(50, 50, [255, 0, 0, 128]);
+    l.image_mut().unwrap().set_pixel(51, 50, [0, 0, 255, 255]);
+    state.doc.mark_dirty();
+    state.record("Fixture");
+    let pixels = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    h.app.eyedropper.sample = op_core::SampleScope::Current;
+    h.app.eyedropper.size = 3;
+    h.drag((50.5, 50.5), (50.5, 50.5), Modifiers::NONE);
+    assert_eq!(h.app.foreground.to_rgba8(), [85, 0, 170, 255]);
+    let foreground = h.app.foreground;
+    h.app.eyedropper.size = 1;
+    h.drag((51.5, 50.5), (51.5, 50.5), Modifiers::ALT);
+    assert_eq!(h.app.background.to_rgba8(), [0, 0, 255, 255]);
+    assert_eq!(h.app.foreground, foreground);
+    h.drag((100.5, 100.5), (100.5, 100.5), Modifiers::NONE);
+    assert_eq!(h.app.foreground, foreground);
+    h.drag((-10.5, -10.5), (-10.5, -10.5), Modifiers::NONE);
+    assert_eq!(h.app.foreground, foreground);
+    assert_eq!(h.state().history.states().len(), count);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    let state = h.app.active().unwrap();
+    let below = op_core::Layer::raster(
+        state.doc.new_layer_id(),
+        "below",
+        op_core::TiledImage::filled(256, 256, [0, 255, 0, 255]),
+    );
+    state.doc.layers.insert(0, below);
+    let above = op_core::Layer::raster(
+        state.doc.new_layer_id(),
+        "above",
+        op_core::TiledImage::filled(256, 256, [0, 0, 255, 255]),
+    );
+    state.doc.layers.push(above);
+    state.doc.mark_dirty();
+    let current = state
+        .sample_average(50, 50, 0, op_core::SampleScope::Current)
+        .unwrap()
+        .to_rgba8();
+    assert_eq!(current, [255, 0, 0, 255]);
+    let below = state
+        .sample_average(50, 50, 1, op_core::SampleScope::CurrentAndBelow)
+        .unwrap()
+        .to_rgba8();
+    assert!(below[0] > 0 && below[1] > 0 && below[2] == 0);
+    assert_eq!(
+        state
+            .sample_average(50, 50, 1, op_core::SampleScope::All)
+            .unwrap()
+            .to_rgba8(),
+        [0, 0, 255, 255]
+    );
+}
