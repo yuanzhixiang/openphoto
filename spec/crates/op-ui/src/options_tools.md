@@ -102,3 +102,5 @@ Count shows total markers, a real group selector, create/delete/visibility butto
 The Count group selector includes Rename Count Group, opening a staged name editor.
 
 Remove Mode dropdown stores Auto/Generative AI on/off. Reset and Apply icons operate on the active removal session. Native synthesis and distraction detection remain unsupported; Remove now has an offline canvas implementation.
+
+The Text Orientation button switches Horizontal/Vertical Type or Horizontal/Vertical Type Mask in the same toolbar slot. An active edit keeps its text and original snapshot and refreshes its orientation without recording history.

@@ -81,3 +81,5 @@ Horizontal Type Mask regression types glyphs, refreshes size without changing te
 Horizontal Type Mask also checks latched Shift addition to an existing selection, Escape restoring it and empty commit leaving selection/history unchanged.
 
 Vertical Type regression exercises down-flowing glyph cells and newline columns, Escape, commit, raster PSD round-trip and undo. It does not validate native type metadata, vertical metrics or glyph rasterization.
+
+Vertical Type Mask checks two columns of selection coverage, orientation switching during editing, unchanged layers/pixels/history until commit, cancellation and commit undo/redo.

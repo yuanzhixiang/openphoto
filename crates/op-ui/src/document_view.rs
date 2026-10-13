@@ -764,13 +764,19 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
             Tool::PerspectiveCrop if !modal => {
                 crate::perspective_crop::input(ui, &response, state, &perspective_options, ppp);
             }
-            Tool::HorizontalType | Tool::HorizontalTypeMask | Tool::VerticalType => {
+            Tool::HorizontalType
+            | Tool::HorizontalTypeMask
+            | Tool::VerticalType
+            | Tool::VerticalTypeMask => {
                 let [r, g, b, _] = foreground.to_rgba8();
                 crate::type_tool::input(
                     ui,
                     &response,
                     state,
-                    (tool == Tool::HorizontalTypeMask, tool == Tool::VerticalType),
+                    (
+                        matches!(tool, Tool::HorizontalTypeMask | Tool::VerticalTypeMask),
+                        matches!(tool, Tool::VerticalType | Tool::VerticalTypeMask),
+                    ),
                     type_options,
                     [r, g, b],
                     ppp,
@@ -1031,9 +1037,10 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 | Tool::SingleColumnMarquee => CursorIcon::Crosshair,
                 Tool::Move => CursorIcon::Move,
                 Tool::Artboard => CursorIcon::Crosshair,
-                Tool::HorizontalType | Tool::HorizontalTypeMask | Tool::VerticalType => {
-                    CursorIcon::Text
-                }
+                Tool::HorizontalType
+                | Tool::HorizontalTypeMask
+                | Tool::VerticalType
+                | Tool::VerticalTypeMask => CursorIcon::Text,
                 _ => CursorIcon::Default,
             }
         };
@@ -1138,7 +1145,10 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     // Picking another tool keeps the text being typed
     if !matches!(
         tool,
-        Tool::HorizontalType | Tool::HorizontalTypeMask | Tool::VerticalType
+        Tool::HorizontalType
+            | Tool::HorizontalTypeMask
+            | Tool::VerticalType
+            | Tool::VerticalTypeMask
     ) && state.text_edit.is_some()
     {
         crate::type_tool::commit(state);

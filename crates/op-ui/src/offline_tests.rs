@@ -1894,3 +1894,52 @@ fn vertical_type_columns_cancel_commit_and_psd_pixels_cpu() {
     assert!(h.app.active().unwrap().undo());
     assert_eq!(h.state().doc.composite_rgba8(), before);
 }
+
+#[test]
+fn vertical_type_mask_orientation_cancel_commit_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::VerticalTypeMask);
+    h.app.type_options.size_pt = 28.;
+    let before = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    let p = h.point(120., 40.);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    h.step(vec![Event::Text("AB\nCD".into())], Modifiers::NONE);
+    assert!(h.state().text_edit.as_ref().unwrap().vertical);
+    assert!(h.state().text_edit.as_ref().unwrap().mask);
+    assert_eq!(h.state().doc.layers.len(), 1);
+    let vertical = h.state().doc.selection().unwrap().clone();
+    assert!((40..90).any(|y| (110..130).any(|x| vertical.get(x, y) > 0)));
+    assert!((40..90).any(|y| (75..100).any(|x| vertical.get(x, y) > 0)));
+    h.app.select_tool(Tool::HorizontalTypeMask);
+    h.step(vec![], Modifiers::NONE);
+    assert!(!h.state().text_edit.as_ref().unwrap().vertical);
+    assert_ne!(h.state().doc.selection(), Some(&vertical));
+    h.app.select_tool(Tool::VerticalTypeMask);
+    h.step(vec![], Modifiers::NONE);
+    assert_eq!(h.state().doc.selection(), Some(&vertical));
+    assert_eq!(h.state().history.states().len(), count);
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+    h.key(Key::Escape);
+    assert!(h.state().doc.selection().is_none());
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    h.step(vec![Event::Text("AB\nCD".into())], Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::COMMAND,
+        }],
+        Modifiers::COMMAND,
+    );
+    assert_eq!(h.state().doc.selection(), Some(&vertical));
+    assert_eq!(h.state().history.states().len(), count + 1);
+    assert!(h.app.active().unwrap().undo());
+    assert!(h.state().doc.selection().is_none());
+    assert!(h.app.active().unwrap().redo());
+    assert_eq!(h.state().doc.selection(), Some(&vertical));
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+}

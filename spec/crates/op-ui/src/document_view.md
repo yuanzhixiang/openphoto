@@ -301,3 +301,5 @@ Remove dispatches to remove_tool input and draws its staged area in document spa
 Horizontal Type Mask routes through the shared text editor, has a text cursor and commits/cancels its selection preview without creating pixel layers.
 
 Vertical Type dispatches through the shared point-text editor and text cursor.
+
+All four Type tools dispatch to the text editor. Vertical Type Mask creates selection coverage with upright vertical columns, preserving pixel layers.

@@ -1891,6 +1891,18 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                     && matches!(icon, Icon::Eye | Icon::DeleteLayer)
                     && count_group.is_none());
                 let response = b.icon(x, icon, tip, on, enabled);
+                if icon == Icon::TextOrientation && response.clicked() {
+                    let next = match app.tool {
+                        Tool::HorizontalType => Some(Tool::VerticalType),
+                        Tool::VerticalType => Some(Tool::HorizontalType),
+                        Tool::HorizontalTypeMask => Some(Tool::VerticalTypeMask),
+                        Tool::VerticalTypeMask => Some(Tool::HorizontalTypeMask),
+                        _ => None,
+                    };
+                    if let Some(next) = next {
+                        app.select_tool(next);
+                    }
+                }
                 if app.tool == Tool::Remove
                     && response.clicked()
                     && let Some(state) = app.active()
