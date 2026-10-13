@@ -373,6 +373,10 @@ impl Document {
                     *image = image.clipped();
                 }
             }
+            if let Some(board) = &mut layer.artboard {
+                board.x += dx;
+                board.y += dy;
+            }
             // New canvas areas are revealed by the mask
             if let Some(mask) = &mut layer.mask {
                 mask.image = mask.image.with_canvas(width, height, dx, dy, [255; 4]);
@@ -721,7 +725,10 @@ impl Document {
                     let Some(layer) = target.and_then(|id| self.layer(id)) else {
                         break;
                     };
-                    if layer.opacity * layer.fill <= 0.0
+                    if layer
+                        .artboard
+                        .is_some_and(|b| !b.contains(x as i64, y as i64))
+                        || layer.opacity * layer.fill <= 0.0
                         || layer
                             .mask
                             .as_ref()
@@ -739,7 +746,9 @@ impl Document {
     /// Move Auto-Select: the hit layer, or its outermost containing group.
     /// An ungrouped layer is selected in either mode.
     pub fn move_target_at(&self, x: u32, y: u32, group: bool) -> Option<LayerId> {
-        let mut id = self.layer_at(x, y)?;
+        let mut id = self
+            .layer_at(x, y)
+            .or_else(|| crate::artboard::at(self, x as i64, y as i64))?;
         if group {
             // Bound traversal even if a caller constructs invalid parent data.
             for _ in 0..self.layers.len() {
@@ -835,11 +844,30 @@ impl Document {
                     let child = move |l: &Layer| l.parent == Some(id);
                     let alpha = layer.opacity * layer.fill;
                     let mask = layer.mask.as_ref().filter(|m| m.enabled);
-                    if layer.blend_mode == BlendMode::PassThrough && alpha >= 1.0 && mask.is_none()
+                    if layer.blend_mode == BlendMode::PassThrough
+                        && alpha >= 1.0
+                        && mask.is_none()
+                        && layer.artboard.is_none()
                     {
                         self.composite_children(layers, &child, out, band);
                     } else if alpha > 0.0 {
                         let mut own = vec![0f32; out.len()];
+                        if let Some(board) = layer.artboard
+                            && let Some(background) = board.background
+                        {
+                            for (i, pixel) in own.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+                                let x = (i % self.width as usize) as i64;
+                                let y = (i / self.width as usize + band.0) as i64;
+                                if board.contains(x, y) {
+                                    pixel.copy_from_slice(&[
+                                        background[0] as f32 / 255.0,
+                                        background[1] as f32 / 255.0,
+                                        background[2] as f32 / 255.0,
+                                        1.0,
+                                    ]);
+                                }
+                            }
+                        }
                         self.composite_children(layers, &child, &mut own, band);
                         self.blend_buffer(layer, &own, out, band.0);
                     }
@@ -866,6 +894,12 @@ impl Document {
             .enumerate()
         {
             let (x, y) = ((i % w) as u32, (i / w + y0) as u32);
+            if group
+                .artboard
+                .is_some_and(|b| !b.contains(x as i64, y as i64))
+            {
+                continue;
+            }
             let m = mask.map_or(1.0, |m| m.value(x, y) as f32 / 255.0);
             let sa = s[3] * alpha * m;
             if sa <= 0.0 {

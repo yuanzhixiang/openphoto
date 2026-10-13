@@ -40,6 +40,7 @@ pub struct Move {
     masks: Vec<(LayerId, TiledImage)>,
     copy_selection: bool,
     mask_only: bool,
+    boards: Vec<(LayerId, crate::artboard::Artboard)>,
     before: crate::Snapshot,
     selected_before: Vec<LayerId>,
     mask_target_before: bool,
@@ -76,6 +77,7 @@ impl Move {
                 masks: Vec::new(),
                 copy_selection: false,
                 mask_only: true,
+                boards: Vec::new(),
                 before: doc.snapshot(),
                 selected_before: doc.selected_layers(),
                 mask_target_before: doc.mask_target,
@@ -121,6 +123,7 @@ impl Move {
                 moving.retain(|(other, _)| *other != id);
                 (id, image.clone())
             }
+            None if layer.artboard.is_some() => (id, TiledImage::new(doc.width, doc.height)),
             None if moving.is_empty() => return Err(MoveError::Locked),
             None => moving.remove(0),
         };
@@ -158,7 +161,27 @@ impl Move {
         } else {
             Vec::new()
         };
+        let mut board_ids = if selection.is_none() {
+            if include_links {
+                crate::link::with_linked(doc)
+            } else {
+                doc.selected_layers()
+            }
+        } else {
+            Vec::new()
+        };
+        for id in board_ids.clone() {
+            board_ids.extend(doc.descendants(id));
+        }
+        board_ids.sort_by_key(|id| id.0);
+        board_ids.dedup();
+        let boards = board_ids
+            .into_iter()
+            .filter(|id| !doc.position_locked(*id))
+            .filter_map(|id| doc.layer(id)?.artboard.map(|b| (id, b)))
+            .collect();
         Ok(Self {
+            boards,
             layer: main,
             base: image,
             selection,
@@ -284,6 +307,15 @@ impl Move {
         for (id, base) in &self.masks {
             if let Some(mask) = doc.layer_mut(*id).and_then(|l| l.mask.as_mut()) {
                 mask.image = base.with_canvas(w, h, dx, dy, [0, 0, 0, 255]);
+            }
+        }
+        for (id, board) in &self.boards {
+            if let Some(layer) = doc.layer_mut(*id) {
+                layer.artboard = Some(crate::artboard::Artboard {
+                    x: board.x + dx,
+                    y: board.y + dy,
+                    ..*board
+                });
             }
         }
         if let Some(sel) = &self.selection {

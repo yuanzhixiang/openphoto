@@ -68,6 +68,7 @@ pub struct DocState {
     pub marquee_drag: Option<MarqueeDrag>,
     /// A Move tool drag: the move and where it started (document pixels).
     pub move_drag: Option<(op_core::move_tool::Move, egui::Pos2)>,
+    pub artboard_drag: Option<crate::artboard_tool::Drag>,
     /// Move hover feedback, navigation only (not document history).
     pub move_hover_target: Option<op_core::LayerId>,
     pub layer_panel_hover: Option<op_core::LayerId>,
@@ -196,6 +197,7 @@ impl DocState {
             || self.marquee_drag.is_some()
             || self.shape_drag.is_some()
             || self.move_drag.is_some()
+            || self.artboard_drag.is_some()
     }
 
     pub fn transform_controls_bounds(&mut self) -> Option<Bounds> {
@@ -248,6 +250,7 @@ impl DocState {
             pending_edit: false,
             marquee_drag: None,
             move_drag: None,
+            artboard_drag: None,
             move_hover_target: None,
             layer_panel_hover: None,
             controls_bounds: None,

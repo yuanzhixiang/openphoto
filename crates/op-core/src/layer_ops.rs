@@ -193,7 +193,15 @@ pub fn duplicate_into(source: &Document, target: &mut Document, name: &str) -> O
 /// The source stays unchanged; callers record one destination history state.
 pub fn move_copy_into(source: &Document, target: &mut Document, dx: i64, dy: i64) -> Vec<LayerId> {
     let (w, h) = (target.width, target.height);
-    let (at, parent) = target.insertion_point();
+    let contains_artboard = source
+        .selected_layers()
+        .iter()
+        .any(|id| source.layer(*id).is_some_and(|l| l.artboard.is_some()));
+    let (at, parent) = if contains_artboard {
+        (target.layers.len(), None)
+    } else {
+        target.insertion_point()
+    };
     let mut copied = Vec::new();
     let mut ids = Vec::new();
     if let Some(selection) = source.selection() {
@@ -228,6 +236,10 @@ pub fn move_copy_into(source: &Document, target: &mut Document, dx: i64, dy: i64
                 continue;
             };
             for layer in &mut block {
+                if let Some(board) = &mut layer.artboard {
+                    board.x += dx;
+                    board.y += dy;
+                }
                 if let Some(image) = layer.image_mut() {
                     *image = image.with_canvas(w, h, dx, dy, [0; 4]);
                 }

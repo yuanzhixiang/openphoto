@@ -60,3 +60,5 @@ A copied group with no movable children rolls back duplication if it cannot star
 
 
 Whole-layer movement carries only linked raster masks. Editing an unlinked mask moves only that mask, including partial selections, with cancellation restoring the original target. Option-drag on an unlinked mask copies mask pixels in place. Independent movement has a regression test.
+
+Whole-artboard Move gestures translate selected board rectangles and their descendants together. Empty artboard containers are movable even without raster children. Mask-only moves do not translate boards. The UI expands the canvas on completion when boards extend outside it.

@@ -133,3 +133,5 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 
 
 `AppState::move_transfer` holds an immutable original source document, source ID and initial document-space grab point while a Move gesture crosses tabs.
+
+DocState stores an optional Artboard drag transaction; it counts as busy, so Escape cancels the gesture.

@@ -137,3 +137,11 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 
 
 `move_cross_document_drop_and_mask_link_offline` tests the mask-link button and undo, source drag/tab activation/destination drop, unchanged original pixels and destination undo using only windowless egui input.
+
+`artboard_create_resize_move_options_copy_cancel_and_undo_offline` exercises creation, corner resizing, interior movement, Option-copy/undo, portrait options, Escape cancellation and the adjacent plus control through windowless egui events.
+
+`artboard_export_preserves_exact_size_and_transparency_offline` verifies a blank transparent board exports at its full dimensions, and a child dot lands at its local coordinates with margins preserved.
+
+`artboard_negative_drag_keeps_view_origin_and_move_auto_nests_offline` verifies leftward canvas expansion keeps the logical view aligned with the pointer; a regular Move drag into a board auto-nests its layer and undo restores both parent and pixels.
+
+`artboard_all_eight_resize_handles_and_custom_background_offline` checks every edge/corner handle, custom background preservation through dimension changes, and color-picker cancellation without history changes.

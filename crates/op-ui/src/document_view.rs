@@ -169,6 +169,7 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     if id == transfer.source_id {
         return;
     }
+    let auto_nest = crate::artboard_tool::options(app).auto_nest;
     let Some(state) = app.docs.get_mut(&id) else {
         return;
     };
@@ -194,12 +195,17 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     )
     .is_empty()
     {
+        op_core::artboard::ensure_canvas(&mut state.doc);
+        if auto_nest {
+            op_core::artboard::auto_nest(&mut state.doc);
+        }
         state.record("Drag Layer");
     }
 }
 
 fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let tool = app.tool;
+    let artboard_options = crate::artboard_tool::options(app);
     let paint = app.paint_options(tool).copied();
     let dynamics = paint_dynamics(app, tool);
     // The Mixer Brush's paint and settings
@@ -737,9 +743,19 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 );
                 magnetic_input(ui, &response, state, options, magnetic, ppp);
             }
+            Tool::Artboard => {
+                crate::artboard_tool::input(ui, &response, state, artboard_options, ppp)
+            }
             Tool::Move => {
                 let [r, g, b, _] = background.to_rgba8();
-                paint_error = move_input(ui, &response, state, [r, g, b], ppp);
+                paint_error = move_input(
+                    ui,
+                    &response,
+                    state,
+                    [r, g, b],
+                    ppp,
+                    artboard_options.auto_nest,
+                );
             }
             Tool::PaintBucket if response.clicked() => {
                 if let Some(p) = response.interact_pointer_pos() {
@@ -938,6 +954,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 | Tool::SingleRowMarquee
                 | Tool::SingleColumnMarquee => CursorIcon::Crosshair,
                 Tool::Move => CursorIcon::Move,
+                Tool::Artboard => CursorIcon::Crosshair,
                 Tool::HorizontalType => CursorIcon::Text,
                 _ => CursorIcon::Default,
             }
@@ -974,6 +991,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         .with_clip_rect(canvas_rect)
         .add(op_render::paint_callback(canvas_rect, image, view));
 
+    if tool == Tool::Artboard {
+        crate::artboard_tool::paint(ui, state, artboard_options, ppp);
+    }
     if view_options.grid_visible() {
         crate::rulers::draw_grid(ui, state, canvas_rect, ppp);
     }
@@ -1811,6 +1831,7 @@ fn move_input(
     state: &mut DocState,
     background: [u8; 3],
     ppp: f32,
+    auto_nest: bool,
 ) -> Option<String> {
     use op_core::move_tool::Move;
     if state.move_drag.is_some()
@@ -1864,9 +1885,15 @@ fn move_input(
     let (dx, dy) = (delta.x.round() as i64, delta.y.round() as i64);
     m.apply(&mut state.doc, dx, dy);
     if !ui.input(|i| i.pointer.primary_down()) {
+        if state.doc.layers.iter().any(|l| l.artboard.is_some()) && (dx != 0 || dy != 0) {
+            op_core::artboard::ensure_canvas(&mut state.doc);
+        }
         if dx == 0 && dy == 0 {
             m.cancel(&mut state.doc);
         } else {
+            if auto_nest && state.doc.selection().is_none() && !state.doc.editing_mask() {
+                op_core::artboard::auto_nest(&mut state.doc);
+            }
             state.record("Move");
         }
         state.move_drag = None;

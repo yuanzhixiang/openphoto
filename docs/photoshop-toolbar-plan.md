@@ -89,8 +89,9 @@ that those additional controls are absent.
 | Stage | State | Evidence |
 | --- | --- | --- |
 | Environment and plan | Verified | REA 6.4.0 setup reports `ready`; Hopper scoped doctor healthy; Rust 1.99.0; baseline workspace tests: 547 passed, 0 failed, 51 ignored; bounded runner verified for success and timeout |
-| Move | Partial repair; full acceptance pending | Group/Layer native dropdown, Shift multi-selection, preserving selected members while dragging, group-child movement and undo tested; live Photoshop exposes Group then Layer |
-| Artboard through Zoom and auxiliary controls | Pending | Tool definitions/options exist to varying degrees; per-tool acceptance has not run |
+| Move | Offline implementation validated; live acceptance pending | Cross-document tab/drop, mask linkage, groups, constraints, copy/cancel, hover and alignment validated; pushed commit 0467f1d |
+| Artboard | Offline implementation validated; live acceptance pending | Semantic containers, canvas gestures, options, clipping, nesting, export and standard PSD descriptors implemented; offline evidence below |
+| Rectangular Marquee through Zoom and auxiliary controls | Pending | Tool definitions/options exist to varying degrees; per-tool acceptance has not run |
 
 ### Move audit boundary
 
@@ -162,3 +163,9 @@ this offline stage.
 Tab-crossing Move gestures restore the source and copy selected layer blocks or pixels on destination drop. Escape/outside drops cancel. Mask linking can be toggled and undone; unlinked mask and pixels move independently. Link state round-trips in the OpenPhoto PSD extension; Adobe link serialization and live drag timing/Shift placement remain pending reference checks. Proceed to Artboard after offline tests and a separate pushed commit.
 
 Move stage validation: 23 core tests and 9 UI tests passed, one screenshot-only test ignored; mask PSD round-trip passed. Formatting, whitespace checks and strict workspace/all-targets Clippy passed. Tests use no OS windows or system mouse events.
+
+### Artboard offline implementation stage
+
+Artboards now have semantic group geometry and backgrounds, child clipping/hit testing, creation with optional nesting, resize without pixel loss, child/mask movement, automatic canvas expansion, eight resize handles, adjacent plus controls, Option-copy, presets, portrait/landscape, left/top alignment, background/dimension options and undo/cancel transactions. Standard artb/artd PSD descriptors preserve board metadata and are checked with an independent parser/fixture; Photoshop-native opening and a full native option catalog remain pending. Live 1:1 acceptance stays open while the user prohibits desktop interaction. The next toolbar tool is Rectangular Marquee.
+
+Artboard final validation (2026-10-13): workspace tests 577 passed, 0 failed, 51 ignored. Six board model tests, three descriptor tests and four windowless Artboard UI tests passed, covering all eight handles, view compensation, auto-nesting/undo, custom background retention, copy/cancel and exact-size transparent export. Formatting, whitespace checks and strict workspace/all-targets Clippy passed. ag-psd 31.0.3 independently recognized the emitted artb rectangle/background, child group and artd board count. No desktop mouse events, desktop capture, dev/debug servers or OS-window test harnesses were used.

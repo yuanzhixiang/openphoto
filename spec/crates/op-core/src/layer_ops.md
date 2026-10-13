@@ -110,3 +110,7 @@ All merges are computed via `Document::composite_layers_rgba8`, with the same ru
 `move_copy_into` copies selected root blocks to another document with fresh IDs, remapped group parents, cleared external links and a supplied pixel offset. Selected pixels instead create one raster layer with selection-weighted alpha. Source content is immutable; the destination selects the copies. Masks travel with transferred content even when unlinked.
 
 Transfer regressions cover selected-group/child deduplication, fresh IDs and parents, cleared cross-document links, masks, off-canvas pixels and unchanged source selection/content.
+
+Cross-document Move copies translate attached artboard rectangles by the same offset as the copied block.
+
+Cross-document transfers containing selected artboard roots insert all transferred roots at the document top level, preventing accidental nesting inside the destination board.

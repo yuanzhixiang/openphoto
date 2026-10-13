@@ -220,6 +220,16 @@ pub(crate) fn layer_alone(doc: &op_core::Document) -> Option<op_core::Document> 
         })
         .collect();
     let pixels = doc.composite_layers_rgba8(&layers);
+    if let Some(board) = doc.layer(id).and_then(|l| l.artboard) {
+        let image = op_core::TiledImage::from_rgba8(doc.width, doc.height, &pixels);
+        let pixels = image.region_rgba8(board.x, board.y, board.width, board.height);
+        return Some(op_core::Document::from_rgba8(
+            doc.layer(id)?.name.clone(),
+            board.width,
+            board.height,
+            &pixels,
+        ));
+    }
     let (w, h) = (doc.width as usize, doc.height as usize);
     let (mut x0, mut y0, mut x1, mut y1) = (w, h, 0, 0);
     for y in 0..h {

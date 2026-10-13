@@ -59,7 +59,7 @@ Clicking it pops up the brush picker popup (`brush_presets.md`): Size, Hardness 
 - Initial values of brush size, opacity, etc. are this program's defaults; the Photoshop screenshots show the state at the time (e.g. a 13 px brush).
 - The Mixer's smoothing icon, symmetry (butterfly), airbrush, angle gradient and similar icons are approximate redrawings from the screenshots; the Ruler's readout is currently fixed at 0.
 - The paint symmetry button (the butterfly) does nothing: Photoshop's paint symmetry draws along symmetry paths, so it comes with paths (P2 #14). "Ignore adjustment layers when healing / cloning" has nothing to ignore until adjustment layers exist (P2 #17).
-- The Pen, Path Selection, Artboard, Perspective Crop, Slice, Slice Select and Frame tools themselves are not implemented yet; their options are only stored in `tool_settings`. Icons such as path operations/alignment/arrangement, gear, Warp Text and panel toggles are appearance only.
+- The Pen, Path Selection, Perspective Crop, Slice, Slice Select and Frame tools themselves are not implemented yet; their options are only stored in `tool_settings`. Icons such as path operations/alignment/arrangement, gear, Warp Text and panel toggles are appearance only.
 - The Remove Tool and Adjustment Brush themselves are not implemented yet; their options are only stored in `tool_settings`. The Remove Tool's feedback icon and the Adjustment Brush's Select Subject icon are approximate drawings. The Move tool's bar is laid out separately by `options_bar.rs` (its separators and edges also match Photoshop).
 
 ## Test coverage
@@ -82,3 +82,7 @@ Clicking it pops up the brush picker popup (`brush_presets.md`): Size, Hardness 
 ## Quick Selection and Object Selection
 
 `quick_options` reads the Quick Selection tool's mode (0 New, 1 Add, 2 Subtract), brush diameter (`quick.size`, default 30), Sample All Layers and Enhance Edge; `object_options` reads the Object Selection tool's Sample All Layers and Hard Edge (default on).
+
+Artboard dimensions, supported presets and background now affect actual board containers. Add, portrait/landscape, left/top alignment and auto-nesting gear controls are functional through artboard_tool. Remaining artboard option parity is documented in that module.
+
+Artboard backgrounds include Other for custom RGB. The swatch opens a staged color picker, applies on OK and discards on Cancel; it displays the actual selected board color.

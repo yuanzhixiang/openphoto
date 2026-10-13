@@ -243,3 +243,5 @@ Escape cancels an active Move gesture without recording history. Releasing at ze
 
 
 A transferred Move drag released inside the destination viewport copies source layers at the drop offset and records one Drag Layer history entry. Shift centers source-canvas coordinates in the destination. Escape, switching tools, dropping outside the viewport or returning to the source cancels without changing either document. Native timing and exact Shift placement parity remain unmeasured.
+
+Artboard canvas input and board outlines are delegated to artboard_tool; space/middle-button panning retains priority.
