@@ -171,3 +171,5 @@ Staged Notes editor changes also make the document dirty; reverting/discarding t
 count_group selects a transient count group ID; count_drag previews marker movement/addition until release.
 
 count_name_edit holds staged count-group name editing; changes to the name contribute to dirty status.
+
+DocState::busy includes Patch/Content-Aware Move outline drags, so Escape cancels the operation before leaving Full Screen Mode.

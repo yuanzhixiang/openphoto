@@ -281,3 +281,5 @@ Ruler input/drawing delegates to measure_tool; unfinished ruler drags cancel whe
 Note input/drawing delegates to note_tool; tool switching cancels marker movement and commits staged text.
 
 Count input delegates to count_tool; Extras displays visible group markers for all tools, and changing tools cancels an unfinished count gesture.
+
+Patch outline drags accept Escape before pixel changes; releasing the cancelled gesture preserves selection, pixels and history.

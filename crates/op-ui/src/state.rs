@@ -229,6 +229,7 @@ impl DocState {
             || self.selection_stroke.is_some()
             || self.object_drag.is_some()
             || self.quick.is_some()
+            || self.patch_drag.is_some()
     }
 
     pub fn transform_controls_bounds(&mut self) -> Option<Bounds> {

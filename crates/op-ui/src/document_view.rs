@@ -3467,6 +3467,10 @@ fn patch_input(
     lasso: (crate::state::SelectionMode, f32, bool),
     ppp: f32,
 ) {
+    if state.patch_drag.is_some() && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        state.patch_drag = None;
+        return;
+    }
     let pointer = ui
         .input(|i| i.pointer.interact_pos())
         .map(|p| to_doc(state, p, ppp));
