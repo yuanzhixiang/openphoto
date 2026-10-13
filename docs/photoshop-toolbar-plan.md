@@ -173,3 +173,5 @@ Artboard final validation (2026-10-13): workspace tests 577 passed, 0 failed, 51
 Execution update: subsequent tools are committed and pushed directly to main, as explicitly requested. Rectangular Marquee now latches pointer-down modifiers and supports Escape/Space preview transactions; native algorithm and visual parity remain pending.
 
 Elliptical Marquee offline stage extends outline movement and keyboard nudging and validates circle/center geometry, edge coverage, intersections, feather and undo. The existing 4×4 supersampled mask remains an approximation pending Photoshop output fixtures.
+
+Single Row Marquee offline stage adds live full-width drag previews, edge clamping, feather, cancellation and transactional history.

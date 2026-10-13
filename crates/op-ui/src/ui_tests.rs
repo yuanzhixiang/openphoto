@@ -9897,3 +9897,55 @@ fn elliptical_marquee_circle_combinations_feather_and_outline_offline() {
     assert!(h.state_mut().state.active().unwrap().undo());
     assert!(active(&h).doc.selection().unwrap().get(120, 120) > 0);
 }
+
+#[test]
+fn single_row_marquee_drag_combine_feather_cancel_and_undo_offline() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.tool = op_tools::Tool::SingleRowMarquee;
+    let pixels = active(&h).doc.composite_rgba8();
+    let (a, b) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 300.0, 140.5));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(
+        active(&h).doc.selection().unwrap().bounds(),
+        Some((0, 140, 734, 141))
+    );
+    assert_eq!(last_history(&h), "Single Row Marquee");
+    let (a, b) = (doc_point(&h, 100.0, 180.0), doc_point(&h, 300.0, 190.5));
+    drag(&mut h, a, b, Modifiers::SHIFT);
+    assert_eq!(active(&h).doc.selection().unwrap().get(700, 140), 255);
+    assert_eq!(active(&h).doc.selection().unwrap().get(700, 190), 255);
+    let before = active(&h).doc.selection().cloned();
+    let count = active(&h).history.states().len();
+    let a = doc_point(&h, 100.0, 220.0);
+    h.event(egui::Event::PointerButton {
+        pos: a,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    h.hover_at(doc_point(&h, 200.0, 230.0));
+    h.step();
+    assert!(active(&h).marquee_drag.is_some());
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert_eq!(active(&h).doc.selection(), before.as_ref());
+    assert_eq!(active(&h).history.states().len(), count);
+    h.event(egui::Event::PointerButton {
+        pos: a,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(2);
+    h.state_mut().state.marquee.feather = 2.0;
+    let p = doc_point(&h, 100.0, 270.5);
+    click(&mut h, p);
+    let selection = active(&h).doc.selection().unwrap();
+    assert!(selection.get(700, 270) > 0 && selection.get(700, 270) < 255);
+    assert!(selection.get(700, 269) > 0);
+    assert_eq!(active(&h).doc.composite_rgba8(), pixels);
+    assert!(h.state_mut().state.active().unwrap().undo());
+    assert_eq!(active(&h).doc.selection(), before.as_ref());
+}

@@ -151,3 +151,5 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 `rectangular_marquee_moves_outline_and_nudges_without_pixels_offline` exercises interior outline dragging, one/ten pixel keyboard nudges and undo, asserting document pixels remain unchanged.
 
 `elliptical_marquee_circle_combinations_feather_and_outline_offline` verifies centered circles, fractional edge coverage, outline movement, pixel preservation, nudge, intersection, feather and undo.
+
+`single_row_marquee_drag_combine_feather_cancel_and_undo_offline` verifies full-width row dragging, Shift addition, preview cancellation, feather, unchanged pixels and undo.

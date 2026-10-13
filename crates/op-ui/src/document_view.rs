@@ -1774,6 +1774,48 @@ fn marquee_input(
     let op_from_mods = || selection_op(press_mods, press_selection, mode);
     let (w, h) = (state.doc.width, state.doc.height);
 
+    if tool == Tool::SingleRowMarquee {
+        if response.contains_pointer()
+            && ui.input(|i| i.pointer.button_pressed(PointerButton::Primary))
+            && let Some(p) = ui
+                .input(|i| i.pointer.press_origin())
+                .map(|p| to_doc(state, p, ppp))
+            && p.x >= 0.0
+            && p.x < w as f32
+            && p.y >= 0.0
+            && p.y < h as f32
+        {
+            let (op, shift_for_op, alt_for_op) = op_from_mods();
+            let start = Pos2::new(0.0, p.y.floor());
+            state.marquee_drag = Some(crate::state::MarqueeDrag {
+                start,
+                current: start,
+                op,
+                shift_for_op,
+                alt_for_op,
+                fixed: Some(crate::state::FixedMarquee::Size(w as f32, 1.0)),
+            });
+        }
+        if let Some(p) = ui
+            .input(|i| i.pointer.interact_pos())
+            .map(|p| to_doc(state, p, ppp))
+            && let Some(drag) = &mut state.marquee_drag
+        {
+            drag.current = Pos2::new(0.0, p.y.floor().clamp(0.0, h.saturating_sub(1) as f32));
+        }
+        if !ui.input(|i| i.pointer.primary_down())
+            && let Some(drag) = state.marquee_drag.take()
+        {
+            let rect = marquee_rect(&drag, false, false);
+            let shape = Selection::rect(w, h, rect).feather(feather);
+            let combined = Selection::combine(state.doc.selection(), shape, drag.op);
+            state.doc.set_selection(Some(combined));
+            state.record("Single Row Marquee");
+            state.marquee_press = None;
+        }
+        return;
+    }
+
     if matches!(tool, Tool::SingleRowMarquee | Tool::SingleColumnMarquee) {
         if response.clicked()
             && let Some(p) = response.interact_pointer_pos()

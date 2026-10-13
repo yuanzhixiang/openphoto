@@ -251,3 +251,5 @@ Marquee combination modifiers are latched from the actual pointer-down event, ra
 Rectangular Marquee in New/Normal mode moves the existing selection outline when dragged from its selected interior, leaving all layer pixels untouched. Each preview is recomputed from the original selection; Escape restores the original snapshot and release records one Move Selection state.
 
 Elliptical Marquee also moves an existing outline from its selected interior in New/Normal mode, with the same absolute preview and cancel contract as Rectangular Marquee. Circle/center modifiers, operation modes, anti-alias and feather act on the ellipse mask.
+
+Single Row Marquee starts a one-pixel, full-width live preview on a valid image press and tracks the pointer row while held. Rows clamp at the canvas edges. Release applies the latched operation and Feather, recording one Single Row Marquee state; Escape cancels without editing the prior selection. Outside-image presses do nothing.
