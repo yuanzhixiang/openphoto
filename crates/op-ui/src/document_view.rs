@@ -567,7 +567,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         }
     }
 
-    let panning = space || tool == Tool::Hand;
+    let panning = (space && state.marquee_drag.is_none()) || tool == Tool::Hand;
     let middle_drag = response.dragged_by(PointerButton::Middle);
     if state.guide_drag.is_some() {
         crate::rulers::drag(ui, state, canvas_rect, ppp);
@@ -584,7 +584,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         if let Some(crate::free_transform::Outcome::Committed(m)) = outcome {
             app.last_transform = Some(m);
         }
-    } else if !space {
+    } else if !space || state.marquee_drag.is_some() {
         match tool {
             Tool::RotateView => rotate_view_input(ui, &response, state, ppp),
             Tool::Zoom if response.clicked() => {
@@ -1704,8 +1704,74 @@ fn marquee_input(
     use op_core::Selection;
     let mods = ui.input(|i| i.modifiers);
     let has_selection = state.doc.selection().is_some();
+    if (state.marquee_drag.is_some() || state.marquee_outline.is_some())
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape))
+    {
+        state.marquee_drag = None;
+        if let Some((before, _, _)) = state.marquee_outline.take() {
+            state.doc.restore(&before);
+        }
+        state.marquee_press = None;
+        return;
+    }
+    if response.contains_pointer() && ui.input(|i| i.pointer.button_pressed(PointerButton::Primary))
+    {
+        let pressed = ui
+            .input(|i| {
+                i.events.iter().find_map(|e| match e {
+                    egui::Event::PointerButton {
+                        button: PointerButton::Primary,
+                        pressed: true,
+                        modifiers,
+                        ..
+                    } => Some(*modifiers),
+                    _ => None,
+                })
+            })
+            .unwrap_or(mods);
+        state.marquee_press = Some((pressed, has_selection));
+        if tool == Tool::RectangularMarquee
+            && fixed.is_none()
+            && mode == crate::state::SelectionMode::New
+            && !pressed.shift
+            && !pressed.alt
+            && let Some(p) = ui
+                .input(|i| i.pointer.press_origin())
+                .map(|p| to_doc(state, p, ppp))
+            && p.x >= 0.0
+            && p.y >= 0.0
+            && let Some(base) = state
+                .doc
+                .selection()
+                .filter(|s| s.get(p.x as u32, p.y as u32) >= 128)
+                .cloned()
+        {
+            state.marquee_outline = Some((state.doc.snapshot(), base, p));
+        }
+    }
+    if let Some((_, base, start)) = &state.marquee_outline {
+        let p = ui
+            .input(|i| i.pointer.interact_pos())
+            .map(|p| to_doc(state, p, ppp))
+            .unwrap_or(*start);
+        let (dx, dy) = (
+            (p.x - start.x).round() as i64,
+            (p.y - start.y).round() as i64,
+        );
+        let shifted = base.translated(dx, dy);
+        state.doc.set_selection(Some(shifted));
+        if !ui.input(|i| i.pointer.primary_down()) {
+            state.marquee_outline = None;
+            state.marquee_press = None;
+            if dx != 0 || dy != 0 {
+                state.record("Move Selection");
+            }
+        }
+        return;
+    }
+    let (press_mods, press_selection) = state.marquee_press.unwrap_or((mods, has_selection));
     // With a selection, Shift/Alt at mouse-down pick the combine mode
-    let op_from_mods = || selection_op(mods, has_selection, mode);
+    let op_from_mods = || selection_op(press_mods, press_selection, mode);
     let (w, h) = (state.doc.width, state.doc.height);
 
     if matches!(tool, Tool::SingleRowMarquee | Tool::SingleColumnMarquee) {
@@ -1754,6 +1820,11 @@ fn marquee_input(
         .map(|p| crate::snap::point(ui, state, to_doc(state, p, ppp), ppp));
     if let Some(drag) = &mut state.marquee_drag {
         if let Some(p) = pointer {
+            if ui.input(|i| i.key_down(Key::Space))
+                && !matches!(drag.fixed, Some(crate::state::FixedMarquee::Size(..)))
+            {
+                drag.start += p - drag.current;
+            }
             drag.current = p;
         }
         if response.drag_stopped() || !ui.input(|i| i.pointer.primary_down()) {

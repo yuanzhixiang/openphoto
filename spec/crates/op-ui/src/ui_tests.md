@@ -145,3 +145,7 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 `artboard_negative_drag_keeps_view_origin_and_move_auto_nests_offline` verifies leftward canvas expansion keeps the logical view aligned with the pointer; a regular Move drag into a board auto-nests its layer and undo restores both parent and pixels.
 
 `artboard_all_eight_resize_handles_and_custom_background_offline` checks every edge/corner handle, custom background preservation through dimension changes, and color-picker cancellation without history changes.
+
+`rectangular_marquee_press_modifiers_space_and_escape_offline` verifies pointer-down combination modifiers, Escape rollback without history, Space moving the preview without panning, one release history entry and undo restoring the prior selection.
+
+`rectangular_marquee_moves_outline_and_nudges_without_pixels_offline` exercises interior outline dragging, one/ten pixel keyboard nudges and undo, asserting document pixels remain unchanged.

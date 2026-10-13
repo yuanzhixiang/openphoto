@@ -245,3 +245,7 @@ Escape cancels an active Move gesture without recording history. Releasing at ze
 A transferred Move drag released inside the destination viewport copies source layers at the drop offset and records one Drag Layer history entry. Shift centers source-canvas coordinates in the destination. Escape, switching tools, dropping outside the viewport or returning to the source cancels without changing either document. Native timing and exact Shift placement parity remain unmeasured.
 
 Artboard canvas input and board outlines are delegated to artboard_tool; space/middle-button panning retains priority.
+
+Marquee combination modifiers are latched from the actual pointer-down event, rather than the delayed egui drag-start frame. Escape discards a live marquee without history or selection changes. Holding Space during a rectangular/elliptical drag translates the preview while retaining its dimensions; it does not pan the document. Fixed Size continues to track its pointer anchor. These are offline interaction contracts; native modifier timing parity is unverified.
+
+Rectangular Marquee in New/Normal mode moves the existing selection outline when dragged from its selected interior, leaving all layer pixels untouched. Each preview is recomputed from the original selection; Escape restores the original snapshot and release records one Move Selection state.

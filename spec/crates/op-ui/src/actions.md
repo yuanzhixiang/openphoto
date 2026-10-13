@@ -78,3 +78,5 @@ Called after the Duplicate Layer dialog is confirmed; handled in three cases dep
 - In Full Screen Mode, hidden panels cannot be revealed by moving the pointer to the screen's sides, as Photoshop allows; Tab shows them.
 
 Artboard layer exports retain the exact board width/height, including empty transparent margins. Only the selected board and descendants are composited, then cropped at its rectangle. An empty transparent artboard still exports a valid transparent image of that size. Other layer exports keep their existing content trimming behavior.
+
+Rectangular Marquee arrow keys move the selection outline by one pixel (Shift: ten), leaving pixels and layer locks unchanged, and record Move Selection. Without a selection these keys make no document edit.

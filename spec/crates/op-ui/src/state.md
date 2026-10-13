@@ -135,3 +135,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 `AppState::move_transfer` holds an immutable original source document, source ID and initial document-space grab point while a Move gesture crosses tabs.
 
 DocState stores an optional Artboard drag transaction; it counts as busy, so Escape cancels the gesture.
+
+`marquee_press` records pointer-down modifiers and whether a selection existed before the gesture. Fixed marquee settings reject non-finite values and invalid ratio quotients.
+
+`marquee_outline` stores the original snapshot, selection and grab point for a selection-outline move; it counts as a busy gesture.

@@ -9722,3 +9722,120 @@ fn artboard_all_eight_resize_handles_and_custom_background_offline() {
         Some([20, 30, 40])
     );
 }
+
+#[test]
+fn rectangular_marquee_press_modifiers_space_and_escape_offline() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.view.snap = false;
+    h.state_mut().state.view.smart_guides = false;
+    let (a, b) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 180.0, 140.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let original = active(&h).doc.selection().cloned();
+    let count = active(&h).history.states().len();
+    let a = doc_point(&h, 300.0, 300.0);
+    h.event(egui::Event::PointerButton {
+        pos: a,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::SHIFT,
+    });
+    h.step();
+    h.event(egui::Event::ModifiersChanged(Modifiers::NONE));
+    h.hover_at(doc_point(&h, 340.0, 320.0));
+    h.step();
+    assert_eq!(
+        active(&h).marquee_drag.unwrap().op,
+        op_core::SelectionOp::Add
+    );
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert!(active(&h).marquee_drag.is_none());
+    assert_eq!(active(&h).doc.selection(), original.as_ref());
+    assert_eq!(active(&h).history.states().len(), count);
+    h.event(egui::Event::PointerButton {
+        pos: a,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(2);
+    let a = doc_point(&h, 300.0, 300.0);
+    h.event(egui::Event::PointerButton {
+        pos: a,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    let b = doc_point(&h, 340.0, 320.0);
+    h.hover_at(b);
+    h.step();
+    let offset = active(&h).view.offset;
+    h.event(egui::Event::Key {
+        key: egui::Key::Space,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    let c = doc_point(&h, 360.0, 330.0);
+    h.hover_at(c);
+    h.step();
+    let preview = active(&h).marquee_drag.unwrap();
+    assert!(preview.start.distance(egui::pos2(320.0, 310.0)) < 0.001);
+    assert_eq!(active(&h).view.offset, offset);
+    h.event(egui::Event::Key {
+        key: egui::Key::Space,
+        physical_key: None,
+        pressed: false,
+        repeat: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.event(egui::Event::PointerButton {
+        pos: c,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(3);
+    assert_eq!(
+        active(&h).doc.selection().unwrap().bounds(),
+        Some((320, 310, 360, 330))
+    );
+    assert_eq!(active(&h).history.states().len(), count + 1);
+    assert!(h.state_mut().state.active().unwrap().undo());
+    assert_eq!(active(&h).doc.selection(), original.as_ref());
+}
+
+#[test]
+fn rectangular_marquee_moves_outline_and_nudges_without_pixels_offline() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let (a, b) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 180.0, 140.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let pixels = active(&h).doc.composite_rgba8();
+    let (a, b) = (doc_point(&h, 120.0, 120.0), doc_point(&h, 150.0, 140.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(
+        active(&h).doc.selection().unwrap().bounds(),
+        Some((130, 120, 210, 160))
+    );
+    assert_eq!(active(&h).doc.composite_rgba8(), pixels);
+    assert_eq!(last_history(&h), "Move Selection");
+    h.key_press(egui::Key::ArrowRight);
+    h.run_steps(2);
+    h.key_press_modifiers(Modifiers::SHIFT, egui::Key::ArrowDown);
+    h.run_steps(2);
+    assert_eq!(
+        active(&h).doc.selection().unwrap().bounds(),
+        Some((131, 130, 211, 170))
+    );
+    assert!(h.state_mut().state.active().unwrap().undo());
+    assert_eq!(
+        active(&h).doc.selection().unwrap().bounds(),
+        Some((131, 120, 211, 160))
+    );
+    assert_eq!(active(&h).doc.composite_rgba8(), pixels);
+}

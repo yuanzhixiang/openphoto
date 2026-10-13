@@ -66,6 +66,8 @@ pub struct DocState {
     pending_edit: bool,
     /// A marquee being dragged on the canvas.
     pub marquee_drag: Option<MarqueeDrag>,
+    pub marquee_press: Option<(egui::Modifiers, bool)>,
+    pub marquee_outline: Option<(op_core::Snapshot, op_core::Selection, egui::Pos2)>,
     /// A Move tool drag: the move and where it started (document pixels).
     pub move_drag: Option<(op_core::move_tool::Move, egui::Pos2)>,
     pub artboard_drag: Option<crate::artboard_tool::Drag>,
@@ -195,6 +197,7 @@ impl DocState {
             || self.magnetic.is_some()
             || self.text_edit.is_some()
             || self.marquee_drag.is_some()
+            || self.marquee_outline.is_some()
             || self.shape_drag.is_some()
             || self.move_drag.is_some()
             || self.artboard_drag.is_some()
@@ -249,6 +252,8 @@ impl DocState {
             view: View::default(),
             pending_edit: false,
             marquee_drag: None,
+            marquee_press: None,
+            marquee_outline: None,
             move_drag: None,
             artboard_drag: None,
             move_hover_target: None,
@@ -1394,11 +1399,12 @@ impl FixedMarquee {
         let read = |k: &str, d: &str| -> Option<f32> {
             let t = settings.get(k).map_or(d, |s| s.as_str());
             let n: f32 = t.trim().trim_end_matches("px").trim().parse().ok()?;
-            (n > 0.0).then_some(n)
+            (n.is_finite() && n > 0.0).then_some(n)
         };
         let (w, h) = (read(kw, dw)?, read(kh, dh)?);
         Some(match style {
-            MarqueeStyle::FixedRatio => Self::Ratio(w, h),
+            MarqueeStyle::FixedRatio if (w / h).is_finite() && w / h > 0.0 => Self::Ratio(w, h),
+            MarqueeStyle::FixedRatio => return None,
             _ => Self::Size(w.round().max(1.0), h.round().max(1.0)),
         })
     }

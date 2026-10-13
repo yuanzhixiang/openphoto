@@ -696,7 +696,8 @@ fn paint_key(app: &mut AppState, key: Key, shift: bool) -> bool {
 
 /// Arrow keys nudge with the Move tool (1 pixel, 10 with Shift).
 fn nudge_key(app: &mut AppState, key: Key, shift: bool) -> bool {
-    if app.tool != op_tools::Tool::Move {
+    let marquee = app.tool == op_tools::Tool::RectangularMarquee;
+    if app.tool != op_tools::Tool::Move && !marquee {
         return false;
     }
     let step = if shift { 10 } else { 1 };
@@ -707,6 +708,15 @@ fn nudge_key(app: &mut AppState, key: Key, shift: bool) -> bool {
         Key::ArrowDown => (0, step),
         _ => return false,
     };
+    if marquee {
+        if let Some(state) = app.active()
+            && let Some(selection) = state.doc.selection().cloned()
+        {
+            state.doc.set_selection(Some(selection.translated(dx, dy)));
+            state.record("Move Selection");
+        }
+        return true;
+    }
     let [r, g, b, _] = app.background.to_rgba8();
     if let Some(state) = app.active()
         && let Err(message) = crate::document_view::nudge(state, dx, dy, [r, g, b])
