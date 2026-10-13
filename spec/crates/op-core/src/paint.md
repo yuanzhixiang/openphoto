@@ -186,3 +186,5 @@ Mixer Brush deposits into the latched pixel/mask target. Layer/Quick Mask stroke
 Art History Brush writes its scattered marks into the stroke target, including layer/Quick Masks. Mask outputs are opaque grayscale and image pixels remain unchanged. Its deterministic style synthesis remains an unmeasured approximation, not Photoshop parity.
 
 Smudge and its initial Finger Painting dab use the latched target. Mask results are opaque grayscale, and dragging mask paint leaves the image untouched. A regression checks initial colored finger paint and subsequent smearing on both mask targets.
+
+Coverage-based strokes normalize mask writes to opaque grayscale, including colored sampled/history/pattern sources.

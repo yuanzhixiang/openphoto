@@ -53,3 +53,5 @@ Count name CPU regression verifies pending dirty state, save committing Unicode 
 Frame sibling CPU regression creates multiple independently clipped containers and verifies that selecting existing content does not extract or nest it when another placeholder is drawn.
 
 Patch cancellation regression covers drag state, busy state, release after Escape, unchanged selection/pixels/history without native input.
+
+Clone Stamp canvas regression checks mask source sampling, destination coverage, untouched pixels, one history state and undo.

@@ -834,7 +834,7 @@ impl Stroke {
                         self.lay(base, target, amount, (x, y))
                     }
                 };
-                image.set_pixel(x, y, px);
+                image.set_pixel(x, y, self.target.color(px));
             }
         }
         doc.mark_dirty();

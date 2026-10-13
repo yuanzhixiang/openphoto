@@ -1292,3 +1292,41 @@ fn patch_escape_preserves_selection_pixels_and_history_cpu() {
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
     assert_eq!(h.state().history.states().len(), count);
 }
+
+#[test]
+fn clone_stamp_samples_and_writes_only_the_active_mask_cpu() {
+    let mut h = CanvasHarness::new(Tool::CloneStamp);
+    h.app.clone_stamp.size = 12.0;
+    let state = h.app.active().unwrap();
+    let id = state.doc.active_layer.unwrap();
+    let mut mask = op_core::layer::LayerMask::filled(256, 256, 255);
+    for y in 30..70 {
+        for x in 30..70 {
+            mask.image.set_pixel(x, y, [0, 0, 0, 255]);
+        }
+    }
+    state.doc.layer_mut(id).unwrap().mask = Some(mask);
+    state.doc.mask_target = true;
+    state.clone_source = Some(egui::pos2(50.5, 50.5));
+    state.record("Mask");
+    let pixels = state.doc.layer(id).unwrap().image().unwrap().to_rgba8();
+    let count = state.history.states().len();
+    h.drag((120.5, 120.5), (130.5, 120.5), Modifiers::NONE);
+    let layer = h.state().doc.layer(id).unwrap();
+    assert_eq!(layer.mask.as_ref().unwrap().value(120, 120), 0);
+    assert_eq!(layer.mask.as_ref().unwrap().value(200, 200), 255);
+    assert_eq!(layer.image().unwrap().to_rgba8(), pixels);
+    assert_eq!(h.state().history.states().len(), count + 1);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(
+        h.state()
+            .doc
+            .layer(id)
+            .unwrap()
+            .mask
+            .as_ref()
+            .unwrap()
+            .value(120, 120),
+        255
+    );
+}

@@ -283,3 +283,5 @@ Note input/drawing delegates to note_tool; tool switching cancels marker movemen
 Count input delegates to count_tool; Extras displays visible group markers for all tools, and changing tools cancels an unfinished count gesture.
 
 Patch outline drags accept Escape before pixel changes; releasing the cancelled gesture preserves selection, pixels and history.
+
+Clone Stamp samples the active layer/Quick Mask when that target is selected, independent of the pixel-layer Sample scope; it writes into the same target. Pixel-layer sampling scopes are unchanged.

@@ -2233,8 +2233,15 @@ fn stroke_kind(
         [r, g, b]
     };
     let active_image = |state: &DocState| {
+        if let Some(mask) = &state.doc.quick_mask {
+            return Some(mask.clone());
+        }
         let layer = state.doc.active_layer.and_then(|id| state.doc.layer(id))?;
-        layer.image().cloned()
+        if state.doc.editing_mask() {
+            layer.mask.as_ref().map(|m| m.image.clone())
+        } else {
+            layer.image().cloned()
+        }
     };
     Ok(match tool {
         Tool::Eraser => StrokeKind::Erase {
@@ -2261,7 +2268,10 @@ fn stroke_kind(
             };
             state.clone_offset = Some(offset);
             // Sample: the layer itself, the layers up to it, or all merged
-            let image = if clone_scope == op_core::SampleScope::Current {
+            let image = if clone_scope == op_core::SampleScope::Current
+                || state.doc.quick_mask.is_some()
+                || state.doc.editing_mask()
+            {
                 active_image(state).ok_or("")?
             } else {
                 state.doc.sample_source(clone_scope).ok_or("")?
