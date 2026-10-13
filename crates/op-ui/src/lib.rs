@@ -16,6 +16,7 @@ mod crop_tool;
 mod dialogs;
 mod doc_tabs;
 mod document_view;
+mod frame_tool;
 mod free_transform;
 mod icons;
 #[cfg(target_os = "macos")]
@@ -1293,7 +1294,12 @@ impl eframe::App for OpenPhotoApp {
                 .collect()
         });
         if !dropped.is_empty() {
-            actions::open_paths(&mut self.state, dropped);
+            actions::drop_paths(
+                &mut self.state,
+                dropped,
+                ctx.input(|i| i.pointer.hover_pos()),
+                ctx.pixels_per_point(),
+            );
         }
         self.run_commands(&ctx);
         actions::handle_tool_keys(&ctx, &mut self.state);

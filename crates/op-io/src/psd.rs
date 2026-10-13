@@ -790,6 +790,16 @@ pub fn write(doc: &Document) -> Vec<u8> {
             if let Some(board) = layer.artboard {
                 write_artboard_descriptor(&mut out, board);
             }
+            if let Some(frame) = layer.frame {
+                out.bytes(b"8BIMopfr");
+                out.u32(24);
+                out.u32(1);
+                out.u32(u32::from(frame.elliptical));
+                let (x0, y0, x1, y1) = frame.bounds;
+                for v in [x0, y0, x1, y1] {
+                    out.u32(v);
+                }
+            }
             // OpenPhoto mask-link extension; Adobe mask-link encoding is not verified.
             if let Some(mask) = &layer.mask {
                 out.bytes(b"8BIMopml");
@@ -969,6 +979,7 @@ struct LayerRecord {
     locks: Option<u32>,
     mask_linked: bool,
     artboard: Option<op_core::artboard::Artboard>,
+    frame: Option<op_core::frame::Frame>,
     rect: (i32, i32, i32, i32),
     channels: Vec<(i16, usize)>,
     blend: [u8; 4],
@@ -1114,6 +1125,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                 let mut locks = None;
                 let mut mask_linked = true;
                 let mut artboard = None;
+                let mut frame = None;
                 while r.pos() + 12 <= extra_end {
                     let sig = r.take::<4>()?;
                     if &sig != b"8BIM" && &sig != b"8B64" {
@@ -1134,6 +1146,17 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                         b"iOpa" => fill = r.u8()?,
                         b"lclr" => label = r.u16()?,
                         b"lspf" => locks = Some(r.u32()?),
+                        b"opfr" if len == 24 => {
+                            let version = r.u32()?;
+                            let elliptical = r.u32()? != 0;
+                            let f = op_core::frame::Frame {
+                                bounds: (r.u32()?, r.u32()?, r.u32()?, r.u32()?),
+                                elliptical,
+                            };
+                            if version == 1 && f.valid(w, h) {
+                                frame = Some(f);
+                            }
+                        }
                         b"opml" => mask_linked = r.u32()? != 0,
                         b"artb" => artboard = read_artboard_descriptor(r.bytes(len as usize)?)?,
                         b"opab" if len >= 20 => {
@@ -1177,6 +1200,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                     locks,
                     mask_linked,
                     artboard,
+                    frame,
                 });
             }
             let mut open_groups: Vec<usize> = Vec::new();
@@ -1241,6 +1265,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                     layer.mask = Some(mask);
                 }
                 layer.artboard = rec.artboard;
+                layer.frame = rec.frame;
                 layer.visible = rec.flags & 2 == 0;
                 layer.opacity = rec.opacity as f32 / 255.0;
                 layer.fill = rec.fill as f32 / 255.0;
@@ -1353,6 +1378,20 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn frame_geometry_mask_and_content_round_trip() {
+        let mut doc = Document::new_with_background("Frame", 32, 32, Color::WHITE);
+        let f = op_core::frame::Frame {
+            bounds: (4, 4, 28, 28),
+            elliptical: true,
+        };
+        let id = op_core::frame::create(&mut doc, f).unwrap();
+        assert_eq!(doc.descendants(id).len(), 1);
+        let back = read(&write(&doc), "Frame".into()).unwrap();
+        assert_eq!(back.layers.iter().find_map(|l| l.frame), Some(f));
+        assert_eq!(back.composite_rgba8(), doc.composite_rgba8());
+    }
 
     #[test]
     fn slices_round_trip_unicode_and_metadata() {

@@ -31,3 +31,5 @@ This file has no tests; for each module's tests, see the corresponding spec.
 The public `artboard` module implements artboard group geometry, clipping metadata, creation, hit testing, resizing and movement.
 
 The public slice module implements non-destructive slice metadata, creation and composite pixel export.
+
+The public frame module creates, moves, resizes and replaces raster content in clipping containers.

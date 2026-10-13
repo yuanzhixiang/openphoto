@@ -31,3 +31,7 @@ Slice CPU regression verifies all three drawing styles, exported dimensions/pixe
 Guide-grid CPU test covers horizontal/vertical division, duplicate guides and repeated no-op creation.
 
 Slice Select CPU regression covers moving, corner resizing, multi-selection/group movement, Escape, deletion, undo and unchanged image pixels.
+
+Frame CPU regression verifies rectangle clipping, moving/undo, cancelled movement, elliptical clipping, synthetic file-drop replacement, no new document and undo. It writes/removes one temporary PNG; no native input or screenshot is used.
+
+Frame resize/Move CPU regression verifies independent clipping geometry, retained child pixels, grouped Move geometry/clamping and cancellation.

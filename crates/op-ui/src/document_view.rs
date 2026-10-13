@@ -215,6 +215,10 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         .unwrap_or(1);
     let artboard_options = crate::artboard_tool::options(app);
     let slice_options = crate::slice_tool::Options::read(app);
+    let frame_ellipse = app
+        .tool_settings
+        .get("frame.shape")
+        .is_some_and(|v| v == "1");
     let paint = app.paint_options(tool).copied();
     let dynamics = paint_dynamics(app, tool);
     // The Mixer Brush's paint and settings
@@ -779,6 +783,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 );
                 magnetic_input(ui, &response, state, options, magnetic, ppp);
             }
+            Tool::Frame => crate::frame_tool::input(ui, &response, state, frame_ellipse, ppp),
             Tool::Slice => crate::slice_tool::input(ui, &response, state, slice_options, ppp),
             Tool::SliceSelect => crate::slice_tool::select_input(ui, &response, state, ppp),
             Tool::Artboard => {
@@ -1106,6 +1111,11 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
     if tool != Tool::SliceSelect {
         crate::slice_tool::cancel_select(state);
+    }
+    if tool == Tool::Frame {
+        crate::frame_tool::draw(ui, state, ppp);
+    } else {
+        crate::frame_tool::cancel(state);
     }
     let transforming = state.free_transform.is_some();
     if let (Some(opts), Some(p), false) = (paint, response.hover_pos(), transforming) {

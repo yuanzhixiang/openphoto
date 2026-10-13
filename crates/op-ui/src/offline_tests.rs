@@ -780,3 +780,110 @@ fn slice_select_move_resize_multiselect_cancel_delete_undo_cpu() {
     assert_eq!(h.state().doc.slices, original);
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn frame_rectangle_ellipse_clip_move_cancel_replace_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::Frame);
+    h.drag((40.0, 40.0), (140.0, 120.0), Modifiers::NONE);
+    let id = h.state().doc.active_layer.unwrap();
+    let f = h.state().doc.layer(id).unwrap().frame.unwrap();
+    assert_eq!(f.bounds, (40, 40, 140, 120));
+    assert_eq!(h.state().doc.composite_rgba8()[3], 0);
+    let original = h.state().doc.composite_rgba8();
+    h.drag((80.0, 80.0), (100.0, 100.0), Modifiers::NONE);
+    assert_eq!(
+        h.state().doc.layer(id).unwrap().frame.unwrap().bounds,
+        (60, 60, 160, 140)
+    );
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.composite_rgba8(), original);
+    let p = h.point(80.0, 80.0);
+    h.button(p, true, Modifiers::NONE);
+    let q = h.point(110.0, 110.0);
+    h.step(vec![Event::PointerMoved(q)], Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    h.button(q, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.layer(id).unwrap().frame, Some(f));
+    let ellipse = op_core::frame::Frame {
+        elliptical: true,
+        ..f
+    };
+    assert!(op_core::frame::set(
+        &mut h.app.active().unwrap().doc,
+        id,
+        ellipse,
+        false
+    ));
+    h.app.active().unwrap().record("Ellipse Frame");
+    let path = std::env::temp_dir().join(format!("openphoto-frame-{}.png", h.state().doc.id.0));
+    let source = op_core::Document::new_with_background(
+        "red",
+        8,
+        4,
+        op_core::Color::from_rgba8([255, 0, 0, 255]),
+    );
+    op_io::save(&source, &path).unwrap();
+    let p = h.point(90.0, 80.0);
+    let ppp = h.ctx.pixels_per_point();
+    crate::actions::drop_paths(&mut h.app, vec![path.clone()], Some(p), ppp);
+    std::fs::remove_file(path).unwrap();
+    assert_eq!(h.app.docs.len(), 1);
+    let image = h.state().doc.composite_rgba8();
+    let center = ((80 * 256 + 90) * 4) as usize;
+    assert_eq!(&image[center..center + 4], &[255, 0, 0, 255]);
+    let corner = ((40 * 256 + 40) * 4) as usize;
+    assert_eq!(image[corner + 3], 0);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.layer(id).unwrap().frame, Some(ellipse));
+}
+
+#[test]
+fn frame_resize_preserves_content_and_move_tool_tracks_geometry_cpu() {
+    let mut h = CanvasHarness::new(Tool::Frame);
+    h.drag((40.0, 40.0), (140.0, 120.0), Modifiers::NONE);
+    let id = h.state().doc.active_layer.unwrap();
+    let content = h.state().doc.descendants(id)[0];
+    let pixels = h
+        .state()
+        .doc
+        .layer(content)
+        .unwrap()
+        .image()
+        .unwrap()
+        .clone();
+    h.drag((140.0, 120.0), (170.0, 150.0), Modifiers::NONE);
+    assert_eq!(
+        h.state().doc.layer(id).unwrap().frame.unwrap().bounds,
+        (40, 40, 170, 150)
+    );
+    assert_eq!(
+        h.state()
+            .doc
+            .layer(content)
+            .unwrap()
+            .image()
+            .unwrap()
+            .pixel(20, 20),
+        pixels.pixel(20, 20)
+    );
+    let movement = op_core::move_tool::Move::begin(&h.state().doc, [0; 3]).unwrap();
+    movement.apply(&mut h.app.active().unwrap().doc, 200, 200);
+    assert_eq!(
+        h.state().doc.layer(id).unwrap().frame.unwrap().bounds,
+        (126, 146, 256, 256)
+    );
+    movement.cancel(&mut h.app.active().unwrap().doc);
+    assert_eq!(
+        h.state().doc.layer(id).unwrap().frame.unwrap().bounds,
+        (40, 40, 170, 150)
+    );
+}

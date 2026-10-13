@@ -41,6 +41,7 @@ pub struct Move {
     copy_selection: bool,
     mask_only: bool,
     boards: Vec<(LayerId, crate::artboard::Artboard)>,
+    frames: Vec<(LayerId, crate::frame::Frame)>,
     before: crate::Snapshot,
     selected_before: Vec<LayerId>,
     mask_target_before: bool,
@@ -78,6 +79,7 @@ impl Move {
                 copy_selection: false,
                 mask_only: true,
                 boards: Vec::new(),
+                frames: Vec::new(),
                 before: doc.snapshot(),
                 selected_before: doc.selected_layers(),
                 mask_target_before: doc.mask_target,
@@ -123,7 +125,9 @@ impl Move {
                 moving.retain(|(other, _)| *other != id);
                 (id, image.clone())
             }
-            None if layer.artboard.is_some() => (id, TiledImage::new(doc.width, doc.height)),
+            None if layer.artboard.is_some() || layer.frame.is_some() => {
+                (id, TiledImage::new(doc.width, doc.height))
+            }
             None if moving.is_empty() => return Err(MoveError::Locked),
             None => moving.remove(0),
         };
@@ -175,6 +179,12 @@ impl Move {
         }
         board_ids.sort_by_key(|id| id.0);
         board_ids.dedup();
+        let frames = board_ids
+            .iter()
+            .copied()
+            .filter(|id| !doc.position_locked(*id))
+            .filter_map(|id| doc.layer(id)?.frame.map(|f| (id, f)))
+            .collect();
         let boards = board_ids
             .into_iter()
             .filter(|id| !doc.position_locked(*id))
@@ -182,6 +192,7 @@ impl Move {
             .collect();
         Ok(Self {
             boards,
+            frames,
             layer: main,
             base: image,
             selection,
@@ -237,6 +248,15 @@ impl Move {
     /// Photoshop, except on the background layer, which ends at the canvas.
     pub fn apply(&self, doc: &mut Document, dx: i64, dy: i64) {
         let (w, h) = (doc.width, doc.height);
+        let (mut dx, mut dy) = (dx, dy);
+        if !self.frames.is_empty() {
+            let x0 = self.frames.iter().map(|(_, f)| f.bounds.0).min().unwrap() as i64;
+            let y0 = self.frames.iter().map(|(_, f)| f.bounds.1).min().unwrap() as i64;
+            let x1 = self.frames.iter().map(|(_, f)| f.bounds.2).max().unwrap() as i64;
+            let y1 = self.frames.iter().map(|(_, f)| f.bounds.3).max().unwrap() as i64;
+            dx = dx.clamp(-x0, (w as i64 - x1).max(-x0));
+            dy = dy.clamp(-y0, (h as i64 - y1).max(-y0));
+        }
         let moved = match &self.selection {
             None => self.base.with_canvas(
                 w,
@@ -315,6 +335,20 @@ impl Move {
                     x: board.x + dx,
                     y: board.y + dy,
                     ..*board
+                });
+            }
+        }
+        for (id, f) in &self.frames {
+            if let Some(l) = doc.layer_mut(*id) {
+                let (x0, y0, x1, y1) = f.bounds;
+                l.frame = Some(crate::frame::Frame {
+                    bounds: (
+                        (x0 as i64 + dx) as u32,
+                        (y0 as i64 + dy) as u32,
+                        (x1 as i64 + dx) as u32,
+                        (y1 as i64 + dy) as u32,
+                    ),
+                    ..*f
                 });
             }
         }

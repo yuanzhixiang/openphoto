@@ -109,3 +109,5 @@ This file has no unit tests.
 Masks have a `linked` boolean, true by default; it controls coupled pixel/mask movement independently of enabled state.
 
 `Layer::artboard` optionally attaches an Artboard rectangle/background to a group. Regular raster/group constructors initialize it to None; clones and snapshots retain it.
+
+Layer.frame stores an optional frame-container geometry, included through cloned layers in snapshots. Its clipping mask remains a normal group mask.

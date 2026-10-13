@@ -135,3 +135,7 @@ The `artboard_tool` module handles board options, canvas gestures and outlines w
 The test-only offline_tests module exercises canvas gestures using an egui Context without a GPU device or native window.
 
 slice_tool handles canvas slice creation and numbered overlays.
+
+frame_tool handles transactional canvas frame creation and movement.
+
+With Frame selected, file drops over a frame delegate to actions::drop_paths for content replacement; other drops open documents.

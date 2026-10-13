@@ -27,6 +27,47 @@ pub fn open_paths(app: &mut AppState, paths: Vec<PathBuf>) {
     }
 }
 
+/// File drops over a frame replace its contents; ordinary Open remains unchanged.
+pub fn drop_paths(app: &mut AppState, paths: Vec<PathBuf>, pointer: Option<egui::Pos2>, ppp: f32) {
+    let target = if app.tool == op_tools::Tool::Frame {
+        app.active_doc.and_then(|doc_id| {
+            app.docs.get(&doc_id).and_then(|state| {
+                let id = pointer
+                    .filter(|p| state.view.viewport.contains(*p))
+                    .and_then(|p| {
+                        let p = crate::document_view::to_doc(state, p, ppp);
+                        op_core::frame::at(&state.doc, p.x, p.y)
+                    });
+                id.map(|id| (doc_id, id))
+            })
+        })
+    } else {
+        None
+    };
+    let Some((doc_id, id)) = target else {
+        open_paths(app, paths);
+        return;
+    };
+    for path in paths {
+        match op_io::open(&path) {
+            Ok(source) => {
+                let pixels = op_core::TiledImage::from_rgba8(
+                    source.width,
+                    source.height,
+                    &source.composite_rgba8(),
+                );
+                if let Some(state) = app.docs.get_mut(&doc_id)
+                    && op_core::frame::place(&mut state.doc, id, &pixels, &source.title)
+                {
+                    state.doc.select_layer(id);
+                    state.record("Place Frame Content");
+                }
+            }
+            Err(e) => app.alert = Some(format!("Could not place “{}”: {e}", path.display())),
+        }
+    }
+}
+
 pub fn open_dialog(app: &mut AppState) {
     let paths = rfd::FileDialog::new()
         .add_filter("Images", op_io::OPEN_EXTENSIONS)

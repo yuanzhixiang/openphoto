@@ -84,3 +84,5 @@ Rectangular Marquee arrow keys move the selection outline by one pixel (Shift: t
 Elliptical Marquee supports one/ten pixel arrow-key selection-outline movement as well.
 
 Single Row and Single Column also support selection-outline arrow-key nudging.
+
+drop_paths replaces contents when a file is dropped over a frame while Frame is selected, using centered cover fit and one Place Frame Content history entry per decoded image. Decode failures produce an alert and leave existing contents intact. Other drops and File Open retain ordinary document opening.

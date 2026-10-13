@@ -15,6 +15,7 @@ pub mod document;
 pub mod fade;
 pub mod fill;
 pub mod filter;
+pub mod frame;
 pub mod gradient;
 pub mod guide_layout;
 pub mod heal;

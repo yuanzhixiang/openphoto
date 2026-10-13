@@ -258,6 +258,7 @@ pub struct Layer {
     pub mask: Option<LayerMask>,
     /// An artboard is a group with its own clipping rectangle and background.
     pub artboard: Option<crate::artboard::Artboard>,
+    pub frame: Option<crate::frame::Frame>,
     pub color: LayerColor,
     /// The group the layer is in, if any.
     pub parent: Option<LayerId>,
@@ -287,6 +288,7 @@ impl Layer {
             kind: LayerKind::Raster(image),
             mask: None,
             artboard: None,
+            frame: None,
             color: LayerColor::None,
             parent: None,
             link: None,

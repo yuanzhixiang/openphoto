@@ -153,3 +153,5 @@ wand_op retains the Magic Wand combination operation between pointer-down and re
 slice_drag retains a live Slice creation gesture and counts as busy; selected_slices holds transient IDs of selected user slices.
 
 slice_select_drag retains the starting snapshot, bounds and selected handle for transactional slice movement/resizing; it counts as busy.
+
+frame_drag stores a transactional Frame gesture and counts as busy.
