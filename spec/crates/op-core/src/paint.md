@@ -141,7 +141,7 @@ The options (`Stroke::with_retouch(Retouch { protect_tones, vibrance, protect_de
 ## Known limitations
 
 - Brush tips are computed (round or elliptical); there are no sampled tips, and no scattering, texture, dual brush or color dynamics.
-- Pressure only reaches the dabs of the coverage-based strokes (painting, erasing, retouching). Smudge, healing and the color-matching strokes use the tip's own size.
+- Pressure only reaches the dabs of the coverage-based strokes (painting, erasing, retouching). Healing honors pressure-controlled diameter; Smudge and the color-matching strokes use the tip's own size.
 - Every dab triggers a full recomposite and upload of the document, so painting on large documents is slow.
 
 ## Test coverage (brush shape and dynamics)
@@ -176,3 +176,5 @@ When the current layer is a group and the target is pixels, starting a stroke re
 - `eraser_removes_alpha_and_paints_background_on_background_layer`: erases to transparency on a regular layer, and to the background color on the background layer.
 - `locked_and_hidden_layers_refuse`: layers with locked pixels and hidden layers refuse painting.
 - `spacing_places_dabs_along_a_line`: dabs along a straight line have no gaps.
+
+Healing dabs use the interpolated pressure diameter for coverage, their membrane window, proximity source search and mirrored texture radius. Spot Healing pressure regression checks the same defect is outside a light-pressure repair and inside a full-pressure repair; it does not measure native healing synthesis.

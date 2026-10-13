@@ -976,7 +976,11 @@ impl Stroke {
     /// coverage × opacity × selection.
     fn heal_dab(&mut self, doc: &mut Document, cx: f32, cy: f32) {
         let (w, h) = (doc.width, doc.height);
-        let r = self.tip.diameter / 2.0 + 1.0;
+        let tip = BrushTip {
+            diameter: self.diameter(),
+            ..self.tip
+        };
+        let r = tip.diameter / 2.0 + 1.0;
         let x0 = ((cx - r).floor() - 1.0).max(0.0) as u32;
         let y0 = ((cy - r).floor() - 1.0).max(0.0) as u32;
         let x1 = (((cx + r).ceil() + 1.0).max(0.0) as u32).min(w);
@@ -985,7 +989,6 @@ impl Stroke {
             return;
         }
         let (bw, bh) = ((x1 - x0) as usize, (y1 - y0) as usize);
-        let tip = self.tip;
         let cover: Vec<f32> = (0..bw * bh)
             .map(|k| {
                 let (x, y) = (x0 + (k % bw) as u32, y0 + (k / bw) as u32);
@@ -2431,5 +2434,52 @@ mod tests {
         let p = pixel(&doc, id, 17, 20);
         assert!(p[0] > p[1] && p[0] > p[2], "{p:?}");
         assert_eq!(pixel(&doc, id, 21, 20), [0, 0, 0, 255]);
+    }
+}
+
+#[cfg(test)]
+mod healing_pressure_tests {
+    use super::*;
+    #[test]
+    fn spot_healing_pressure_limits_repair_extent() {
+        for (pressure, repaired) in [(0.2, false), (1.0, true)] {
+            let mut doc = Document::new_with_background("pressure", 256, 256, crate::Color::WHITE);
+            let id = doc.active_layer.unwrap();
+            doc.layer_mut(id)
+                .unwrap()
+                .image_mut()
+                .unwrap()
+                .set_pixel(128, 132, [0, 0, 0, 255]);
+            let source = doc.layer(id).unwrap().image().unwrap().clone();
+            let mut stroke = Stroke::begin(
+                &doc,
+                BrushTip {
+                    diameter: 20.0,
+                    hardness: 1.0,
+                    aliased: false,
+                    square: false,
+                    angle: 0.0,
+                    roundness: 1.0,
+                    spacing: 0.25,
+                },
+                StrokeKind::SpotHeal(source),
+                1.0,
+                1.0,
+            )
+            .unwrap()
+            .with_pressure(Pressure {
+                size: true,
+                ..Default::default()
+            });
+            stroke.add_point_with_pressure(&mut doc, 128.5, 128.5, pressure);
+            assert_eq!(
+                doc.layer(id).unwrap().image().unwrap().pixel(128, 132)[0] > 200,
+                repaired
+            );
+            assert_eq!(
+                doc.layer(id).unwrap().image().unwrap().pixel(3, 3),
+                [255, 255, 255, 255]
+            );
+        }
     }
 }
