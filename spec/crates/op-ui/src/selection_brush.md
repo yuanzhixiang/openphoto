@@ -29,3 +29,5 @@ Photoshop 2026's Selection Brush: painting the selection with a brush, and showi
 ## Test coverage
 
 - `selection_brush_paints_the_selection` (UI test): see `ui_tests.md`.
+
+Escape cancels an active stroke and restores the pre-stroke snapshot without history. Release records Selection Brush only when the selection differs from its starting state; zero-opacity and otherwise ineffective strokes restore the original snapshot instead of adding history.

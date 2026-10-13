@@ -179,3 +179,5 @@ Single Row Marquee offline stage adds live full-width drag previews, edge clampi
 The WGPU single-row regression exceeded its 180-second deadline after the pixel-center correction; the runner stopped it. Its interaction coverage is moved to a CPU-only egui canvas harness, so semantic input testing does not depend on GPU progress. The initially pushed row commit is not considered validated until this follow-up passes.
 
 Single Row CPU-only regression passed after cleanup. Single Column adds full-height drag preview, feather, cancellation, keyboard movement and undo. Both line tools ignore fixed styles and preserve layer pixels.
+
+Selection Brush offline follow-up adds snapshot cancellation and no-op history suppression, with live add/subtract and undo exercised through the CPU harness.

@@ -7,3 +7,5 @@ The single-row regression tests live dragging, combination, feather, Escape, und
 FullOutput texture deltas are intentionally cleared instead of uploaded, satisfying egui's output lifecycle contract without a renderer.
 
 `single_column_drag_feather_cancel_nudge_and_undo_cpu` exercises full-height drag, combination, keyboard movement, feather, cancellation and undo without rendering.
+
+Selection Brush CPU regression covers live selection, cancellation, zero opacity, Alt subtraction, unchanged pixels and undo.

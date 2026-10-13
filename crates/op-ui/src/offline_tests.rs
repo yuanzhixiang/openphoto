@@ -177,3 +177,49 @@ fn single_column_drag_feather_cancel_nudge_and_undo_cpu() {
     assert!(h.app.active().unwrap().undo());
     assert_eq!(h.state().doc.selection(), before.as_ref());
 }
+
+#[test]
+fn selection_brush_cancel_zero_opacity_subtract_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::SelectionBrush);
+    h.app.selection_brush.size = 20.0;
+    let pixels = h.state().doc.composite_rgba8();
+    let original = h.state().doc.selection().cloned();
+    let count = h.state().history.states().len();
+    let a = h.point(50.0, 50.0);
+    h.button(a, true, Modifiers::NONE);
+    let b = h.point(80.0, 50.0);
+    h.step(vec![Event::PointerMoved(b)], Modifiers::NONE);
+    assert!(h.state().doc.selection().unwrap().get(60, 50) > 0);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    h.button(b, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.selection(), original.as_ref());
+    assert_eq!(h.state().history.states().len(), count);
+    h.app.selection_brush.opacity = 0.0;
+    h.drag((50.0, 50.0), (80.0, 50.0), Modifiers::NONE);
+    assert_eq!(h.state().history.states().len(), count);
+    h.app.selection_brush.opacity = 1.0;
+    h.drag((50.0, 50.0), (80.0, 50.0), Modifiers::NONE);
+    let before = h.state().doc.selection().cloned();
+    assert_eq!(h.state().doc.selection().unwrap().get(60, 50), 255);
+    h.drag(
+        (60.0, 45.0),
+        (60.0, 55.0),
+        Modifiers {
+            alt: true,
+            ..Modifiers::NONE
+        },
+    );
+    assert_eq!(h.state().doc.selection().unwrap().get(60, 50), 0);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.selection(), before.as_ref());
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}

@@ -139,3 +139,5 @@ DocState stores an optional Artboard drag transaction; it counts as busy, so Esc
 `marquee_press` records pointer-down modifiers and whether a selection existed before the gesture. Fixed marquee settings reject non-finite values and invalid ratio quotients.
 
 `marquee_outline` stores the original snapshot, selection and grab point for a selection-outline move; it counts as a busy gesture.
+
+Selection Brush retains a pre-stroke snapshot/selection for cancellation and no-op detection, and active strokes count as busy.

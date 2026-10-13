@@ -108,6 +108,7 @@ pub struct DocState {
     /// A Selection Brush stroke under way, and the overlay texture showing
     /// the selection with that tool (keyed by selection revision and color).
     pub selection_stroke: Option<op_core::selection_brush::SelectionStroke>,
+    pub selection_stroke_before: Option<(op_core::Snapshot, Option<op_core::Selection>)>,
     pub overlay: Option<((u64, [u8; 3]), egui::TextureHandle)>,
     /// The Color Sampler tool's points (document pixels, at most
     /// `MAX_SAMPLERS`), and the one being dragged.
@@ -201,6 +202,7 @@ impl DocState {
             || self.shape_drag.is_some()
             || self.move_drag.is_some()
             || self.artboard_drag.is_some()
+            || self.selection_stroke.is_some()
     }
 
     pub fn transform_controls_bounds(&mut self) -> Option<Bounds> {
@@ -275,6 +277,7 @@ impl DocState {
             history_source: None,
             fade: None,
             selection_stroke: None,
+            selection_stroke_before: None,
             overlay: None,
             color_samplers: Vec::new(),
             sampler_drag: None,

@@ -47,6 +47,15 @@ pub fn input(
     subtract: bool,
     ppp: f32,
 ) -> Option<String> {
+    if state.selection_stroke.is_some()
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+    {
+        if let Some((before, _)) = state.selection_stroke_before.take() {
+            state.doc.restore(&before);
+        }
+        state.selection_stroke = None;
+        return None;
+    }
     let pointer = ui
         .input(|i| i.pointer.interact_pos())
         .map(|p| to_doc(state, p, ppp));
@@ -54,6 +63,8 @@ pub fn input(
         if state.doc.active_layer.is_none() {
             return Some(NO_LAYER.to_owned());
         }
+        state.selection_stroke_before =
+            Some((state.doc.snapshot(), state.doc.selection().cloned()));
         let alt = ui.input(|i| i.modifiers.alt);
         let tip = BrushTip {
             diameter: opts.size,
@@ -88,7 +99,13 @@ pub fn input(
     state.doc.set_selection(selection);
     if done {
         state.selection_stroke = None;
-        state.record("Selection Brush");
+        if let Some((before, selection)) = state.selection_stroke_before.take() {
+            if state.doc.selection() != selection.as_ref() {
+                state.record("Selection Brush");
+            } else {
+                state.doc.restore(&before);
+            }
+        }
     } else {
         ui.ctx().request_repaint();
     }
