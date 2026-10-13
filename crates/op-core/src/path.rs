@@ -173,3 +173,59 @@ mod document_tests {
         assert_eq!(d.paths[0].subpaths[0].knots[0].anchor, (20., 30.));
     }
 }
+
+/// An interpolating cubic spline through sampled anchors. Corner flags keep
+/// both controls at the anchor; smooth knots share a centered tangent.
+pub fn interpolating_subpath(points: &[(Point, bool)], closed: bool) -> Subpath {
+    let mut knots = Vec::with_capacity(points.len());
+    for (i, &(p, corner)) in points.iter().enumerate() {
+        let mut k = Knot::corner(p);
+        if !corner && points.len() > 1 {
+            let prev = if i > 0 {
+                points[i - 1].0
+            } else if closed {
+                points[points.len() - 1].0
+            } else {
+                p
+            };
+            let next = if i + 1 < points.len() {
+                points[i + 1].0
+            } else if closed {
+                points[0].0
+            } else {
+                p
+            };
+            let tangent = ((next.0 - prev.0) / 6., (next.1 - prev.1) / 6.);
+            k.incoming = (p.0 - tangent.0, p.1 - tangent.1);
+            k.outgoing = (p.0 + tangent.0, p.1 + tangent.1);
+            k.linked = true;
+        }
+        knots.push(k);
+    }
+    Subpath { knots, closed }
+}
+#[cfg(test)]
+mod interpolation_tests {
+    use super::*;
+    #[test]
+    fn samples_interpolate_with_continuous_tangents_and_explicit_corners() {
+        let p = interpolating_subpath(
+            &[((0., 0.), false), ((30., 40.), false), ((60., 0.), true)],
+            false,
+        );
+        assert_eq!(p.knots[1].anchor, (30., 40.));
+        assert_eq!(p.knots[2].incoming, p.knots[2].anchor);
+        assert_eq!(cubic(&p.knots[0], &p.knots[1], 1.), p.knots[1].anchor);
+        assert_eq!(cubic(&p.knots[1], &p.knots[2], 0.), p.knots[1].anchor);
+        assert_eq!(
+            (
+                p.knots[1].anchor.0 - p.knots[1].incoming.0,
+                p.knots[1].anchor.1 - p.knots[1].incoming.1
+            ),
+            (
+                p.knots[1].outgoing.0 - p.knots[1].anchor.0,
+                p.knots[1].outgoing.1 - p.knots[1].anchor.1
+            )
+        );
+    }
+}

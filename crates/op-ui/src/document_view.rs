@@ -252,6 +252,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 app.flag("pattern.impressionist", false),
             )
         });
+    let freeform_magnetic = app.flag("freeform.magnetic", false);
     let pen_path_mode = app.setting("pen.mode", "1") == "1";
     let remove_options = crate::remove_tool::options(app);
     let (foreground, background) = (app.foreground, app.background);
@@ -758,6 +759,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
+            Tool::FreeformPen if !modal && pen_path_mode && !freeform_magnetic => {
+                crate::pen_tool::freeform(ui, &response, state, ppp);
+            }
             Tool::DirectSelection if !modal => {
                 crate::pen_tool::direct_select(ui, &response, state, ppp);
             }
@@ -1174,7 +1178,11 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
     if !matches!(
         tool,
-        Tool::Pen | Tool::ConvertPoint | Tool::PathSelection | Tool::DirectSelection
+        Tool::Pen
+            | Tool::FreeformPen
+            | Tool::ConvertPoint
+            | Tool::PathSelection
+            | Tool::DirectSelection
     ) {
         crate::pen_tool::cancel_inflight(state);
     }

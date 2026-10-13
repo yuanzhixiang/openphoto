@@ -95,3 +95,7 @@ Convert Point verifies smooth-to-corner, undo, Shift constrained symmetric contr
 Path Selection regression checks all controls translate, Alt-copy preserves its source, Escape restores live drags, undo restores original paths and pixels remain unchanged.
 
 Direct Selection verifies neighboring knots stay fixed, one-pixel nudge, linked rotation with preserved opposite length, Alt independent editing, cancellation, undo and unchanged pixels.
+
+Freeform Pen verifies sampled cubic anchors/handles, cancellation, one changed history state, PSD geometry read-back, undo and unchanged pixels.
+
+Freeform Magnetic selection rejects canvas creation instead of silently using the ordinary sampled spline.

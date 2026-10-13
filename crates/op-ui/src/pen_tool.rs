@@ -14,6 +14,7 @@ pub struct Session {
     move_path: Option<PathDrag>,
     nodes: Vec<(usize, usize, usize)>,
     direct: Option<DirectDrag>,
+    freeform: Option<FreeformDrag>,
 }
 struct Drag {
     before: op_core::Snapshot,
@@ -28,6 +29,7 @@ impl Session {
             || self.convert.is_some()
             || self.move_path.is_some()
             || self.direct.is_some()
+            || self.freeform.is_some()
     }
 }
 pub fn input(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
@@ -287,6 +289,9 @@ fn handle_hit(state: &DocState, pointer: Pos2, ppp: f32) -> Option<(usize, usize
     hit
 }
 pub fn cancel_inflight(state: &mut DocState) {
+    if let Some(d) = state.pen_session.freeform.take() {
+        state.doc.restore(&d.before);
+    }
     if let Some(d) = state.pen_session.direct.take() {
         state.doc.restore(&d.before);
     }
@@ -626,5 +631,58 @@ pub fn direct_select(ui: &Ui, response: &egui::Response, state: &mut DocState, p
         }
         state.doc.mark_dirty();
         state.record("Nudge Anchor Point");
+    }
+}
+
+struct FreeformDrag {
+    before: op_core::Snapshot,
+    path: usize,
+    points: Vec<(op_core::path::Point, bool)>,
+}
+pub fn freeform(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
+    if ui.input(|i| i.key_pressed(Key::Escape)) {
+        cancel_inflight(state);
+        return;
+    }
+    if response.hovered()
+        && ui.input(|i| i.pointer.primary_pressed())
+        && let Some(p) = ui.input(|i| i.pointer.interact_pos())
+    {
+        let p = to_doc(state, p, ppp);
+        let path = state.doc.paths.len();
+        let before = state.doc.snapshot();
+        state.doc.paths.push(Path {
+            name: format!("Path {}", path + 1),
+            subpaths: vec![Subpath::default()],
+        });
+        state.doc.active_path = Some(path);
+        state.pen_session.freeform = Some(FreeformDrag {
+            before,
+            path,
+            points: vec![((p.x, p.y), true)],
+        });
+        state.pen_session.continuation = None;
+    }
+    let Some(d) = state.pen_session.freeform.as_ref() else {
+        return;
+    };
+    let path = d.path;
+    if let Some(pointer) = ui.input(|i| i.pointer.interact_pos()) {
+        let p = to_doc(state, pointer, ppp);
+        let d = state.pen_session.freeform.as_mut().unwrap();
+        let last = d.points.last().unwrap().0;
+        if (p.x - last.0).hypot(p.y - last.1) >= 1. && d.points.len() < 65535 {
+            d.points.push(((p.x, p.y), ui.input(|i| i.modifiers.alt)));
+        }
+        state.doc.paths[path].subpaths[0] = op_core::path::interpolating_subpath(&d.points, false);
+    }
+    if !ui.input(|i| i.pointer.primary_down()) {
+        let d = state.pen_session.freeform.take().unwrap();
+        if d.points.len() < 2 {
+            state.doc.restore(&d.before);
+            return;
+        }
+        state.doc.mark_dirty();
+        state.record("Freeform Pen Tool");
     }
 }

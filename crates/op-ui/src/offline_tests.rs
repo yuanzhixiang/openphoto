@@ -2190,3 +2190,51 @@ fn direct_selection_moves_nodes_rotates_linked_controls_and_cancels_cpu() {
     assert_eq!(h.state().doc.paths[0].subpaths[0].knots[0], rotated);
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn freeform_pen_samples_editable_cubic_cancel_commit_and_psd_cpu() {
+    let mut h = CanvasHarness::new(Tool::FreeformPen);
+    let pixels = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    let start = h.point(40., 40.);
+    h.button(start, true, Modifiers::NONE);
+    for (x, y) in [(60., 60.), (90., 50.), (130., 100.)] {
+        h.step(vec![Event::PointerMoved(h.point(x, y))], Modifiers::NONE);
+    }
+    assert_eq!(h.state().doc.paths[0].subpaths[0].knots.len(), 4);
+    assert!(h.state().doc.paths[0].subpaths[0].knots[1].linked);
+    h.key(Key::Escape);
+    h.button(start, false, Modifiers::NONE);
+    assert!(h.state().doc.paths.is_empty());
+    assert_eq!(h.state().history.states().len(), count);
+    h.button(start, true, Modifiers::NONE);
+    for (x, y) in [(60., 60.), (90., 50.), (130., 100.)] {
+        h.step(vec![Event::PointerMoved(h.point(x, y))], Modifiers::NONE);
+    }
+    h.button(h.point(130., 100.), false, Modifiers::NONE);
+    assert_eq!(h.state().history.states().len(), count + 1);
+    let path = std::env::temp_dir().join(format!("openphoto-freeform-{}.psd", h.state().doc.id.0));
+    op_io::save(&h.state().doc, &path).unwrap();
+    let back = op_io::open(&path).unwrap();
+    std::fs::remove_file(path).unwrap();
+    for (a, b) in back.paths[0].subpaths[0]
+        .knots
+        .iter()
+        .zip(&h.state().doc.paths[0].subpaths[0].knots)
+    {
+        assert!((a.anchor.0 - b.anchor.0).abs() < 0.001 && (a.anchor.1 - b.anchor.1).abs() < 0.001);
+    }
+    assert!(h.app.active().unwrap().undo());
+    assert!(h.state().doc.paths.is_empty());
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}
+
+#[test]
+fn freeform_magnetic_does_not_silently_fall_back_cpu() {
+    let mut h = CanvasHarness::new(Tool::FreeformPen);
+    *h.app.setting("freeform.magnetic", "0") = "1".into();
+    let count = h.state().history.states().len();
+    h.drag((40., 40.), (180., 120.), Modifiers::NONE);
+    assert!(h.state().doc.paths.is_empty());
+    assert_eq!(h.state().history.states().len(), count);
+}

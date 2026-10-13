@@ -191,3 +191,5 @@ pen_session also tracks Convert Point pointer transactions and treats them as bu
 pen_session stores transient selected path indexes and a whole-path drag snapshot; it is busy during movement.
 
 pen_session retains selected node indexes and a Direct Selection snapshot for transient pointer editing.
+
+pen_session keeps sampled Freeform pointer transactions and counts them as busy.

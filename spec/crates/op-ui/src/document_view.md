@@ -315,3 +315,5 @@ Convert Point handles transactional knot/control editing. Leaving Pen/Convert Po
 Path Selection routes whole-path selection/move transactions and participates in path drag cancellation.
 
 Direct Selection routes node/control editing and path pointer cancellation.
+
+Non-magnetic Freeform Pen in Path mode dispatches sampled cubic creation and participates in cancellation.
