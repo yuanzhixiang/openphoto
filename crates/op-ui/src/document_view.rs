@@ -1424,6 +1424,10 @@ fn shape_input(
     color: [u8; 3],
     ppp: f32,
 ) {
+    if state.shape_drag.is_some() && ui.input(|i| i.key_pressed(Key::Escape)) {
+        state.shape_drag = None;
+        return;
+    }
     if response.drag_started_by(PointerButton::Primary)
         && let Some(p) = ui.input(|i| i.pointer.press_origin())
     {

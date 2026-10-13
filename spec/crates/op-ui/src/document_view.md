@@ -289,3 +289,5 @@ Clone Stamp samples the active layer/Quick Mask when that target is selected, in
 History Brush reads the corresponding image, layer mask or Quick Mask from its selected history source. A missing mask source rejects the stroke rather than restoring layer pixels into a mask.
 
 Gradient Escape clears the pending line without committing pixels; release after cancellation does nothing. A subsequent valid line remains undoable. The editable Gradient layer mode remains unimplemented.
+
+Rectangle/Ellipse/Triangle/Polygon/Line drags accept Escape before layer creation. Release after cancellation preserves layers/pixels/history; subsequent valid shapes remain undoable. Their vector/live shape representation and Custom Shape remain unimplemented.

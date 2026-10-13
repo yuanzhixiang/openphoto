@@ -59,3 +59,5 @@ Clone Stamp canvas regression checks mask source sampling, destination coverage,
 History Brush regression restores a mask pixel from a selected state on both mask targets, leaves image pixels unchanged and verifies undo.
 
 Gradient regression checks pending busy state, Escape/release preserving pixels/history and a subsequent valid gradient with undo. The CPU harness key helper synthesizes key-down events without host input.
+
+Shape cancellation regression exercises each supported shape tool, releasing after Escape, a subsequent valid shape and undo. It does not establish native vector-layer or rasterization parity.

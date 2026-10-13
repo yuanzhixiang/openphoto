@@ -1426,3 +1426,35 @@ fn gradient_escape_cancels_before_pixels_and_valid_release_undoes_cpu() {
     assert!(h.app.active().unwrap().undo());
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn shape_escape_preserves_layers_and_subsequent_shapes_undo_cpu() {
+    for tool in [
+        Tool::Rectangle,
+        Tool::Ellipse,
+        Tool::Triangle,
+        Tool::Polygon,
+        Tool::Line,
+    ] {
+        let mut h = CanvasHarness::new(tool);
+        let pixels = h.state().doc.composite_rgba8();
+        let count = h.state().history.states().len();
+        let layers = h.state().doc.layers.len();
+        let a = h.point(30.5, 40.5);
+        let b = h.point(150.5, 170.5);
+        h.button(a, true, Modifiers::NONE);
+        h.step(vec![Event::PointerMoved(b)], Modifiers::NONE);
+        assert!(h.state().shape_drag.is_some(), "{tool:?}");
+        h.key(Key::Escape);
+        assert!(h.state().shape_drag.is_none(), "{tool:?}");
+        h.button(b, false, Modifiers::NONE);
+        assert_eq!(h.state().doc.layers.len(), layers, "{tool:?}");
+        assert_eq!(h.state().doc.composite_rgba8(), pixels, "{tool:?}");
+        assert_eq!(h.state().history.states().len(), count, "{tool:?}");
+        h.drag((30.5, 40.5), (150.5, 170.5), Modifiers::NONE);
+        assert_eq!(h.state().doc.layers.len(), layers + 1, "{tool:?}");
+        assert_eq!(h.state().history.states().len(), count + 1, "{tool:?}");
+        assert!(h.app.active().unwrap().undo());
+        assert_eq!(h.state().doc.composite_rgba8(), pixels, "{tool:?}");
+    }
+}
