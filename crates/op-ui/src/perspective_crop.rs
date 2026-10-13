@@ -73,7 +73,8 @@ impl PerspectiveOptions {
 
     fn ppi(&self) -> Option<f32> {
         let v: f32 = self.resolution.trim().parse().ok()?;
-        (v > 0.0).then_some(if self.per_cm { v * 2.54 } else { v })
+        let v = if self.per_cm { v * 2.54 } else { v };
+        (v.is_finite() && v > 0.0).then_some(v)
     }
 
     /// The size typed, in pixels (units as the Crop tool's fields read
@@ -85,7 +86,7 @@ impl PerspectiveOptions {
                 None => v,
                 Some(k) => v / k * self.ppi()?,
             };
-            Some(v.round().max(1.0) as u32)
+            (v.is_finite() && v > 0.0 && v < u32::MAX as f32).then_some(v.round().max(1.0) as u32)
         };
         Some((px(&self.width)?, px(&self.height)?))
     }
@@ -129,9 +130,24 @@ fn handle_at(state: &DocState, q: &[Pos2; 4], p: Pos2, ppp: f32) -> Option<DragK
 /// Crops to the box: the size typed, or the box's mean side lengths, and
 /// the resolution typed. Returns true when the image changed.
 pub fn commit(state: &mut DocState, options: &PerspectiveOptions) -> bool {
-    let Some(quad) = state.perspective_crop.take().and_then(|b| b.quad) else {
+    let Some(quad) = state.perspective_crop.as_ref().and_then(|b| b.quad) else {
         return false;
     };
+    // Crossing, concave and collapsed corners do not define a usable plane.
+    let mut sign = 0.0;
+    for i in 0..4 {
+        if !quad[i].x.is_finite() || !quad[i].y.is_finite() {
+            return false;
+        }
+        let a = quad[(i + 1) % 4] - quad[i];
+        let b = quad[(i + 2) % 4] - quad[(i + 1) % 4];
+        let cross = a.x * b.y - a.y * b.x;
+        if !cross.is_finite() || cross.abs() < 1e-6 || (sign != 0.0 && cross.signum() != sign) {
+            return false;
+        }
+        sign = cross.signum();
+    }
+    state.perspective_crop = None;
     let quad = quad.map(tuple);
     let (w, h) = options
         .size()

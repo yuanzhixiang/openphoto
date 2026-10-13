@@ -195,3 +195,5 @@ Quick Selection offline follow-up adds snapshot cancellation, no-op history supp
 - Magic Wand: sampling-window mean, press-latched operation and no-op suppression pass the CPU integration test; workspace strict clippy passes. Native average sampling/connectivity remain unmeasured.
 
 - Crop: resolution-only edits are undoable; non-finite size/resolution conversion is rejected. CPU crop regression and strict op-ui clippy pass. Existing Generative Expand/Content-Aware Fill remain disabled.
+
+- Perspective Crop: convex-plane validation preserves invalid editable boxes; finite resolution/size validation and CPU draw/commit/undo test pass, as does strict op-ui clippy. Native shield/output-size parity remains unmeasured.

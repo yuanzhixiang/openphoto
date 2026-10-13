@@ -27,9 +27,11 @@ The options bar (`options_tools.rs`, `pcrop.*` settings, read by `PerspectiveOpt
 ## Known limitations
 
 - The look (shield blending, line and handle sizes, grid spacing) and the output size Photoshop picks without a typed size are approximations; they have not been measured against Photoshop yet.
-- Photoshop warns when the box's sides don't describe a plausible perspective; this tool crops any convex box.
+- Photoshop warns when the box's sides don't describe a plausible perspective; this tool rejects non-finite, collapsed, concave or crossing quadrilaterals without discarding the editable box or recording history.
 
 ## Test coverage
 
 - `typed_sizes_and_the_inside_test`: "4 in" × "300" at 100 ppi is 400 × 300; inches without a resolution give no size; points inside and outside a skewed box.
 - `ui_tests::perspective_crop_straightens_a_box`: a drawn box from (100, 100) to (500, 400) and its top-right corner moved to (450, 150) crop to the box's mean side lengths and record "Perspective Crop"; four clicks place a box and typed 120 × "80 px" crops to 120 × 80; Escape removes a box.
+
+Resolution and converted output sizes must be positive and finite. CPU integration verifies invalid-box rejection and drawn-box commit with typed size/resolution and undo.

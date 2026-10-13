@@ -605,3 +605,51 @@ fn crop_resolution_only_commit_cancel_and_undo_cpu() {
     h.app.crop_options.resolution = "inf".into();
     assert!(h.app.crop_options.output_size().is_none());
 }
+
+#[test]
+fn perspective_crop_rejects_crossing_plane_and_undoes_valid_commit_cpu() {
+    let mut h = CanvasHarness::new(Tool::PerspectiveCrop);
+    let pixels = h.state().doc.composite_rgba8();
+    let options = crate::perspective_crop::PerspectiveOptions {
+        width: "80".into(),
+        height: "60".into(),
+        resolution: "144".into(),
+        ..Default::default()
+    };
+    let invalid = [
+        egui::pos2(20.0, 20.0),
+        egui::pos2(200.0, 200.0),
+        egui::pos2(200.0, 20.0),
+        egui::pos2(20.0, 200.0),
+    ];
+    let count = h.state().history.states().len();
+    h.app.active().unwrap().perspective_crop = Some(crate::perspective_crop::PerspectiveBox {
+        quad: Some(invalid),
+        ..Default::default()
+    });
+    assert!(!crate::perspective_crop::commit(
+        h.app.active().unwrap(),
+        &options
+    ));
+    assert!(h.state().perspective_crop.is_some());
+    assert_eq!(h.state().history.states().len(), count);
+    h.app.active().unwrap().perspective_crop = None;
+    h.drag((20.0, 20.0), (200.0, 180.0), Modifiers::NONE);
+    assert!(h.state().perspective_crop.as_ref().unwrap().quad.is_some());
+    assert!(crate::perspective_crop::commit(
+        h.app.active().unwrap(),
+        &options
+    ));
+    assert_eq!((h.state().doc.width, h.state().doc.height), (80, 60));
+    assert_eq!(h.state().doc.resolution, 144.0);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!((h.state().doc.width, h.state().doc.height), (256, 256));
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    let invalid_size = crate::perspective_crop::PerspectiveOptions {
+        width: "4 in".into(),
+        height: "4 in".into(),
+        resolution: "inf".into(),
+        ..Default::default()
+    };
+    assert!(invalid_size.size().is_none());
+}
