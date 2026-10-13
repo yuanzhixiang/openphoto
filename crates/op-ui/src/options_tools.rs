@@ -1184,7 +1184,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             Label(343.5, "Color:"),
             ColorBox(376.5, 403.0, [255, 255, 255]),
             Sep(411.5),
-            Button(421.5, 483.0, "Clear All", false),
+            Action(421.5, 483.0, "Clear All"),
             Sep(491.0),
             Icon(515.0, Icon::NotesPanel, "Toggle the Notes panel"),
         ],
@@ -1889,6 +1889,13 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                             });
                     }
                 }
+                if app.tool == Tool::Note
+                    && icon == Icon::NotesPanel
+                    && response.clicked()
+                    && let Some(state) = app.active()
+                {
+                    crate::note_tool::toggle(state);
+                }
                 // The Clone Source panel's toggle
                 if icon == Icon::CloneSourcePanel && response.clicked() {
                     app.floating
@@ -2033,7 +2040,26 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 b.popup(x0, x1, label, label, false, |_| {});
             }
             ColorBox(x0, x1, [r, g, bl]) => {
-                b.color_box(x0, x1, egui::Color32::from_rgb(r, g, bl));
+                if app.tool == Tool::Note {
+                    let mut rgb = crate::note_tool::color(app);
+                    let response =
+                        b.color_box(x0, x1, egui::Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
+                    egui::Popup::from_response(&response)
+                        .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
+                        .show(|ui| {
+                            if ui.color_edit_button_srgb(&mut rgb).changed() {
+                                *app.setting("note.color", "") =
+                                    format!("{},{},{}", rgb[0], rgb[1], rgb[2]);
+                                if let Some(state) = app.active()
+                                    && let Some(edit) = &mut state.note_edit
+                                {
+                                    edit.color = rgb;
+                                }
+                            }
+                        });
+                } else {
+                    b.color_box(x0, x1, egui::Color32::from_rgb(r, g, bl));
+                }
             }
             GradientSwatch(x0, x1, x2) => {
                 let g = app.tool_gradient();
@@ -2457,6 +2483,17 @@ fn action(app: &mut AppState, label: &str, ppp: f32) {
             }
         }
         // The Color Sampler's Clear All
+        "Clear All" if app.tool == Tool::Note => {
+            if let Some(s) = app.active()
+                && !s.doc.notes.is_empty()
+            {
+                s.doc.notes.clear();
+                s.note_drag = None;
+                s.note_edit = None;
+                s.doc.mark_dirty();
+                s.record("Delete Notes");
+            }
+        }
         "Clear All" => {
             if let Some(doc) = app.active() {
                 doc.color_samplers.clear();

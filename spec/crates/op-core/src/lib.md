@@ -33,3 +33,5 @@ The public `artboard` module implements artboard group geometry, clipping metada
 The public slice module implements non-destructive slice metadata, creation and composite pixel export.
 
 The public frame module creates, moves, resizes and replaces raster content in clipping containers.
+
+The annotation module defines persisted note metadata and creation.

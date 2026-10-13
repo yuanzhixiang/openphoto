@@ -215,6 +215,12 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         .unwrap_or(1);
     let artboard_options = crate::artboard_tool::options(app);
     let slice_options = crate::slice_tool::Options::read(app);
+    let note_color = crate::note_tool::color(app);
+    let note_author = app
+        .tool_settings
+        .get("note.author")
+        .cloned()
+        .unwrap_or_default();
     let frame_ellipse = app
         .tool_settings
         .get("frame.shape")
@@ -609,6 +615,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
             }
             Tool::Zoom => zoom_drag(ui, &response, state, scrubby, ppp),
             Tool::ColorSampler => sampler_input(ui, &response, state, alt, ppp),
+            Tool::Note => {
+                crate::note_tool::input(ui, &response, state, &note_author, note_color, ppp)
+            }
             Tool::Ruler => crate::measure_tool::input(ui, &response, state, ppp),
             Tool::SelectionBrush => {
                 if let Some(opts) = paint {
@@ -1112,6 +1121,12 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
     if tool != Tool::SliceSelect {
         crate::slice_tool::cancel_select(state);
+    }
+    if tool == Tool::Note {
+        crate::note_tool::draw(ui, state, ppp);
+    } else {
+        crate::note_tool::cancel(state);
+        crate::note_tool::commit(state);
     }
     if tool == Tool::Ruler {
         if view_options.extras {

@@ -41,3 +41,7 @@ Eyedropper CPU regression verifies alpha-weighted averaging, Alt background sele
 Color Sampler CPU regression covers the ten-marker limit, movement, Alt deletion, Escape and tool-switch cancellation, no history and unchanged pixels.
 
 Ruler CPU regression covers line metrics, Alt protractor/angle, endpoint cancellation, whole-line movement, constrained geometry, no pixel/history edits while measuring, Straighten Layer and undo.
+
+Note CPU regression covers canvas creation, author, staged Unicode multiline text/color commit, marker movement/undo, cancelled dragging and unchanged image pixels.
+
+A Note save regression writes a temporary PSD with pending editor text, reopens it, checks text and saved-state status, then removes the file.

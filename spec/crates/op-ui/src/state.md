@@ -161,3 +161,9 @@ Sample-average windows clamp to the supported 1–101 pixel range before iterati
 sampler_before retains the original marker collection during a Color Sampler drag.
 
 measurement and measure_drag store transient Ruler geometry and the pre-drag measurement; neither is part of document history.
+
+note_drag and note_edit retain transient marker movement and staged note text/author/color.
+
+note_selected retains the last chosen note ID for the panel toggle, outside document snapshots.
+
+Staged Notes editor changes also make the document dirty; reverting/discarding the draft restores ordinary history-based dirty status. Save commits the draft before marking the document saved.

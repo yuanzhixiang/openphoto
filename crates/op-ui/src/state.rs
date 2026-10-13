@@ -123,6 +123,9 @@ pub struct DocState {
     /// `MAX_SAMPLERS`), and the one being dragged.
     pub color_samplers: Vec<egui::Pos2>,
     pub sampler_before: Option<Vec<egui::Pos2>>,
+    pub note_selected: Option<u32>,
+    pub note_drag: Option<crate::note_tool::Drag>,
+    pub note_edit: Option<crate::note_tool::Edit>,
     pub measurement: Option<crate::measure_tool::Measurement>,
     pub measure_drag: Option<crate::measure_tool::Drag>,
     pub sampler_drag: Option<usize>,
@@ -310,6 +313,9 @@ impl DocState {
             overlay: None,
             color_samplers: Vec::new(),
             sampler_before: None,
+            note_selected: None,
+            note_drag: None,
+            note_edit: None,
             measurement: None,
             measure_drag: None,
             sampler_drag: None,
@@ -349,6 +355,13 @@ impl DocState {
     /// unchanged, as in Photoshop.
     pub fn is_dirty(&self) -> bool {
         self.history.current_id() != self.saved_state
+            || self.note_edit.as_ref().is_some_and(|e| {
+                self.doc
+                    .notes
+                    .iter()
+                    .find(|n| n.id == e.id)
+                    .is_some_and(|n| n.text != e.text || n.author != e.author || n.color != e.color)
+            })
     }
 
     /// The document now matches its file.

@@ -361,6 +361,60 @@ fn read_slice_text(r: &mut Reader) -> Result<String, IoError> {
     let units = (0..n).map(|_| r.u16()).collect::<Result<Vec<_>, _>>()?;
     Ok(String::from_utf16_lossy(&units))
 }
+fn write_notes(out: &mut Writer, doc: &Document) {
+    if doc.notes.is_empty() {
+        return;
+    }
+    out.bytes(b"8BIM");
+    out.u16(4000);
+    out.bytes(&[0, 0]);
+    let size = out.length_slot();
+    out.bytes(b"OPNT");
+    out.u32(1);
+    out.u32(doc.notes.len() as u32);
+    for n in &doc.notes {
+        out.u32(n.id);
+        out.u32(n.x);
+        out.u32(n.y);
+        out.bytes(&n.color);
+        out.u8(0);
+        slice_text(out, &n.author);
+        slice_text(out, &n.text);
+    }
+    out.close(size, 1);
+    if (out.0.len() - size) % 2 == 1 {
+        out.u8(0);
+    }
+}
+fn read_notes(data: &[u8]) -> Result<Vec<op_core::annotation::Note>, IoError> {
+    let mut r = Reader(Cursor::new(data));
+    if r.remaining() < 12 || &r.take::<4>()? != b"OPNT" || r.u32()? != 1 {
+        return Ok(Vec::new());
+    }
+    let count = r.u32()? as usize;
+    if count > r.remaining() / 24 {
+        return Err(invalid("invalid note count"));
+    }
+    let mut notes = Vec::new();
+    for _ in 0..count {
+        let id = r.u32()?;
+        let x = r.u32()?;
+        let y = r.u32()?;
+        let color = r.take::<3>()?;
+        r.u8()?;
+        let author = read_slice_text(&mut r)?;
+        let text = read_slice_text(&mut r)?;
+        notes.push(op_core::annotation::Note {
+            id,
+            x,
+            y,
+            color,
+            author,
+            text,
+        });
+    }
+    Ok(notes)
+}
 fn write_slices(out: &mut Writer, doc: &Document) {
     if doc.slices.is_empty() {
         return;
@@ -643,6 +697,7 @@ pub fn write(doc: &Document) -> Vec<u8> {
         }
     }
     write_slices(&mut out, doc);
+    write_notes(&mut out, doc);
     out.close(resources, 2);
 
     // Layer and mask information
@@ -1026,6 +1081,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
     let mut resolution = 72.0;
     let mut links: Vec<u16> = Vec::new();
     let mut guides: Vec<op_core::Guide> = Vec::new();
+    let mut notes = Vec::new();
     let mut slices = Vec::new();
     while r.pos() + 12 <= resources_end {
         if &r.take::<4>()? != b"8BIM" {
@@ -1057,6 +1113,10 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                 });
             }
         }
+        if id == 4000 {
+            r.seek(start);
+            notes = read_notes(r.bytes(size as usize)?)?;
+        }
         if id == 1050 {
             r.seek(start);
             slices = read_slices(r.bytes(size as usize)?)?;
@@ -1074,6 +1134,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
     doc.resolution = resolution;
     doc.guides = guides.clone();
     doc.slices = slices.clone();
+    doc.notes = notes.clone();
     if lm_len > 0 {
         let info_len = r.u32()? as u64;
         if info_len > 0 {
@@ -1366,6 +1427,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
         doc.resolution = resolution;
         doc.guides = guides;
         doc.slices = slices;
+        doc.notes = notes;
         return Ok(doc);
     }
 
@@ -1378,6 +1440,17 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn notes_round_trip_unicode_text_and_positions() {
+        let mut d = Document::new_with_background("Notes", 32, 32, Color::WHITE);
+        op_core::annotation::create_note(&mut d, 5, 8, "作者");
+        d.notes[0].text = "First line\n第二行 ✨".into();
+        d.notes[0].color = [255, 200, 0];
+        let back = read(&write(&d), "Notes".into()).unwrap();
+        assert_eq!(back.notes, d.notes);
+        assert_eq!(back.composite_rgba8(), d.composite_rgba8());
+    }
 
     #[test]
     fn frame_geometry_mask_and_content_round_trip() {

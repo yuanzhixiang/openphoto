@@ -468,6 +468,7 @@ pub fn write_to(
     let Some(state) = app.docs.get_mut(&id) else {
         return false;
     };
+    crate::note_tool::commit(state);
     if let Err(e) = op_io::save_with(&state.doc, &path, options) {
         app.alert = Some(format!("Could not save “{}”: {e}", path.display()));
         return false;

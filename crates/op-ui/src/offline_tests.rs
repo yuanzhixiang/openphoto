@@ -1056,3 +1056,83 @@ fn ruler_line_protractor_drag_cancel_readout_straighten_and_undo_cpu() {
     let m = h.state().measurement.unwrap();
     assert!(((m.b - m.a) - egui::vec2(70.0, 70.0)).length() < 1e-3);
 }
+
+#[test]
+fn note_creation_unicode_edit_move_cancel_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::Note);
+    h.app.tool_settings.insert("note.author", "Alice".into());
+    h.app
+        .tool_settings
+        .insert("note.color", "100,150,200".into());
+    let pixels = h.state().doc.composite_rgba8();
+    h.drag((10.0, 20.0), (10.0, 20.0), Modifiers::NONE);
+    assert_eq!(h.state().doc.notes.len(), 1);
+    assert_eq!(h.state().doc.notes[0].author, "Alice");
+    assert_eq!(h.state().doc.notes[0].color, [100, 150, 200]);
+    let edit = h.app.active().unwrap().note_edit.as_mut().unwrap();
+    edit.text = "First line\n第二行 ✨".into();
+    edit.color = [255, 200, 0];
+    crate::note_tool::commit(h.app.active().unwrap());
+    assert_eq!(h.state().doc.notes[0].text, "First line\n第二行 ✨");
+    crate::note_tool::toggle(h.app.active().unwrap());
+    assert!(h.state().note_edit.is_some());
+    crate::note_tool::toggle(h.app.active().unwrap());
+    assert!(h.state().note_edit.is_none());
+    h.drag((10.0, 20.0), (50.0, 60.0), Modifiers::NONE);
+    assert_eq!(
+        (h.state().doc.notes[0].x, h.state().doc.notes[0].y),
+        (50, 60)
+    );
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(
+        (h.state().doc.notes[0].x, h.state().doc.notes[0].y),
+        (10, 20)
+    );
+    h.app.active().unwrap().note_edit = None;
+    let count = h.state().history.states().len();
+    let p = h.point(10.0, 20.0);
+    h.button(p, true, Modifiers::NONE);
+    let q = h.point(100.0, 120.0);
+    h.step(vec![Event::PointerMoved(q)], Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    h.button(q, false, Modifiers::NONE);
+    assert_eq!(
+        (h.state().doc.notes[0].x, h.state().doc.notes[0].y),
+        (10, 20)
+    );
+    assert_eq!(h.state().history.states().len(), count);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}
+
+#[test]
+fn saving_a_document_commits_pending_note_text_cpu() {
+    let mut h = CanvasHarness::new(Tool::Note);
+    h.drag((20.0, 20.0), (20.0, 20.0), Modifiers::NONE);
+    h.app.active().unwrap().mark_saved();
+    assert!(!h.state().is_dirty());
+    h.app.active().unwrap().note_edit.as_mut().unwrap().text = "Pending text — 保存".into();
+    assert!(h.state().is_dirty());
+    let id = h.state().doc.id;
+    let path = std::env::temp_dir().join(format!("openphoto-note-{}.psd", id.0));
+    assert!(crate::actions::write_to(
+        &mut h.app,
+        id,
+        path.clone(),
+        false,
+        &op_io::ExportOptions::default()
+    ));
+    let back = op_io::open(&path).unwrap();
+    std::fs::remove_file(path).unwrap();
+    assert_eq!(back.notes[0].text, "Pending text — 保存");
+    assert!(h.state().note_edit.is_none());
+    assert!(!h.state().is_dirty());
+}

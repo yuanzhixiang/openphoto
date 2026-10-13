@@ -92,3 +92,7 @@ Quick Selection mode is bounded to New/Add/Subtract and brush size to finite 1â€
 Slices From Guides creates the guide grid through op_core::slice and records one state only when bounds change.
 
 Ruler readouts show live measurement metrics in document pixels. Clear Ruler resets geometry, and Straighten Layer calls the transform operation for transformable layers. Measurement Scale remains unimplemented.
+
+Note Clear All deletes document notes in one undoable state; Color Sampler Clear All continues to remove session markers.
+
+Note color swatch uses an egui RGB popup, updating new-note default/staged edit color. Notes-panel icon toggles the current or latest note editor.

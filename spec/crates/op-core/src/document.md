@@ -154,3 +154,5 @@ A layer group's locks apply to all layers in the group (measured in Photoshop 20
 Artboard groups always composite into isolated buffers, initialized with their configured background inside the rectangle. Their buffer and descendant hit testing are clipped at the board boundary. `place_canvas` translates artboard coordinates along with pixels and masks.
 
 Document.slices and Snapshot.slices retain undoable user slice metadata. Restoring history restores the slice collection.
+
+Document.notes and Snapshot.notes retain non-pixel note annotations across undo/redo.

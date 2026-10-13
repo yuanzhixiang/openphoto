@@ -23,6 +23,7 @@ mod measure_tool;
 #[cfg(target_os = "macos")]
 mod menu;
 mod native_popup;
+mod note_tool;
 mod options_bar;
 mod options_kit;
 mod options_tools;

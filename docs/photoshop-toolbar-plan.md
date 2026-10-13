@@ -209,3 +209,5 @@ Quick Selection offline follow-up adds snapshot cancellation, no-op history supp
 - Color Sampler: cancelled drags and tool switches restore original marker positions; CPU tests cover ten-marker limit, move/Alt delete, cancellation and pixel/history preservation. Strict op-ui clippy passes. Sampler PSD persistence remains outstanding.
 
 - Ruler: line/endpoint/whole-line gestures, Alt protractor, Shift constraints, metrics, cancel/Clear and transformable-layer straightening are implemented. CPU integration and strict op-ui clippy pass. Coordinates are document pixels; custom measurement scales, native styling and locked-background straightening remain outstanding.
+
+- Note: canvas markers, author, RGB color, Unicode multiline text, move/cancel, editor/panel toggle, Clear All, undo and private OPNT PSD persistence are implemented. Saving commits pending draft text and drafts affect dirty status. Two CPU regressions and PSD round-trip pass; workspace regression is 606 passed, 0 failed, 51 ignored, with strict clippy passing. Adobe native annotation resources, exact Notes panel styling and transform remapping remain outstanding.
