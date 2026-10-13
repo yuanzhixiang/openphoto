@@ -76,3 +76,5 @@ Near the clicked point (3% of the image's short side, at least 8 pixels), finds 
 - `bucket_fills_with_a_pattern`: the bucket and `fill_pattern` lay a two-pixel pattern down tiled from the corner.
 - `bucket_fills_contiguous_region`: when separated by a column of black, only one side is filled; when non-contiguous, similar pixels on both sides are filled.
 - `locked_layer_refuses`: refuses when pixels are locked, with message text matching Photoshop.
+
+magic_wand_sampled uses a clipped 1–101 pixel window and rounded per-channel RGBA means as its tolerance reference. Point sampling retains the original magic_wand contract. Contiguous traversal includes only matching pixels reachable from the click; if the clicked pixel differs beyond tolerance from the mean, it can produce an empty region. Native averaging and connectivity parity are unmeasured.

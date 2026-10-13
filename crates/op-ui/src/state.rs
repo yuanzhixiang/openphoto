@@ -94,6 +94,7 @@ pub struct DocState {
     /// A Quick Selection stroke under way.
     pub quick: Option<QuickStroke>,
     pub quick_before: Option<op_core::Snapshot>,
+    pub wand_op: Option<op_core::SelectionOp>,
     /// The Object Selection tool's rectangle being dragged (document
     /// pixels).
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
@@ -279,6 +280,7 @@ impl DocState {
             magnetic: None,
             quick: None,
             quick_before: None,
+            wand_op: None,
             object_drag: None,
             object_path: None,
             object_op: None,

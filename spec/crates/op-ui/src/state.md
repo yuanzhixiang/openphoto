@@ -147,3 +147,5 @@ Selection Brush retains a pre-stroke snapshot/selection for cancellation and no-
 Object Selection stores a freehand ROI path and pointer-down operation alongside its rectangle. Its active gesture counts as busy.
 
 Quick Selection stores a pre-stroke snapshot and counts as busy during a live stroke.
+
+wand_op retains the Magic Wand combination operation between pointer-down and release.

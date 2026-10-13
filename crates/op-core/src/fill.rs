@@ -254,6 +254,17 @@ impl Default for BucketOptions {
 /// the active layer or, with `all_layers`, the merged image. `None` outside
 /// the canvas or without an active layer.
 pub fn magic_wand(doc: &Document, x: u32, y: u32, options: &BucketOptions) -> Option<Selection> {
+    magic_wand_sampled(doc, x, y, options, 1)
+}
+
+/// Select against the rounded mean RGBA color of a clipped sampling window.
+pub fn magic_wand_sampled(
+    doc: &Document,
+    x: u32,
+    y: u32,
+    options: &BucketOptions,
+    sample_size: u32,
+) -> Option<Selection> {
     if x >= doc.width || y >= doc.height {
         return None;
     }
@@ -263,7 +274,20 @@ pub fn magic_wand(doc: &Document, x: u32, y: u32, options: &BucketOptions) -> Op
         let layer = doc.active_layer.and_then(|id| doc.layer(id))?;
         layer.image()?.clone()
     };
-    Some(bucket_region(&source, x, y, options))
+    let radius = sample_size.clamp(1, 101) / 2;
+    let mut sum = [0u64; 4];
+    let mut count = 0u64;
+    for py in y.saturating_sub(radius)..=y.saturating_add(radius).min(doc.height - 1) {
+        for px in x.saturating_sub(radius)..=x.saturating_add(radius).min(doc.width - 1) {
+            let pixel = source.pixel(px, py);
+            for c in 0..4 {
+                sum[c] += pixel[c] as u64;
+            }
+            count += 1;
+        }
+    }
+    let seed = sum.map(|v| ((v + count / 2) / count) as u8);
+    Some(bucket_region_seed(&source, x, y, options, seed))
 }
 
 /// Select > Grow (`contiguous`) and Select > Similar: adds the pixels
@@ -345,8 +369,17 @@ pub fn grow(doc: &Document, options: &BucketOptions, contiguous: bool) -> Option
 /// channels all lie within `tolerance` of the clicked pixel, either
 /// connected to it (4-neighborhood) or anywhere.
 fn bucket_region(source: &TiledImage, x: u32, y: u32, options: &BucketOptions) -> Selection {
+    bucket_region_seed(source, x, y, options, source.pixel(x, y))
+}
+
+fn bucket_region_seed(
+    source: &TiledImage,
+    x: u32,
+    y: u32,
+    options: &BucketOptions,
+    seed: [u8; 4],
+) -> Selection {
     let (w, h) = (source.width(), source.height());
-    let seed = source.pixel(x, y);
     let tol = options.tolerance as i32;
     let similar = |px: [u8; 4]| (0..4).all(|c| (px[c] as i32 - seed[c] as i32).abs() <= tol);
     let mut mask = vec![0u8; (w * h) as usize];

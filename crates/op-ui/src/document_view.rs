@@ -205,6 +205,14 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
 
 fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let tool = app.tool;
+    let wand_sample = [1, 3, 5, 11, 31, 51, 101]
+        .get(
+            app.setting("wand.sample_size", "0")
+                .parse::<usize>()
+                .unwrap_or(0),
+        )
+        .copied()
+        .unwrap_or(1);
     let artboard_options = crate::artboard_tool::options(app);
     let paint = app.paint_options(tool).copied();
     let dynamics = paint_dynamics(app, tool);
@@ -642,26 +650,44 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
-            Tool::MagicWand if response.clicked() => {
-                if let Some(p) = response.interact_pointer_pos() {
-                    let d = to_doc(state, p, ppp);
+            Tool::MagicWand => {
+                if response.contains_pointer() && ui.input(|i| i.pointer.primary_pressed()) {
                     let mods = ui.input(|i| i.modifiers);
-                    let has_selection = state.doc.selection().is_some();
-                    let (op, _, _) = selection_op(mods, has_selection, app.wand.mode);
+                    state.wand_op =
+                        Some(selection_op(mods, state.doc.selection().is_some(), app.wand.mode).0);
+                }
+                if response.clicked()
+                    && let Some(p) = response.interact_pointer_pos()
+                {
+                    let d = to_doc(state, p, ppp);
+                    let op = state.wand_op.take().unwrap_or_else(|| {
+                        selection_op(
+                            ui.input(|i| i.modifiers),
+                            state.doc.selection().is_some(),
+                            app.wand.mode,
+                        )
+                        .0
+                    });
                     if d.x >= 0.0
                         && d.y >= 0.0
-                        && let Some(shape) = op_core::fill::magic_wand(
+                        && let Some(shape) = op_core::fill::magic_wand_sampled(
                             &state.doc,
                             d.x as u32,
                             d.y as u32,
                             &app.wand.region,
+                            wand_sample,
                         )
                     {
-                        let combined =
-                            op_core::Selection::combine(state.doc.selection(), shape, op);
+                        let before = state.doc.selection().cloned();
+                        let combined = op_core::Selection::combine(before.as_ref(), shape, op);
                         state.doc.set_selection(Some(combined));
-                        state.record("Magic Wand");
+                        if state.doc.selection() != before.as_ref() {
+                            state.record("Magic Wand");
+                        }
                     }
+                }
+                if ui.input(|i| i.pointer.primary_released()) {
+                    state.wand_op = None;
                 }
             }
             Tool::Patch | Tool::ContentAwareMove => {

@@ -19,3 +19,5 @@ Magnetic Lasso CPU tests verify auto/manual anchors, anchor deletion, closure, i
 Object Selection CPU regression tests freehand ROI selection on a contrasting object, excluded background, cancellation, undo and pixel preservation.
 
 Quick Selection CPU regression checks live segmentation, cancel, New-to-Add transition, no-op suppression, Alt subtraction, undo, unchanged pixels and invalid size fallback.
+
+Magic Wand CPU regression checks average versus point sampling, pointer-down Add, no-op history, undo and pixel preservation.

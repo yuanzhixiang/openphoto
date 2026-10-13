@@ -523,3 +523,43 @@ fn quick_selection_cancel_mode_transition_noop_and_undo_cpu() {
     h.app.tool_settings.insert("quick.size", "NaN".into());
     assert_eq!(crate::options_tools::quick_options(&mut h.app).1, 30.0);
 }
+
+#[test]
+fn magic_wand_sampling_latched_add_noop_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::MagicWand);
+    let state = h.app.active().unwrap();
+    let id = state.doc.active_layer.unwrap();
+    let image = state.doc.layer_mut(id).unwrap().image_mut().unwrap();
+    for y in 0..256 {
+        for x in 0..256 {
+            image.set_pixel(x, y, [100, 100, 100, 255]);
+        }
+    }
+    image.set_pixel(50, 50, [190, 190, 190, 255]);
+    image.set_pixel(100, 100, [110, 110, 110, 255]);
+    state.doc.mark_dirty();
+    state.record("Fixture");
+    let pixels = h.state().doc.composite_rgba8();
+    h.app.wand.region.tolerance = 0;
+    h.app.wand.region.anti_alias = false;
+    h.app.wand.region.contiguous = false;
+    h.drag((50.5, 50.5), (50.5, 50.5), Modifiers::NONE);
+    assert_eq!(h.state().doc.selection().unwrap().get(50, 50), 255);
+    assert_eq!(h.state().doc.selection().unwrap().get(100, 100), 0);
+    h.app.tool_settings.insert("wand.sample_size", "1".into());
+    h.drag((50.5, 50.5), (50.5, 50.5), Modifiers::NONE);
+    assert_eq!(h.state().doc.selection().unwrap().get(100, 100), 255);
+    assert_eq!(h.state().doc.selection().unwrap().get(50, 50), 0);
+    let before = h.state().doc.selection().cloned();
+    let count = h.state().history.states().len();
+    h.drag((50.5, 50.5), (50.5, 50.5), Modifiers::NONE);
+    assert_eq!(h.state().history.states().len(), count);
+    let p = h.point(150.5, 150.5);
+    h.button(p, true, Modifiers::SHIFT);
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.selection().unwrap().get(100, 100), 255);
+    assert_eq!(h.state().doc.selection().unwrap().get(150, 150), 255);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.selection(), before.as_ref());
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}

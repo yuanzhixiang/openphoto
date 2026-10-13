@@ -191,3 +191,5 @@ Magnetic Lasso offline follow-up bounds empty/outside edge-map inputs, rejects o
 Object Selection offline input follow-up makes Lasso ROI functional and adds press-latched operations and cancellation. The detector remains color/edge based; learned Photoshop recognition, object finder, people/subject inference and full 1:1 acceptance are not completed.
 
 Quick Selection offline follow-up adds snapshot cancellation, no-op history suppression and validated options. Its region growth remains the documented color/edge approximation, not learned Photoshop selection.
+
+- Magic Wand: sampling-window mean, press-latched operation and no-op suppression pass the CPU integration test; workspace strict clippy passes. Native average sampling/connectivity remain unmeasured.
