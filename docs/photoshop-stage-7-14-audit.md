@@ -1,11 +1,11 @@
 # Stages 7–14 offline audit (2026-10-13)
 
 The requested full implementation and 1:1 acceptance of stages 7–14 are **not
-complete**. This run produces 16 source/test commits and 19 additional offline
+complete**. The initial audit produces 16 source/test commits and 19 additional offline
 regression tests. Desktop mouse input, desktop capture, native Photoshop execution
 and UI-based disassembly are absent from this run.
 
-## Delivered repairs
+## Initial delivered repairs
 
 | Commit | Tool / repaired contract |
 | --- | --- |
@@ -30,7 +30,7 @@ Each commit includes mirrored English specifications. Shared painting/gesture
 code repairs affect multiple tools; these commits are repairs, not individual
 tool parity approvals.
 
-## Validation
+## Initial audit validation
 
 - `cargo fmt --all -- --check` passes.
 - `cargo test --workspace`: **629 passed, 0 failed, 51 ignored** across 15 suites.
@@ -74,8 +74,9 @@ Proximity Match, mirrored texture or a different AI model as 1:1 behavior.
 
 The stage table in [the implementation plan](photoshop-toolbar-plan.md) records
 all eight stages as pending parity acceptance. Significant implementation gaps
-remain in Remove, Adjustment Brush, the Pen/Path tools, vertical/type-mask tools,
-editable text/vector/gradient layers, Custom Shape and toolbar customization.
+remain in native Remove synthesis, Adjustment Brush native records/properties,
+complete path operations/magnetic Freeform, editable text/vector/gradient layers,
+native Custom Shape presets and toolbar customization.
 Existing healing, Mixer/Art History and tonal/retouch approximations also require
 actual native output comparisons and reconstruction. Mask Fade remains pending.
 
@@ -84,3 +85,31 @@ algorithms/model interfaces are necessary for numerical 1:1 acceptance. Static
 layout strings and self-generated expected images cannot provide that evidence.
 Remaining data-model, renderer, interaction and PSD changes still require
 implementation; none is marked complete by this audit.
+
+## Subsequent canvas implementation run
+
+The following individual changes are implemented, tested offline and pushed to main:
+
+| Commit | Working behavior | Remaining native gate |
+| --- | --- | --- |
+| `8482082` | Remove marks, subtraction, pressure, local undo/redo, atomic exemplar fill, new-layer/composite sampling | Proprietary synthesis/models, distraction detection and native output |
+| `7aa8718` | Horizontal Type Mask selection preview/commit/cancel | Typography, AA and exact overlay |
+| `6c97d53` | Upright Vertical Type columns, editing and raster PSD | Native metrics, Roman rotation and editable type records |
+| `bd41332` | Vertical Type Mask and live orientation toggle | Native glyph/layout acceptance |
+| `e93d6c3` | Editable Pen cubic paths, cancellation/history, canvas remapping and standard PSD paths | Shape/Pixels modes, native path panels/operations and native reopening |
+| `a384006` | Exact de Casteljau Add Anchor Point | Native picking/cursor/options |
+| `67fa699` | Delete Anchor Point topology/history | Native editing comparison |
+| `4a97067` | Convert Point corner/smooth/independent handles | Native gesture/cursor comparison |
+| `d25e64d` | Whole-path selection, movement, Shift multi-selection and Alt-copy | Rectangle selection, transforms/alignment/arrangement |
+| `b996714` | Direct anchor/linked-handle editing, Alt separation and nudge | Complete node operations, selection UI/native comparison |
+| `f42f2d8` | Freeform sampled editable spline, cancellation/history/PSD | Native fitting and magnetic Freeform; no silent magnetic fallback |
+| `18ac3f6` | Curvature interpolating topology/closure | Native fitting; own spline is not 1:1 acceptance |
+| `a749dcb` | Six retained Adjustment Brush kinds, masks, source preservation, editable settings and own PSD persistence | Native adjustment tags, subject detection and exact properties/history |
+| `4d39139` | Functional one/two-column toolbar switching | Native measurements/auxiliary arrangement and customization |
+| `fe33187` | Named-path Custom Shape picker, scaling, multi-contour holes and raster layer creation | Native CSH library, vector fill/stroke layers and AA/preview |
+
+Latest full validation: **659 passed, 0 failed, 51 ignored** across 15 suites;
+strict workspace clippy passes. No desktop input/capture, native Photoshop execution
+or dev/debug server is used. These are actual canvas/data-model implementations,
+but they do not close the 7–14 1:1 gate. No substituted spline, exemplar fill,
+private PSD extension or raster shape is counted as native parity.
