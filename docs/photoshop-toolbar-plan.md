@@ -13,8 +13,8 @@ implementations are audited rather than assumed to meet full parity.
 
 ## Current offline milestone (2026-10-13)
 
-The current changes reach Count. This does **not** complete all 14 stages or
-establish Photoshop 1:1 parity. Desktop input/capture is prohibited by the
+The follow-up adds offline repairs across stages 7–14. None of these stages
+has full Photoshop 1:1 acceptance. Desktop input/capture is prohibited by the
 current user instruction; validation uses synthetic egui input, model tests,
 PSD round-trips and offscreen workspace tests.
 
@@ -26,10 +26,21 @@ PSD round-trips and offscreen workspace tests.
 | 4 | Crop and Perspective Crop, user slices and Slice Select | Auto slices, full export/options UI, transform remapping and modern slice descriptors |
 | 5 | Raster Frame containers, clipping, handles, content replacement and sibling layout | Smart Objects/original sources, native Frame encoding, content-only transforms/strokes/off-canvas behaviour |
 | 6 | Eyedropper, Color Sampler, Ruler, Note and Count implementations/tests | Sampler persistence, physical/custom measurement scales, native annotation/count formats, exact styling and transform remapping |
-| 7–14 | Existing code remains; this run has not completed these stages | Healing/removal, painting/history/erasers/gradients/retouch, paths/type/shapes, navigation and auxiliary toolbar acceptance |
+| 7 | Spot Healing size pressure, Healing mask targets, Patch cancellation/target permissions/no-op detection, Content-Aware Move safety, Red Eye transparency/no-op detection | Remove has no canvas implementation; healing/content-aware algorithms remain unmeasured approximations |
+| 8 | Mixer mask-target correction and regressions; existing Brush/Pencil/Color Replacement | Sampled tips/full brush dynamics, native pressure/smoothing/mixing coverage |
+| 9 | Clone mask sampling, corresponding History mask sources, Art History mask writes | Native pattern/history/style comparison, mask Fade, complete source/options behavior |
+| 10 | Gradient cancellation/history regression; existing erasers/bucket | Editable gradient fill layers and numerical/eraser sampling parity |
+| 11 | Smudge/Finger Painting mask-target correction | Adjustment Brush has no canvas implementation; native retouch algorithms and target/options coverage |
+| 12 | Escape/release/undo regression for five raster shape tools | Pen/Path tools, Vertical/Mask Type, editable type/vector layers, Custom Shape, native PSD records |
+| 13 | Rotate View reset clears the active drag; Zoom cancels scrubby/box gestures | Complete navigation modifier/all-window/native timing and visual comparison |
+| 14 | Screen Mode button and mode menu are functional; warning/return regression | Toolbar customization, two-column collapse and full native control acceptance |
 
-Latest full regression: **610 passed, 0 failed, 51 ignored**. Strict workspace
+Latest full regression: **629 passed, 0 failed, 51 ignored**. Strict workspace
 clippy passes. Ignored/native-reference tests do not count as parity acceptance.
+
+The follow-up has 16 source/test commits, each pushed to main after focused
+offline checks. The detailed [audit and static evidence](photoshop-stage-7-14-audit.md)
+records remaining gaps; this is not completion of the requested 7–14 sequence.
 
 ## Execution and acceptance
 
