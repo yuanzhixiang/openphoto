@@ -78,3 +78,5 @@ Near the clicked point (3% of the image's short side, at least 8 pixels), finds 
 - `locked_layer_refuses`: refuses when pixels are locked, with message text matching Photoshop.
 
 magic_wand_sampled uses a clipped 1–101 pixel window and rounded per-channel RGBA means as its tolerance reference. Point sampling retains the original magic_wand contract. Contiguous traversal includes only matching pixels reachable from the click; if the clicked pixel differs beyond tolerance from the mean, it can produce an empty region. Native averaging and connectivity parity are unmeasured.
+
+Red Eye ignores fully transparent pixels during seed discovery and region traversal. An empty/excluding selection returns false and leaves the document revision unchanged; partial alpha is preserved. The redness/darkening algorithm remains unmeasured against Photoshop and is not parity acceptance.

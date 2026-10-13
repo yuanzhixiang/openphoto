@@ -729,7 +729,13 @@ pub fn red_eye(
     if x >= w || y >= h {
         return Ok(false);
     }
-    let redness = |p: [u8; 4]| p[0] as f32 - p[1].max(p[2]) as f32;
+    let redness = |p: [u8; 4]| {
+        if p[3] == 0 {
+            0.0
+        } else {
+            p[0] as f32 - p[1].max(p[2]) as f32
+        }
+    };
     let threshold = 40.0 + (1.0 - pupil.clamp(0.0, 1.0)) * 60.0;
     // The seed: the reddest pixel within a few percent of the image
     let reach = ((w.min(h) as f32 * 0.03).max(8.0)) as i64;
@@ -771,6 +777,7 @@ pub fn red_eye(
         }
     }
     let dark = 1.0 - 0.6 * darken.clamp(0.0, 1.0);
+    let mut changed = false;
     for (px, py) in region {
         let amount = selection
             .as_ref()
@@ -783,10 +790,16 @@ pub fn red_eye(
         let fixed = [m * dark, p[1] as f32 * dark, p[2] as f32 * dark];
         let out =
             [0, 1, 2].map(|c| (p[c] as f32 + (fixed[c] - p[c] as f32) * amount).round() as u8);
-        image.set_pixel(px, py, [out[0], out[1], out[2], p[3]]);
+        let out = [out[0], out[1], out[2], p[3]];
+        if out != p {
+            image.set_pixel(px, py, out);
+            changed = true;
+        }
     }
-    doc.mark_dirty();
-    Ok(true)
+    if changed {
+        doc.mark_dirty();
+    }
+    Ok(changed)
 }
 
 #[cfg(test)]
@@ -829,5 +842,46 @@ mod eraser_and_red_eye_tests {
         assert!(!layer.is_background);
         assert_eq!(layer.image().unwrap().pixel(2, 2)[3], 0);
         assert_eq!(layer.image().unwrap().pixel(30, 30)[3], 255);
+    }
+}
+
+#[cfg(test)]
+mod red_eye_target_tests {
+    use super::*;
+    #[test]
+    fn red_eye_ignores_transparency_and_unselected_pupils() {
+        let mut doc = Document::new_with_background("eye", 32, 32, crate::Color::WHITE);
+        let id = doc.active_layer.unwrap();
+        doc.layer_mut(id)
+            .unwrap()
+            .image_mut()
+            .unwrap()
+            .set_pixel(16, 16, [255, 0, 0, 0]);
+        let revision = doc.revision();
+        assert!(!red_eye(&mut doc, (16, 16), 0.5, 0.5).unwrap());
+        assert_eq!(doc.revision(), revision);
+        assert_eq!(
+            doc.layer(id).unwrap().image().unwrap().pixel(16, 16),
+            [255, 0, 0, 0]
+        );
+        doc.layer_mut(id)
+            .unwrap()
+            .image_mut()
+            .unwrap()
+            .set_pixel(16, 16, [255, 0, 0, 128]);
+        doc.set_selection(Some(Selection::rect(
+            32,
+            32,
+            crate::selection::Rect::new(0.0, 0.0, 4.0, 4.0),
+        )));
+        let revision = doc.revision();
+        assert!(!red_eye(&mut doc, (16, 16), 0.5, 0.5).unwrap());
+        assert_eq!(doc.revision(), revision);
+        doc.set_selection(None);
+        assert!(red_eye(&mut doc, (16, 16), 0.5, 0.5).unwrap());
+        assert_eq!(
+            doc.layer(id).unwrap().image().unwrap().pixel(16, 16)[3],
+            128
+        );
     }
 }
