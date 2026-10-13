@@ -49,3 +49,5 @@ The Quick Mask button ("Edit in Quick Mask Mode (Q)") enters/exits Quick Mask fo
 The icons in the buttons are drawn in Photoshop's style by `tool_icons.rs` (see `tool_icons.md`), with icon centers computed from Photoshop's row pitch; tools for which `paint` returns false (currently none) fall back to Phosphor font icons.
 
 The screen-mode control changes view/window state only, without editing the document or recording history. Toolbar customization and two-column collapse remain unimplemented.
+
+The header switches between one and two columns, storing toolbar.two_columns. Two columns place consecutive slots row-by-row, preserve slot memory/flyouts, and move auxiliary controls upward by the rows saved. width exposes the current panel width. Default one-column geometry is preserved. Exact two-column native measurements and auxiliary arrangement remain unverified.

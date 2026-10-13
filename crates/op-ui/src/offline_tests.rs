@@ -2448,3 +2448,21 @@ fn adjustment_brush_kinds_selection_permissions_and_empty_cancel_cpu() {
         );
     }
 }
+
+#[test]
+fn toolbar_two_columns_toggle_selects_second_column_and_collapses_cpu() {
+    let mut h = CanvasHarness::new(Tool::Move);
+    let single = crate::toolbar::width(&h.app);
+    let origin = h.toolbar_step(vec![]);
+    let header = origin + egui::vec2(crate::theme::pt(9.25), crate::theme::pt(6.5));
+    h.toolbar_click(header);
+    assert!(h.app.flag("toolbar.two_columns", false));
+    assert!(crate::toolbar::width(&h.app) > single);
+    let center = origin + egui::vec2(crate::theme::pt(19.5 + 39.), crate::theme::pt(43.));
+    h.toolbar_click(center);
+    assert_eq!(h.app.tool.slot(), 1);
+    h.toolbar_click(header);
+    assert!(!h.app.flag("toolbar.two_columns", false));
+    assert_eq!(crate::toolbar::width(&h.app), single);
+    assert_eq!(h.app.tool.slot(), 1);
+}

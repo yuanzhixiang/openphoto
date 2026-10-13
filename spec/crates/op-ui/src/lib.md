@@ -151,3 +151,5 @@ The remove_tool component supplies staged Remove canvas input and overlay withou
 pen_tool handles editable path canvas geometry without native input.
 
 adjustment_tool implements masked retained adjustment painting and editable properties.
+
+The toolbar panel, hover region and fullscreen reveal region use toolbar.width for either column arrangement.

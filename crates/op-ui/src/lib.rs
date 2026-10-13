@@ -678,6 +678,7 @@ impl OpenPhotoApp {
         let reveal = |on: &mut bool, hidden: bool, at_edge: bool, over: bool| {
             *on = hidden && (at_edge || (*on && over));
         };
+        let toolbar_width = toolbar::width(&self.state);
         if let Some(p) = pointer {
             reveal(
                 &mut self.state.reveal_panels,
@@ -689,7 +690,7 @@ impl OpenPhotoApp {
                 &mut self.state.reveal_tools,
                 hide_tools,
                 p.x <= screen.left() + edge,
-                p.x <= screen.left() + size::TOOLBAR,
+                p.x <= screen.left() + toolbar_width,
             );
         }
         if self.state.reveal_panels {
@@ -723,8 +724,10 @@ impl OpenPhotoApp {
                 });
         }
         if self.state.reveal_tools {
-            let rect =
-                egui::Rect::from_min_size(screen.min, egui::vec2(size::TOOLBAR, screen.height()));
+            let rect = egui::Rect::from_min_size(
+                screen.min,
+                egui::vec2(toolbar::width(&self.state), screen.height()),
+            );
             egui::Area::new(egui::Id::new("revealed-tools"))
                 .fixed_pos(rect.min)
                 .order(egui::Order::Foreground)
@@ -1332,7 +1335,7 @@ impl eframe::App for OpenPhotoApp {
                 .show(ui, |ui| options_bar::show(ui, &mut self.state));
             egui::Panel::left("toolbar")
                 .show_separator_line(false)
-                .exact_size(size::TOOLBAR)
+                .exact_size(toolbar::width(&self.state))
                 .resizable(false)
                 .frame(bar_frame)
                 .show(ui, |ui| toolbar::show(ui, &mut self.state));

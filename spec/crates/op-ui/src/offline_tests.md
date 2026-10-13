@@ -105,3 +105,5 @@ Curvature Pen verifies smooth controls, closure, geometry undo, Escape ending co
 Adjustment Brush regression paints a retained black-mask adjustment, checks effect/source preservation, cancels, changes editable parameters, saves/reads OpenPhoto's private PSD settings and masks, subtracts and undoes. Native PSD adjustment-tag compatibility is not asserted.
 
 Adjustment Brush also checks all six retained kinds, selection-limited masks, out-of-selection new-layer rollback and lock-all rejection without extra history.
+
+Toolbar column regression clicks the header, checks width, selects the first row second column, collapses and verifies tool selection survives.

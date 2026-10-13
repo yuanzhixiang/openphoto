@@ -12,6 +12,18 @@ use crate::widgets;
 /// Dark border on the toolbar's right edge, next to the canvas.
 const RIGHT_BORDER: f32 = crate::theme::pt(3.0);
 
+pub fn width(app: &AppState) -> f32 {
+    if app
+        .tool_settings
+        .get("toolbar.two_columns")
+        .is_some_and(|v| v == "1")
+    {
+        (size::TOOLBAR - RIGHT_BORDER) * 2. + RIGHT_BORDER
+    } else {
+        size::TOOLBAR
+    }
+}
+
 pub fn show(ui: &mut Ui, app: &mut AppState) {
     let full = ui.max_rect();
     // The 3 pt divider next to the canvas: a light line between dark ones
@@ -26,7 +38,10 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
     ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
 
     // Collapse arrows and drag grip at the top
-    header(ui, Collapse::Toolbar);
+    if header(ui, Collapse::Toolbar).clicked() {
+        let expanded = app.flag("toolbar.two_columns", false);
+        app.set_flag("toolbar.two_columns", !expanded);
+    }
     grip(ui);
     // Measured on Photoshop 2026: the first tool's center 43 pt below the
     // toolbar's top, then one tool every 25.9 pt, with no gaps between groups
@@ -37,67 +52,79 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
     let first_top = full.top() + crate::theme::pt(43.0) - pitch / 2.0;
     ui.add_space((first_top - ui.cursor().top()).max(0.0));
 
-    for (slot, group) in TOOLBAR.iter().enumerate() {
-        // Each slot shows the tool of its group that was used last
-        let shown = app.tool_slots[slot];
+    let columns = if app.flag("toolbar.two_columns", false) {
+        2
+    } else {
+        1
+    };
+    for row in (0..TOOLBAR.len()).step_by(columns) {
         ui.horizontal(|ui| {
-            ui.add_space(tool_pad);
-            let selected = app.tool.slot() == slot;
-            // Photoshop's tool icons are about 15 pt across
-            let r = widgets::icon_button_font(
-                ui,
-                "",
-                Vec2::new(button_w, pitch - 1.0),
-                theme::tool_icon(crate::theme::pt(17.5)),
-                selected,
-            );
-            // Photoshop-style drawings, else the icon font
-            // The icon's center by Photoshop's pitch, free of the buttons'
-            // rounding
-            let icon_center = Pos2::new(
-                r.rect.center().x,
-                full.top() + crate::theme::pt(43.0) + pitch * slot as f32,
-            );
-            let bg = if selected || r.is_pointer_button_down_on() {
-                color::TOOL_ACTIVE
-            } else if r.hovered() {
-                color::HOVER
-            } else {
-                color::PANEL
-            };
-            let tint = crate::tool_icons::COLOR;
-            if !crate::tool_icons::paint(ui.painter(), icon_center, shown, tint, bg) {
-                ui.painter().text(
-                    r.rect.center(),
-                    Align2::CENTER_CENTER,
-                    icons::tool(shown),
+            for (slot, group) in TOOLBAR
+                .iter()
+                .enumerate()
+                .take((row + columns).min(TOOLBAR.len()))
+                .skip(row)
+            {
+                let shown = app.tool_slots[slot];
+                ui.add_space(tool_pad);
+                let selected = app.tool.slot() == slot;
+                // Photoshop's tool icons are about 15 pt across
+                let r = widgets::icon_button_font(
+                    ui,
+                    "",
+                    Vec2::new(button_w, pitch - 1.0),
                     theme::tool_icon(crate::theme::pt(17.5)),
-                    color::ICON,
+                    selected,
                 );
-            }
-            // The selected tool's box has a faint light outline
-            if selected {
-                ui.painter().rect_stroke(
-                    r.rect,
-                    4,
-                    egui::Stroke::new(1.0, Color32::from_gray(0x60)),
-                    egui::StrokeKind::Outside,
+                // Photoshop-style drawings, else the icon font
+                // The icon's center by Photoshop's pitch, free of the buttons'
+                // rounding
+                let icon_center = Pos2::new(
+                    r.rect.center().x,
+                    full.top() + crate::theme::pt(43.0) + pitch * (slot / columns) as f32,
                 );
-            }
-            if group.len() > 1 {
-                group_marker(ui, r.rect);
-            }
-            let r = r.on_hover_text(tool_tip(shown));
-            // A click picks the tool; the release ending a hold doesn't
-            let was_held = ui
-                .ctx()
-                .data(|d| d.get_temp::<bool>(r.id.with("held")))
-                .unwrap_or(false);
-            if r.clicked() && !was_held {
-                app.select_tool(shown);
-            }
-            if group.len() > 1 {
-                flyout(&r, group, shown, app);
+                let bg = if selected || r.is_pointer_button_down_on() {
+                    color::TOOL_ACTIVE
+                } else if r.hovered() {
+                    color::HOVER
+                } else {
+                    color::PANEL
+                };
+                let tint = crate::tool_icons::COLOR;
+                if !crate::tool_icons::paint(ui.painter(), icon_center, shown, tint, bg) {
+                    ui.painter().text(
+                        r.rect.center(),
+                        Align2::CENTER_CENTER,
+                        icons::tool(shown),
+                        theme::tool_icon(crate::theme::pt(17.5)),
+                        color::ICON,
+                    );
+                }
+                // The selected tool's box has a faint light outline
+                if selected {
+                    ui.painter().rect_stroke(
+                        r.rect,
+                        4,
+                        egui::Stroke::new(1.0, Color32::from_gray(0x60)),
+                        egui::StrokeKind::Outside,
+                    );
+                }
+                if group.len() > 1 {
+                    group_marker(ui, r.rect);
+                }
+                let r = r.on_hover_text(tool_tip(shown));
+                // A click picks the tool; the release ending a hold doesn't
+                let was_held = ui
+                    .ctx()
+                    .data(|d| d.get_temp::<bool>(r.id.with("held")))
+                    .unwrap_or(false);
+                if r.clicked() && !was_held {
+                    app.select_tool(shown);
+                }
+                if group.len() > 1 {
+                    flyout(&r, group, shown, app);
+                }
+                ui.add_space(tool_pad);
             }
         });
         ui.add_space(1.0);
@@ -113,7 +140,23 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
 fn bottom(ui: &mut Ui, app: &mut AppState, full: Rect, button: Vec2) {
     use crate::ps_icons::Icon;
     use crate::theme::pt;
-    let p = |x: f32, y: f32| Pos2::new(full.left() + pt(x / 2.0), full.top() + pt(y / 2.0));
+    let expanded = app.flag("toolbar.two_columns", false);
+    let dx = if expanded {
+        (size::TOOLBAR - RIGHT_BORDER) / 2.
+    } else {
+        0.
+    };
+    let dy = if expanded {
+        pt(25.9) * (TOOLBAR.len() - TOOLBAR.len().div_ceil(2)) as f32
+    } else {
+        0.
+    };
+    let p = |x: f32, y: f32| {
+        Pos2::new(
+            full.left() + pt(x / 2.0) + dx,
+            full.top() + pt(y / 2.0) - dy,
+        )
+    };
     let r = |x0: f32, y0: f32, x1: f32, y1: f32| Rect::from_min_max(p(x0, y0), p(x1, y1));
     let painter = ui.painter().clone();
     let icon_color = color::OPTIONS_ICON;
