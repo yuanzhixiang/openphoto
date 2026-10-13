@@ -290,7 +290,7 @@ History Brush reads the corresponding image, layer mask or Quick Mask from its s
 
 Gradient Escape clears the pending line without committing pixels; release after cancellation does nothing. A subsequent valid line remains undoable. The editable Gradient layer mode remains unimplemented.
 
-Rectangle/Ellipse/Triangle/Polygon/Line drags accept Escape before layer creation. Release after cancellation preserves layers/pixels/history; subsequent valid shapes remain undoable. Their vector/live shape representation and Custom Shape remain unimplemented.
+Rectangle/Ellipse/Triangle/Polygon/Line drags accept Escape before layer creation. Release after cancellation preserves layers/pixels/history; subsequent valid shapes remain undoable. Their vector/live shape representation remains unimplemented; Custom Shape uses named-path rasterization as described below.
 
 Rotate View Escape resets to zero and removes the cached drag origin immediately; continued pointer movement/release cannot restore the cancelled rotation.
 
@@ -321,3 +321,5 @@ Non-magnetic Freeform Pen in Path mode dispatches sampled cubic creation and par
 Curvature Pen in Path mode dispatches interpolating anchor creation and closure.
 
 Adjustment Brush dispatches retained adjustment mask strokes, displays the optional pink mask overlay, and cancels unfinished strokes on tool departure.
+
+Custom Shape dispatches the shared cancellable shape drag and rasterizes the chosen named path on release, retaining source geometry. Missing shape selection adds no layer/history. The current preview remains a box, and Shape/Path/Pixels modes, native presets and vector fill/stroke are incomplete.

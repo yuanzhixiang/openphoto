@@ -13,6 +13,7 @@ pub mod blend;
 pub mod clipboard;
 pub mod color;
 pub mod color_match;
+pub mod custom_shape;
 pub mod document;
 pub mod fade;
 pub mod fill;

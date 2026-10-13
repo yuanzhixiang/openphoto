@@ -269,6 +269,15 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let view_options = app.view;
     let retouch = app.retouch;
     let shape_options = app.shape;
+    let custom_index = app
+        .setting("shape.custom_path", "0")
+        .parse::<usize>()
+        .unwrap_or(0);
+    let custom_path = app
+        .docs
+        .get(&id)
+        .and_then(|s| s.doc.paths.get(custom_index))
+        .cloned();
     let move_options = app.move_options;
     let layer_panel_feedback =
         move_options.show_layer_panel_bounds && !app.hide_panels && !app.panels_collapsed;
@@ -820,9 +829,22 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     ppp,
                 );
             }
-            Tool::Rectangle | Tool::Ellipse | Tool::Triangle | Tool::Polygon | Tool::Line => {
+            Tool::Rectangle
+            | Tool::Ellipse
+            | Tool::Triangle
+            | Tool::Polygon
+            | Tool::Line
+            | Tool::CustomShape => {
                 let [r, g, b, _] = foreground.to_rgba8();
-                shape_input(ui, &response, state, tool, shape_options, [r, g, b], ppp);
+                shape_input(
+                    ui,
+                    &response,
+                    state,
+                    tool,
+                    (shape_options, custom_path.as_ref()),
+                    [r, g, b],
+                    ppp,
+                );
             }
             Tool::Gradient => {
                 let g = tool_gradient.clone().expect("the Gradient tool's");
@@ -1521,10 +1543,11 @@ fn shape_input(
     response: &egui::Response,
     state: &mut DocState,
     tool: Tool,
-    options: crate::state::ShapeOptions,
+    settings: (crate::state::ShapeOptions, Option<&op_core::path::Path>),
     color: [u8; 3],
     ppp: f32,
 ) {
+    let (options, custom_path) = settings;
     if state.shape_drag.is_some() && ui.input(|i| i.key_pressed(Key::Escape)) {
         state.shape_drag = None;
         return;
@@ -1546,6 +1569,21 @@ fn shape_input(
         let (s, e) = state.shape_drag.take().expect("checked");
         let mods = ui.input(|i| i.modifiers);
         let (a, b) = shape_points(tool, s, e, mods);
+        if tool == Tool::CustomShape {
+            if let Some(path) = custom_path
+                && op_core::custom_shape::add_layer(
+                    &mut state.doc,
+                    path,
+                    (a.x, a.y),
+                    (b.x, b.y),
+                    color,
+                )
+                .is_some()
+            {
+                state.record("Custom Shape Tool");
+            }
+            return;
+        }
         let kind = shape_kind(tool, options);
         if op_core::shape::add_shape_layer(
             &mut state.doc,

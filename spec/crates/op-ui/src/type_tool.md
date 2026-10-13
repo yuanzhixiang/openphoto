@@ -1,8 +1,8 @@
-# type_tool.rs: Horizontal Type tool (canvas interaction)
+# type_tool.rs: Type and Type Mask canvas interaction
 
 ## Component responsibilities
 
-Input, live preview, commit, and cancel for Horizontal Type and Horizontal Type Mask (T) on the canvas. For rasterization, see `op-core`'s `text.md`.
+Input, live preview, commit, and cancel for Horizontal/Vertical Type and both Type Mask tools (T) on the canvas. For rasterization, see `op-core`'s `text.md`.
 
 ## State
 

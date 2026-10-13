@@ -2410,6 +2410,35 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                     crate::theme::color::OPTIONS_ICON,
                     crate::theme::color::FIELD,
                 );
+                let names = app.active().map_or_else(Vec::new, |s| {
+                    s.doc
+                        .paths
+                        .iter()
+                        .map(|p| p.name.clone())
+                        .collect::<Vec<_>>()
+                });
+                let response = b.ui.interact(
+                    frame(x0, x2),
+                    b.ui.id().with("custom-shape-picker"),
+                    egui::Sense::click(),
+                );
+                egui::Popup::from_response(&response)
+                    .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
+                    .show(|ui| {
+                        if names.is_empty() {
+                            ui.label("No saved shapes available");
+                        }
+                        let mut selected = app
+                            .setting("shape.custom_path", "0")
+                            .parse::<usize>()
+                            .unwrap_or(0);
+                        for (i, name) in names.iter().enumerate() {
+                            if ui.selectable_value(&mut selected, i, name).clicked() {
+                                *app.setting("shape.custom_path", "0") = i.to_string();
+                                ui.close();
+                            }
+                        }
+                    });
             }
             IconPopup(x0, x1, icon, key, options) => {
                 let mut i = choice(app, key).min(options.len() - 1);

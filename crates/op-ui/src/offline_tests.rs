@@ -2466,3 +2466,47 @@ fn toolbar_two_columns_toggle_selects_second_column_and_collapses_cpu() {
     assert_eq!(crate::toolbar::width(&h.app), single);
     assert_eq!(h.app.tool.slot(), 1);
 }
+
+#[test]
+fn custom_shape_fills_named_path_holes_cancel_and_undo_cpu() {
+    use op_core::path::{Knot, Path, Subpath};
+    let mut h = CanvasHarness::new(Tool::CustomShape);
+    let count = h.state().history.states().len();
+    h.drag((30., 30.), (120., 120.), Modifiers::NONE);
+    assert_eq!(h.state().doc.layers.len(), 1);
+    assert_eq!(h.state().history.states().len(), count);
+    let rect = |lo: f32, hi: f32| Subpath {
+        closed: true,
+        knots: vec![
+            Knot::corner((lo, lo)),
+            Knot::corner((hi, lo)),
+            Knot::corner((hi, hi)),
+            Knot::corner((lo, hi)),
+        ],
+    };
+    h.app.active().unwrap().doc.paths.push(Path {
+        name: "Frame".into(),
+        subpaths: vec![rect(0., 10.), rect(3., 7.)],
+    });
+    h.app.active().unwrap().record("Path");
+    let source = h.state().doc.paths.clone();
+    h.drag((30., 30.), (130., 80.), Modifiers::NONE);
+    assert_eq!(h.state().doc.layers.len(), 2);
+    let image = h.state().doc.layers.last().unwrap().image().unwrap();
+    assert_eq!(image.pixel(40, 40)[3], 255);
+    assert_eq!(image.pixel(80, 55)[3], 0);
+    assert_eq!(h.state().doc.paths, source);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.layers.len(), 1);
+    let count = h.state().history.states().len();
+    let p = h.point(30., 30.);
+    h.button(p, true, Modifiers::NONE);
+    h.step(
+        vec![Event::PointerMoved(h.point(180., 180.))],
+        Modifiers::NONE,
+    );
+    h.key(Key::Escape);
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.layers.len(), 1);
+    assert_eq!(h.state().history.states().len(), count);
+}

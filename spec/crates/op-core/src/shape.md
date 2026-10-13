@@ -15,7 +15,7 @@ The Rectangle, Ellipse, Triangle, Polygon, and Line tools: generates a shape's c
 ## Known limitations
 
 - Shapes are raster layers, not Photoshop's vector shape layers: no paths, live shape properties, rounded corners, or strokes, and the shape cannot be edited afterwards.
-- No Custom Shape tool and no path/pixel modes.
+- Named-path Custom Shape rasterization lives in custom_shape.md. Native preset libraries and path/pixel/vector modes remain unsupported.
 
 ## Test coverage
 

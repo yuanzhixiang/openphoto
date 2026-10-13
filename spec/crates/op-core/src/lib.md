@@ -41,3 +41,5 @@ The remove module supplies bounded offline exemplar filling and atomic document 
 The path module supplies editable cubic geometry without UI/GPU dependencies.
 
 adjustment_layer supplies retained point adjustment settings and masked layer creation.
+
+custom_shape maps named Bezier geometry and rasterizes multi-contour even/odd fills.

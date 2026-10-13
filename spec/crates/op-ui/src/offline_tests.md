@@ -107,3 +107,5 @@ Adjustment Brush regression paints a retained black-mask adjustment, checks effe
 Adjustment Brush also checks all six retained kinds, selection-limited masks, out-of-selection new-layer rollback and lock-all rejection without extra history.
 
 Toolbar column regression clicks the header, checks width, selects the first row second column, collapses and verifies tool selection survives.
+
+Custom Shape regression rejects an absent preset, uses a named two-contour path, preserves the hole/source geometry, undoes the raster result and cancels drags without history. It does not claim native CSH/vector-layer parity.
