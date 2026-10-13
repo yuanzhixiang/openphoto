@@ -120,3 +120,60 @@ pub(super) fn single_row() {
     assert!(h.app.active().unwrap().undo());
     assert_eq!(h.state().doc.selection(), before.as_ref());
 }
+
+#[test]
+fn single_column_drag_feather_cancel_nudge_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::SingleColumnMarquee);
+    let pixels = h.state().doc.composite_rgba8();
+    h.drag((20.5, 20.5), (50.5, 90.5), Modifiers::NONE);
+    assert_eq!(
+        h.state().doc.selection().unwrap().bounds(),
+        Some((50, 0, 51, 256))
+    );
+    h.step(
+        vec![Event::Key {
+            key: Key::ArrowRight,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    assert_eq!(
+        h.state().doc.selection().unwrap().bounds(),
+        Some((51, 0, 52, 256))
+    );
+    h.drag((90.5, 20.5), (100.5, 90.5), Modifiers::SHIFT);
+    assert_eq!(h.state().doc.selection().unwrap().get(51, 250), 255);
+    assert_eq!(h.state().doc.selection().unwrap().get(100, 250), 255);
+    let before = h.state().doc.selection().cloned();
+    let count = h.state().history.states().len();
+    let a = h.point(120.5, 20.5);
+    h.button(a, true, Modifiers::NONE);
+    let b = h.point(130.5, 80.5);
+    h.step(vec![Event::PointerMoved(b)], Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    h.button(b, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.selection(), before.as_ref());
+    assert_eq!(h.state().history.states().len(), count);
+    h.app.marquee.feather = 2.0;
+    let p = h.point(160.5, 20.5);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    let selection = h.state().doc.selection().unwrap();
+    assert!(selection.get(160, 250) > 0 && selection.get(160, 250) < 255);
+    assert!(selection.get(159, 250) > 0);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.selection(), before.as_ref());
+}

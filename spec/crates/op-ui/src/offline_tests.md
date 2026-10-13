@@ -5,3 +5,5 @@ CPU-only canvas integration harness. An egui Context and AppState receive synthe
 The single-row regression tests live dragging, combination, feather, Escape, undo and unchanged document pixels. It is called by ui_tests to retain the existing test entry name.
 
 FullOutput texture deltas are intentionally cleared instead of uploaded, satisfying egui's output lifecycle contract without a renderer.
+
+`single_column_drag_feather_cancel_nudge_and_undo_cpu` exercises full-height drag, combination, keyboard movement, feather, cancellation and undo without rendering.

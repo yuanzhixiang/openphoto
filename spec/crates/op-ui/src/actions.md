@@ -82,3 +82,5 @@ Artboard layer exports retain the exact board width/height, including empty tran
 Rectangular Marquee arrow keys move the selection outline by one pixel (Shift: ten), leaving pixels and layer locks unchanged, and record Move Selection. Without a selection these keys make no document edit.
 
 Elliptical Marquee supports one/ten pixel arrow-key selection-outline movement as well.
+
+Single Row and Single Column also support selection-outline arrow-key nudging.

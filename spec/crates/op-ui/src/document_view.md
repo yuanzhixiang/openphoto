@@ -253,3 +253,5 @@ Rectangular Marquee in New/Normal mode moves the existing selection outline when
 Elliptical Marquee also moves an existing outline from its selected interior in New/Normal mode, with the same absolute preview and cancel contract as Rectangular Marquee. Circle/center modifiers, operation modes, anti-alias and feather act on the ellipse mask.
 
 Single Row Marquee starts a one-pixel, full-width live preview on a valid image press and tracks the pointer row while held. Rows clamp at the canvas edges. Release applies the latched operation and Feather, recording one Single Row Marquee state; Escape cancels without editing the prior selection. Outside-image presses do nothing.
+
+Single Column Marquee shares the transactional line input: a one-pixel, full-height preview tracks and clamps the pointer column. It supports Feather, latched combination modes, Escape cancellation and one release history state. Its style does not inherit fixed ratio/size from other marquees.

@@ -698,7 +698,10 @@ fn paint_key(app: &mut AppState, key: Key, shift: bool) -> bool {
 fn nudge_key(app: &mut AppState, key: Key, shift: bool) -> bool {
     let marquee = matches!(
         app.tool,
-        op_tools::Tool::RectangularMarquee | op_tools::Tool::EllipticalMarquee
+        op_tools::Tool::RectangularMarquee
+            | op_tools::Tool::EllipticalMarquee
+            | op_tools::Tool::SingleRowMarquee
+            | op_tools::Tool::SingleColumnMarquee
     );
     if app.tool != op_tools::Tool::Move && !marquee {
         return false;
