@@ -20,14 +20,21 @@ pub fn input(
     ui: &Ui,
     response: &egui::Response,
     state: &mut DocState,
-    mask: bool,
+    mode: (bool, bool),
     options: TypeOptions,
     color: [u8; 3],
     ppp: f32,
 ) -> bool {
+    let (mask, vertical) = mode;
     let mut committed = false;
     if state.text_edit.as_ref().is_some_and(|e| e.mask != mask) {
         committed = commit(state);
+    }
+    if let Some(edit) = &mut state.text_edit
+        && edit.vertical != vertical
+    {
+        edit.vertical = vertical;
+        edit.shown_options = None;
     }
     if response.clicked()
         && let Some(p) = response.interact_pointer_pos()
@@ -42,6 +49,7 @@ pub fn input(
                 before: state.doc.snapshot(),
                 shown: String::new(),
                 mask,
+                vertical,
                 selection_op: {
                     let m = ui.input(|i| i.modifiers);
                     match (m.shift, m.alt) {
@@ -113,17 +121,24 @@ pub fn preview(state: &mut DocState, options: TypeOptions, color: [u8; 3]) {
     if edit.text == edit.shown && edit.shown_options == Some((options, color)) {
         return;
     }
-    let (text, origin, mask, op) = (edit.text.clone(), edit.origin, edit.mask, edit.selection_op);
+    let (text, origin, mask, op, vertical) = (
+        edit.text.clone(),
+        edit.origin,
+        edit.mask,
+        edit.selection_op,
+        edit.vertical,
+    );
     state.doc.restore(&edit.before);
     let changed = if mask {
         let previous = state.doc.selection().cloned();
-        match op_core::text::coverage(
+        match op_core::text::coverage_oriented(
             options.font(),
             &text,
             size,
             (origin.x, origin.y),
             state.doc.width,
             state.doc.height,
+            vertical,
         ) {
             Ok(coverage) => {
                 let shape = op_core::Selection::from_mask(
@@ -139,13 +154,14 @@ pub fn preview(state: &mut DocState, options: TypeOptions, color: [u8; 3]) {
             Err(_) => false,
         }
     } else {
-        op_core::text::add_text_layer(
+        op_core::text::add_text_layer_oriented(
             &mut state.doc,
             options.font(),
             &text,
             size,
             (origin.x, origin.y),
             color,
+            vertical,
         )
         .is_ok_and(|id| id.is_some())
     };
@@ -212,11 +228,12 @@ pub fn draw_caret(ui: &Ui, state: &DocState, options: TypeOptions, canvas: Rect,
         return;
     };
     let size = size_px(state, options);
-    let Some(((x, y), line)) = op_core::text::caret(
+    let Some(((x, y), line)) = op_core::text::caret_oriented(
         options.font(),
         &edit.text,
         size,
         (edit.origin.x, edit.origin.y),
+        edit.vertical,
     ) else {
         return;
     };
@@ -227,8 +244,13 @@ pub fn draw_caret(ui: &Ui, state: &DocState, options: TypeOptions, canvas: Rect,
     if (time * 2.0) as i64 % 2 == 1 {
         return;
     }
-    let top = to_screen(state, Pos2::new(x, y - line * 0.75), ppp);
-    let bottom = to_screen(state, Pos2::new(x, y + line * 0.2), ppp);
+    let (a, b) = if edit.vertical {
+        (Pos2::new(x - line / 2., y), Pos2::new(x + line / 2., y))
+    } else {
+        (Pos2::new(x, y - line * 0.75), Pos2::new(x, y + line * 0.2))
+    };
+    let top = to_screen(state, a, ppp);
+    let bottom = to_screen(state, b, ppp);
     // Black with a white core, visible on any color
     let painter = ui.painter_at(canvas);
     painter.line_segment([top, bottom], Stroke::new(3.0, Color32::BLACK));

@@ -977,6 +977,7 @@ pub struct TextEdit {
     /// The text as last shown on the document.
     pub shown: String,
     pub mask: bool,
+    pub vertical: bool,
     pub selection_op: op_core::SelectionOp,
     pub changed: bool,
     pub shown_options: Option<(TypeOptions, [u8; 3])>,

@@ -172,6 +172,19 @@ pub fn coverage(
     width: u32,
     height: u32,
 ) -> Result<Vec<u8>, FontError> {
+    coverage_oriented(font_data, text, size, origin, width, height, false)
+}
+
+/// Upright vertical glyph cells; newline starts a column to the left.
+pub fn coverage_oriented(
+    font_data: &[u8],
+    text: &str,
+    size: f32,
+    origin: (f32, f32),
+    width: u32,
+    height: u32,
+    vertical: bool,
+) -> Result<Vec<u8>, FontError> {
     let font = FontRef::new(font_data).map_err(|_| FontError)?;
     let charmap = font.charmap();
     let outlines = font.outline_glyphs();
@@ -181,12 +194,22 @@ pub fn coverage(
     for (i, text_line) in text.split('\n').enumerate() {
         let mut x = origin.0;
         let baseline = origin.1 + i as f32 * line;
-        for ch in text_line.chars() {
-            let Some(gid) = charmap.map(ch) else {
-                continue;
-            };
+        let ascent = font.metrics(Size::new(size), LocationRef::default()).ascent;
+
+        for (row, gid) in text_line
+            .chars()
+            .filter_map(|ch| charmap.map(ch))
+            .enumerate()
+        {
             if let Some(glyph) = outlines.get(gid) {
-                pen.origin = (x, baseline);
+                pen.origin = if vertical {
+                    (
+                        origin.0 - i as f32 * line - metrics.advance_width(gid).unwrap_or(0.) / 2.,
+                        origin.1 + row as f32 * size + ascent,
+                    )
+                } else {
+                    (x, baseline)
+                };
                 let settings = DrawSettings::unhinted(Size::new(size), LocationRef::default());
                 let _ = glyph.draw(settings, &mut pen);
             }
@@ -204,6 +227,15 @@ pub fn caret(
     size: f32,
     origin: (f32, f32),
 ) -> Option<((f32, f32), f32)> {
+    caret_oriented(font_data, text, size, origin, false)
+}
+pub fn caret_oriented(
+    font_data: &[u8],
+    text: &str,
+    size: f32,
+    origin: (f32, f32),
+    vertical: bool,
+) -> Option<((f32, f32), f32)> {
     let font = FontRef::new(font_data).ok()?;
     let charmap = font.charmap();
     let metrics = font.glyph_metrics(Size::new(size), LocationRef::default());
@@ -215,10 +247,15 @@ pub fn caret(
         .filter_map(|ch| charmap.map(ch))
         .map(|gid| metrics.advance_width(gid).unwrap_or(0.0))
         .sum::<f32>();
-    Some((
-        (origin.0 + x, origin.1 + (lines.len() - 1) as f32 * line),
-        line,
-    ))
+    let p = if vertical {
+        (
+            origin.0 - (lines.len() - 1) as f32 * line,
+            origin.1 + last.chars().filter(|&c| charmap.map(c).is_some()).count() as f32 * size,
+        )
+    } else {
+        (origin.0 + x, origin.1 + (lines.len() - 1) as f32 * line)
+    };
+    Some((p, line))
 }
 
 /// Adds a layer with `text` in `color` above the active layer, named after
@@ -232,8 +269,19 @@ pub fn add_text_layer(
     origin: (f32, f32),
     color: [u8; 3],
 ) -> Result<Option<LayerId>, FontError> {
+    add_text_layer_oriented(doc, font_data, text, size, origin, color, false)
+}
+pub fn add_text_layer_oriented(
+    doc: &mut Document,
+    font_data: &[u8],
+    text: &str,
+    size: f32,
+    origin: (f32, f32),
+    color: [u8; 3],
+    vertical: bool,
+) -> Result<Option<LayerId>, FontError> {
     let (w, h) = (doc.width, doc.height);
-    let cov = coverage(font_data, text, size, origin, w, h)?;
+    let cov = coverage_oriented(font_data, text, size, origin, w, h, vertical)?;
     if cov.iter().all(|&v| v == 0) {
         return Ok(None);
     }

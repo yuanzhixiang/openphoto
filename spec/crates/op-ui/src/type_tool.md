@@ -26,3 +26,5 @@ Text in progress is stored in `DocState::text_edit` (`TextEdit`): the start of t
 - Only Source Sans 3 Regular and Semibold (the fonts bundled with the application) are available; there is no system font list.
 
 Horizontal Type Mask uses glyph coverage as a selection and creates no layer. Shift adds, Alt subtracts and both intersect, latched when editing starts. Preview restores the original snapshot before recomputing; Escape and empty/no-change commits restore it. A changed commit records Type Mask. Font/size/color changes refresh previews even with unchanged text. The red editing overlay covers unselected pixels proportionally, mapped through rotation/flip; it is display-only. Native glyph rasterization, overlay color/opacity and UI parity remain unmeasured.
+
+Vertical Type shares input/preview/cancel/commit with Horizontal Type, with upright glyph cells and a horizontal caret. Orientation changes invalidate the preview cache. Committed type remains raster; editable type metadata/native glyph parity are still pending.

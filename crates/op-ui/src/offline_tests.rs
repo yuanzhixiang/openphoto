@@ -1852,3 +1852,45 @@ fn horizontal_type_mask_add_empty_commit_and_cancel_preserve_prior_selection_cpu
     assert_eq!(h.state().doc.selection(), Some(&selection));
     assert_eq!(h.state().history.states().len(), count);
 }
+
+#[test]
+fn vertical_type_columns_cancel_commit_and_psd_pixels_cpu() {
+    let mut h = CanvasHarness::new(Tool::VerticalType);
+    h.app.type_options.size_pt = 28.;
+    let before = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    let p = h.point(120., 40.);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    h.step(vec![Event::Text("AB\nCD".into())], Modifiers::NONE);
+    assert!(h.state().text_edit.as_ref().unwrap().vertical);
+    assert_eq!(h.state().doc.layers.len(), 2);
+    let image = h.state().doc.layers.last().unwrap().image().unwrap();
+    assert!((40..90).any(|y| (110..130).any(|x| image.pixel(x, y)[3] > 0)));
+    assert!((40..90).any(|y| (75..100).any(|x| image.pixel(x, y)[3] > 0)));
+    h.key(Key::Escape);
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+    assert_eq!(h.state().history.states().len(), count);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    h.step(vec![Event::Text("AB\nCD".into())], Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::COMMAND,
+        }],
+        Modifiers::COMMAND,
+    );
+    assert!(h.state().text_edit.is_none());
+    assert_eq!(h.state().history.states().len(), count + 1);
+    let path = std::env::temp_dir().join(format!("openphoto-vertical-{}.psd", h.state().doc.id.0));
+    op_io::save(&h.state().doc, &path).unwrap();
+    let back = op_io::open(&path).unwrap();
+    std::fs::remove_file(path).unwrap();
+    assert_eq!(back.composite_rgba8(), h.state().doc.composite_rgba8());
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+}

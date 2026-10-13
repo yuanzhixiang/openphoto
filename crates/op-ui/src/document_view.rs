@@ -764,13 +764,13 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
             Tool::PerspectiveCrop if !modal => {
                 crate::perspective_crop::input(ui, &response, state, &perspective_options, ppp);
             }
-            Tool::HorizontalType | Tool::HorizontalTypeMask => {
+            Tool::HorizontalType | Tool::HorizontalTypeMask | Tool::VerticalType => {
                 let [r, g, b, _] = foreground.to_rgba8();
                 crate::type_tool::input(
                     ui,
                     &response,
                     state,
-                    tool == Tool::HorizontalTypeMask,
+                    (tool == Tool::HorizontalTypeMask, tool == Tool::VerticalType),
                     type_options,
                     [r, g, b],
                     ppp,
@@ -1031,7 +1031,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 | Tool::SingleColumnMarquee => CursorIcon::Crosshair,
                 Tool::Move => CursorIcon::Move,
                 Tool::Artboard => CursorIcon::Crosshair,
-                Tool::HorizontalType | Tool::HorizontalTypeMask => CursorIcon::Text,
+                Tool::HorizontalType | Tool::HorizontalTypeMask | Tool::VerticalType => {
+                    CursorIcon::Text
+                }
                 _ => CursorIcon::Default,
             }
         };
@@ -1134,7 +1136,10 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         state.perspective_crop = None;
     }
     // Picking another tool keeps the text being typed
-    if !matches!(tool, Tool::HorizontalType | Tool::HorizontalTypeMask) && state.text_edit.is_some()
+    if !matches!(
+        tool,
+        Tool::HorizontalType | Tool::HorizontalTypeMask | Tool::VerticalType
+    ) && state.text_edit.is_some()
     {
         crate::type_tool::commit(state);
     }

@@ -19,10 +19,12 @@ Rasterizes text typed with the Type tool into pixels: uses `skrifa` to get glyph
 ## Known limitations
 
 - Text layers are raster layers, and the text can no longer be edited (Photoshop's type layers can be).
-- There are no kerning, tracking, or leading settings, no paragraph text (text boxes), vertical text, or text warping, and no support for text that requires shaping (Arabic, Indic scripts, etc.) or fallback for characters missing from the font.
+- There are no kerning, tracking, or leading settings, no paragraph text (text boxes) or text warping, and no support for text that requires shaping (Arabic, Indic scripts, etc.) or fallback for characters missing from the font.
 
 ## Test coverage
 
 - `letters_cover_pixels_above_the_baseline`: the vertical stroke of "I" is solid between the baseline and the cap height, and empty below the baseline and above the top of the letter.
 - `holes_stay_open_and_lines_stack`: the middle of "O" is empty; the second line is one line height below the first.
 - `text_layers_are_named_after_the_text`: the layer for two lines of text is named after the first line; no layer is added for only spaces; an invalid font returns an error.
+
+coverage_oriented, caret_oriented and add_text_layer_oriented add upright vertical point text: mapped glyphs occupy em-height cells centered on the column axis, and newline starts a column to the left separated by font line height. Horizontal wrappers retain prior layout. Vertical metrics/features, roman character rotation, full shaping and native numerical parity remain unmeasured or unsupported. [Adobe orientation documentation](https://helpx.adobe.com/photoshop/using/editing-text.html) distinguishes line orientation from glyph rotation; this implementation supports upright glyphs only.

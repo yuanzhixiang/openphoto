@@ -299,3 +299,5 @@ Zoom Escape removes the drag session. Scrubby zoom returns to its start scale ar
 Remove dispatches to remove_tool input and draws its staged area in document space; the document selection remains independent.
 
 Horizontal Type Mask routes through the shared text editor, has a text cursor and commits/cancels its selection preview without creating pixel layers.
+
+Vertical Type dispatches through the shared point-text editor and text cursor.

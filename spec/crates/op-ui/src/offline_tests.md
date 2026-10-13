@@ -79,3 +79,5 @@ Remove mark undo/redo regression verifies local area restoration, unchanged docu
 Horizontal Type Mask regression types glyphs, refreshes size without changing text, preserves layers/pixels, cancels, commits with Command-Enter and undoes the selection.
 
 Horizontal Type Mask also checks latched Shift addition to an existing selection, Escape restoring it and empty commit leaving selection/history unchanged.
+
+Vertical Type regression exercises down-flowing glyph cells and newline columns, Escape, commit, raster PSD round-trip and undo. It does not validate native type metadata, vertical metrics or glyph rasterization.
