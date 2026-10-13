@@ -152,3 +152,5 @@ A layer group's locks apply to all layers in the group (measured in Photoshop 20
 - `in_locked_group(id)`: some group containing it has Lock all turned on. Such a layer cannot be deleted, cannot have its blend mode or opacity changed, and cannot have layer styles added (in the Layers panel, the lock row, blend mode, opacity, fx and trash can are all grayed out).
 
 Artboard groups always composite into isolated buffers, initialized with their configured background inside the rectangle. Their buffer and descendant hit testing are clipped at the board boundary. `place_canvas` translates artboard coordinates along with pixels and masks.
+
+Document.slices and Snapshot.slices retain undoable user slice metadata. Restoring history restores the slice collection.

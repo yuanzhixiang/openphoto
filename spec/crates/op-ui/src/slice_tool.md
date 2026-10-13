@@ -1,0 +1,2 @@
+# slice_tool.rs
+Slice input creates non-destructive regions in Normal, Fixed Aspect Ratio or Fixed Size styles. A valid image press starts an absolute preview, release clips it to the canvas and records one New Slice state. Escape and switching away cancel preview. Slice/Select tools show numbered blue outlines and selected borders. Selection/move/resize, auto slices and options dialogs are not provided by this creation component yet. Values must be finite and positive.

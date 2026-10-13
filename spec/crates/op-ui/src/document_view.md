@@ -267,3 +267,5 @@ Object Selection Lasso mode now collects and previews a freehand polygon and res
 Quick Selection Escape restores its initial snapshot without history or switching New to Add. Release records only actual selection changes; ineffective strokes preserve the original snapshot. The New-to-Add transition happens only after a changed replacement stroke.
 
 Magic Wand uses its configured Point/3/5/11/31/51/101 sampling window. Combination modifiers latch at press, and unchanged selections do not add history.
+
+Slice input is delegated to slice_tool; Slice and Slice Select display numbered user slice overlays. Switching away cancels creation preview.

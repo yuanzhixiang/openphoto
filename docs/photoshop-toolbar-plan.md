@@ -197,3 +197,5 @@ Quick Selection offline follow-up adds snapshot cancellation, no-op history supp
 - Crop: resolution-only edits are undoable; non-finite size/resolution conversion is rejected. CPU crop regression and strict op-ui clippy pass. Existing Generative Expand/Content-Aware Fill remain disabled.
 
 - Perspective Crop: convex-plane validation preserves invalid editable boxes; finite resolution/size validation and CPU draw/commit/undo test pass, as does strict op-ui clippy. Native shield/output-size parity remains unmeasured.
+
+- Slice: user regions, three size styles, guide-grid generation, numbered overlays, undo and composite pixel export API are implemented. Version-6 PSD resource 1050 retains names/URLs/target/alt/bounds. Two CPU regressions, PSD Unicode round-trip and strict workspace clippy pass. Auto slices, modern descriptor import, export dialog and transform remapping remain outstanding; this is not full native parity.

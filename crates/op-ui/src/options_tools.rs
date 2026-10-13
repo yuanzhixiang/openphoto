@@ -1308,7 +1308,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             SliceSize(266.5, "Width:", 301.5, 362.0, "slice.w"),
             SliceSize(372.0, "Height:", 410.0, 470.5, "slice.h"),
             Sep(478.5),
-            Button(488.0, 601.5, "Slices From Guides", false),
+            Action(488.0, 601.5, "Slices From Guides"),
         ],
         SliceSelect => &[
             Icon(123.0, Icon::ArrangeFront, "Bring to front"),
@@ -2424,6 +2424,14 @@ fn to32(c: op_core::Color) -> egui::Color32 {
 fn action(app: &mut AppState, label: &str, ppp: f32) {
     use crate::document_view as view;
     match label {
+        "Slices From Guides" => {
+            if let Some(state) = app.active()
+                && op_core::slice::from_guides(&mut state.doc)
+            {
+                state.selected_slices.clear();
+                state.record("Slices From Guides");
+            }
+        }
         "Reset View" => {
             if let Some(doc) = app.active() {
                 doc.view.rotation = 0.0;

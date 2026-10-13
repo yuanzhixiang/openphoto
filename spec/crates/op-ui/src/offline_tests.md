@@ -25,3 +25,7 @@ Magic Wand CPU regression checks average versus point sampling, pointer-down Add
 Crop CPU regression verifies resolution-only commit/history/undo, Escape preserving pixels/dimensions and invalid infinite inputs.
 
 Perspective Crop CPU regression covers crossing-box rejection, valid drawn-box commit, typed dimensions/resolution, undo and non-finite physical-unit input.
+
+Slice CPU regression verifies all three drawing styles, exported dimensions/pixels, Escape cancellation, undo and untouched source pixels.
+
+Guide-grid CPU test covers horizontal/vertical division, duplicate guides and repeated no-op creation.

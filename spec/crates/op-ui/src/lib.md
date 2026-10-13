@@ -133,3 +133,5 @@ When `AppState::alert` has content, it is shown in a macOS-style alert box (`dia
 The `artboard_tool` module handles board options, canvas gestures and outlines without native input.
 
 The test-only offline_tests module exercises canvas gestures using an egui Context without a GPU device or native window.
+
+slice_tool handles canvas slice creation and numbered overlays.

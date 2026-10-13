@@ -32,6 +32,7 @@ pub mod pixel;
 pub mod selection;
 pub mod selection_brush;
 pub mod shape;
+pub mod slice;
 pub mod smart_select;
 pub mod text;
 pub mod tile;

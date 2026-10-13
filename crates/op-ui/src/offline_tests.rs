@@ -653,3 +653,77 @@ fn perspective_crop_rejects_crossing_plane_and_undoes_valid_commit_cpu() {
     };
     assert!(invalid_size.size().is_none());
 }
+
+#[test]
+fn slice_creation_styles_cancel_export_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::Slice);
+    let pixels = h.state().doc.composite_rgba8();
+    h.drag((20.0, 30.0), (100.0, 90.0), Modifiers::NONE);
+    assert_eq!(h.state().doc.slices[0].bounds, (20, 30, 100, 90));
+    let id = h.state().doc.slices[0].id;
+    let (w, hh, bytes) = op_core::slice::rgba8(&h.state().doc, id).unwrap();
+    assert_eq!((w, hh, bytes.len()), (80, 60, 80 * 60 * 4));
+    assert!(
+        bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|p| *p == [255, 255, 255, 255])
+    );
+    h.app.tool_settings.insert("slice.style", "1".into());
+    h.app.tool_settings.insert("slice.w", "2".into());
+    h.app.tool_settings.insert("slice.h", "1".into());
+    h.drag((120.0, 120.0), (180.0, 150.0), Modifiers::NONE);
+    assert_eq!(h.state().doc.slices[1].bounds, (120, 120, 180, 150));
+    h.app.tool_settings.insert("slice.style", "2".into());
+    h.app.tool_settings.insert("slice.w", "20".into());
+    h.app.tool_settings.insert("slice.h", "10".into());
+    h.drag((200.0, 200.0), (210.0, 210.0), Modifiers::NONE);
+    assert_eq!(h.state().doc.slices[2].bounds, (200, 200, 220, 210));
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.slices.len(), 2);
+    let count = h.state().history.states().len();
+    let p = h.point(40.0, 140.0);
+    h.button(p, true, Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(h.state().history.states().len(), count);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}
+
+#[test]
+fn slice_guide_grid_replaces_user_slices_and_deduplicates_cpu() {
+    let mut h = CanvasHarness::new(Tool::Slice);
+    let d = &mut h.app.active().unwrap().doc;
+    d.guides = vec![
+        op_core::Guide {
+            vertical: true,
+            position: 128.0,
+            ..Default::default()
+        },
+        op_core::Guide {
+            vertical: true,
+            position: 128.0,
+            ..Default::default()
+        },
+        op_core::Guide {
+            vertical: false,
+            position: 64.0,
+            ..Default::default()
+        },
+    ];
+    assert!(op_core::slice::from_guides(d));
+    assert_eq!(d.slices.len(), 4);
+    assert_eq!(d.slices[0].bounds, (0, 0, 128, 64));
+    assert_eq!(d.slices[3].bounds, (128, 64, 256, 256));
+    assert!(!op_core::slice::from_guides(d));
+}

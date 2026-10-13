@@ -30,6 +30,7 @@ mod ps_icons;
 mod recent;
 mod rulers;
 mod selection_brush;
+mod slice_tool;
 mod smart_guides;
 mod snap;
 mod state;

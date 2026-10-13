@@ -149,3 +149,5 @@ Object Selection stores a freehand ROI path and pointer-down operation alongside
 Quick Selection stores a pre-stroke snapshot and counts as busy during a live stroke.
 
 wand_op retains the Magic Wand combination operation between pointer-down and release.
+
+slice_drag retains a live Slice creation gesture and counts as busy; selected_slices holds transient IDs of selected user slices.

@@ -55,6 +55,7 @@ pub struct Guide {
 #[derive(Clone)]
 pub struct Snapshot {
     guides: Vec<Guide>,
+    slices: Vec<crate::slice::Slice>,
     quick_mask: Option<TiledImage>,
     width: u32,
     height: u32,
@@ -98,6 +99,7 @@ pub struct Document {
     selection_revision: u64,
     /// Ruler guides; undoable like edits, as in Photoshop.
     pub guides: Vec<Guide>,
+    pub slices: Vec<crate::slice::Slice>,
     /// Edits go to the active layer's mask (its thumbnail was clicked in
     /// the Layers panel) rather than its pixels. Not part of the history.
     pub mask_target: bool,
@@ -138,6 +140,7 @@ impl Document {
             last_selection: None,
             selection_revision: 0,
             guides: Vec::new(),
+            slices: Vec::new(),
             mask_target: false,
             selected_layers: Vec::new(),
             quick_mask: None,
@@ -258,6 +261,7 @@ impl Document {
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             guides: self.guides.clone(),
+            slices: self.slices.clone(),
             quick_mask: self.quick_mask.clone(),
             width: self.width,
             height: self.height,
@@ -279,6 +283,7 @@ impl Document {
         self.selection = s.selection;
         self.last_selection = s.last_selection;
         self.guides = s.guides;
+        self.slices = s.slices;
         self.quick_mask = s.quick_mask;
         self.selection_revision += 1;
         self.mark_dirty();

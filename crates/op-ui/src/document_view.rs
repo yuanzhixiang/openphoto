@@ -214,6 +214,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         .copied()
         .unwrap_or(1);
     let artboard_options = crate::artboard_tool::options(app);
+    let slice_options = crate::slice_tool::Options::read(app);
     let paint = app.paint_options(tool).copied();
     let dynamics = paint_dynamics(app, tool);
     // The Mixer Brush's paint and settings
@@ -778,6 +779,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 );
                 magnetic_input(ui, &response, state, options, magnetic, ppp);
             }
+            Tool::Slice => crate::slice_tool::input(ui, &response, state, slice_options, ppp),
             Tool::Artboard => {
                 crate::artboard_tool::input(ui, &response, state, artboard_options, ppp)
             }
@@ -1096,6 +1098,11 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     crate::type_tool::draw_caret(ui, state, type_options, canvas_rect, ppp);
     crate::crop_tool::draw(ui, state, &crop_options, canvas_rect, ppp);
     crate::perspective_crop::draw(ui, state, &perspective_options, canvas_rect, ppp);
+    if matches!(tool, Tool::Slice | Tool::SliceSelect) {
+        crate::slice_tool::draw(ui, state, slice_options, ppp);
+    } else {
+        state.slice_drag = None;
+    }
     let transforming = state.free_transform.is_some();
     if let (Some(opts), Some(p), false) = (paint, response.hover_pos(), transforming) {
         // The Clone Stamp's overlay: the source, as it would be painted,

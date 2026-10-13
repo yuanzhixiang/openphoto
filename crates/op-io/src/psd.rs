@@ -346,6 +346,106 @@ fn rle_channel(plane: &[u8], rows: usize, cols: usize) -> (Vec<u16>, Vec<u8>) {
     (counts, data)
 }
 
+fn slice_text(out: &mut Writer, text: &str) {
+    let units: Vec<_> = text.encode_utf16().collect();
+    out.u32(units.len() as u32);
+    for unit in units {
+        out.u16(unit);
+    }
+}
+fn read_slice_text(r: &mut Reader) -> Result<String, IoError> {
+    let n = r.u32()? as usize;
+    if n > r.remaining() / 2 {
+        return Err(invalid("invalid slice text length"));
+    }
+    let units = (0..n).map(|_| r.u16()).collect::<Result<Vec<_>, _>>()?;
+    Ok(String::from_utf16_lossy(&units))
+}
+fn write_slices(out: &mut Writer, doc: &Document) {
+    if doc.slices.is_empty() {
+        return;
+    }
+    out.bytes(b"8BIM");
+    out.u16(1050);
+    out.bytes(&[0, 0]);
+    let length = out.length_slot();
+    out.u32(6);
+    for v in [0, 0, doc.height, doc.width] {
+        out.u32(v);
+    }
+    slice_text(out, &doc.title);
+    out.u32(doc.slices.len() as u32);
+    for s in &doc.slices {
+        out.u32(s.id as u32);
+        out.u32(0);
+        out.u32(2);
+        slice_text(out, &s.name);
+        out.u32(0);
+        let (x0, y0, x1, y1) = s.bounds;
+        for v in [x0, y0, x1, y1] {
+            out.u32(v);
+        }
+        for text in [&s.url, &s.target, "", &s.alt] {
+            slice_text(out, text);
+        }
+        out.u8(0);
+        slice_text(out, "");
+        out.u32(0);
+        out.u32(0);
+        out.bytes(&[0, 0, 0, 0]);
+    }
+    out.close(length, 1);
+    if (out.0.len() - length) % 2 == 1 {
+        out.u8(0);
+    }
+}
+fn read_slices(bytes: &[u8]) -> Result<Vec<op_core::slice::Slice>, IoError> {
+    let mut r = Reader(Cursor::new(bytes));
+    if r.u32()? != 6 {
+        return Ok(Vec::new());
+    }
+    for _ in 0..4 {
+        r.u32()?;
+    }
+    read_slice_text(&mut r)?;
+    let count = r.u32()? as usize;
+    if count > r.remaining() / 69 {
+        return Err(invalid("invalid slice count"));
+    }
+    let mut slices = Vec::new();
+    for _ in 0..count {
+        let id = r.u32()? as u64;
+        r.u32()?;
+        let origin = r.u32()?;
+        if origin == 1 {
+            r.u32()?;
+        }
+        let name = read_slice_text(&mut r)?;
+        r.u32()?;
+        let bounds = (r.u32()?, r.u32()?, r.u32()?, r.u32()?);
+        let url = read_slice_text(&mut r)?;
+        let target = read_slice_text(&mut r)?;
+        read_slice_text(&mut r)?;
+        let alt = read_slice_text(&mut r)?;
+        r.u8()?;
+        read_slice_text(&mut r)?;
+        r.u32()?;
+        r.u32()?;
+        r.take::<4>()?;
+        if origin == 2 && bounds.0 < bounds.2 && bounds.1 < bounds.3 {
+            slices.push(op_core::slice::Slice {
+                id,
+                name,
+                bounds,
+                url,
+                target,
+                alt,
+            });
+        }
+    }
+    Ok(slices)
+}
+
 // ---- Writing ----
 
 struct Writer(Vec<u8>);
@@ -542,6 +642,7 @@ pub fn write(doc: &Document) -> Vec<u8> {
             out.bytes(&[0]);
         }
     }
+    write_slices(&mut out, doc);
     out.close(resources, 2);
 
     // Layer and mask information
@@ -914,6 +1015,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
     let mut resolution = 72.0;
     let mut links: Vec<u16> = Vec::new();
     let mut guides: Vec<op_core::Guide> = Vec::new();
+    let mut slices = Vec::new();
     while r.pos() + 12 <= resources_end {
         if &r.take::<4>()? != b"8BIM" {
             break;
@@ -944,6 +1046,10 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                 });
             }
         }
+        if id == 1050 {
+            r.seek(start);
+            slices = read_slices(r.bytes(size as usize)?)?;
+        }
         r.seek(start + size.next_multiple_of(2));
     }
     r.seek(resources_end);
@@ -956,6 +1062,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
     let mut doc = Document::new_with_background(title, w, h, Color::from_rgba8([0; 4]));
     doc.resolution = resolution;
     doc.guides = guides.clone();
+    doc.slices = slices.clone();
     if lm_len > 0 {
         let info_len = r.u32()? as u64;
         if info_len > 0 {
@@ -1233,6 +1340,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
         let mut doc = Document::from_rgba8(doc.title.clone(), w, h, &rgba);
         doc.resolution = resolution;
         doc.guides = guides;
+        doc.slices = slices;
         return Ok(doc);
     }
 
@@ -1245,6 +1353,22 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slices_round_trip_unicode_and_metadata() {
+        let mut doc = Document::new_with_background("Slices", 20, 20, Color::WHITE);
+        let id = op_core::slice::create(&mut doc, (2, 3, 12, 13)).unwrap();
+        let s = doc.slices.iter_mut().find(|s| s.id == id).unwrap();
+        s.name = "测试 ✨".into();
+        s.url = "https://example.com/photo".into();
+        s.target = "_blank".into();
+        s.alt = "Image".into();
+        assert_eq!(
+            read(&write(&doc), "read".into()).unwrap().slices,
+            doc.slices
+        );
+        assert!(read_slices(&[0, 0, 0, 6]).is_err());
+    }
 
     #[test]
     fn guides_round_trip() {
