@@ -32,6 +32,7 @@ mod panels;
 mod perspective_crop;
 mod ps_icons;
 mod recent;
+mod remove_tool;
 mod rulers;
 mod selection_brush;
 mod slice_tool;

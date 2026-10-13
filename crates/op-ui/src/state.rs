@@ -89,6 +89,7 @@ pub struct DocState {
     /// The Patch or Content-Aware Move tool dragging the selection: where
     /// the drag started and where it is (document pixels).
     pub patch_drag: Option<(egui::Pos2, egui::Pos2)>,
+    pub remove_session: Option<crate::remove_tool::Session>,
     /// The Magnetic Lasso under way (its outline is `lasso`).
     pub magnetic: Option<MagneticPath>,
     /// A Quick Selection stroke under way.
@@ -231,6 +232,7 @@ impl DocState {
             || self.quick.is_some()
             || self.patch_drag.is_some()
             || self.gradient_drag.is_some()
+            || self.remove_session.as_ref().is_some_and(|s| s.pending())
     }
 
     pub fn transform_controls_bounds(&mut self) -> Option<Bounds> {
@@ -298,6 +300,7 @@ impl DocState {
             lasso: None,
             lasso_press: None,
             patch_drag: None,
+            remove_session: None,
             magnetic: None,
             quick: None,
             quick_before: None,
@@ -560,11 +563,19 @@ impl DocState {
     }
 
     pub fn undo(&mut self) -> bool {
+        if crate::remove_tool::undo_marks(self) {
+            return true;
+        }
+        self.remove_session = None;
         self.pending_edit = false;
         self.history.undo(&mut self.doc)
     }
 
     pub fn redo(&mut self) -> bool {
+        if crate::remove_tool::redo_marks(self) {
+            return true;
+        }
+        self.remove_session = None;
         self.pending_edit = false;
         self.history.redo(&mut self.doc)
     }

@@ -295,3 +295,5 @@ Rectangle/Ellipse/Triangle/Polygon/Line drags accept Escape before layer creatio
 Rotate View Escape resets to zero and removes the cached drag origin immediately; continued pointer movement/release cannot restore the cancelled rotation.
 
 Zoom Escape removes the drag session. Scrubby zoom returns to its start scale around the original anchor, recovering the prior offset; a pending zoom box is discarded. Continued movement/release does not resume it.
+
+Remove dispatches to remove_tool input and draws its staged area in document space; the document selection remains independent.

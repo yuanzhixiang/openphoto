@@ -1595,3 +1595,180 @@ fn content_aware_move_escape_preserves_selection_pixels_and_history_cpu() {
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
     assert_eq!(h.state().history.states().len(), count);
 }
+
+fn removal_fixture(h: &mut CanvasHarness) {
+    h.app.tool_settings.insert("remove.size", "20".into());
+    h.app.tool_settings.insert("remove.ai_mode", "2".into());
+    let state = h.app.active().unwrap();
+    let id = state.doc.active_layer.unwrap();
+    for y in 99..107 {
+        for x in 99..107 {
+            state
+                .doc
+                .layer_mut(id)
+                .unwrap()
+                .image_mut()
+                .unwrap()
+                .set_pixel(x, y, [0, 0, 0, 255]);
+        }
+    }
+    state.doc.mark_dirty();
+    state.record("Fixture");
+}
+#[test]
+fn remove_accumulates_subtracts_cancels_commits_and_undoes_cpu() {
+    let mut h = CanvasHarness::new(Tool::Remove);
+    removal_fixture(&mut h);
+    h.app.set_flag("remove.after_stroke", false);
+    let before = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    h.drag((101.5, 101.5), (105.5, 103.5), Modifiers::NONE);
+    assert!(
+        h.state()
+            .remove_session
+            .as_ref()
+            .unwrap()
+            .area
+            .as_ref()
+            .unwrap()
+            .get(101, 101)
+            > 200
+    );
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+    assert_eq!(h.state().history.states().len(), count);
+    h.drag((101.5, 101.5), (101.5, 101.5), Modifiers::ALT);
+    assert_eq!(
+        h.state()
+            .remove_session
+            .as_ref()
+            .unwrap()
+            .area
+            .as_ref()
+            .unwrap()
+            .get(101, 101),
+        0
+    );
+    h.key(Key::Escape);
+    assert!(h.state().remove_session.is_none());
+    h.drag((101.5, 101.5), (105.5, 103.5), Modifiers::NONE);
+    h.key(Key::Enter);
+    assert!(h.state().remove_session.is_none());
+    assert_eq!(h.state().doc.composite_rgba8(), vec![255; 256 * 256 * 4]);
+    assert_eq!(h.state().history.states().len(), count + 1);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+    assert!(h.app.active().unwrap().redo());
+    assert_ne!(h.state().doc.composite_rgba8(), before);
+}
+#[test]
+fn remove_new_layer_sample_all_and_psd_roundtrip_cpu() {
+    let mut h = CanvasHarness::new(Tool::Remove);
+    removal_fixture(&mut h);
+    h.app.set_flag("remove.all_layers", true);
+    h.app.set_flag("remove.new_layer", true);
+    let old = h.state().doc.active_layer.unwrap();
+    let before = h
+        .state()
+        .doc
+        .layer(old)
+        .unwrap()
+        .image()
+        .unwrap()
+        .to_rgba8();
+    h.drag((101.5, 101.5), (105.5, 103.5), Modifiers::NONE);
+    assert_eq!(h.state().doc.layers.len(), 2);
+    assert_eq!(
+        h.state()
+            .doc
+            .layer(old)
+            .unwrap()
+            .image()
+            .unwrap()
+            .to_rgba8(),
+        before
+    );
+    let active = h
+        .state()
+        .doc
+        .layer(h.state().doc.active_layer.unwrap())
+        .unwrap();
+    assert_eq!(active.image().unwrap().pixel(103, 103), [255; 4]);
+    assert_eq!(active.image().unwrap().pixel(20, 20), [0; 4]);
+    let path = std::env::temp_dir().join(format!("openphoto-remove-{}.psd", h.state().doc.id.0));
+    op_io::save(&h.state().doc, &path).unwrap();
+    let back = op_io::open(&path).unwrap();
+    std::fs::remove_file(path).unwrap();
+    assert_eq!(back.composite_rgba8(), h.state().doc.composite_rgba8());
+    assert_eq!(back.layers.len(), 2);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.layers.len(), 1);
+}
+#[test]
+fn remove_genai_rejects_without_fallback_and_can_retry_offline_cpu() {
+    let mut h = CanvasHarness::new(Tool::Remove);
+    removal_fixture(&mut h);
+    h.app.tool_settings.insert("remove.ai_mode", "1".into());
+    let before = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    h.drag((101.5, 101.5), (105.5, 103.5), Modifiers::NONE);
+    assert!(
+        h.app
+            .alert
+            .as_ref()
+            .is_some_and(|s| s.contains("Generative AI"))
+    );
+    assert!(h.state().remove_session.as_ref().unwrap().area.is_some());
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+    assert_eq!(h.state().history.states().len(), count);
+    h.app.alert = None;
+    h.app.tool_settings.insert("remove.ai_mode", "2".into());
+    h.key(Key::Enter);
+    assert!(h.state().remove_session.is_none());
+    assert_ne!(h.state().doc.composite_rgba8(), before);
+}
+
+#[test]
+fn remove_pressure_cancel_and_tool_switch_preserve_pixels_cpu() {
+    let mut h = CanvasHarness::new(Tool::Remove);
+    removal_fixture(&mut h);
+    h.app.set_flag("remove.after_stroke", false);
+    h.app.pen_pressure = Some(0.25);
+    let before = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    h.drag((101.5, 101.5), (101.5, 101.5), Modifiers::NONE);
+    let saved = h.state().remove_session.as_ref().unwrap().area.clone();
+    assert_eq!(saved.as_ref().unwrap().get(108, 101), 0);
+    assert!(saved.as_ref().unwrap().get(101, 101) > 200);
+    let a = h.point(140.5, 140.5);
+    h.button(a, true, Modifiers::NONE);
+    h.key(Key::Escape);
+    h.button(a, false, Modifiers::NONE);
+    assert_eq!(h.state().remove_session.as_ref().unwrap().area, saved);
+    h.app.tool = Tool::Move;
+    h.step(Vec::new(), Modifiers::NONE);
+    assert!(h.state().remove_session.is_none());
+    assert!(!h.state().busy());
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+    assert_eq!(h.state().history.states().len(), count);
+}
+
+#[test]
+fn remove_pending_undo_redo_changes_marks_and_not_document_history_cpu() {
+    let mut h = CanvasHarness::new(Tool::Remove);
+    removal_fixture(&mut h);
+    h.app.set_flag("remove.after_stroke", false);
+    let before = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    h.drag((101.5, 101.5), (105.5, 103.5), Modifiers::NONE);
+    let area = h.state().remove_session.as_ref().unwrap().area.clone();
+    assert!(h.app.active().unwrap().undo());
+    assert!(h.state().remove_session.as_ref().unwrap().area.is_none());
+    assert!(h.app.active().unwrap().redo());
+    assert_eq!(h.state().remove_session.as_ref().unwrap().area, area);
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+    assert_eq!(h.state().history.states().len(), count);
+    h.key(Key::Enter);
+    assert!(h.state().remove_session.is_none());
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+}

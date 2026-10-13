@@ -60,7 +60,7 @@ Clicking it pops up the brush picker popup (`brush_presets.md`): Size, Hardness 
 - The Mixer's smoothing icon, symmetry (butterfly), airbrush, angle gradient and similar icons are approximate redrawings from the screenshots; the Ruler's metrics are computed from its live geometry.
 - The paint symmetry button (the butterfly) does nothing: Photoshop's paint symmetry draws along symmetry paths, so it comes with paths (P2 #14). "Ignore adjustment layers when healing / cloning" has nothing to ignore until adjustment layers exist (P2 #17).
 - The Pen and Path Selection tools themselves are not implemented yet; their options are only stored in `tool_settings`. Perspective Crop, Slice, Slice Select and Frame use their own canvas components, with remaining limitations documented there. Icons such as path operations/alignment/arrangement, gear, Warp Text and panel toggles are appearance only.
-- The Remove Tool and Adjustment Brush themselves are not implemented yet; their options are only stored in `tool_settings`. The Remove Tool's feedback icon and the Adjustment Brush's Select Subject icon are approximate drawings. The Move tool's bar is laid out separately by `options_bar.rs` (its separators and edges also match Photoshop).
+- The Adjustment Brush itself is not implemented yet; its options are only stored in `tool_settings`. The Remove Tool has a staged offline canvas implementation with synthesis limitations in remove_tool.md. The Remove Tool's feedback icon and the Adjustment Brush's Select Subject icon are approximate drawings. The Move tool's bar is laid out separately by `options_bar.rs` (its separators and edges also match Photoshop).
 
 ## Test coverage
 
@@ -100,3 +100,5 @@ Note color swatch uses an egui RGB popup, updating new-note default/staged edit 
 Count shows total markers, a real group selector, create/delete/visibility buttons, Clear and RGB/marker/label options. Empty groups can be created before counting.
 
 The Count group selector includes Rename Count Group, opening a staged name editor.
+
+Remove Mode dropdown stores Auto/Generative AI on/off. Reset and Apply icons operate on the active removal session. Native synthesis and distraction detection remain unsupported; Remove now has an offline canvas implementation.

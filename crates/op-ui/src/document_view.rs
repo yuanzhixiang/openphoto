@@ -205,6 +205,11 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
 
 fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let tool = app.tool;
+    if tool != Tool::Remove
+        && let Some(state) = app.docs.get_mut(&id)
+    {
+        crate::remove_tool::reset(state);
+    }
     let wand_sample = [1, 3, 5, 11, 31, 51, 101]
         .get(
             app.setting("wand.sample_size", "0")
@@ -247,6 +252,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 app.flag("pattern.impressionist", false),
             )
         });
+    let remove_options = crate::remove_tool::options(app);
     let (foreground, background) = (app.foreground, app.background);
     let bucket = app.bucket;
     // The Paint Bucket's Source: Pattern
@@ -670,6 +676,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
+            Tool::Remove => {
+                paint_error = crate::remove_tool::input(ui, &response, state, remove_options, ppp);
+            }
             Tool::MagicWand => {
                 if response.contains_pointer() && ui.input(|i| i.pointer.primary_pressed()) {
                     let mods = ui.input(|i| i.modifiers);
@@ -981,6 +990,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
             match tool {
                 Tool::Zoom if alt != zoom_out => CursorIcon::ZoomOut,
                 Tool::Zoom => CursorIcon::ZoomIn,
+                Tool::Remove => CursorIcon::None,
                 // Painting tools draw their own brush outline instead
                 _ if paint.is_some_and(|p| p.size * state.view.zoom / ppp >= 4.0) => {
                     CursorIcon::None
@@ -1092,6 +1102,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     if rulers.is_some() {
         let pointer = ui.input(|i| i.pointer.hover_pos());
         crate::rulers::draw_rulers(ui, state, ruler_units, window_rect, pointer, ppp);
+    }
+    if tool == Tool::Remove {
+        crate::remove_tool::draw(ui, state, remove_options, ppp);
     }
     crate::free_transform::draw(ui, state, canvas_rect, ppp);
     if let Some(bounds) = controls_bounds

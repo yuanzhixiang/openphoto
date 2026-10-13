@@ -69,3 +69,9 @@ Zoom cancellation regression covers scrubby scale/anchor restoration and box dis
 Toolbar CPU frames construct the Tools panel directly, without a native window. The screen-mode regression clicks its real hit area, checks the warning before Full Screen, simulates confirmation, returns with F and preserves pixels/history.
 
 Content-Aware Move canvas regression checks Escape and release preserve the original selection, pixels and history.
+
+Remove CPU regressions cover accumulating and subtracting areas, Escape, Enter, actual defect filling, no pending edits, one history state, undo/redo, new-layer/composite sampling, source preservation, PSD round-trip and explicit GenAI rejection/retry without fallback. These tests validate own offline synthesis and interaction contracts, not native Photoshop synthesis.
+
+Remove also verifies pen size pressure, Escape restoring the prior staged area during a stroke, tool-switch cleanup and unchanged pixels/history.
+
+Remove mark undo/redo regression verifies local area restoration, unchanged document history/pixels, commit and subsequent document undo.

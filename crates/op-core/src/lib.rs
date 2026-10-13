@@ -31,6 +31,7 @@ pub mod more_filters;
 pub mod move_tool;
 pub mod paint;
 pub mod pixel;
+pub mod remove;
 pub mod selection;
 pub mod selection_brush;
 pub mod shape;

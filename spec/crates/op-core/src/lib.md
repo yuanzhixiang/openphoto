@@ -35,3 +35,5 @@ The public slice module implements non-destructive slice metadata, creation and 
 The public frame module creates, moves, resizes and replaces raster content in clipping containers.
 
 The annotation module defines persisted note metadata and creation.
+
+The remove module supplies bounded offline exemplar filling and atomic document application; it is not native Photoshop synthesis.

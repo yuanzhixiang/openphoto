@@ -1457,11 +1457,20 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
                 "remove.pressure",
             ),
             Sep(294.5),
-            Icon(312.5, Icon::GearMenu, "Set additional options"),
+            IconOff(312.5, Icon::GearMenu),
             Sep(329.5),
             MenuButton(339.0, 439.5, "Find distractions"),
             Sep(444.0),
-            MenuButton(453.5, 557.0, "Auto (May use g..."),
+            Popup(
+                453.5,
+                557.0,
+                "remove.ai_mode",
+                &[
+                    "Auto (May use generative AI)",
+                    "Generative AI on",
+                    "Generative AI off",
+                ],
+            ),
             Sep(561.0),
             Check(566.0, "Sample all layers", "remove.all_layers", false),
             Check(
@@ -1474,8 +1483,8 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             Sep(923.5),
             IconOff(941.5, Icon::Feedback),
             Sep(958.5),
-            IconOff(976.0, Icon::CropReset),
-            IconOff(1009.5, Icon::CropCommit),
+            Icon(976.0, Icon::CropReset, "Reset removal area"),
+            Icon(1009.5, Icon::CropCommit, "Apply removal"),
         ],
         AdjustmentBrush => &[
             Label(110.5, "Adjustment:"),
@@ -1882,6 +1891,16 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                     && matches!(icon, Icon::Eye | Icon::DeleteLayer)
                     && count_group.is_none());
                 let response = b.icon(x, icon, tip, on, enabled);
+                if app.tool == Tool::Remove
+                    && response.clicked()
+                    && let Some(state) = app.active()
+                {
+                    match icon {
+                        Icon::CropReset => crate::remove_tool::reset(state),
+                        Icon::CropCommit => crate::remove_tool::request_apply(state),
+                        _ => {}
+                    }
+                }
                 if app.tool == Tool::Artboard {
                     response.widget_info(|| {
                         egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip)
@@ -2450,7 +2469,11 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 }
             }
             MenuButton(x0, x1, label) => {
-                b.menu_button(x0, x1, label);
+                if app.tool == Tool::Remove {
+                    b.button(x0, x1, label, false);
+                } else {
+                    b.menu_button(x0, x1, label);
+                }
             }
             // The Mixer Brush's load: the color sampled with Option-click,
             // or the foreground color

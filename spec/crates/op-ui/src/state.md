@@ -175,3 +175,7 @@ count_name_edit holds staged count-group name editing; changes to the name contr
 DocState::busy includes Patch/Content-Aware Move outline drags, so Escape cancels the operation before leaving Full Screen Mode.
 
 DocState::busy includes pending gradient lines so Escape cancels them before exiting Full Screen Mode.
+
+remove_session stores session-local Remove marks/stroke state and counts as busy while pending.
+
+DocState undo/redo first handles staged Remove marks; committed removal uses normal document history. Only pending marks/strokes count as busy, not an empty redo archive.

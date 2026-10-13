@@ -15,3 +15,5 @@ The pixel side of Photoshop 2026's Selection Brush tool: a brush stroke that add
 
 - `painting_adds_and_subtracts`: a stroke selects along its path and its round ends; a subtracting stroke across it splits it; a stroke larger than everything leaves no selection.
 - `opacity_selects_partly_and_strokes_dont_build_up`: at 50% opacity, going over the same spot many times leaves it at 128.
+
+add_point_with_pressure interpolates normalized size pressure between input points and scales dab diameter and spacing. Regular add_point passes pressure 1; non-finite pressure falls back to 1. This shared mask brush also supplies Remove strokes. Native pressure-curve parity is unmeasured.

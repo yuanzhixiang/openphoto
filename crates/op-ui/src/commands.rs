@@ -855,8 +855,13 @@ impl Command {
             Self::ClearSelectedGuides => doc.is_some_and(|d| !d.guide_selection().is_empty()),
             Self::EditSelectedGuides => doc.is_some_and(|d| d.guide_selection().len() == 1),
             Self::Revert => doc.is_some_and(|d| d.path.is_some() && d.is_dirty()),
-            Self::Undo | Self::ToggleLastState => doc.is_some_and(|d| d.history.can_undo()),
-            Self::Redo => doc.is_some_and(|d| d.history.can_redo()),
+            Self::Undo => doc.is_some_and(|d| {
+                d.history.can_undo() || d.remove_session.as_ref().is_some_and(|s| s.can_undo())
+            }),
+            Self::ToggleLastState => doc.is_some_and(|d| d.history.can_undo()),
+            Self::Redo => doc.is_some_and(|d| {
+                d.history.can_redo() || d.remove_session.as_ref().is_some_and(|s| s.can_redo())
+            }),
             Self::DeleteLayer => doc.is_some_and(|d| {
                 let selected = d.doc.selected_layers();
                 let n = selected.len();

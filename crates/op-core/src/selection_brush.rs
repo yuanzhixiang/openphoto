@@ -19,6 +19,8 @@ pub struct SelectionStroke {
     covered: Vec<f32>,
     last: Option<(f32, f32)>,
     since_dab: f32,
+    base_diameter: f32,
+    last_pressure: f32,
 }
 
 impl SelectionStroke {
@@ -50,28 +52,48 @@ impl SelectionStroke {
             covered: vec![0.0; n],
             last: None,
             since_dab: 0.0,
+            base_diameter: tip.diameter,
+            last_pressure: 1.0,
         }
     }
 
     /// Continues the stroke to (`x`, `y`), a dab every quarter of the
     /// brush's diameter (the first point places one dab).
     pub fn add_point(&mut self, x: f32, y: f32) {
+        self.add_point_with_pressure(x, y, 1.0);
+    }
+    /// Pressure affects diameter, interpolated at each emitted dab.
+    pub fn add_point_with_pressure(&mut self, x: f32, y: f32, pressure: f32) {
+        let pressure = if pressure.is_finite() {
+            pressure.clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
         let Some((lx, ly)) = self.last else {
+            self.tip.diameter = (self.base_diameter * pressure).max(1.0);
             self.dab(x, y);
             self.last = Some((x, y));
+            self.last_pressure = pressure;
             return;
         };
         let (dx, dy) = (x - lx, y - ly);
         let dist = (dx * dx + dy * dy).sqrt();
-        let spacing = (self.tip.diameter * 0.25).max(1.0);
-        let mut t = spacing - self.since_dab;
-        while t <= dist {
+        if !dist.is_finite() {
+            return;
+        }
+        let mut spacing = (self.base_diameter * self.last_pressure * 0.25).max(1.0);
+        let mut t = (spacing - self.since_dab).max(0.0);
+        while t <= dist && dist > 0.0 {
             let f = t / dist;
+            let p = self.last_pressure + (pressure - self.last_pressure) * f;
+            self.tip.diameter = (self.base_diameter * p).max(1.0);
             self.dab(lx + dx * f, ly + dy * f);
+            spacing = (self.tip.diameter * 0.25).max(1.0);
             t += spacing;
         }
         self.since_dab = dist - (t - spacing);
         self.last = Some((x, y));
+        self.last_pressure = pressure;
     }
 
     fn dab(&mut self, cx: f32, cy: f32) {
