@@ -2238,3 +2238,33 @@ fn freeform_magnetic_does_not_silently_fall_back_cpu() {
     assert!(h.state().doc.paths.is_empty());
     assert_eq!(h.state().history.states().len(), count);
 }
+
+#[test]
+fn curvature_pen_interpolates_closes_and_undoes_without_pixels_cpu() {
+    let mut h = CanvasHarness::new(Tool::CurvaturePen);
+    let pixels = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    for (x, y) in [(40., 40.), (120., 60.), (160., 150.)] {
+        let p = h.point(x, y);
+        h.button(p, true, Modifiers::NONE);
+        h.button(p, false, Modifiers::NONE);
+    }
+    let sub = h.state().doc.paths[0].subpaths[0].clone();
+    assert_eq!(sub.knots.len(), 3);
+    assert!(sub.knots.iter().all(|k| k.linked));
+    assert_ne!(sub.knots[1].incoming, sub.knots[1].anchor);
+    assert_ne!(sub.knots[1].outgoing, sub.knots[1].anchor);
+    let p = h.point(40., 40.);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    assert!(h.state().doc.paths[0].subpaths[0].closed);
+    assert_eq!(h.state().history.states().len(), count + 4);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.paths[0].subpaths[0], sub);
+    h.key(Key::Escape);
+    let p = h.point(200., 200.);
+    h.button(p, true, Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.paths.len(), 2);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}

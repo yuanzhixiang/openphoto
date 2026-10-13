@@ -317,3 +317,5 @@ Path Selection routes whole-path selection/move transactions and participates in
 Direct Selection routes node/control editing and path pointer cancellation.
 
 Non-magnetic Freeform Pen in Path mode dispatches sampled cubic creation and participates in cancellation.
+
+Curvature Pen in Path mode dispatches interpolating anchor creation and closure.

@@ -686,3 +686,62 @@ pub fn freeform(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f
         state.record("Freeform Pen Tool");
     }
 }
+
+pub fn curvature(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
+    if ui.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Enter)) {
+        state.pen_session.continuation = None;
+        return;
+    }
+    if !response.clicked() {
+        return;
+    }
+    let Some(pointer) = ui.input(|i| i.pointer.interact_pos()) else {
+        return;
+    };
+    let at = to_doc(state, pointer, ppp);
+    let existing = state.pen_session.continuation.filter(|&(p, s)| {
+        state
+            .doc
+            .paths
+            .get(p)
+            .and_then(|p| p.subpaths.get(s))
+            .is_some_and(|s| !s.closed)
+    });
+    let (path, sub) = if let Some(existing) = existing {
+        existing
+    } else {
+        let path = state.doc.paths.len();
+        state.doc.paths.push(Path {
+            name: format!("Path {}", path + 1),
+            subpaths: vec![Subpath::default()],
+        });
+        (path, 0)
+    };
+    state.doc.active_path = Some(path);
+    state.pen_session.continuation = Some((path, sub));
+    let hit = anchor_hit(state, pointer, ppp).filter(|&(p, s, _)| p == path && s == sub);
+    let geometry = &mut state.doc.paths[path].subpaths[sub];
+    if let Some((_, _, knot)) = hit {
+        if response.double_clicked() {
+            geometry.knots[knot].linked = !geometry.knots[knot].linked;
+        } else if knot == 0 && geometry.knots.len() > 2 {
+            geometry.closed = true;
+            state.pen_session.continuation = None;
+        } else {
+            return;
+        }
+    } else {
+        geometry.knots.push(Knot {
+            linked: true,
+            ..Knot::corner((at.x, at.y))
+        });
+    }
+    let points = geometry
+        .knots
+        .iter()
+        .map(|k| (k.anchor, !k.linked))
+        .collect::<Vec<_>>();
+    *geometry = op_core::path::interpolating_subpath(&points, geometry.closed);
+    state.doc.mark_dirty();
+    state.record("Curvature Pen Tool");
+}

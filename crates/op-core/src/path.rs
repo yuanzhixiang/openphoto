@@ -180,6 +180,7 @@ pub fn interpolating_subpath(points: &[(Point, bool)], closed: bool) -> Subpath 
     let mut knots = Vec::with_capacity(points.len());
     for (i, &(p, corner)) in points.iter().enumerate() {
         let mut k = Knot::corner(p);
+        k.linked = !corner;
         if !corner && points.len() > 1 {
             let prev = if i > 0 {
                 points[i - 1].0

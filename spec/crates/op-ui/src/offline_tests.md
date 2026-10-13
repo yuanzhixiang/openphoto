@@ -99,3 +99,5 @@ Direct Selection verifies neighboring knots stay fixed, one-pixel nudge, linked 
 Freeform Pen verifies sampled cubic anchors/handles, cancellation, one changed history state, PSD geometry read-back, undo and unchanged pixels.
 
 Freeform Magnetic selection rejects canvas creation instead of silently using the ordinary sampled spline.
+
+Curvature Pen verifies smooth controls, closure, geometry undo, Escape ending continuation, a subsequent new path and unchanged pixels.

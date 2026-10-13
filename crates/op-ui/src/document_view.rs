@@ -759,6 +759,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
+            Tool::CurvaturePen if !modal && pen_path_mode => {
+                crate::pen_tool::curvature(ui, &response, state, ppp);
+            }
             Tool::FreeformPen if !modal && pen_path_mode && !freeform_magnetic => {
                 crate::pen_tool::freeform(ui, &response, state, ppp);
             }
@@ -1180,6 +1183,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         tool,
         Tool::Pen
             | Tool::FreeformPen
+            | Tool::CurvaturePen
             | Tool::ConvertPoint
             | Tool::PathSelection
             | Tool::DirectSelection
