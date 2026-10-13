@@ -39,6 +39,9 @@ pub struct Move {
     others: Vec<(LayerId, TiledImage)>,
     masks: Vec<(LayerId, TiledImage)>,
     copy_selection: bool,
+    before: crate::Snapshot,
+    selected_before: Vec<LayerId>,
+    mask_target_before: bool,
 }
 
 impl Move {
@@ -118,6 +121,9 @@ impl Move {
             others,
             masks,
             copy_selection: false,
+            before: doc.snapshot(),
+            selected_before: doc.selected_layers(),
+            mask_target_before: doc.mask_target,
         })
     }
 
@@ -129,11 +135,32 @@ impl Move {
             movement.copy_selection = true;
             return Ok(movement);
         }
+        let before = movement.before;
+        let selected_before = movement.selected_before;
+        let mask_target_before = movement.mask_target_before;
         crate::layer_ops::duplicate_selected(doc);
         // Copies retain link metadata; moving only the selected copies
         // keeps their linked originals in place, including group contents.
-        movement = Self::begin_with_links(doc, background, false)?;
+        movement = match Self::begin_with_links(doc, background, false) {
+            Ok(movement) => movement,
+            Err(error) => {
+                doc.restore(&before);
+                doc.set_selected_layers(selected_before);
+                doc.mask_target = mask_target_before;
+                return Err(error);
+            }
+        };
+        movement.before = before;
+        movement.selected_before = selected_before;
+        movement.mask_target_before = mask_target_before;
         Ok(movement)
+    }
+
+    /// Cancel the complete gesture, including any temporary Option copies.
+    pub fn cancel(&self, doc: &mut Document) {
+        doc.restore(&self.before);
+        doc.set_selected_layers(self.selected_before.clone());
+        doc.mask_target = self.mask_target_before;
     }
 
     /// Shows the layer moved by (`dx`, `dy`) pixels from where it started.
@@ -206,6 +233,21 @@ impl Move {
     }
 }
 
+/// Project a drag onto its nearest horizontal, vertical or 45-degree line.
+/// This geometric rule is deterministic; Photoshop's angle-boundary rounding
+/// still requires a separate live reference comparison.
+pub fn constrain_offset(dx: f32, dy: f32) -> (f32, f32) {
+    let threshold = std::f32::consts::SQRT_2 - 1.0;
+    if dy.abs() <= dx.abs() * threshold {
+        (dx, 0.0)
+    } else if dx.abs() <= dy.abs() * threshold {
+        (0.0, dy)
+    } else {
+        let distance = (dx.abs() + dy.abs()) * 0.5;
+        (distance.copysign(dx), distance.copysign(dy))
+    }
+}
+
 fn mix(a: [u8; 4], b: [u8; 4], t: f32) -> [u8; 4] {
     let m = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
     [m(a[0], b[0]), m(a[1], b[1]), m(a[2], b[2]), m(a[3], b[3])]
@@ -243,6 +285,52 @@ mod tests {
     fn px(doc: &Document, id: LayerId, x: u32, y: u32) -> [u8; 4] {
         let img = doc.layer(id).unwrap().image().unwrap();
         img.pixel(x, y)
+    }
+
+    #[test]
+    fn refused_copy_rolls_back_an_empty_group_with_external_links() {
+        let (mut doc, id) = doc_with_dot();
+        doc.select_layer(id);
+        let group = crate::layer_ops::new_group(&mut doc);
+        doc.layer_mut(id).unwrap().link = Some(7);
+        doc.layer_mut(group).unwrap().link = Some(7);
+        let count = doc.layers.len();
+        assert!(Move::begin(&doc, [0; 3]).is_ok());
+        assert!(matches!(
+            Move::begin_copy(&mut doc, [0; 3]),
+            Err(MoveError::Locked)
+        ));
+        assert_eq!(doc.layers.len(), count);
+        assert_eq!(doc.selected_layers(), vec![group]);
+    }
+
+    #[test]
+    fn cancelling_copy_restores_layers_pixels_and_selection() {
+        let (mut doc, id) = doc_with_dot();
+        doc.select_layer(id);
+        let count = doc.layers.len();
+        let m = Move::begin_copy(&mut doc, [0; 3]).unwrap();
+        m.apply(&mut doc, 3, 0);
+        assert_eq!(doc.layers.len(), count + 1);
+        m.cancel(&mut doc);
+        assert_eq!(doc.layers.len(), count);
+        assert_eq!(doc.selected_layers(), vec![id]);
+        assert_eq!(px(&doc, id, 2, 2), [255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn constrained_offsets_cover_axes_diagonals_and_zero() {
+        for (input, expected) in [
+            ((100.0, 20.0), (100.0, 0.0)),
+            ((-20.0, 100.0), (0.0, 100.0)),
+            ((100.0, 60.0), (80.0, 80.0)),
+            ((-100.0, 60.0), (-80.0, 80.0)),
+            ((-60.0, -100.0), (-80.0, -80.0)),
+            ((60.0, -100.0), (80.0, -80.0)),
+            ((0.0, 0.0), (0.0, 0.0)),
+        ] {
+            assert_eq!(constrain_offset(input.0, input.1), expected);
+        }
     }
 
     #[test]

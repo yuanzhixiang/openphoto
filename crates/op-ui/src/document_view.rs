@@ -183,6 +183,8 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let retouch = app.retouch;
     let shape_options = app.shape;
     let move_options = app.move_options;
+    let layer_panel_feedback =
+        move_options.show_layer_panel_bounds && !app.hide_panels && !app.panels_collapsed;
     let type_options = app.type_options;
     let crop_options = app.crop_options.clone();
     let tool_gradient = (app.tool == Tool::Gradient).then(|| app.tool_gradient());
@@ -462,9 +464,41 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 // dragging; selecting a different target replaces it.
                 state.doc.select_layer(id);
             }
+            if move_options.expand_groups {
+                let mut target = Some(id);
+                for _ in 0..state.doc.layers.len() {
+                    let Some(layer) = target.and_then(|id| state.doc.layer_mut(id)) else {
+                        break;
+                    };
+                    if let op_core::LayerKind::Group { collapsed } = &mut layer.kind {
+                        *collapsed = false;
+                    }
+                    target = layer.parent;
+                }
+            }
         }
     }
     let hover = response.hover_pos();
+    state.move_hover_target = if tool == Tool::Move
+        && move_options.show_hover_bounds
+        && move_options.auto_select != cmd
+        && !space
+        && !modal
+        && state.move_drag.is_none()
+        && state.free_transform.is_none()
+        && !ui.input(|i| i.pointer.primary_down())
+    {
+        hover
+            .map(|p| to_doc(state, p, ppp))
+            .filter(|p| p.x >= 0.0 && p.y >= 0.0)
+            .and_then(|p| {
+                state
+                    .doc
+                    .move_target_at(p.x as u32, p.y as u32, move_options.auto_select_group)
+            })
+    } else {
+        None
+    };
     // For the Info panel
     state.pointer = hover.map(|p| to_doc(state, p, ppp));
 
@@ -897,6 +931,21 @@ pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
     if view_options.extras && view_options.layer_edges {
         draw_layer_edges(ui, state, canvas_rect, ppp);
+    }
+    if tool == Tool::Move
+        && view_options.extras
+        && !modal
+        && state.move_drag.is_none()
+        && state.free_transform.is_none()
+    {
+        let target = state.move_hover_target.or_else(|| {
+            (layer_panel_feedback && hover.is_none())
+                .then_some(state.layer_panel_hover)
+                .flatten()
+        });
+        if let Some(id) = target {
+            draw_move_hover_bounds(ui, state, id, canvas_rect, ppp);
+        }
     }
     crate::smart_guides::draw(ui, state, canvas_rect, ppp);
     // The color samplers show with the tools that use them
@@ -1716,6 +1765,16 @@ fn move_input(
     ppp: f32,
 ) -> Option<String> {
     use op_core::move_tool::Move;
+    if state.move_drag.is_some()
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape))
+    {
+        if let Some((movement, _)) = state.move_drag.take() {
+            movement.cancel(&mut state.doc);
+        }
+        state.smart_guides = None;
+        return None;
+    }
+
     if response.drag_started_by(PointerButton::Primary) {
         let start = ui
             .input(|i| i.pointer.press_origin())
@@ -1747,17 +1806,23 @@ fn move_input(
             delta = smart.align_with(raw, delta, tolerance);
         }
     }
+    if ui.input(|i| i.modifiers.shift) {
+        let (x, y) = op_core::move_tool::constrain_offset(delta.x, delta.y);
+        delta = egui::vec2(x, y);
+    }
     let Some((m, _)) = &state.move_drag else {
         return None;
     };
     let (dx, dy) = (delta.x.round() as i64, delta.y.round() as i64);
     m.apply(&mut state.doc, dx, dy);
     if !ui.input(|i| i.pointer.primary_down()) {
-        state.move_drag = None;
-        state.smart_guides = None;
-        if dx != 0 || dy != 0 {
+        if dx == 0 && dy == 0 {
+            m.cancel(&mut state.doc);
+        } else {
             state.record("Move");
         }
+        state.move_drag = None;
+        state.smart_guides = None;
     } else {
         ui.ctx().request_repaint();
     }
@@ -3356,6 +3421,29 @@ fn draw_layer_edges(ui: &Ui, state: &DocState, clip: Rect, ppp: f32) {
         for i in 0..4 {
             painter.line_segment([corners[i], corners[(i + 1) % 4]], stroke);
         }
+    }
+}
+
+/// A hover outline includes all visible raster descendants of a group.
+fn draw_move_hover_bounds(ui: &Ui, state: &DocState, id: op_core::LayerId, clip: Rect, ppp: f32) {
+    let bounds = state
+        .doc
+        .pixel_layers(&[id])
+        .into_iter()
+        .filter(|id| state.doc.is_shown(*id))
+        .filter_map(|id| state.doc.layer(id)?.image()?.content_bounds())
+        .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3)));
+    if let Some((x0, y0, x1, y1)) = bounds {
+        let rect = Rect::from_min_max(
+            to_screen(state, Pos2::new(x0 as f32, y0 as f32), ppp),
+            to_screen(state, Pos2::new(x1 as f32, y1 as f32), ppp),
+        );
+        ui.painter().with_clip_rect(clip).rect_stroke(
+            rect,
+            0,
+            egui::Stroke::new(pt(1.0), Color32::from_rgb(0x2c, 0x8b, 0xe8)),
+            egui::StrokeKind::Inside,
+        );
     }
 }
 

@@ -232,3 +232,11 @@ Measured against Photoshop 2026's status bar (pt from the document area's left e
 ## Known limitations
 
 - Scrollbar thumb length does not exactly match Photoshop (Photoshop computes the scrollable range differently), and clicking the track does not page.
+
+## Move navigation and constrained drag
+
+- Shift during a Move drag projects the snapped offset onto the nearest axis or 45-degree line using `move_tool::constrain_offset`. Releasing Shift resumes unconstrained movement from the original pixels. Exact Photoshop constraint boundary/rounding is pending reference measurement.
+- With Auto-Select active (including temporary Command inversion) and Show layer bounds on hover enabled, hovering a canvas pixel highlights its Layer/Group target. Moving, transforming, Space panning or a modal suppresses this feedback. Show hover bounds from Layers also outlines a hovered layer-panel row while the panels are shown and expanded and the pointer is outside the canvas. The outline uses the union of visible raster descendant bounds and is clipped to the viewport. Extras hides outlines.
+- Expand layer group on click expands the auto-selected group and its ancestor groups. This navigation records no history.
+
+Escape cancels an active Move gesture without recording history. Releasing at zero net displacement restores the original state, including removing temporary Option copies, and records no history.

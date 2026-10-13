@@ -713,11 +713,25 @@ impl Document {
                 let Some(image) = l.image() else {
                     return false;
                 };
-                let masked = l
-                    .mask
-                    .as_ref()
-                    .is_some_and(|m| m.enabled && m.value(x, y) == 0);
-                image.pixel(x, y)[3] > 0 && !masked
+                if image.pixel(x, y)[3] == 0 {
+                    return false;
+                }
+                let mut target = Some(l.id);
+                for _ in 0..self.layers.len() {
+                    let Some(layer) = target.and_then(|id| self.layer(id)) else {
+                        break;
+                    };
+                    if layer.opacity * layer.fill <= 0.0
+                        || layer
+                            .mask
+                            .as_ref()
+                            .is_some_and(|m| m.enabled && m.value(x, y) == 0)
+                    {
+                        return false;
+                    }
+                    target = layer.parent;
+                }
+                true
             })
             .map(|l| l.id)
     }
@@ -1033,6 +1047,27 @@ mod tests {
         doc.layers.push(layer);
         let px = doc.composite_rgba8();
         assert_eq!(&px[0..4], &[128, 128, 128, 255]);
+    }
+
+    #[test]
+    fn auto_select_skips_pixels_hidden_by_group_opacity_or_mask() {
+        let mut doc = Document::new_with_background("hit", 10, 10, Color::WHITE);
+        let bottom = doc.layers[0].id;
+        let id = doc.new_layer_id();
+        doc.layers.push(Layer::raster(
+            id,
+            "Top",
+            TiledImage::filled(10, 10, [255, 0, 0, 255]),
+        ));
+        doc.select_layer(id);
+        let group = crate::layer_ops::group_selected(&mut doc).unwrap();
+        doc.layer_mut(group).unwrap().opacity = 0.0;
+        assert_eq!(doc.layer_at(2, 2), Some(bottom));
+        doc.layer_mut(group).unwrap().opacity = 1.0;
+        doc.layer_mut(group).unwrap().mask = Some(crate::layer::LayerMask::filled(10, 10, 0));
+        assert_eq!(doc.layer_at(2, 2), Some(bottom));
+        doc.layer_mut(group).unwrap().mask.as_mut().unwrap().enabled = false;
+        assert_eq!(doc.layer_at(2, 2), Some(id));
     }
 
     #[test]

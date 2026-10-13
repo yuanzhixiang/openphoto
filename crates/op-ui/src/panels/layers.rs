@@ -636,6 +636,7 @@ fn crop_preview_list(ui: &mut Ui, state: &mut DocState) {
 pub const CROP_PREVIEW: &str = "Crop Preview";
 
 fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
+    state.layer_panel_hover = None;
     if crate::crop_tool::previewing(state) {
         crop_preview_list(ui, state);
         return (false, None);
@@ -865,6 +866,9 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
             Pos2::new(eye_rect.right() + pt(1.0), lit.top()),
             Pos2::new(row_rect.right(), lit.bottom()),
         );
+        if response.hovered() {
+            state.layer_panel_hover = Some(id);
+        }
         if response.dragged() {
             painter.rect_filled(body, 0, DRAGGED_ROW);
         } else if selected {

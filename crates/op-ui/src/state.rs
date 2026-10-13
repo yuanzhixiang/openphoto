@@ -68,6 +68,9 @@ pub struct DocState {
     pub marquee_drag: Option<MarqueeDrag>,
     /// A Move tool drag: the move and where it started (document pixels).
     pub move_drag: Option<(op_core::move_tool::Move, egui::Pos2)>,
+    /// Move hover feedback, navigation only (not document history).
+    pub move_hover_target: Option<op_core::LayerId>,
+    pub layer_panel_hover: Option<op_core::LayerId>,
     /// The paint stroke in progress, and the tool painting it.
     pub stroke: Option<(op_core::paint::Stroke, Tool)>,
     /// Where the last stroke ended; Shift-click draws a line from here.
@@ -245,6 +248,8 @@ impl DocState {
             pending_edit: false,
             marquee_drag: None,
             move_drag: None,
+            move_hover_target: None,
+            layer_panel_hover: None,
             controls_bounds: None,
             movable: Default::default(),
             stroke: None,
@@ -892,8 +897,8 @@ pub struct TextEdit {
     pub shown: String,
 }
 
-/// Move tool options. Both are off by default, as in Photoshop.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Move tool options shared across documents.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MoveOptions {
     /// Clicking picks the topmost layer with a pixel under the pointer
     /// (Cmd inverts this while held).
@@ -903,6 +908,24 @@ pub struct MoveOptions {
     /// Draw the transform box around the active layer; dragging one of its
     /// handles starts Free Transform.
     pub show_transform_controls: bool,
+    pub show_hover_bounds: bool,
+    pub expand_groups: bool,
+    pub show_layer_panel_bounds: bool,
+    pub align_canvas: bool,
+}
+
+impl Default for MoveOptions {
+    fn default() -> Self {
+        Self {
+            auto_select: false,
+            auto_select_group: false,
+            show_transform_controls: false,
+            show_hover_bounds: true,
+            expand_groups: true,
+            show_layer_panel_bounds: true,
+            align_canvas: false,
+        }
+    }
 }
 
 /// Shape tool options: the Polygon's sides (5) and the Line's weight

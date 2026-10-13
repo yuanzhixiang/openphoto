@@ -56,5 +56,13 @@ off did not produce a move. A keyboard Right nudge changed X from 60 to 61 px.
 A later coordinate action failed with ScreenCaptureKit error -3811 (audio/video
 capture failure). The disposable reference document was closed without saving;
 the user's original image remained unmodified. The tool documentation requires
-explicit user authorization for alternative native input technologies; a request
-to use CGEvent is pending. No security permissions were changed.
+explicit user authorization for alternative native input technologies; the user explicitly authorized CGEvent on 2026-10-13. A bounded temporary
+Swift helper was compiled, and preflight checks reported existing AX/event-post/
+screen-capture access. Targeted and system-level event attempts did not change
+the reference layer coordinates. No security permissions were changed.
+
+The user subsequently requested offline work because agent input interferes with
+their use of the same Mac. Native Photoshop, mouse, keyboard and screenshot
+experiments are stopped. Further verification uses model tests and egui_kittest
+without opening a system window. The temporary reference image remains disposable;
+no further action is sent to Photoshop to close it while the user is working.

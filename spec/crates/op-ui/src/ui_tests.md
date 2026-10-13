@@ -130,3 +130,7 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 - `more_filters_and_adjustments_apply`: see `dialogs/adjust.md` ("The dialogs added after the measured ones"); also writes `dialog_Shadows_Highlights` and `dialog_Wave` screenshots.
 
 - `move_option_drag_copies_layer_and_undo_restores_structure`: Option-drag preserves the original, moves a selected copy, records one Move state, and undo restores layer structure and pixels.
+
+- `move_shift_constraints_gear_hover_and_canvas_alignment` verifies Shift-axis movement through synthetic drag events, canvas hover targeting, gear toggles without history, the More popup Canvas target, a single-layer alignment and its history entry. The harness opens no OS window and sends no system input.
+
+- `move_cancel_and_return_to_origin_leave_no_copy_or_history` checks that an Option drag returning to its origin leaves no copies or history, and Escape restores pixels during an active drag without undoing an earlier action.

@@ -472,6 +472,122 @@ fn move_option_drag_copies_layer_and_undo_restores_structure() {
 }
 
 #[test]
+fn move_cancel_and_return_to_origin_leave_no_copy_or_history() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    crate::panels::new_layer(h.state_mut().state.active().unwrap());
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    select_rect(&mut h, 100.0, 100.0, 140.0, 140.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.key_press(egui::Key::V);
+    h.run_steps(3);
+    let count = active(&h).doc.layers.len();
+    let history = active(&h).history.current_id();
+    let a = doc_point(&h, 120.0, 120.0);
+    let b = doc_point(&h, 220.0, 170.0);
+    drag_path(&mut h, &[a, b, a], Modifiers::ALT);
+    assert_eq!(active(&h).doc.layers.len(), count);
+    assert_eq!(active(&h).history.current_id(), history);
+    h.hover_at(a);
+    h.event(egui::Event::PointerButton {
+        pos: a,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    h.event(egui::Event::PointerMoved(b));
+    h.step();
+    assert!(active(&h).move_drag.is_some());
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert!(active(&h).move_drag.is_none());
+    h.event(egui::Event::PointerButton {
+        pos: b,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(3);
+    assert_eq!(active(&h).history.current_id(), history);
+    assert_eq!(composite_pixel(&mut h, 110, 110), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 220, 170), [0x14, 0x14, 0x14, 255]);
+}
+
+#[test]
+fn move_shift_constraints_gear_hover_and_canvas_alignment() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let id = {
+        let state = h.state_mut().state.active().unwrap();
+        let id = state.doc.new_layer_id();
+        let mut image = op_core::TiledImage::new(734, 811);
+        for y in 100..140 {
+            for x in 100..140 {
+                image.set_pixel(x, y, [255, 0, 0, 255]);
+            }
+        }
+        state
+            .doc
+            .layers
+            .push(op_core::Layer::raster(id, "Red", image));
+        state.doc.select_layer(id);
+        state.record("New Layer");
+        id
+    };
+    h.state_mut().state.select_tool(op_tools::Tool::Move);
+    h.state_mut().state.view.snap = false;
+    h.state_mut().state.view.smart_guides = false;
+    h.run_steps(3);
+    let a = doc_point(&h, 120.0, 120.0);
+    let b = doc_point(&h, 220.0, 140.0);
+    drag(&mut h, a, b, Modifiers::SHIFT);
+    assert_eq!(layer_pixel(&h, 1, 220, 120), [255, 0, 0, 255]);
+    assert_eq!(layer_pixel(&h, 1, 220, 150)[3], 0);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run_steps(3);
+    h.state_mut().state.move_options.auto_select = true;
+    h.hover_at(a);
+    h.run_steps(3);
+    assert_eq!(active(&h).move_hover_target, Some(id));
+    let history_len = active(&h).history.states().len();
+    h.get_by_label("Set additional options").click();
+    h.run_steps(3);
+    h.get_by_label("Show layer bounds on hover").click();
+    h.run_steps(3);
+    assert!(!h.state().state.move_options.show_hover_bounds);
+    h.key_press(egui::Key::Escape);
+    h.hover_at(a);
+    h.run_steps(3);
+    assert_eq!(active(&h).move_hover_target, None);
+    assert_eq!(active(&h).history.states().len(), history_len);
+    h.get_by_label("More options").click();
+    h.run_steps(3);
+    h.get_by_label("Canvas").click();
+    h.run_steps(3);
+    assert!(h.state().state.move_options.align_canvas);
+    h.get_by_label("More options").click();
+    h.run_steps(3);
+    h.get_by_label("Align Right Edges").click();
+    h.run_steps(3);
+    assert_eq!(
+        active(&h)
+            .doc
+            .layer(id)
+            .unwrap()
+            .image()
+            .unwrap()
+            .content_bounds()
+            .unwrap()
+            .2,
+        734
+    );
+    assert_eq!(last_history(&h), "Align Right Edges");
+}
+
+#[test]
 fn move_auto_select_and_transform_controls() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);

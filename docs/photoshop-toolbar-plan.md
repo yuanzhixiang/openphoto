@@ -113,8 +113,11 @@ path was stopped rather than repeatedly retrying captures. The disposable
 reference document was closed without saving; the original document and its
 Marquee tool were restored. No reference pixel-drag experiment is claimed.
 
-The ordered sequence remains at Move until its remaining behaviors and live
-comparison pass; Artboard is not marked complete or skipped.
+The full parity acceptance gate remains pending for Move. Following the user's
+2026-10-13 instruction to avoid desktop contention, implementation may proceed
+through offline stages in toolbar order while live reference comparisons remain
+explicitly pending. No native input or screen capture runs while the user is
+using the same Mac.
 
 Move repair validation on 2026-10-13: the two targeted egui interaction tests
 and the nested-group model test pass. Workspace tests: 549 passed, 0 failed,
@@ -132,3 +135,23 @@ group children. Whole-raster-layer movement carries its mask. Core regression
 tests and an egui drag/undo test verify these changes. These are implementation
 checks; native drag comparison remains pending due to the input-service failure
 recorded in `local-analysis.md`. Move has not passed the full 1:1 acceptance gate.
+
+### Offline Move stage
+
+Implemented without desktop interaction: Shift axis/45-degree projection,
+functional gear options, canvas and Layers hover bounds, automatic ancestor-group
+expansion on selection, all alignment/distribution choices in More, single-layer
+canvas alignment, mask-preserving alignment, ancestor mask/opacity hit testing,
+and Escape/zero-displacement rollback (including Option copies). Headless tests
+exercise input, pixels, options, history and transaction failures.
+
+Remaining Move work: cross-document drag interaction, linked/unlinked mask
+controls, exact popup/hover styling and Photoshop pixel references, especially
+constraint thresholds and rounding. This stage is not full 1:1 acceptance.
+
+Offline Move validation (2026-10-13): workspace tests 560 passed, 0 failed,
+51 ignored; final targeted Move UI tests 8 passed, 1 screenshot test ignored;
+Move model tests 13 passed. Formatting, whitespace validation and strict
+workspace/all-target clippy pass. No native app was launched, no development
+server or port was opened, and no system input or screen capture was used in
+this offline stage.
