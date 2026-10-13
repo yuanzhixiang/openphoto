@@ -43,6 +43,8 @@ mod type_tool;
 mod widgets;
 
 #[cfg(test)]
+mod offline_tests;
+#[cfg(test)]
 mod ui_tests;
 
 use std::path::PathBuf;

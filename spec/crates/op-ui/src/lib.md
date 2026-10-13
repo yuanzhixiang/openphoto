@@ -131,3 +131,5 @@ On OK, applies `image_ops::trim` to the current document and records "Trim" if t
 When `AppState::alert` has content, it is shown in a macOS-style alert box (`dialogs/alert.md`: app icon, bold message, full-width OK), closed by Enter, Esc or OK. Failures opening files, failures exporting and the various "Could not ..." messages all use it. `AppState::flatten_prompt` is the Flatten Image question box, also shown with `dialogs::alert`.
 
 The `artboard_tool` module handles board options, canvas gestures and outlines without native input.
+
+The test-only offline_tests module exercises canvas gestures using an egui Context without a GPU device or native window.

@@ -175,3 +175,5 @@ Execution update: subsequent tools are committed and pushed directly to main, as
 Elliptical Marquee offline stage extends outline movement and keyboard nudging and validates circle/center geometry, edge coverage, intersections, feather and undo. The existing 4×4 supersampled mask remains an approximation pending Photoshop output fixtures.
 
 Single Row Marquee offline stage adds live full-width drag previews, edge clamping, feather, cancellation and transactional history.
+
+The WGPU single-row regression exceeded its 180-second deadline after the pixel-center correction; the runner stopped it. Its interaction coverage is moved to a CPU-only egui canvas harness, so semantic input testing does not depend on GPU progress. The initially pushed row commit is not considered validated until this follow-up passes.
