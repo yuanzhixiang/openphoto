@@ -85,6 +85,7 @@ pub struct DocState {
     pub mixer_left: Option<Option<[u8; 3]>>,
     /// A lasso outline being drawn.
     pub lasso: Option<LassoPath>,
+    pub lasso_press: Option<(egui::Modifiers, bool)>,
     /// The Patch or Content-Aware Move tool dragging the selection: where
     /// the drag started and where it is (document pixels).
     pub patch_drag: Option<(egui::Pos2, egui::Pos2)>,
@@ -268,6 +269,7 @@ impl DocState {
             mixer_left: None,
             renaming: None,
             lasso: None,
+            lasso_press: None,
             patch_drag: None,
             magnetic: None,
             quick: None,

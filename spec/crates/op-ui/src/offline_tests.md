@@ -9,3 +9,5 @@ FullOutput texture deltas are intentionally cleared instead of uploaded, satisfy
 `single_column_drag_feather_cancel_nudge_and_undo_cpu` exercises full-height drag, combination, keyboard movement, feather, cancellation and undo without rendering.
 
 Selection Brush CPU regression covers live selection, cancellation, zero opacity, Alt subtraction, unchanged pixels and undo.
+
+The Lasso regression covers degenerate paths, polygon-shaped freehand closure, pointer-down mode latching, cancellation, addition, untouched pixels and undo.

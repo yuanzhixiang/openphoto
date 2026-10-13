@@ -181,3 +181,5 @@ The WGPU single-row regression exceeded its 180-second deadline after the pixel-
 Single Row CPU-only regression passed after cleanup. Single Column adds full-height drag preview, feather, cancellation, keyboard movement and undo. Both line tools ignore fixed styles and preserve layer pixels.
 
 Selection Brush offline follow-up adds snapshot cancellation and no-op history suppression, with live add/subtract and undo exercised through the CPU harness.
+
+Freehand Lasso offline follow-up adds Escape cancellation, Enter closure and pointer-down combination modifiers; real native curve/feather comparison is still pending.

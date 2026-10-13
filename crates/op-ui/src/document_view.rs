@@ -1449,6 +1449,31 @@ fn lasso_input(
     use crate::state::LassoPath;
     let mods = ui.input(|i| i.modifiers);
     let has_selection = state.doc.selection().is_some();
+    if state.lasso.is_some() && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape))
+    {
+        state.lasso = None;
+        state.lasso_press = None;
+        return;
+    }
+    if tool == Tool::Lasso
+        && response.contains_pointer()
+        && ui.input(|i| i.pointer.button_pressed(PointerButton::Primary))
+    {
+        let pressed = ui
+            .input(|i| {
+                i.events.iter().find_map(|event| match event {
+                    egui::Event::PointerButton {
+                        button: PointerButton::Primary,
+                        pressed: true,
+                        modifiers,
+                        ..
+                    } => Some(*modifiers),
+                    _ => None,
+                })
+            })
+            .unwrap_or(mods);
+        state.lasso_press = Some((pressed, has_selection));
+    }
     let pointer = ui
         .input(|i| i.pointer.interact_pos())
         .map(|p| to_doc(state, p, ppp));
@@ -1459,7 +1484,8 @@ fn lasso_input(
             && response.drag_started_by(PointerButton::Primary)
             && let Some(p) = ui.input(|i| i.pointer.press_origin())
         {
-            let (op, _, _) = selection_op(mods, has_selection, mode);
+            let (pressed, selection) = state.lasso_press.unwrap_or((mods, has_selection));
+            let (op, _, _) = selection_op(pressed, selection, mode);
             state.lasso = Some(LassoPath {
                 points: vec![to_doc(state, p, ppp)],
                 op,
@@ -1546,7 +1572,14 @@ fn lasso_input(
         }
     }
 
+    if tool == Tool::Lasso
+        && state.lasso.is_some()
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Enter))
+    {
+        close = true;
+    }
     if close && let Some(lasso) = state.lasso.take() {
+        state.lasso_press = None;
         let name = if lasso.polygonal {
             "Polygonal Lasso"
         } else {
