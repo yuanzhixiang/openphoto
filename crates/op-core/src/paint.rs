@@ -1235,7 +1235,7 @@ impl Stroke {
             seed ^= seed << 17;
             (seed >> 11) as f32 / (1u64 << 53) as f32
         };
-        let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
+        let Some(image) = self.target.image_mut(doc, self.layer) else {
             return;
         };
         let lum = |p: [u8; 4]| 0.299 * p[0] as f32 + 0.587 * p[1] as f32 + 0.114 * p[2] as f32;
@@ -1302,7 +1302,7 @@ impl Stroke {
                         } else {
                             paint_mode(base, amount, rgb, mode, preserve, (px, py))
                         };
-                        image.set_pixel(px, py, p);
+                        image.set_pixel(px, py, self.target.color(p));
                     }
                 }
                 x += dir.cos() * d * 0.25;
@@ -2622,6 +2622,36 @@ mod masked_special_stroke_tests {
             assert_eq!(p[0], p[1]);
             assert_eq!(p[1], p[2]);
             assert_eq!(p[3], 255);
+            assert_eq!(doc.layer(id).unwrap().image().unwrap().to_rgba8(), pixels);
+        }
+    }
+    #[test]
+    fn art_history_changes_masks_without_touching_image_pixels() {
+        for quick in [false, true] {
+            let (mut doc, id, target) = masked(quick);
+            let pixels = doc.layer(id).unwrap().image().unwrap().to_rgba8();
+            let mut stroke = Stroke::begin(
+                &doc,
+                TIP,
+                StrokeKind::ArtHistory {
+                    source: TiledImage::filled(64, 64, [255, 0, 0, 255]),
+                    style: ArtStyle::Dab,
+                    area: 12.0,
+                    tolerance: 0.0,
+                },
+                1.0,
+                1.0,
+            )
+            .unwrap();
+            stroke.add_point(&mut doc, 32.5, 32.5);
+            let mask = target.image(&doc, id).unwrap().to_rgba8();
+            assert!(mask.as_chunks::<4>().0.iter().any(|p| p[0] < 200));
+            assert!(
+                mask.as_chunks::<4>()
+                    .0
+                    .iter()
+                    .all(|p| p[0] == p[1] && p[1] == p[2] && p[3] == 255)
+            );
             assert_eq!(doc.layer(id).unwrap().image().unwrap().to_rgba8(), pixels);
         }
     }

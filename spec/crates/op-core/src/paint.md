@@ -182,3 +182,5 @@ Healing dabs use the interpolated pressure diameter for coverage, their membrane
 Healing Brush reads and writes the stroke-selected target (pixels, layer mask or Quick Mask). Mask results become opaque grayscale; healing a mask leaves layer pixels unchanged. The target accessors are latched to the stroke layer and target instead of following later UI selection changes. A sampled-healing regression exercises both mask targets and alpha preservation.
 
 Mixer Brush deposits into the latched pixel/mask target. Layer/Quick Mask strokes produce opaque grayscale and do not paint image pixels; a colored-load regression covers both targets. Native wet-paint dynamics remain an approximation.
+
+Art History Brush writes its scattered marks into the stroke target, including layer/Quick Masks. Mask outputs are opaque grayscale and image pixels remain unchanged. Its deterministic style synthesis remains an unmeasured approximation, not Photoshop parity.
