@@ -148,6 +148,16 @@ impl QuickSelect {
     }
 }
 
+/// Color/edge object detection restricted to a freehand polygon ROI.
+/// This remains a deterministic approximation, not learned subject detection.
+pub fn object_in_polygon(sampler: &Sampler, points: &[(f32, f32)]) -> Option<Selection> {
+    let mask = Selection::polygon(sampler.width, sampler.height, points, false);
+    let bounds = mask.bounds()?;
+    let object = object_in_rect(sampler, bounds)?;
+    let clipped = Selection::combine(Some(&mask), object, crate::SelectionOp::Intersect);
+    (!clipped.is_empty()).then_some(clipped)
+}
+
 /// The Object Selection tool (Rectangle mode): within `rect` (x0, y0, x1,
 /// y1), the pixels that stand out from the rectangle's edge (farther than
 /// 40 levels from every color sampled along it) form the object; its
@@ -275,6 +285,21 @@ mod tests {
             }
         }
         (w, h, rgba)
+    }
+
+    #[test]
+    fn polygon_roi_excludes_object_pixels_outside_the_contour() {
+        let mut image = crate::TiledImage::filled(128, 128, [255; 4]);
+        for y in 50..90 {
+            for x in 50..90 {
+                image.set_pixel(x, y, [200, 20, 20, 255]);
+            }
+        }
+        let sampler = Sampler::new(128, 128, &image.to_rgba8());
+        let selection =
+            object_in_polygon(&sampler, &[(30.0, 30.0), (110.0, 30.0), (30.0, 110.0)]).unwrap();
+        assert_eq!(selection.get(55, 55), 255);
+        assert_eq!(selection.get(85, 85), 0);
     }
 
     #[test]

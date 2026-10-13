@@ -143,3 +143,5 @@ DocState stores an optional Artboard drag transaction; it counts as busy, so Esc
 Selection Brush retains a pre-stroke snapshot/selection for cancellation and no-op detection, and active strokes count as busy.
 
 `lasso_press` captures freehand/polygonal initial pointer-down modifiers and the initial selection presence.
+
+Object Selection stores a freehand ROI path and pointer-down operation alongside its rectangle. Its active gesture counts as busy.

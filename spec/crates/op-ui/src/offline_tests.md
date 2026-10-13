@@ -15,3 +15,5 @@ The Lasso regression covers degenerate paths, polygon-shaped freehand closure, p
 Polygonal Lasso CPU tests check constrained vertices, Backspace removing one corner, Enter closing, Escape preserving selection/history and undo with unchanged pixels.
 
 Magnetic Lasso CPU tests verify auto/manual anchors, anchor deletion, closure, initial mode latching, cancellation, undo and untouched pixels.
+
+Object Selection CPU regression tests freehand ROI selection on a contrasting object, excluded background, cancellation, undo and pixel preservation.

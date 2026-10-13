@@ -268,6 +268,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let magnetic = crate::options_tools::magnetic_options(app);
     let quick = crate::options_tools::quick_options(app);
     let object = crate::options_tools::object_options(app);
+    let object_lasso = app.setting("object.mode", "0").as_str() == "1";
     let mut quick_switch_to_add = false;
     // A Mixer Brush stroke ended with this paint on the brush
     let mut mixer_left: Option<Option<[u8; 3]>> = None;
@@ -733,7 +734,15 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     quick_input(ui, &response, state, quick, app.marquee.feather, ppp);
             }
             Tool::ObjectSelection => {
-                object_input(ui, &response, state, app.marquee.mode, object, ppp);
+                object_input(
+                    ui,
+                    &response,
+                    state,
+                    app.marquee.mode,
+                    object,
+                    ppp,
+                    object_lasso,
+                );
             }
             Tool::MagneticLasso => {
                 let options = (
@@ -2939,9 +2948,16 @@ fn draw_selection(
             })
             .collect()
     };
-    if let Some((a, b)) = state.object_drag {
-        for w in corners(Rect::from_two_pos(a, b)).windows(2) {
-            ants(w[0], w[1]);
+    if let Some(path) = &state.object_path {
+        for segment in path.windows(2) {
+            ants(
+                to_screen(state, segment[0], ppp),
+                to_screen(state, segment[1], ppp),
+            );
+        }
+    } else if let Some((a, b)) = state.object_drag {
+        for segment in corners(Rect::from_two_pos(a, b)).windows(2) {
+            ants(segment[0], segment[1]);
         }
     }
     if let Some(drag) = state.marquee_drag {
@@ -3553,7 +3569,33 @@ fn object_input(
     mode: crate::state::SelectionMode,
     (all_layers, hard_edge): (bool, bool),
     ppp: f32,
+    lasso: bool,
 ) {
+    if state.object_drag.is_some()
+        && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape))
+    {
+        state.object_drag = None;
+        state.object_path = None;
+        state.object_op = None;
+        return;
+    }
+    if response.contains_pointer() && ui.input(|i| i.pointer.button_pressed(PointerButton::Primary))
+    {
+        let mods = ui
+            .input(|i| {
+                i.events.iter().find_map(|event| match event {
+                    egui::Event::PointerButton {
+                        button: PointerButton::Primary,
+                        pressed: true,
+                        modifiers,
+                        ..
+                    } => Some(*modifiers),
+                    _ => None,
+                })
+            })
+            .unwrap_or_else(|| ui.input(|i| i.modifiers));
+        state.object_op = Some(selection_op(mods, state.doc.selection().is_some(), mode).0);
+    }
     let pointer = ui
         .input(|i| i.pointer.interact_pos())
         .map(|p| to_doc(state, p, ppp));
@@ -3563,12 +3605,18 @@ fn object_input(
     {
         let p = to_doc(state, p, ppp);
         state.object_drag = Some((p, p));
+        state.object_path = lasso.then(|| vec![p]);
     }
     let Some((a, _)) = state.object_drag else {
         return;
     };
     if let Some(p) = pointer {
         state.object_drag = Some((a, p));
+        if let Some(path) = &mut state.object_path
+            && path.last().is_none_or(|last| last.distance(p) >= 1.0)
+        {
+            path.push(p);
+        }
     }
     if ui.input(|i| i.pointer.primary_down()) {
         ui.ctx().request_repaint();
@@ -3582,17 +3630,35 @@ fn object_input(
     let y0 = a.y.min(b.y).clamp(0.0, h) as u32;
     let x1 = a.x.max(b.x).clamp(0.0, w) as u32;
     let y1 = a.y.max(b.y).clamp(0.0, h) as u32;
+    let path = state.object_path.take();
+    let op = state.object_op.take().unwrap_or_else(|| {
+        selection_op(
+            ui.input(|i| i.modifiers),
+            state.doc.selection().is_some(),
+            mode,
+        )
+        .0
+    });
     let Some(sampler) = sampler(state, all_layers) else {
+        state.object_op = None;
         return;
     };
-    let Some(mut region) = op_core::smart_select::object_in_rect(&sampler, (x0, y0, x1, y1)) else {
+    let found = if let Some(path) = path {
+        op_core::smart_select::object_in_polygon(
+            &sampler,
+            &path.iter().map(|p| (p.x, p.y)).collect::<Vec<_>>(),
+        )
+    } else {
+        op_core::smart_select::object_in_rect(&sampler, (x0, y0, x1, y1))
+    };
+
+    let Some(mut region) = found else {
         return;
     };
     if !hard_edge {
         region = region.feather(1.0);
     }
-    let mods = ui.input(|i| i.modifiers);
-    let (op, _, _) = selection_op(mods, state.doc.selection().is_some(), mode);
+
     let combined = op_core::Selection::combine(state.doc.selection(), region, op);
     state.doc.set_selection(Some(combined));
     state.record("Object Selection");

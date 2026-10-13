@@ -187,3 +187,5 @@ Freehand Lasso offline follow-up adds Escape cancellation, Enter closure and poi
 Polygonal Lasso offline follow-up adds Shift-constrained vertices and initial-press modifier latching, and verifies anchor removal, explicit closure, cancellation and undo.
 
 Magnetic Lasso offline follow-up bounds empty/outside edge-map inputs, rejects outside-image starts and latches pointer-down combination modes. Edge tracking is the existing Sobel/live-wire implementation; matching Photoshop's exact algorithm remains unverified.
+
+Object Selection offline input follow-up makes Lasso ROI functional and adds press-latched operations and cancellation. The detector remains color/edge based; learned Photoshop recognition, object finder, people/subject inference and full 1:1 acceptance are not completed.

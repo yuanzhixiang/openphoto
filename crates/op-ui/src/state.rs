@@ -96,6 +96,8 @@ pub struct DocState {
     /// The Object Selection tool's rectangle being dragged (document
     /// pixels).
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
+    pub object_path: Option<Vec<egui::Pos2>>,
+    pub object_op: Option<op_core::SelectionOp>,
     /// What the drag in progress snaps to (View › Snap).
     pub snap: Option<crate::snap::Targets>,
     /// The Move tool's smart guides while it drags.
@@ -204,6 +206,7 @@ impl DocState {
             || self.move_drag.is_some()
             || self.artboard_drag.is_some()
             || self.selection_stroke.is_some()
+            || self.object_drag.is_some()
     }
 
     pub fn transform_controls_bounds(&mut self) -> Option<Bounds> {
@@ -274,6 +277,8 @@ impl DocState {
             magnetic: None,
             quick: None,
             object_drag: None,
+            object_path: None,
+            object_op: None,
             snap: None,
             smart_guides: None,
             history_source: None,

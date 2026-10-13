@@ -18,3 +18,5 @@ The region-finding behind the Quick Selection and Object Selection tools. Photos
 
 - `quick_selection_stays_within_edges`: a dab inside a red disc on gray grows over the disc and stops at its edge.
 - `object_selection_finds_the_disc`: a rectangle around the disc selects it (bounds within a pixel), the white dot inside it filled in; a plain area gives `None`.
+
+`object_in_polygon` intersects the existing bounding-rectangle detector output with a freehand polygon ROI. Pixels outside the polygon cannot be selected. Background analysis still uses its bounding rectangle and can be biased by objects outside the contour; this is an explicit approximation, not Photoshop learned recognition.

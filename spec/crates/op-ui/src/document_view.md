@@ -120,7 +120,7 @@ While the document is in Free Transform, presses, drags, Enter, and Esc on the c
 ## Quick Selection and Object Selection
 
 - Quick Selection (`quick_input`): pressing starts a stroke (`op_core::smart_select::QuickSelect` over the merged image with Sample All Layers, else the active layer). Combine mode: ⌥ or the bar's Subtract → subtract, Shift or the bar's Add → add, otherwise replace. A dab at the press and then every half radius of pointer travel; the selection updates live (Enhance Edge feathers 1 px; the marquee Feather applies). Release records "Quick Selection". A stroke in New mode switches the bar's mode to Add (`quick.mode` = 1), as Photoshop does. The stroke in progress is `DocState::quick`.
-- Object Selection (`object_input`): dragging draws a rectangle (marching ants, `DocState::object_drag`); on release `smart_select::object_in_rect` runs on it; with Hard Edge off the result is feathered 1 px; it is combined by the bar's mode with Shift/⌥ (`selection_op`), recording "Object Selection". When nothing is found, nothing changes. Its Lasso mode works like Rectangle.
+- Object Selection (`object_input`): dragging draws a rectangle (marching ants, `DocState::object_drag`); on release `smart_select::object_in_rect` runs on it; with Hard Edge off the result is feathered 1 px; it is combined by the bar's mode with Shift/⌥ (`selection_op`), recording "Object Selection". When nothing is found, nothing changes. Lasso mode collects a freehand polygon ROI and restricts the approximate detector output to that contour.
 
 ## Healing tools
 
@@ -261,3 +261,5 @@ Freehand Lasso latches combine modifiers at pointer-down; Escape discards its li
 Polygonal Lasso latches its combination operation at the initial pointer-down. Holding Shift snaps newly committed segments to 45-degree directions using the line constraint geometry; Backspace, Enter and Escape retain their existing anchor/closure/cancel roles. Exact Photoshop angle rounding remains unverified.
 
 Magnetic Lasso starts only inside a nonempty image and latches its initial combination modifiers at pointer-down. Closing/cancelling clears the modifier latch. Live paths, automatic/manual anchors, Backspace, Enter, Escape and undo are exercised through CPU-only input.
+
+Object Selection Lasso mode now collects and previews a freehand polygon and restricts detected pixels to it, rather than behaving as Rectangle. Its combination operation is latched at pointer-down. Escape clears an unfinished ROI without selection/history changes.
