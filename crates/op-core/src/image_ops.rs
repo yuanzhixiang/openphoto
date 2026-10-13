@@ -75,6 +75,13 @@ pub fn reorient(doc: &mut Document, orientation: Orientation) {
         |selection| selection.remapped(nw, nh, source),
     );
     let (w, h) = (w as f32, h as f32);
+    doc.map_paths(|(x, y)| match orientation {
+        Orientation::Rotate180 => (w - x, h - y),
+        Orientation::Rotate90Clockwise => (h - y, x),
+        Orientation::Rotate90CounterClockwise => (y, w - x),
+        Orientation::FlipHorizontal => (w - x, y),
+        Orientation::FlipVertical => (x, h - y),
+    });
     doc.map_guides(|g| {
         let p = g.position;
         match (orientation, g.vertical) {
@@ -252,6 +259,10 @@ pub fn rotate_arbitrary(doc: &mut Document, degrees: f32, background: crate::Col
             cw, ch, mask, false,
         )));
     }
+    doc.map_paths(|(x, y)| {
+        let (x, y) = forth(x as f64, y as f64);
+        (x as f32, y as f32)
+    });
     doc.width = cw;
     doc.height = ch;
     doc.mark_dirty();
@@ -284,6 +295,7 @@ pub fn crop(doc: &mut Document, x0: u32, y0: u32, x1: u32, y1: u32) {
         |image| image.with_canvas(w, h, dx, dy, [0; 4]).clipped(),
         |selection| selection.with_canvas(w, h, dx, dy),
     );
+    doc.map_paths(|(x, y)| (x - x0 as f32, y - y0 as f32));
     doc.map_guides(|g| Guide {
         position: g.position - if g.vertical { x0 } else { y0 } as f32,
         ..g
@@ -539,6 +551,7 @@ pub fn resize_reducing_noise(
     };
     let (sw, sh) = (doc.width as usize, doc.height as usize);
     let (kx, ky) = (width as f32 / sw as f32, height as f32 / sh as f32);
+    doc.map_paths(|(x, y)| (x * kx, y * ky));
     doc.map_guides(|g| Guide {
         position: g.position * if g.vertical { kx } else { ky },
         ..g

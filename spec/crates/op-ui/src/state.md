@@ -183,3 +183,5 @@ DocState undo/redo first handles staged Remove marks; committed removal uses nor
 TextEdit records whether it creates a selection mask, the latched selection operation, whether the preview changes the document, and its last font/size/color settings.
 
 TextEdit also stores vertical orientation, separate from whether it creates a type-mask selection.
+
+pen_session holds Pen continuation and an in-flight pointer snapshot. In-flight edits count as busy; undo/redo discard this transient session.

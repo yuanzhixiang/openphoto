@@ -29,6 +29,7 @@ mod options_bar;
 mod options_kit;
 mod options_tools;
 mod panels;
+mod pen_tool;
 mod perspective_crop;
 mod ps_icons;
 mod recent;

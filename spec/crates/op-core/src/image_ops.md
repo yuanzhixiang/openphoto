@@ -67,3 +67,5 @@ Implements the Image menu operations that change the whole canvas: Image Size re
 - `reduce_noise_smooths_speckle_and_keeps_edges`: doubling a ±10 gray checker beside black with Preserve Details at full Reduce Noise leaves less than half the speckle of plain Preserve Details, the edge stays black, and Bicubic ignores the amount.
 - `trim_removes_borders_of_the_corner_color`: trimming by the top-left color trims all four sides, trimming by the bottom-right color trims only the top; trimming by transparent pixels on an opaque background changes nothing.
 - `pixels_outside_the_canvas_follow_merges_rotation_and_image_size`: in a 100×100 document, a square half off the left side is merged with another block, then rotated clockwise, reduced by half, and flipped horizontally; at every step the layer range (including outside the canvas) matches Photoshop 2026 measurements: (−20, 10, 60, 60) → (40, −20, 90, 60) → (20, −10, 45, 30) → (5, −10, 30, 30).
+
+Fixed rotations/flips, crop and Image Size map all path anchors/controls through the same affine geometry. Arbitrary rotation uses the same forward affine map as layer geometry.

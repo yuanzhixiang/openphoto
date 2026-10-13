@@ -37,3 +37,5 @@ The public frame module creates, moves, resizes and replaces raster content in c
 The annotation module defines persisted note metadata and creation.
 
 The remove module supplies bounded offline exemplar filling and atomic document application; it is not native Photoshop synthesis.
+
+The path module supplies editable cubic geometry without UI/GPU dependencies.

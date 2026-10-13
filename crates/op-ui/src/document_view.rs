@@ -252,6 +252,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                 app.flag("pattern.impressionist", false),
             )
         });
+    let pen_path_mode = app.setting("pen.mode", "1") == "1";
     let remove_options = crate::remove_tool::options(app);
     let (foreground, background) = (app.foreground, app.background);
     let bucket = app.bucket;
@@ -757,6 +758,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
+            Tool::Pen if !modal && pen_path_mode => {
+                crate::pen_tool::input(ui, &response, state, ppp);
+            }
             Tool::Crop if !modal => {
                 straightened =
                     crate::crop_tool::input(ui, &response, state, &crop_options, background, ppp);
@@ -1153,6 +1157,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     {
         crate::type_tool::commit(state);
     }
+    crate::pen_tool::draw(ui, state, canvas_rect, ppp);
     crate::type_tool::draw_mask_overlay(ui, state, canvas_rect, ppp);
     crate::type_tool::draw_caret(ui, state, type_options, canvas_rect, ppp);
     crate::crop_tool::draw(ui, state, &crop_options, canvas_rect, ppp);

@@ -147,3 +147,5 @@ note_tool implements canvas note markers and a staged Notes editor.
 count_tool handles count marker input, overlays and group options.
 
 The remove_tool component supplies staged Remove canvas input and overlay without native input or capture.
+
+pen_tool handles editable path canvas geometry without native input.

@@ -113,6 +113,7 @@ pub fn save(doc: &Document, path: &Path) -> Result<(), IoError> {
 /// [`save`] with the JPEG or PNG options.
 pub fn save_with(doc: &Document, path: &Path, options: &ExportOptions) -> Result<(), IoError> {
     if extension(path) == "psd" {
+        psd::validate_paths(doc)?;
         std::fs::write(path, psd::write(doc))?;
         Ok(())
     } else {

@@ -83,3 +83,5 @@ Horizontal Type Mask also checks latched Shift addition to an existing selection
 Vertical Type regression exercises down-flowing glyph cells and newline columns, Escape, commit, raster PSD round-trip and undo. It does not validate native type metadata, vertical metrics or glyph rasterization.
 
 Vertical Type Mask checks two columns of selection coverage, orientation switching during editing, unchanged layers/pixels/history until commit, cancellation and commit undo/redo.
+
+Pen CPU regression covers corner creation, symmetric cubic control dragging, in-flight Escape cancellation, closing, undo/redo, and unchanged pixel layers. Native parity is not asserted.

@@ -89,6 +89,7 @@ pub struct DocState {
     /// The Patch or Content-Aware Move tool dragging the selection: where
     /// the drag started and where it is (document pixels).
     pub patch_drag: Option<(egui::Pos2, egui::Pos2)>,
+    pub pen_session: crate::pen_tool::Session,
     pub remove_session: Option<crate::remove_tool::Session>,
     /// The Magnetic Lasso under way (its outline is `lasso`).
     pub magnetic: Option<MagneticPath>,
@@ -225,6 +226,7 @@ impl DocState {
             || self.marquee_drag.is_some()
             || self.marquee_outline.is_some()
             || self.shape_drag.is_some()
+            || self.pen_session.busy()
             || self.move_drag.is_some()
             || self.artboard_drag.is_some()
             || self.selection_stroke.is_some()
@@ -300,6 +302,7 @@ impl DocState {
             lasso: None,
             lasso_press: None,
             patch_drag: None,
+            pen_session: crate::pen_tool::Session::default(),
             remove_session: None,
             magnetic: None,
             quick: None,
@@ -567,6 +570,7 @@ impl DocState {
             return true;
         }
         self.remove_session = None;
+        self.pen_session = crate::pen_tool::Session::default();
         self.pending_edit = false;
         self.history.undo(&mut self.doc)
     }
@@ -576,6 +580,7 @@ impl DocState {
             return true;
         }
         self.remove_session = None;
+        self.pen_session = crate::pen_tool::Session::default();
         self.pending_edit = false;
         self.history.redo(&mut self.doc)
     }

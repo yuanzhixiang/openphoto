@@ -160,3 +160,5 @@ Document.notes and Snapshot.notes retain non-pixel note annotations across undo/
 Document.count_groups and Snapshot.count_groups retain non-pixel count data through undo/redo.
 
 snapshot_quick_mask returns a borrowed Quick Mask from a history snapshot, or None when it was not present.
+
+Document paths and active_path belong to snapshots. Undo restores their geometry and selection without touching pixel layers. Canvas placement translates all anchor/control coordinates by the same offset, preserving off-canvas geometry. map_paths applies a supplied coordinate map to all controls and anchors; fixed orientation, crop and image resizing use it. Arbitrary-angle rotation maps path coordinates through its forward affine transform.

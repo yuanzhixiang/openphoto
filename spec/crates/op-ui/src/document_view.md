@@ -303,3 +303,5 @@ Horizontal Type Mask routes through the shared text editor, has a text cursor an
 Vertical Type dispatches through the shared point-text editor and text cursor.
 
 All four Type tools dispatch to the text editor. Vertical Type Mask creates selection coverage with upright vertical columns, preserving pixel layers.
+
+Pen dispatches to transactional path creation. Active path geometry draws as an overlay independent of the pixel composite.

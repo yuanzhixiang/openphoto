@@ -89,3 +89,5 @@ The JPEG Options and PNG Format Options of a save (`dialogs/save_options.md` in 
 - `unknown_extension_writes_nothing`: an unknown extension returns `Unsupported` and creates no file.
 - `transparent_png_opens_as_regular_layer`: a PNG with semi-transparent pixels opens as a regular "Layer 0" layer.
 - `flatten_blends_alpha`: 50% transparent black laid onto white gives `(127, 127, 127)`.
+
+PSD saves validate editable path resource limits before generating/writing bytes; invalid path names, points or counts return Psd and leave the target file unchanged.

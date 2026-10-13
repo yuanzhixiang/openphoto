@@ -1943,3 +1943,42 @@ fn vertical_type_mask_orientation_cancel_commit_and_undo_cpu() {
     assert_eq!(h.state().doc.selection(), Some(&vertical));
     assert_eq!(h.state().doc.composite_rgba8(), before);
 }
+
+#[test]
+fn pen_cubic_close_cancel_undo_and_preserve_pixels_cpu() {
+    let mut h = CanvasHarness::new(Tool::Pen);
+    let before = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    let a = h.point(40., 40.);
+    h.button(a, true, Modifiers::NONE);
+    h.button(a, false, Modifiers::NONE);
+    h.drag((140., 40.), (160., 70.), Modifiers::NONE);
+    let k = &h.state().doc.paths[0].subpaths[0].knots[1];
+    for (actual, expected) in [
+        (k.anchor, (140., 40.)),
+        (k.outgoing, (160., 70.)),
+        (k.incoming, (120., 10.)),
+    ] {
+        assert!((actual.0 - expected.0).abs() < 0.001 && (actual.1 - expected.1).abs() < 0.001);
+    }
+    assert!(k.linked);
+    let paths = h.state().doc.paths.clone();
+    let p = h.point(140., 140.);
+    h.button(p, true, Modifiers::NONE);
+    h.key(Key::Escape);
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.paths, paths);
+    assert_eq!(h.state().history.states().len(), count + 2);
+    // Escape ends continuation; restore it only to exercise closing.
+    h.app.active().unwrap().pen_session.continuation = Some((0, 0));
+    h.button(a, true, Modifiers::NONE);
+    h.button(a, false, Modifiers::NONE);
+    assert!(h.state().doc.paths[0].subpaths[0].closed);
+    assert_eq!(h.state().doc.paths[0].subpaths[0].knots.len(), 2);
+    assert!(h.app.active().unwrap().undo());
+    assert!(!h.state().doc.paths[0].subpaths[0].closed);
+    assert!(h.app.active().unwrap().redo());
+    assert!(h.state().doc.paths[0].subpaths[0].closed);
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+    assert_eq!(h.state().doc.layers.len(), 1);
+}

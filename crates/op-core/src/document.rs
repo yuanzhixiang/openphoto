@@ -58,6 +58,8 @@ pub struct Snapshot {
     slices: Vec<crate::slice::Slice>,
     notes: Vec<crate::annotation::Note>,
     count_groups: Vec<crate::annotation::CountGroup>,
+    paths: Vec<crate::path::Path>,
+    active_path: Option<usize>,
     quick_mask: Option<TiledImage>,
     width: u32,
     height: u32,
@@ -104,6 +106,8 @@ pub struct Document {
     pub slices: Vec<crate::slice::Slice>,
     pub notes: Vec<crate::annotation::Note>,
     pub count_groups: Vec<crate::annotation::CountGroup>,
+    pub paths: Vec<crate::path::Path>,
+    pub active_path: Option<usize>,
     /// Edits go to the active layer's mask (its thumbnail was clicked in
     /// the Layers panel) rather than its pixels. Not part of the history.
     pub mask_target: bool,
@@ -147,6 +151,8 @@ impl Document {
             slices: Vec::new(),
             notes: Vec::new(),
             count_groups: Vec::new(),
+            paths: Vec::new(),
+            active_path: None,
             mask_target: false,
             selected_layers: Vec::new(),
             quick_mask: None,
@@ -275,6 +281,8 @@ impl Document {
             slices: self.slices.clone(),
             notes: self.notes.clone(),
             count_groups: self.count_groups.clone(),
+            paths: self.paths.clone(),
+            active_path: self.active_path,
             quick_mask: self.quick_mask.clone(),
             width: self.width,
             height: self.height,
@@ -299,6 +307,8 @@ impl Document {
         self.slices = s.slices;
         self.notes = s.notes;
         self.count_groups = s.count_groups;
+        self.paths = s.paths;
+        self.active_path = s.active_path;
         self.quick_mask = s.quick_mask;
         self.selection_revision += 1;
         self.mark_dirty();
@@ -308,6 +318,18 @@ impl Document {
     /// orientation); used when the canvas is cropped, extended, resized,
     /// rotated or flipped. A rotation by 90° turns guides around, so `f`
     /// also returns the new orientation.
+    pub fn map_paths(&mut self, f: impl Fn(crate::path::Point) -> crate::path::Point) {
+        for path in &mut self.paths {
+            for sub in &mut path.subpaths {
+                for knot in &mut sub.knots {
+                    knot.incoming = f(knot.incoming);
+                    knot.anchor = f(knot.anchor);
+                    knot.outgoing = f(knot.outgoing);
+                }
+            }
+        }
+    }
+
     pub fn map_guides(&mut self, f: impl Fn(Guide) -> Guide) {
         self.guides = self.guides.iter().map(|&g| f(g)).collect();
     }
@@ -379,6 +401,13 @@ impl Document {
     /// A `width`×`height` canvas with the old one at (`dx`, `dy`): the
     /// common part of Canvas Size and Reveal All.
     pub fn place_canvas(&mut self, width: u32, height: u32, dx: i64, dy: i64, fill: Color) {
+        for path in &mut self.paths {
+            for sub in &mut path.subpaths {
+                for knot in &mut sub.knots {
+                    knot.translate((dx as f32, dy as f32));
+                }
+            }
+        }
         let fill = fill.to_rgba8();
         for layer in &mut self.layers {
             let extension = if layer.is_background {

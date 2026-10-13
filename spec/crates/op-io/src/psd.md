@@ -32,7 +32,7 @@ PackBits encoding: runs of 3 or more identical bytes are encoded as repeat segme
 
 ## Known Limitations
 
-- Not supported: vector masks, adjustment layers, type layers, smart objects, layer styles, clipping masks, channels and paths, and 16/32-bit, grayscale, CMYK, and other modes.
+- Not supported: vector masks, adjustment layers, type layers, smart objects, layer styles, clipping masks and channels, and 16/32-bit, grayscale, CMYK, and other modes.
 - ICC profiles and other image resources (thumbnails, etc.) are not read or written; the grid settings in 1032 are not kept.
 - No thumbnail is written on save; PSD previews in Finder may rely on the system rendering the composite itself.
 - Verified: when Photoshop 2026 opens a PSD written by OpenPhoto, layer names, opacity, blend modes, visibility, and the background layer are all correct; when OpenPhoto reads a PSD saved by Photoshop, both the background layer and normal layers are correct. Layer masks have not yet been verified with Photoshop.
@@ -86,3 +86,5 @@ OpenPhoto Frame metadata uses the private opfr additional layer block (version, 
 Notes use private image resource 4000 with OPNT magic/version, positions, RGB colors and UTF-16 author/text. This is OpenPhoto persistence, not Adobe native annotation import/export. Unicode multiline round-trip preserves document pixels.
 
 Count groups use private OPCT version-1 image resource 4001, preserving Unicode name, style, visibility and points. This is OpenPhoto persistence and does not import Adobe native count descriptors. PSD round-trip checks styles/points and unchanged pixels.
+
+Named cubic paths use standard image resources 2000–2997 and Adobe's 26-byte path records: even/odd fill record, open/closed subpath lengths and linked/unlinked knots. Incoming/anchor/outgoing coordinates are normalized signed 8.24 fixed-point values, y before x. Working path resource 1025 is also read. Save validates at most 998 paths, 65535 knots per subpath, finite points within normalized [-16,16), and ASCII names up to 255 bytes before touching the destination. Non-ASCII path names and inverted initial fills are unsupported. Path selection defaults to the first path on load; native path panel state and vector masks are not represented. Geometry round-trip and independent byte layout assertions pass; Photoshop-native reopening remains unverified. Reference: [Adobe PSD specification](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/).

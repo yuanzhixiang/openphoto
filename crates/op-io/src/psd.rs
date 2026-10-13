@@ -361,6 +361,128 @@ fn read_slice_text(r: &mut Reader) -> Result<String, IoError> {
     let units = (0..n).map(|_| r.u16()).collect::<Result<Vec<_>, _>>()?;
     Ok(String::from_utf16_lossy(&units))
 }
+// Standard named path image resources, as specified by Adobe's PSD format.
+pub(crate) fn validate_paths(doc: &Document) -> Result<(), IoError> {
+    if doc.paths.len() > 998 {
+        return Err(invalid("too many saved paths"));
+    }
+    for path in &doc.paths {
+        if !path.name.is_ascii() || path.name.len() > 255 {
+            return Err(invalid("path name must be ASCII and at most 255 bytes"));
+        }
+        for sub in &path.subpaths {
+            if sub.knots.len() > u16::MAX as usize {
+                return Err(invalid("too many Bezier knots"));
+            }
+            for knot in &sub.knots {
+                for (x, y) in [knot.incoming, knot.anchor, knot.outgoing] {
+                    if !x.is_finite()
+                        || !y.is_finite()
+                        || !(-16.0..16.0).contains(&(x / doc.width as f32))
+                        || !(-16.0..16.0).contains(&(y / doc.height as f32))
+                    {
+                        return Err(invalid("path point exceeds PSD coordinate range"));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+fn write_paths(out: &mut Writer, doc: &Document) {
+    for (index, path) in doc.paths.iter().enumerate() {
+        out.bytes(b"8BIM");
+        out.u16(2000 + index as u16);
+        let name = path.name.as_bytes();
+        out.u8(name.len() as u8);
+        out.bytes(name);
+        if (name.len() + 1) % 2 == 1 {
+            out.u8(0);
+        }
+        let size = out.length_slot();
+        out.u16(6);
+        out.bytes(&[0; 24]);
+        for sub in &path.subpaths {
+            out.u16(if sub.closed { 0 } else { 3 });
+            out.u16(sub.knots.len() as u16);
+            out.bytes(&[0; 22]);
+            for knot in &sub.knots {
+                out.u16(match (sub.closed, knot.linked) {
+                    (true, true) => 1,
+                    (true, false) => 2,
+                    (false, true) => 4,
+                    (false, false) => 5,
+                });
+                for (x, y) in [knot.incoming, knot.anchor, knot.outgoing] {
+                    out.i32((y as f64 / doc.height as f64 * 16777216.).round() as i32);
+                    out.i32((x as f64 / doc.width as f64 * 16777216.).round() as i32);
+                }
+            }
+        }
+        out.close(size, 1);
+    }
+}
+fn read_path(data: &[u8], name: String, w: u32, h: u32) -> Result<op_core::path::Path, IoError> {
+    if !data.len().is_multiple_of(26) {
+        return Err(invalid("invalid path record size"));
+    }
+    let mut r = Reader(Cursor::new(data));
+    let mut path = op_core::path::Path {
+        name,
+        subpaths: vec![],
+    };
+    let mut remaining = 0usize;
+    while r.remaining() > 0 {
+        let selector = r.u16()?;
+        match selector {
+            0 | 3 => {
+                if remaining != 0 {
+                    return Err(invalid("short path subpath"));
+                }
+                remaining = r.u16()? as usize;
+                r.bytes(22)?;
+                path.subpaths.push(op_core::path::Subpath {
+                    knots: vec![],
+                    closed: selector == 0,
+                });
+            }
+            1 | 2 | 4 | 5 => {
+                let Some(sub) = path.subpaths.last_mut() else {
+                    return Err(invalid("path knot without subpath"));
+                };
+                if remaining == 0 || sub.closed != (selector <= 2) {
+                    return Err(invalid("invalid path knot selector"));
+                }
+                let mut point = || -> Result<(f32, f32), IoError> {
+                    let y = r.i32()? as f64 / 16777216. * h as f64;
+                    let x = r.i32()? as f64 / 16777216. * w as f64;
+                    Ok((x as f32, y as f32))
+                };
+                sub.knots.push(op_core::path::Knot {
+                    incoming: point()?,
+                    anchor: point()?,
+                    outgoing: point()?,
+                    linked: selector == 1 || selector == 4,
+                });
+                remaining -= 1;
+            }
+            6 | 7 => {
+                r.bytes(24)?;
+            }
+            8 => {
+                if r.u16()? != 0 {
+                    return Err(invalid("inverted path fill is unsupported"));
+                }
+                r.bytes(22)?;
+            }
+            _ => return Err(invalid("unknown path record")),
+        }
+    }
+    if remaining != 0 {
+        return Err(invalid("short path subpath"));
+    }
+    Ok(path)
+}
 fn write_counts(out: &mut Writer, doc: &Document) {
     if doc.count_groups.is_empty() {
         return;
@@ -764,6 +886,7 @@ pub fn write(doc: &Document) -> Vec<u8> {
     write_slices(&mut out, doc);
     write_notes(&mut out, doc);
     write_counts(&mut out, doc);
+    write_paths(&mut out, doc);
     out.close(resources, 2);
 
     // Layer and mask information
@@ -1150,14 +1273,17 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
     let mut count_groups = Vec::new();
     let mut notes = Vec::new();
     let mut slices = Vec::new();
+    let mut paths = Vec::new();
     while r.pos() + 12 <= resources_end {
         if &r.take::<4>()? != b"8BIM" {
             break;
         }
         let id = r.u16()?;
         let name_len = r.u8()? as u64;
-        let padded = (name_len + 1).next_multiple_of(2) - 1;
-        r.seek(r.pos() + padded);
+        let name = String::from_utf8_lossy(r.bytes(name_len as usize)?).into_owned();
+        if (name_len + 1) % 2 == 1 {
+            r.u8()?;
+        }
         let size = r.u32()? as u64;
         let start = r.pos();
         if id == 1005 && size >= 4 {
@@ -1179,6 +1305,10 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                     color: None,
                 });
             }
+        }
+        if (2000..=2997).contains(&id) || id == 1025 {
+            r.seek(start);
+            paths.push(read_path(r.bytes(size as usize)?, name, w, h)?);
         }
         if id == 4001 {
             r.seek(start);
@@ -1207,6 +1337,8 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
     doc.slices = slices.clone();
     doc.notes = notes.clone();
     doc.count_groups = count_groups.clone();
+    doc.paths = paths.clone();
+    doc.active_path = (!doc.paths.is_empty()).then_some(0);
     if lm_len > 0 {
         let info_len = r.u32()? as u64;
         if info_len > 0 {
@@ -1501,6 +1633,8 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
         doc.slices = slices;
         doc.notes = notes;
         doc.count_groups = count_groups;
+        doc.paths = paths;
+        doc.active_path = (!doc.paths.is_empty()).then_some(0);
         return Ok(doc);
     }
 
@@ -2010,5 +2144,51 @@ mod artboard_tests {
         assert_eq!(group.artboard, Some(b));
         assert_eq!(restored.layers[0].parent, Some(group.id));
         assert_eq!(restored.composite_rgba8(), doc.composite_rgba8());
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+    use op_core::path::{Knot, Path, Subpath};
+    #[test]
+    fn standard_paths_preserve_cubic_controls_and_closed_flags() {
+        let mut doc = Document::new_with_background("Paths", 128, 64, Color::WHITE);
+        doc.paths.push(Path {
+            name: "Outline".into(),
+            subpaths: vec![
+                Subpath {
+                    closed: true,
+                    knots: vec![
+                        Knot {
+                            incoming: (-4., 4.),
+                            anchor: (20., 30.),
+                            outgoing: (44., 56.),
+                            linked: true,
+                        },
+                        Knot::corner((100., 50.)),
+                    ],
+                },
+                Subpath {
+                    closed: false,
+                    knots: vec![Knot::corner((0., 0.)), Knot::corner((128., 64.))],
+                },
+            ],
+        });
+        validate_paths(&doc).unwrap();
+        let data = write(&doc);
+        let marker = data.windows(6).position(|b| b == b"8BIM\x07\xd0").unwrap();
+        // Independent checks of Adobe record selector and normalized y-first coordinates.
+        let start = marker + 6 + 8 + 4; // Pascal Outline occupies eight bytes.
+        assert_eq!(&data[start..start + 2], &6u16.to_be_bytes());
+        assert_eq!(&data[start + 26..start + 30], &[0, 0, 0, 2]);
+        assert_eq!(&data[start + 52..start + 54], &1u16.to_be_bytes());
+        assert_eq!(&data[start + 54..start + 58], &(1048576i32).to_be_bytes());
+        let back = read(&data, "Back".into()).unwrap();
+        assert_eq!(back.paths, doc.paths);
+        assert_eq!(back.composite_rgba8(), doc.composite_rgba8());
+        assert!(read_path(&[0; 25], "bad".into(), 128, 64).is_err());
+        doc.paths[0].subpaths[0].knots[0].anchor.0 = f32::NAN;
+        assert!(validate_paths(&doc).is_err());
     }
 }

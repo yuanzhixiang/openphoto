@@ -1,0 +1,142 @@
+//! Path-mode Pen canvas input. Geometry stays editable and pixel-independent.
+use crate::{
+    document_view::{to_doc, to_screen},
+    state::DocState,
+};
+use egui::{Key, PointerButton, Pos2, Rect, Stroke, Ui};
+use op_core::path::{Knot, Path, Subpath};
+#[derive(Default)]
+pub struct Session {
+    pub continuation: Option<(usize, usize)>,
+    drag: Option<Drag>,
+}
+struct Drag {
+    before: op_core::Snapshot,
+    path: usize,
+    sub: usize,
+    knot: usize,
+    closing: bool,
+}
+impl Session {
+    pub fn busy(&self) -> bool {
+        self.drag.is_some()
+    }
+}
+pub fn input(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
+    if ui.input(|i| i.key_pressed(Key::Escape)) {
+        if let Some(drag) = state.pen_session.drag.take() {
+            state.doc.restore(&drag.before);
+        }
+        state.pen_session.continuation = None;
+        return;
+    }
+    if response.hovered()
+        && ui.input(|i| i.pointer.button_pressed(PointerButton::Primary))
+        && let Some(p) = ui.input(|i| i.pointer.interact_pos())
+    {
+        let p = to_doc(state, p, ppp);
+        let before = state.doc.snapshot();
+        let continuing = state.pen_session.continuation.filter(|&(path, sub)| {
+            state
+                .doc
+                .paths
+                .get(path)
+                .and_then(|p| p.subpaths.get(sub))
+                .is_some_and(|s| !s.closed)
+        });
+        let (path, sub) = if let Some(existing) = continuing {
+            existing
+        } else {
+            let path = state.doc.paths.len();
+            state.doc.paths.push(Path {
+                name: format!("Path {}", path + 1),
+                subpaths: vec![Subpath::default()],
+            });
+            (path, 0)
+        };
+        let first = state.doc.paths[path].subpaths[sub]
+            .knots
+            .first()
+            .map(|k| k.anchor);
+        let closing = state.doc.paths[path].subpaths[sub].knots.len() > 1
+            && first.is_some_and(|a| {
+                to_screen(state, Pos2::new(a.0, a.1), ppp).distance(to_screen(state, p, ppp)) <= 6.
+            });
+        let knot = if closing {
+            0
+        } else {
+            let s = &mut state.doc.paths[path].subpaths[sub];
+            s.knots.push(Knot::corner((p.x, p.y)));
+            s.knots.len() - 1
+        };
+        state.doc.active_path = Some(path);
+        state.pen_session.continuation = Some((path, sub));
+        state.pen_session.drag = Some(Drag {
+            before,
+            path,
+            sub,
+            knot,
+            closing,
+        });
+    }
+    let Some(d) = state.pen_session.drag.as_ref() else {
+        return;
+    };
+    let (path, sub, knot, closing) = (d.path, d.sub, d.knot, d.closing);
+    if let Some(p) = ui.input(|i| i.pointer.interact_pos()) {
+        let p = to_doc(state, p, ppp);
+        let k = &mut state.doc.paths[path].subpaths[sub].knots[knot];
+        let (mut dx, mut dy) = (p.x - k.anchor.0, p.y - k.anchor.1);
+        if ui.input(|i| i.modifiers.shift) {
+            let length = dx.hypot(dy);
+            let step = std::f32::consts::FRAC_PI_4;
+            let a = (dy.atan2(dx) / step).round() * step;
+            dx = length * a.cos();
+            dy = length * a.sin();
+        }
+        if dx.hypot(dy) > 0.5 {
+            k.outgoing = (k.anchor.0 + dx, k.anchor.1 + dy);
+            if !ui.input(|i| i.modifiers.alt) {
+                k.incoming = (k.anchor.0 - dx, k.anchor.1 - dy);
+                k.linked = true;
+            } else {
+                k.linked = false;
+            }
+        }
+    }
+    if !ui.input(|i| i.pointer.primary_down()) {
+        state.pen_session.drag = None;
+        if closing {
+            state.doc.paths[path].subpaths[sub].closed = true;
+            state.pen_session.continuation = None;
+        }
+        state.doc.mark_dirty();
+        state.record("Pen Tool");
+    }
+}
+pub fn draw(ui: &Ui, state: &DocState, canvas: Rect, ppp: f32) {
+    let Some(path) = state.doc.active_path.and_then(|i| state.doc.paths.get(i)) else {
+        return;
+    };
+    let painter = ui.painter_at(canvas);
+    let blue = egui::Color32::from_rgb(45, 150, 255);
+    for sub in &path.subpaths {
+        let points = sub
+            .flatten()
+            .into_iter()
+            .map(|p| to_screen(state, Pos2::new(p.0, p.1), ppp))
+            .collect::<Vec<_>>();
+        painter.add(egui::Shape::line(points, Stroke::new(1., blue)));
+        for k in &sub.knots {
+            let a = to_screen(state, Pos2::new(k.anchor.0, k.anchor.1), ppp);
+            for p in [k.incoming, k.outgoing] {
+                let b = to_screen(state, Pos2::new(p.0, p.1), ppp);
+                if a.distance(b) > 0.5 {
+                    painter.line_segment([a, b], Stroke::new(0.75, blue));
+                    painter.circle_filled(b, 2.5, blue);
+                }
+            }
+            painter.rect_filled(Rect::from_center_size(a, egui::vec2(5., 5.)), 0., blue);
+        }
+    }
+}

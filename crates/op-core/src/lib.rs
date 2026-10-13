@@ -30,6 +30,7 @@ pub mod magnetic;
 pub mod more_filters;
 pub mod move_tool;
 pub mod paint;
+pub mod path;
 pub mod pixel;
 pub mod remove;
 pub mod selection;
