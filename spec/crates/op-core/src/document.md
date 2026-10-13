@@ -158,3 +158,5 @@ Document.slices and Snapshot.slices retain undoable user slice metadata. Restori
 Document.notes and Snapshot.notes retain non-pixel note annotations across undo/redo.
 
 Document.count_groups and Snapshot.count_groups retain non-pixel count data through undo/redo.
+
+snapshot_quick_mask returns a borrowed Quick Mask from a history snapshot, or None when it was not present.

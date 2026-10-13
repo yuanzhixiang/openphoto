@@ -55,3 +55,5 @@ Frame sibling CPU regression creates multiple independently clipped containers a
 Patch cancellation regression covers drag state, busy state, release after Escape, unchanged selection/pixels/history without native input.
 
 Clone Stamp canvas regression checks mask source sampling, destination coverage, untouched pixels, one history state and undo.
+
+History Brush regression restores a mask pixel from a selected state on both mask targets, leaves image pixels unchanged and verifies undo.

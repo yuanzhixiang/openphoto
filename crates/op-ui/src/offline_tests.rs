@@ -1330,3 +1330,64 @@ fn clone_stamp_samples_and_writes_only_the_active_mask_cpu() {
         255
     );
 }
+
+#[test]
+fn history_brush_restores_the_corresponding_mask_and_undoes_cpu() {
+    for quick in [false, true] {
+        let mut h = CanvasHarness::new(Tool::HistoryBrush);
+        h.app.history_brush.size = 12.0;
+        let state = h.app.active().unwrap();
+        let id = state.doc.active_layer.unwrap();
+        if quick {
+            state.doc.enter_quick_mask();
+        } else {
+            state.doc.layer_mut(id).unwrap().mask =
+                Some(op_core::layer::LayerMask::filled(256, 256, 255));
+            state.doc.mask_target = true;
+        }
+        state
+            .doc
+            .edit_target()
+            .unwrap()
+            .image
+            .set_pixel(120, 120, [0, 0, 0, 255]);
+        state.record("Mask Source");
+        state.history_source = Some(state.history.current_id());
+        state
+            .doc
+            .edit_target()
+            .unwrap()
+            .image
+            .set_pixel(120, 120, [255, 255, 255, 255]);
+        state.record("Erase Mask");
+        let pixels = state.doc.layer(id).unwrap().image().unwrap().to_rgba8();
+        h.drag((120.5, 120.5), (122.5, 120.5), Modifiers::NONE);
+        assert_eq!(
+            h.app
+                .active()
+                .unwrap()
+                .doc
+                .edit_target()
+                .unwrap()
+                .image
+                .pixel(120, 120),
+            [0, 0, 0, 255]
+        );
+        assert_eq!(
+            h.state().doc.layer(id).unwrap().image().unwrap().to_rgba8(),
+            pixels
+        );
+        assert!(h.app.active().unwrap().undo());
+        assert_eq!(
+            h.app
+                .active()
+                .unwrap()
+                .doc
+                .edit_target()
+                .unwrap()
+                .image
+                .pixel(120, 120),
+            [255, 255, 255, 255]
+        );
+    }
+}

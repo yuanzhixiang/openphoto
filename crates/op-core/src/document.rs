@@ -264,6 +264,11 @@ impl Document {
         snapshot.layers.iter().find(|l| l.id == id)
     }
 
+    /// The Quick Mask stored in a history state, if that state has one.
+    pub fn snapshot_quick_mask(snapshot: &Snapshot) -> Option<&TiledImage> {
+        snapshot.quick_mask.as_ref()
+    }
+
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             guides: self.guides.clone(),

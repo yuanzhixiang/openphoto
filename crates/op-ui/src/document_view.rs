@@ -2292,7 +2292,14 @@ fn stroke_kind(
                  a corresponding layer."
                     .to_string()
             })?;
-            let image = layer.image().ok_or_else(|| {
+            let image = if state.doc.quick_mask.is_some() {
+                op_core::Document::snapshot_quick_mask(snapshot)
+            } else if state.doc.editing_mask() {
+                layer.mask.as_ref().map(|m| &m.image)
+            } else {
+                layer.image()
+            }
+            .ok_or_else(|| {
                 "Could not use the history brush because the history state does not contain \
                  a corresponding layer."
                     .to_string()
