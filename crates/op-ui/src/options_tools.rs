@@ -1174,8 +1174,8 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             Sep(549.0),
             Check(554.0, "Use Measurement Scale", "ruler.scale", true),
             Sep(694.5),
-            Button(702.0, 802.5, "Straighten Layer", false),
-            Button(811.5, 858.0, "Clear", false),
+            Action(702.0, 802.5, "Straighten Layer"),
+            Action(811.5, 858.0, "Clear"),
         ],
         Note => &[
             Label(111.5, "Author:"),
@@ -1838,7 +1838,16 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
     for &item in items {
         match item {
             Sep(x) => b.sep(x),
-            Label(x, t) => b.label(x, t, true),
+            Label(x, t) => {
+                let readout = (app.tool == Tool::Ruler)
+                    .then(|| {
+                        app.active()
+                            .and_then(|s| s.measurement)
+                            .and_then(|m| m.readout(t))
+                    })
+                    .flatten();
+                b.label(x, readout.as_deref().unwrap_or(t), true);
+            }
             Picker(x) => picker(b, app, x),
             Icon(x, icon, tip) => {
                 let response = b.icon(x, icon, tip, false, true);
@@ -2172,7 +2181,16 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 }
             }
             Action(x0, x1, label) => {
-                if b.button(x0, x1, label, true).clicked() {
+                let enabled = if label == "Straighten Layer" {
+                    app.active().is_some_and(|s| {
+                        s.measurement.is_some() && op_core::transform::bounds(&s.doc).is_ok()
+                    })
+                } else if label == "Clear" && app.tool == Tool::Ruler {
+                    app.active().is_some_and(|s| s.measurement.is_some())
+                } else {
+                    true
+                };
+                if b.button(x0, x1, label, enabled).clicked() {
                     let ppp = b.ui.ctx().pixels_per_point();
                     action(app, label, ppp);
                 }
@@ -2432,6 +2450,7 @@ fn action(app: &mut AppState, label: &str, ppp: f32) {
                 state.record("Slices From Guides");
             }
         }
+        "Straighten Layer" => crate::measure_tool::straighten(app),
         "Reset View" => {
             if let Some(doc) = app.active() {
                 doc.view.rotation = 0.0;
@@ -2441,6 +2460,12 @@ fn action(app: &mut AppState, label: &str, ppp: f32) {
         "Clear All" => {
             if let Some(doc) = app.active() {
                 doc.color_samplers.clear();
+            }
+        }
+        "Clear" if app.tool == Tool::Ruler => {
+            if let Some(s) = app.active() {
+                crate::measure_tool::cancel(s);
+                s.measurement = None;
             }
         }
         "Clear" => {

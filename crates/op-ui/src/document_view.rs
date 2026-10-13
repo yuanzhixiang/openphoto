@@ -609,6 +609,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
             }
             Tool::Zoom => zoom_drag(ui, &response, state, scrubby, ppp),
             Tool::ColorSampler => sampler_input(ui, &response, state, alt, ppp),
+            Tool::Ruler => crate::measure_tool::input(ui, &response, state, ppp),
             Tool::SelectionBrush => {
                 if let Some(opts) = paint {
                     paint_error = crate::selection_brush::input(
@@ -1111,6 +1112,13 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
     if tool != Tool::SliceSelect {
         crate::slice_tool::cancel_select(state);
+    }
+    if tool == Tool::Ruler {
+        if view_options.extras {
+            crate::measure_tool::draw(ui, state, ppp);
+        }
+    } else {
+        crate::measure_tool::cancel(state);
     }
     if tool != Tool::ColorSampler {
         if let Some(before) = state.sampler_before.take() {

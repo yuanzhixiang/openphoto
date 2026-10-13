@@ -57,9 +57,9 @@ Clicking it pops up the brush picker popup (`brush_presets.md`): Size, Hardness 
 ## Known differences
 
 - Initial values of brush size, opacity, etc. are this program's defaults; the Photoshop screenshots show the state at the time (e.g. a 13 px brush).
-- The Mixer's smoothing icon, symmetry (butterfly), airbrush, angle gradient and similar icons are approximate redrawings from the screenshots; the Ruler's readout is currently fixed at 0.
+- The Mixer's smoothing icon, symmetry (butterfly), airbrush, angle gradient and similar icons are approximate redrawings from the screenshots; the Ruler's metrics are computed from its live geometry.
 - The paint symmetry button (the butterfly) does nothing: Photoshop's paint symmetry draws along symmetry paths, so it comes with paths (P2 #14). "Ignore adjustment layers when healing / cloning" has nothing to ignore until adjustment layers exist (P2 #17).
-- The Pen, Path Selection, Perspective Crop, Slice, Slice Select and Frame tools themselves are not implemented yet; their options are only stored in `tool_settings`. Icons such as path operations/alignment/arrangement, gear, Warp Text and panel toggles are appearance only.
+- The Pen and Path Selection tools themselves are not implemented yet; their options are only stored in `tool_settings`. Perspective Crop, Slice, Slice Select and Frame use their own canvas components, with remaining limitations documented there. Icons such as path operations/alignment/arrangement, gear, Warp Text and panel toggles are appearance only.
 - The Remove Tool and Adjustment Brush themselves are not implemented yet; their options are only stored in `tool_settings`. The Remove Tool's feedback icon and the Adjustment Brush's Select Subject icon are approximate drawings. The Move tool's bar is laid out separately by `options_bar.rs` (its separators and edges also match Photoshop).
 
 ## Test coverage
@@ -90,3 +90,5 @@ Artboard backgrounds include Other for custom RGB. The swatch opens a staged col
 Quick Selection mode is bounded to New/Add/Subtract and brush size to finite 1–5000 px, with invalid numbers falling back to 30.
 
 Slices From Guides creates the guide grid through op_core::slice and records one state only when bounds change.
+
+Ruler readouts show live measurement metrics in document pixels. Clear Ruler resets geometry, and Straighten Layer calls the transform operation for transformable layers. Measurement Scale remains unimplemented.

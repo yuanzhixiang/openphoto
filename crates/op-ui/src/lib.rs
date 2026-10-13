@@ -19,6 +19,7 @@ mod document_view;
 mod frame_tool;
 mod free_transform;
 mod icons;
+mod measure_tool;
 #[cfg(target_os = "macos")]
 mod menu;
 mod native_popup;

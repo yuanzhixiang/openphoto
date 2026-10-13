@@ -998,3 +998,61 @@ fn color_sampler_limit_cancel_move_alt_delete_and_tool_switch_cpu() {
     assert_eq!(h.state().history.states().len(), count);
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn ruler_line_protractor_drag_cancel_readout_straighten_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::Ruler);
+    let s = h.app.active().unwrap();
+    let id = s.doc.active_layer.unwrap();
+    s.doc.layer_mut(id).unwrap().is_background = false;
+    s.doc.mark_dirty();
+    s.record("Fixture");
+    let pixels = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    h.drag((20.0, 20.0), (100.0, 80.0), Modifiers::NONE);
+    let m = h.state().measurement.unwrap();
+    assert_eq!(m.readout("L1: 0.00").unwrap(), "L1: 100.00");
+    assert_eq!(m.readout("A: 0.0°").unwrap(), "A: 36.9°");
+    h.drag((20.0, 20.0), (20.0, 120.0), Modifiers::ALT);
+    let m = h.state().measurement.unwrap();
+    assert!(m.c.unwrap().distance(egui::pos2(20.0, 120.0)) < 1e-3);
+    assert_eq!(m.readout("A: 0.0°").unwrap(), "A: 53.1°");
+    assert_eq!(m.readout("L2:").unwrap(), "L2: 100.00");
+    let p = h.point(20.0, 120.0);
+    h.button(p, true, Modifiers::NONE);
+    let q = h.point(40.0, 160.0);
+    h.step(vec![Event::PointerMoved(q)], Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    h.button(q, false, Modifiers::NONE);
+    assert_eq!(h.state().measurement, Some(m));
+    h.drag((60.0, 50.0), (70.0, 60.0), Modifiers::NONE);
+    assert!(
+        h.state()
+            .measurement
+            .unwrap()
+            .a
+            .distance(egui::pos2(30.0, 30.0))
+            < 1e-3
+    );
+    assert_eq!(h.state().history.states().len(), count);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    crate::measure_tool::straighten(&mut h.app);
+    assert!(h.state().measurement.is_none());
+    assert_eq!(h.state().history.states().len(), count + 1);
+    assert_ne!(h.state().doc.composite_rgba8(), pixels);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    h.app.active().unwrap().measurement = None;
+    h.drag((20.0, 20.0), (100.0, 80.0), Modifiers::SHIFT);
+    let m = h.state().measurement.unwrap();
+    assert!(((m.b - m.a) - egui::vec2(70.0, 70.0)).length() < 1e-3);
+}

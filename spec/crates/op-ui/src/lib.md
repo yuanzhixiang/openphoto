@@ -139,3 +139,5 @@ slice_tool handles canvas slice creation and numbered overlays.
 frame_tool handles transactional canvas frame creation and movement.
 
 With Frame selected, file drops over a frame delegate to actions::drop_paths for content replacement; other drops open documents.
+
+measure_tool provides Ruler canvas gestures and overlays.

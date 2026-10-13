@@ -207,3 +207,5 @@ Quick Selection offline follow-up adds snapshot cancellation, no-op history supp
 - Eyedropper: bounded sample windows and CPU checks cover transparent pixels, alpha-weighted averages, foreground/background, three scopes, outside no-op and no history/pixel edits. CPU test and strict op-ui clippy pass. Native averaging numerical parity remains unmeasured.
 
 - Color Sampler: cancelled drags and tool switches restore original marker positions; CPU tests cover ten-marker limit, move/Alt delete, cancellation and pixel/history preservation. Strict op-ui clippy passes. Sampler PSD persistence remains outstanding.
+
+- Ruler: line/endpoint/whole-line gestures, Alt protractor, Shift constraints, metrics, cancel/Clear and transformable-layer straightening are implemented. CPU integration and strict op-ui clippy pass. Coordinates are document pixels; custom measurement scales, native styling and locked-background straightening remain outstanding.
