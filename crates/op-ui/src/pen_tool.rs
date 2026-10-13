@@ -12,6 +12,8 @@ pub struct Session {
     convert: Option<ConvertDrag>,
     selected_paths: Vec<usize>,
     move_path: Option<PathDrag>,
+    nodes: Vec<(usize, usize, usize)>,
+    direct: Option<DirectDrag>,
 }
 struct Drag {
     before: op_core::Snapshot,
@@ -22,7 +24,10 @@ struct Drag {
 }
 impl Session {
     pub fn busy(&self) -> bool {
-        self.drag.is_some() || self.convert.is_some() || self.move_path.is_some()
+        self.drag.is_some()
+            || self.convert.is_some()
+            || self.move_path.is_some()
+            || self.direct.is_some()
     }
 }
 pub fn input(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
@@ -282,6 +287,9 @@ fn handle_hit(state: &DocState, pointer: Pos2, ppp: f32) -> Option<(usize, usize
     hit
 }
 pub fn cancel_inflight(state: &mut DocState) {
+    if let Some(d) = state.pen_session.direct.take() {
+        state.doc.restore(&d.before);
+    }
     if let Some(d) = state.pen_session.move_path.take() {
         state.doc.restore(&d.before);
     }
@@ -462,5 +470,161 @@ pub fn select_path(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp
             state.doc.mark_dirty();
             state.record("Drag Path");
         }
+    }
+}
+
+struct DirectDrag {
+    before: op_core::Snapshot,
+    original: Vec<Path>,
+    nodes: Vec<(usize, usize, usize)>,
+    handle: Option<(usize, usize, usize, u8)>,
+    start: Pos2,
+}
+pub fn direct_select(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
+    if ui.input(|i| i.key_pressed(Key::Escape)) {
+        cancel_inflight(state);
+        return;
+    }
+    if response.hovered()
+        && ui.input(|i| i.pointer.primary_pressed())
+        && let Some(p) = ui.input(|i| i.pointer.interact_pos())
+    {
+        let active = state.doc.active_path;
+        let mut anchor = None;
+        for path in (0..state.doc.paths.len()).rev() {
+            state.doc.active_path = Some(path);
+            if let Some(hit) = anchor_hit(state, p, ppp) {
+                anchor = Some(hit);
+                break;
+            }
+        }
+        state.doc.active_path = active;
+        let handle = if anchor.is_none() {
+            handle_hit(state, p, ppp)
+        } else {
+            None
+        };
+        if let Some(node) = anchor {
+            state.doc.active_path = Some(node.0);
+            if ui.input(|i| i.modifiers.shift) && state.pen_session.nodes.contains(&node) {
+                state.pen_session.nodes.retain(|n| *n != node);
+                return;
+            }
+            if !ui.input(|i| i.modifiers.shift) && !state.pen_session.nodes.contains(&node) {
+                state.pen_session.nodes = vec![node];
+            } else if !state.pen_session.nodes.contains(&node) {
+                state.pen_session.nodes.push(node);
+            }
+        } else if handle.is_none() {
+            state.pen_session.nodes.clear();
+            state.doc.active_path = None;
+            return;
+        }
+        state.pen_session.nodes.retain(|&(p, s, k)| {
+            state
+                .doc
+                .paths
+                .get(p)
+                .and_then(|p| p.subpaths.get(s))
+                .is_some_and(|s| k < s.knots.len())
+        });
+        state.pen_session.continuation = None;
+        state.pen_session.direct = Some(DirectDrag {
+            before: state.doc.snapshot(),
+            original: state.doc.paths.clone(),
+            nodes: state.pen_session.nodes.clone(),
+            handle,
+            start: to_doc(state, p, ppp),
+        });
+    }
+    if let Some(d) = state.pen_session.direct.as_ref() {
+        if let Some(p) = ui.input(|i| i.pointer.interact_pos()) {
+            let mut delta = to_doc(state, p, ppp) - d.start;
+            if ui.input(|i| i.modifiers.shift) {
+                if delta.x.abs() > delta.y.abs() {
+                    delta.y = 0.;
+                } else {
+                    delta.x = 0.;
+                }
+            }
+            if let Some((path, sub, knot, handle)) = d.handle {
+                let original = &d.original[path].subpaths[sub].knots[knot];
+                let k = &mut state.doc.paths[path].subpaths[sub].knots[knot];
+                *k = original.clone();
+                let (target, opposite) = if handle == 1 {
+                    (original.incoming, original.outgoing)
+                } else {
+                    (original.outgoing, original.incoming)
+                };
+                let at = (target.0 + delta.x, target.1 + delta.y);
+                if handle == 1 {
+                    k.incoming = at;
+                } else {
+                    k.outgoing = at;
+                }
+                if ui.input(|i| i.modifiers.alt) {
+                    k.linked = false;
+                } else if original.linked {
+                    let (dx, dy) = (at.0 - k.anchor.0, at.1 - k.anchor.1);
+                    let length = dx.hypot(dy);
+                    if length > 0.0001 {
+                        let old = (opposite.0 - k.anchor.0).hypot(opposite.1 - k.anchor.1);
+                        let other = (
+                            k.anchor.0 - dx / length * old,
+                            k.anchor.1 - dy / length * old,
+                        );
+                        if handle == 1 {
+                            k.outgoing = other;
+                        } else {
+                            k.incoming = other;
+                        }
+                    }
+                }
+            } else {
+                for &(path, sub, knot) in &d.nodes {
+                    let k = &mut state.doc.paths[path].subpaths[sub].knots[knot];
+                    *k = d.original[path].subpaths[sub].knots[knot].clone();
+                    k.translate((delta.x, delta.y));
+                }
+            }
+        }
+        if !ui.input(|i| i.pointer.primary_down()) {
+            let d = state.pen_session.direct.take().unwrap();
+            if state.doc.paths != d.original {
+                state.doc.mark_dirty();
+                state.record("Drag Anchor Point");
+            }
+        }
+        return;
+    }
+    // Keyboard movement changes geometry in document pixels, independent of zoom.
+    let delta = ui.input(|i| {
+        let amount = if i.modifiers.shift { 10. } else { 1. };
+        if i.key_pressed(Key::ArrowLeft) {
+            (-amount, 0.)
+        } else if i.key_pressed(Key::ArrowRight) {
+            (amount, 0.)
+        } else if i.key_pressed(Key::ArrowUp) {
+            (0., -amount)
+        } else if i.key_pressed(Key::ArrowDown) {
+            (0., amount)
+        } else {
+            (0., 0.)
+        }
+    });
+    if delta != (0., 0.) && !state.pen_session.nodes.is_empty() {
+        for &(p, s, k) in &state.pen_session.nodes {
+            if let Some(k) = state
+                .doc
+                .paths
+                .get_mut(p)
+                .and_then(|p| p.subpaths.get_mut(s))
+                .and_then(|s| s.knots.get_mut(k))
+            {
+                k.translate(delta);
+            }
+        }
+        state.doc.mark_dirty();
+        state.record("Nudge Anchor Point");
     }
 }

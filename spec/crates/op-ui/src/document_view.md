@@ -313,3 +313,5 @@ Delete Anchor Point dispatches active-path anchor picking and topology deletion.
 Convert Point handles transactional knot/control editing. Leaving Pen/Convert Point cancels unfinished path pointer edits.
 
 Path Selection routes whole-path selection/move transactions and participates in path drag cancellation.
+
+Direct Selection routes node/control editing and path pointer cancellation.

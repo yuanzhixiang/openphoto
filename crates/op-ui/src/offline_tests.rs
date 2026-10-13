@@ -2134,3 +2134,59 @@ fn path_selection_moves_all_controls_duplicates_cancels_and_undoes_cpu() {
     assert_eq!(h.state().doc.paths, original);
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn direct_selection_moves_nodes_rotates_linked_controls_and_cancels_cpu() {
+    use op_core::path::{Knot, Path, Subpath};
+    let mut h = CanvasHarness::new(Tool::DirectSelection);
+    h.app.active().unwrap().doc.paths.push(Path {
+        name: "Outline".into(),
+        subpaths: vec![Subpath {
+            closed: false,
+            knots: vec![
+                Knot {
+                    incoming: (60., 80.),
+                    anchor: (80., 80.),
+                    outgoing: (120., 80.),
+                    linked: true,
+                },
+                Knot::corner((180., 160.)),
+            ],
+        }],
+    });
+    h.app.active().unwrap().doc.active_path = Some(0);
+    h.app.active().unwrap().record("Path");
+    let pixels = h.state().doc.composite_rgba8();
+    let original = h.state().doc.paths.clone();
+    h.drag((80., 80.), (90., 90.), Modifiers::NONE);
+    assert_eq!(
+        h.state().doc.paths[0].subpaths[0].knots[1],
+        original[0].subpaths[0].knots[1]
+    );
+    h.key(Key::ArrowRight);
+    let moved = h.state().doc.paths[0].subpaths[0].knots[0].clone();
+    assert!((moved.anchor.0 - 91.).abs() < 0.001);
+    h.drag((131., 90.), (91., 130.), Modifiers::NONE);
+    let rotated = h.state().doc.paths[0].subpaths[0].knots[0].clone();
+    assert!(rotated.linked);
+    assert!((rotated.incoming.0 - 91.).abs() < 0.001);
+    assert!((rotated.incoming.1 - 70.).abs() < 0.001);
+    h.drag((91., 130.), (141., 110.), Modifiers::ALT);
+    let independent = h.state().doc.paths[0].subpaths[0].knots[0].clone();
+    assert!(!independent.linked);
+    assert_eq!(independent.incoming, rotated.incoming);
+    let count = h.state().history.states().len();
+    let a = h.point(91., 90.);
+    h.button(a, true, Modifiers::NONE);
+    h.step(
+        vec![Event::PointerMoved(h.point(130., 170.))],
+        Modifiers::NONE,
+    );
+    h.key(Key::Escape);
+    h.button(a, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.paths[0].subpaths[0].knots[0], independent);
+    assert_eq!(h.state().history.states().len(), count);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.paths[0].subpaths[0].knots[0], rotated);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}
