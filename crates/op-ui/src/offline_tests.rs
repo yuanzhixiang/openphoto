@@ -1481,3 +1481,34 @@ fn rotate_view_escape_resets_and_does_not_resume_the_old_drag_cpu() {
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
     assert_eq!(h.state().history.states().len(), count);
 }
+
+#[test]
+fn zoom_escape_restores_scrubby_view_and_discards_zoom_boxes_cpu() {
+    for scrubby in [false, true] {
+        let mut h = CanvasHarness::new(Tool::Zoom);
+        h.app.set_flag("zoom.scrubby", scrubby);
+        let pixels = h.state().doc.composite_rgba8();
+        let count = h.state().history.states().len();
+        let zoom = h.state().view.zoom;
+        let offset = h.state().view.offset;
+        let a = h.point(100.5, 100.5);
+        let b = a + egui::vec2(100.0, 80.0);
+        h.button(a, true, Modifiers::NONE);
+        h.step(vec![Event::PointerMoved(b)], Modifiers::NONE);
+        if scrubby {
+            assert!(h.state().view.zoom > zoom);
+        }
+        h.key(Key::Escape);
+        assert!((h.state().view.zoom - zoom).abs() < 0.0001);
+        assert!((h.state().view.offset - offset).length() < 0.001);
+        h.step(
+            vec![Event::PointerMoved(b + egui::vec2(10.0, 10.0))],
+            Modifiers::NONE,
+        );
+        h.button(b, false, Modifiers::NONE);
+        assert!((h.state().view.zoom - zoom).abs() < 0.0001);
+        assert!((h.state().view.offset - offset).length() < 0.001);
+        assert_eq!(h.state().doc.composite_rgba8(), pixels);
+        assert_eq!(h.state().history.states().len(), count);
+    }
+}

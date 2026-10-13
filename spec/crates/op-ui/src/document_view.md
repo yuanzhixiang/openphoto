@@ -293,3 +293,5 @@ Gradient Escape clears the pending line without committing pixels; release after
 Rectangle/Ellipse/Triangle/Polygon/Line drags accept Escape before layer creation. Release after cancellation preserves layers/pixels/history; subsequent valid shapes remain undoable. Their vector/live shape representation and Custom Shape remain unimplemented.
 
 Rotate View Escape resets to zero and removes the cached drag origin immediately; continued pointer movement/release cannot restore the cancelled rotation.
+
+Zoom Escape removes the drag session. Scrubby zoom returns to its start scale around the original anchor, recovering the prior offset; a pending zoom box is discarded. Continued movement/release does not resume it.

@@ -63,3 +63,5 @@ Gradient regression checks pending busy state, Escape/release preserving pixels/
 Shape cancellation regression exercises each supported shape tool, releasing after Escape, a subsequent valid shape and undo. It does not establish native vector-layer or rasterization parity.
 
 Rotate View regression checks a quarter-turn drag, Escape while pressed, continued movement/release staying at zero, unchanged pixels and history.
+
+Zoom cancellation regression covers scrubby scale/anchor restoration and box discard, post-Escape movement/release, unchanged document pixels and history.

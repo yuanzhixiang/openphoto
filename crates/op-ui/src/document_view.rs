@@ -1226,6 +1226,13 @@ fn follow_view(
 /// without it, a box is drawn and the view zooms to fit it on release.
 fn zoom_drag(ui: &Ui, response: &egui::Response, state: &mut DocState, scrubby: bool, ppp: f32) {
     let start_id = ui.id().with("zoom-drag-start");
+    if ui.input(|i| i.key_pressed(Key::Escape)) {
+        if let Some((start, origin)) = ui.data(|d| d.get_temp::<(f32, Pos2)>(start_id)) {
+            zoom_at(state, start, origin, ppp);
+            ui.data_mut(|d| d.remove::<(f32, Pos2)>(start_id));
+        }
+        return;
+    }
     if response.drag_started_by(PointerButton::Primary)
         && let Some(origin) = ui.input(|i| i.pointer.press_origin())
     {
