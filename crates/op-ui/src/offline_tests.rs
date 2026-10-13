@@ -1458,3 +1458,26 @@ fn shape_escape_preserves_layers_and_subsequent_shapes_undo_cpu() {
         assert_eq!(h.state().doc.composite_rgba8(), pixels, "{tool:?}");
     }
 }
+
+#[test]
+fn rotate_view_escape_resets_and_does_not_resume_the_old_drag_cpu() {
+    let mut h = CanvasHarness::new(Tool::RotateView);
+    let pixels = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    let a = h.point(190.5, 128.0);
+    let b = h.point(128.0, 190.5);
+    h.button(a, true, Modifiers::NONE);
+    h.step(vec![Event::PointerMoved(b)], Modifiers::NONE);
+    assert!((h.state().view.rotation - 90.0).abs() < 0.01);
+    h.key(Key::Escape);
+    assert_eq!(h.state().view.rotation, 0.0);
+    h.step(
+        vec![Event::PointerMoved(b + egui::vec2(20.0, 20.0))],
+        Modifiers::NONE,
+    );
+    assert_eq!(h.state().view.rotation, 0.0);
+    h.button(b, false, Modifiers::NONE);
+    assert_eq!(h.state().view.rotation, 0.0);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    assert_eq!(h.state().history.states().len(), count);
+}

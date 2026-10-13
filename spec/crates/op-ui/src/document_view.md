@@ -291,3 +291,5 @@ History Brush reads the corresponding image, layer mask or Quick Mask from its s
 Gradient Escape clears the pending line without committing pixels; release after cancellation does nothing. A subsequent valid line remains undoable. The editable Gradient layer mode remains unimplemented.
 
 Rectangle/Ellipse/Triangle/Polygon/Line drags accept Escape before layer creation. Release after cancellation preserves layers/pixels/history; subsequent valid shapes remain undoable. Their vector/live shape representation and Custom Shape remain unimplemented.
+
+Rotate View Escape resets to zero and removes the cached drag origin immediately; continued pointer movement/release cannot restore the cancelled rotation.

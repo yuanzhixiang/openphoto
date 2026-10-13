@@ -3810,6 +3810,8 @@ fn rotate_view_input(ui: &Ui, response: &egui::Response, state: &mut DocState, p
     let start_id = ui.id().with("rotate-view-start");
     if ui.input(|i| i.key_pressed(Key::Escape)) {
         state.view.rotation = 0.0;
+        ui.data_mut(|d| d.remove::<(f32, f32)>(start_id));
+        return;
     }
     let angle_of = |p: Pos2| (p.y - center.y).atan2(p.x - center.x).to_degrees();
     if response.drag_started_by(PointerButton::Primary)
