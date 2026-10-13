@@ -101,3 +101,7 @@ Freeform Pen verifies sampled cubic anchors/handles, cancellation, one changed h
 Freeform Magnetic selection rejects canvas creation instead of silently using the ordinary sampled spline.
 
 Curvature Pen verifies smooth controls, closure, geometry undo, Escape ending continuation, a subsequent new path and unchanged pixels.
+
+Adjustment Brush regression paints a retained black-mask adjustment, checks effect/source preservation, cancels, changes editable parameters, saves/reads OpenPhoto's private PSD settings and masks, subtracts and undoes. Native PSD adjustment-tag compatibility is not asserted.
+
+Adjustment Brush also checks all six retained kinds, selection-limited masks, out-of-selection new-layer rollback and lock-all rejection without extra history.

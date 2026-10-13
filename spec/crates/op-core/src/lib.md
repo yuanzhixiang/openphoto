@@ -39,3 +39,5 @@ The annotation module defines persisted note metadata and creation.
 The remove module supplies bounded offline exemplar filling and atomic document application; it is not native Photoshop synthesis.
 
 The path module supplies editable cubic geometry without UI/GPU dependencies.
+
+adjustment_layer supplies retained point adjustment settings and masked layer creation.

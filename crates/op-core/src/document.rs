@@ -560,6 +560,9 @@ impl Document {
                 keep_alpha: true,
             });
         }
+        if layer.adjustment.is_some() {
+            return None;
+        }
         let keep_alpha = layer.is_background || transparency_locked;
         // A group has no pixels to edit
         let image = layer.image_mut()?;
@@ -886,6 +889,41 @@ impl Document {
         band: (usize, usize),
     ) {
         for layer in layers.iter().filter(|l| belongs(l) && l.visible) {
+            if let Some(settings) = layer.adjustment {
+                let effect = settings.effect();
+                let tables = effect.tables();
+                for (i, px) in out.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+                    if px[3] <= 0. {
+                        continue;
+                    }
+                    let x = (i % self.width as usize) as u32;
+                    let y = (i / self.width as usize + band.0) as u32;
+                    let coverage = layer
+                        .mask
+                        .as_ref()
+                        .filter(|m| m.enabled)
+                        .map_or(1., |m| m.image.pixel(x, y)[0] as f32 / 255.);
+                    let amount = (coverage * layer.opacity * layer.fill).clamp(0., 1.);
+                    if amount == 0. {
+                        continue;
+                    }
+                    let bytes = std::array::from_fn(|c| (px[c].clamp(0., 1.) * 255.).round() as u8);
+                    let target = crate::adjustment_layer::map(effect, &tables, bytes);
+                    let color = blend::blend(
+                        layer.blend_mode,
+                        [px[0], px[1], px[2]],
+                        [
+                            target[0] as f32 / 255.,
+                            target[1] as f32 / 255.,
+                            target[2] as f32 / 255.,
+                        ],
+                    );
+                    for c in 0..3 {
+                        px[c] += (color[c] - px[c]) * amount;
+                    }
+                }
+                continue;
+            }
             match &layer.kind {
                 LayerKind::Raster(image) => self.composite_image(layer, image, out, band),
                 LayerKind::Group { .. } => {

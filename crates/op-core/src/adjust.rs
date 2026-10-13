@@ -611,7 +611,7 @@ fn to_u8(rgb: [f32; 3], a: u8) -> [u8; 4] {
 }
 
 /// The per-pixel adjustments that mix channels.
-fn color_adjust(adjustment: Adjustment, px: [u8; 4]) -> [u8; 4] {
+pub(crate) fn color_adjust(adjustment: Adjustment, px: [u8; 4]) -> [u8; 4] {
     let rgb = [px[0], px[1], px[2]].map(|v| v as f32 / 255.0);
     let lum = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
     match adjustment {

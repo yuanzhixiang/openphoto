@@ -256,6 +256,7 @@ pub struct Layer {
     pub lock_all: bool,
     pub kind: LayerKind,
     pub mask: Option<LayerMask>,
+    pub adjustment: Option<crate::adjustment_layer::Settings>,
     /// An artboard is a group with its own clipping rectangle and background.
     pub artboard: Option<crate::artboard::Artboard>,
     pub frame: Option<crate::frame::Frame>,
@@ -287,6 +288,7 @@ impl Layer {
             lock_all: false,
             kind: LayerKind::Raster(image),
             mask: None,
+            adjustment: None,
             artboard: None,
             frame: None,
             color: LayerColor::None,
@@ -311,6 +313,9 @@ impl Layer {
 
     /// The layer's pixels; `None` for a group.
     pub fn image(&self) -> Option<&TiledImage> {
+        if self.adjustment.is_some() {
+            return None;
+        }
         match &self.kind {
             LayerKind::Raster(image) => Some(image),
             LayerKind::Group { .. } => None,
@@ -318,6 +323,9 @@ impl Layer {
     }
 
     pub fn image_mut(&mut self) -> Option<&mut TiledImage> {
+        if self.adjustment.is_some() {
+            return None;
+        }
         match &mut self.kind {
             LayerKind::Raster(image) => Some(image),
             LayerKind::Group { .. } => None,

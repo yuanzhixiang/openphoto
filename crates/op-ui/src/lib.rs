@@ -4,6 +4,7 @@
 //! the resulting state.
 
 mod actions;
+mod adjustment_tool;
 #[cfg(target_os = "macos")]
 mod app_kit;
 mod artboard_tool;

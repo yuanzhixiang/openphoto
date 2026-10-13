@@ -4,6 +4,7 @@
 //! the data structures defined here.
 
 pub mod adjust;
+pub mod adjustment_layer;
 pub mod align;
 pub mod annotation;
 pub mod artboard;

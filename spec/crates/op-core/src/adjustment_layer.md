@@ -1,0 +1,5 @@
+# adjustment_layer.rs: Non-destructive masked adjustments
+
+Six adjustment kinds retain editable settings: Vibrance, Brightness/Contrast, Exposure, Hue/Saturation, Color Balance and Black & White. They use the existing adjustment math and tables, with its documented numerical limitations. Point adjustments operate on the composite below the layer, under its mask, visibility, opacity, fill and blend mode, preserving composite alpha and source raster pixels. Group compositing supplies the local backdrop. New layers have an empty black mask and target mask editing. Pixel editing of the adjustment layer itself is rejected.
+
+Settings expose nine finite values. Application defaults are effectful values and are not verified Photoshop defaults. Color Balance preserves luminosity; B&W has six weights and no tint, and Hue/Saturation edits Master only. Native adjustment-layer PSD tags, properties styling and brush presets remain unverified. Tests verify black-mask no-op, isolated masked output, source changes affecting output and later editable settings.

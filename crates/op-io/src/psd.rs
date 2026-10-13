@@ -363,6 +363,14 @@ fn read_slice_text(r: &mut Reader) -> Result<String, IoError> {
 }
 // Standard named path image resources, as specified by Adobe's PSD format.
 pub(crate) fn validate_paths(doc: &Document) -> Result<(), IoError> {
+    if doc
+        .layers
+        .iter()
+        .filter_map(|l| l.adjustment)
+        .any(|a| !a.valid())
+    {
+        return Err(invalid("invalid adjustment settings"));
+    }
     if doc.paths.len() > 998 {
         return Err(invalid("too many saved paths"));
     }
@@ -1034,6 +1042,15 @@ pub fn write(doc: &Document) -> Vec<u8> {
             if let Some(board) = layer.artboard {
                 write_artboard_descriptor(&mut out, board);
             }
+            if let Some(settings) = layer.adjustment {
+                out.bytes(b"8BIMopad");
+                out.u32(44);
+                out.u32(1);
+                out.u32(settings.kind as u32);
+                for v in settings.values {
+                    out.u32(v.to_bits());
+                }
+            }
             if let Some(frame) = layer.frame {
                 out.bytes(b"8BIMopfr");
                 out.u32(24);
@@ -1224,6 +1241,7 @@ struct LayerRecord {
     mask_linked: bool,
     artboard: Option<op_core::artboard::Artboard>,
     frame: Option<op_core::frame::Frame>,
+    adjustment: Option<op_core::adjustment_layer::Settings>,
     rect: (i32, i32, i32, i32),
     channels: Vec<(i16, usize)>,
     blend: [u8; 4],
@@ -1391,6 +1409,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                 let mut mask_linked = true;
                 let mut artboard = None;
                 let mut frame = None;
+                let mut adjustment = None;
                 while r.pos() + 12 <= extra_end {
                     let sig = r.take::<4>()?;
                     if &sig != b"8BIM" && &sig != b"8B64" {
@@ -1421,6 +1440,24 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                             if version == 1 && f.valid(w, h) {
                                 frame = Some(f);
                             }
+                        }
+                        b"opad" if len == 44 => {
+                            let version = r.u32()?;
+                            let kind = r.u32()? as usize;
+                            let mut values = [0.; 9];
+                            for v in &mut values {
+                                *v = f32::from_bits(r.u32()?);
+                            }
+                            if version != 1
+                                || kind >= op_core::adjustment_layer::Kind::ALL.len()
+                                || values.iter().any(|v| !v.is_finite())
+                            {
+                                return Err(invalid("invalid retained adjustment settings"));
+                            }
+                            adjustment = Some(op_core::adjustment_layer::Settings {
+                                kind: op_core::adjustment_layer::Kind::ALL[kind],
+                                values,
+                            });
                         }
                         b"opml" => mask_linked = r.u32()? != 0,
                         b"artb" => artboard = read_artboard_descriptor(r.bytes(len as usize)?)?,
@@ -1466,6 +1503,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                     mask_linked,
                     artboard,
                     frame,
+                    adjustment,
                 });
             }
             let mut open_groups: Vec<usize> = Vec::new();
@@ -1531,6 +1569,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                 }
                 layer.artboard = rec.artboard;
                 layer.frame = rec.frame;
+                layer.adjustment = rec.adjustment;
                 layer.visible = rec.flags & 2 == 0;
                 layer.opacity = rec.opacity as f32 / 255.0;
                 layer.fill = rec.fill as f32 / 255.0;

@@ -193,3 +193,5 @@ pen_session stores transient selected path indexes and a whole-path drag snapsho
 pen_session retains selected node indexes and a Direct Selection snapshot for transient pointer editing.
 
 pen_session keeps sampled Freeform pointer transactions and counts them as busy.
+
+adjustment_session holds a common paint stroke, pre-edit snapshot/mask target and original mask pixels. It counts as busy and is discarded by undo/redo.

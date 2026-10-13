@@ -111,3 +111,7 @@ Masks have a `linked` boolean, true by default; it controls coupled pixel/mask m
 `Layer::artboard` optionally attaches an Artboard rectangle/background to a group. Regular raster/group constructors initialize it to None; clones and snapshots retain it.
 
 Layer.frame stores an optional frame-container geometry, included through cloned layers in snapshots. Its clipping mask remains a normal group mask.
+
+A layer can retain adjustment settings alongside its empty raster backing and normal layer mask. The document compositor evaluates these settings against the backdrop; the backing is not a flattened effect image.
+
+image/image_mut return None for retained adjustment layers, preventing generic pixel tools from treating the empty backing as editable content.

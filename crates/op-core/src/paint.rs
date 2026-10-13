@@ -308,6 +308,7 @@ pub enum StrokeError {
     Hidden,
     /// Painting pixels while a group is the active layer.
     Group,
+    Adjustment,
 }
 
 impl StrokeError {
@@ -318,6 +319,9 @@ impl StrokeError {
             }
             Self::Locked => format!("Could not use the {tool} because the layer is locked."),
             Self::Hidden => format!("Could not use the {tool} because the target layer is hidden."),
+            Self::Adjustment => format!(
+                "Could not use the {tool} because the adjustment layer has no editable pixels."
+            ),
             Self::Group => format!("Could not use the {tool} because the target layer is a group."),
         }
     }
@@ -433,6 +437,9 @@ impl Stroke {
             }
             if doc.pixels_locked(id) {
                 return Err(StrokeError::Locked);
+            }
+            if target == Target::Pixels && layer.adjustment.is_some() {
+                return Err(StrokeError::Adjustment);
             }
             if target == Target::Pixels && layer.is_group() {
                 return Err(StrokeError::Group);

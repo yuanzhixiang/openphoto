@@ -46,6 +46,9 @@ pub fn show(ui: &mut Ui, app: &mut AppState) {
         empty(ui);
         return;
     };
+    if crate::adjustment_tool::properties(ui, state) {
+        return;
+    }
     let doc = &mut state.doc;
     let has_guides = !doc.guides.is_empty();
     let mut view_after = view;

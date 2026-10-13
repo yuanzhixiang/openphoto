@@ -2268,3 +2268,183 @@ fn curvature_pen_interpolates_closes_and_undoes_without_pixels_cpu() {
     assert_eq!(h.state().doc.paths.len(), 2);
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn adjustment_brush_add_subtract_cancel_edit_undo_and_psd_cpu() {
+    use op_core::adjustment_layer::Kind;
+    let mut h = CanvasHarness::new(Tool::AdjustmentBrush);
+    *h.app.setting("adjbrush.adjustment", "0") = "1".into();
+    *h.app.setting("adjbrush.size", "100") = "30".into();
+    let id = h.state().doc.layers[0].id;
+    h.app
+        .active()
+        .unwrap()
+        .doc
+        .layer_mut(id)
+        .unwrap()
+        .image_mut()
+        .unwrap()
+        .set_pixel(100, 100, [80, 100, 120, 255]);
+    h.app.active().unwrap().doc.mark_dirty();
+    h.app.active().unwrap().record("Fixture");
+    let source = h.state().doc.layers[0].image().unwrap().to_rgba8();
+    let count = h.state().history.states().len();
+    h.drag((100., 100.), (102., 100.), Modifiers::NONE);
+    assert_eq!(h.state().doc.layers.len(), 2);
+    let layer = h.state().doc.layers.last().unwrap();
+    assert_eq!(layer.adjustment.unwrap().kind, Kind::BrightnessContrast);
+    assert!(layer.image().is_none());
+    assert!(layer.mask.as_ref().unwrap().image.pixel(100, 100)[0] > 0);
+    assert_eq!(h.state().history.states().len(), count + 1);
+    assert_eq!(h.state().doc.layers[0].image().unwrap().to_rgba8(), source);
+    let composite = h.state().doc.composite_rgba8();
+    assert!(composite[((100 * 256 + 100) * 4) as usize] > 80);
+    let mask = layer.mask.as_ref().unwrap().image.to_rgba8();
+    let p = h.point(140., 140.);
+    h.button(p, true, Modifiers::NONE);
+    h.step(
+        vec![Event::PointerMoved(h.point(160., 160.))],
+        Modifiers::NONE,
+    );
+    h.key(Key::Escape);
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(
+        h.state()
+            .doc
+            .layers
+            .last()
+            .unwrap()
+            .mask
+            .as_ref()
+            .unwrap()
+            .image
+            .to_rgba8(),
+        mask
+    );
+    assert_eq!(h.state().history.states().len(), count + 1);
+    let active = h.state().doc.active_layer.unwrap();
+    h.app
+        .active()
+        .unwrap()
+        .doc
+        .layer_mut(active)
+        .unwrap()
+        .adjustment
+        .as_mut()
+        .unwrap()
+        .values[0] = -50.;
+    h.app.active().unwrap().doc.mark_dirty();
+    h.app.active().unwrap().record("Adjustment Settings");
+    assert!(h.state().doc.composite_rgba8()[((100 * 256 + 100) * 4) as usize] < 80);
+    let path =
+        std::env::temp_dir().join(format!("openphoto-adjustment-{}.psd", h.state().doc.id.0));
+    op_io::save(&h.state().doc, &path).unwrap();
+    let back = op_io::open(&path).unwrap();
+    std::fs::remove_file(path).unwrap();
+    assert_eq!(back.composite_rgba8(), h.state().doc.composite_rgba8());
+    assert_eq!(
+        back.layers.last().unwrap().adjustment,
+        h.state().doc.layers.last().unwrap().adjustment
+    );
+    *h.app.setting("adjbrush.mode", "1") = "0".into();
+    h.drag((100., 100.), (102., 100.), Modifiers::NONE);
+    assert!(
+        h.state()
+            .doc
+            .layers
+            .last()
+            .unwrap()
+            .mask
+            .as_ref()
+            .unwrap()
+            .image
+            .pixel(100, 100)[0]
+            < mask[((100 * 256 + 100) * 4) as usize]
+    );
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(
+        h.state()
+            .doc
+            .layers
+            .last()
+            .unwrap()
+            .mask
+            .as_ref()
+            .unwrap()
+            .image
+            .to_rgba8(),
+        mask
+    );
+    assert_eq!(h.state().doc.layers[0].image().unwrap().to_rgba8(), source);
+}
+
+#[test]
+fn adjustment_brush_kinds_selection_permissions_and_empty_cancel_cpu() {
+    for index in 0..6 {
+        let mut h = CanvasHarness::new(Tool::AdjustmentBrush);
+        *h.app.setting("adjbrush.adjustment", "0") = index.to_string();
+        *h.app.setting("adjbrush.size", "100") = "20".into();
+        let selection = op_core::Selection::rect(
+            256,
+            256,
+            op_core::selection::Rect::new(90., 90., 110., 110.),
+        );
+        h.app.active().unwrap().doc.set_selection(Some(selection));
+        h.app.active().unwrap().record("Selection");
+        let count = h.state().history.states().len();
+        h.drag((40., 40.), (50., 50.), Modifiers::NONE);
+        assert_eq!(h.state().doc.layers.len(), 1);
+        assert_eq!(h.state().history.states().len(), count);
+        h.drag((100., 100.), (102., 100.), Modifiers::NONE);
+        assert_eq!(
+            h.state()
+                .doc
+                .layers
+                .last()
+                .unwrap()
+                .adjustment
+                .unwrap()
+                .kind,
+            op_core::adjustment_layer::Kind::ALL[index]
+        );
+        let id = h.state().doc.active_layer.unwrap();
+        let mask = h
+            .state()
+            .doc
+            .layer(id)
+            .unwrap()
+            .mask
+            .as_ref()
+            .unwrap()
+            .image
+            .to_rgba8();
+        assert_eq!(
+            h.state()
+                .doc
+                .layer(id)
+                .unwrap()
+                .mask
+                .as_ref()
+                .unwrap()
+                .image
+                .pixel(89, 100)[0],
+            0
+        );
+        h.app.active().unwrap().doc.layer_mut(id).unwrap().lock_all = true;
+        let count = h.state().history.states().len();
+        h.drag((100., 100.), (104., 104.), Modifiers::NONE);
+        assert_eq!(h.state().history.states().len(), count);
+        assert_eq!(
+            h.state()
+                .doc
+                .layer(id)
+                .unwrap()
+                .mask
+                .as_ref()
+                .unwrap()
+                .image
+                .to_rgba8(),
+            mask
+        );
+    }
+}

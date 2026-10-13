@@ -33,3 +33,5 @@ When no document is open, the panel shows "No Properties" in the center.
 ## Test coverage
 
 - `properties_sections_toggle_views_and_run_quick_actions` in `ui_tests.rs`: after collapsing Canvas, clicking the rulers and grid buttons turns on rulers and grid; after collapsing Rulers & Grids, clicking lock guides; after collapsing Guides, clicking Crop switches to the Crop tool and clicking Trim opens the Trim dialog. `screenshot_properties_sections` (`#[ignore]`) captures the top, middle and bottom of the panel for side-by-side comparison with Photoshop.
+
+When the active layer retains adjustment settings, the panel shows editable values for that kind instead of document geometry. These generic slider controls are functional but their native styling/history grouping remain unverified.

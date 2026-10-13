@@ -91,3 +91,5 @@ The JPEG Options and PNG Format Options of a save (`dialogs/save_options.md` in 
 - `flatten_blends_alpha`: 50% transparent black laid onto white gives `(127, 127, 127)`.
 
 PSD saves validate editable path resource limits before generating/writing bytes; invalid path names, points or counts return Psd and leave the target file unchanged.
+
+PSD validation also rejects nonfinite retained adjustment settings before modifying the destination.

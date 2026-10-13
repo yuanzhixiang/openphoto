@@ -254,6 +254,8 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
         });
     let freeform_magnetic = app.flag("freeform.magnetic", false);
     let pen_path_mode = app.setting("pen.mode", "1") == "1";
+    let adjustment_options = crate::adjustment_tool::options(app);
+    let adjustment_pressure = app.pen_pressure;
     let remove_options = crate::remove_tool::options(app);
     let (foreground, background) = (app.foreground, app.background);
     let bucket = app.bucket;
@@ -759,6 +761,16 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
+            Tool::AdjustmentBrush if !modal => {
+                crate::adjustment_tool::input(
+                    ui,
+                    &response,
+                    state,
+                    adjustment_options,
+                    adjustment_pressure,
+                    ppp,
+                );
+            }
             Tool::CurvaturePen if !modal && pen_path_mode => {
                 crate::pen_tool::curvature(ui, &response, state, ppp);
             }
@@ -1189,6 +1201,12 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
             | Tool::DirectSelection
     ) {
         crate::pen_tool::cancel_inflight(state);
+    }
+    if tool != Tool::AdjustmentBrush {
+        crate::adjustment_tool::cancel(state);
+    }
+    if tool == Tool::AdjustmentBrush {
+        crate::adjustment_tool::draw(ui, state, canvas_rect, ppp, adjustment_options);
     }
     crate::pen_tool::draw(ui, state, canvas_rect, ppp);
     crate::type_tool::draw_mask_overlay(ui, state, canvas_rect, ppp);

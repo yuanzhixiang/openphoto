@@ -84,3 +84,5 @@ The Brightness/Contrast tables and the reference data under `fixtures/adjust/` w
 - `photoshop::black_white_photo_filter_and_exposure_match_photoshop`: Black & White (including two Tint settings), four Photo Filter settings, four Exposure settings, and three Vibrance Saturation settings compared against Photoshop.
 - `photoshop::gradient_map_matches_photoshop`: a red→blue gradient under four methods compared against Photoshop.
 - `equalize_the_entire_image_from_the_selection`: with EqualizeEntireImage, pixels outside the selection change by the selection's table; with Equalize, they do not change.
+
+color_adjust is shared internally with non-destructive adjustment-layer compositing for supported point adjustments.

@@ -319,3 +319,5 @@ Direct Selection routes node/control editing and path pointer cancellation.
 Non-magnetic Freeform Pen in Path mode dispatches sampled cubic creation and participates in cancellation.
 
 Curvature Pen in Path mode dispatches interpolating anchor creation and closure.
+
+Adjustment Brush dispatches retained adjustment mask strokes, displays the optional pink mask overlay, and cancels unfinished strokes on tool departure.
