@@ -396,7 +396,7 @@ pub fn patch_with(
     style: HealStyle,
     transparent: bool,
 ) -> bool {
-    let Some(id) = doc.active_layer else {
+    let Some(id) = writable_pixels(doc) else {
         return false;
     };
     let Some((bx0, by0, bx1, by1)) = selection.bounds() else {
@@ -425,6 +425,7 @@ pub fn patch_with(
     let Some(image) = doc.layer_mut(id).and_then(|l| l.image_mut()) else {
         return false;
     };
+    let mut changed = false;
     for k in 0..w * h {
         if !inside[k] {
             continue;
@@ -433,10 +434,16 @@ pub fn patch_with(
         let a = selection.get(x, y) as f32 / 255.0;
         let p = image.pixel(x, y);
         let out = [0, 1, 2].map(|c| (p[c] as f32 + (healed[k][c] - p[c] as f32) * a).round() as u8);
-        image.set_pixel(x, y, [out[0], out[1], out[2], p[3]]);
+        let out = [out[0], out[1], out[2], p[3]];
+        if out != p {
+            image.set_pixel(x, y, out);
+            changed = true;
+        }
     }
-    doc.mark_dirty();
-    true
+    if changed {
+        doc.mark_dirty();
+    }
+    changed
 }
 
 /// Transparent: `healed`'s texture (its difference from its own 5 × 5
@@ -511,8 +518,23 @@ pub fn patch_to_from(
     write_result(doc, &original, result, merged.is_some())
 }
 
+/// Healing region operations currently target pixel layers only.
+fn writable_pixels(doc: &Document) -> Option<crate::layer::LayerId> {
+    if doc.quick_mask.is_some() || doc.editing_mask() {
+        return None;
+    }
+    let id = doc.active_layer?;
+    let layer = doc.layer(id)?;
+    if !layer.visible || doc.pixels_locked(id) {
+        return None;
+    }
+    layer.image()?;
+    Some(id)
+}
+
 /// What the move tools read: `merged`, or the active layer's pixels.
 fn read_image(doc: &Document, merged: Option<&TiledImage>) -> Option<TiledImage> {
+    writable_pixels(doc)?;
     match merged {
         Some(m) => Some(m.clone()),
         None => doc
@@ -527,14 +549,22 @@ fn read_image(doc: &Document, merged: Option<&TiledImage>) -> Option<TiledImage>
 /// or, when it was computed from the merged image, only the pixels that
 /// changed, made opaque, so the rest of the layer stays as it was.
 fn write_result(doc: &mut Document, read: &TiledImage, result: TiledImage, merged: bool) -> bool {
-    let Some(id) = doc.active_layer else {
+    let Some(id) = writable_pixels(doc) else {
         return false;
     };
     let Some(image) = doc.layer_mut(id).and_then(|l| l.image_mut()) else {
         return false;
     };
+    let mut changed = false;
     if !merged {
+        let different = (image.width(), image.height()) != (result.width(), result.height())
+            || (0..image.height())
+                .any(|y| (0..image.width()).any(|x| image.pixel(x, y) != result.pixel(x, y)));
+        if !different {
+            return false;
+        }
         *image = result;
+        changed = true;
     } else {
         let (w, h) = (
             image.width().min(result.width()),
@@ -544,13 +574,19 @@ fn write_result(doc: &mut Document, read: &TiledImage, result: TiledImage, merge
             for x in 0..w {
                 let p = result.pixel(x, y);
                 if p != read.pixel(x, y) {
-                    image.set_pixel(x, y, [p[0], p[1], p[2], 255]);
+                    let out = [p[0], p[1], p[2], 255];
+                    if image.pixel(x, y) != out {
+                        image.set_pixel(x, y, out);
+                        changed = true;
+                    }
                 }
             }
         }
     }
-    doc.mark_dirty();
-    true
+    if changed {
+        doc.mark_dirty();
+    }
+    changed
 }
 
 /// `onto` with the selected pixels of `source` moved by (`dx`, `dy`) and
@@ -903,5 +939,66 @@ mod tests {
             doc.layer(bg).unwrap().image().unwrap().pixel(12, 12),
             [0, 0, 0, 255]
         );
+    }
+}
+
+#[cfg(test)]
+mod patch_target_tests {
+    use super::*;
+    #[test]
+    fn patch_rejects_locked_hidden_and_mask_targets_without_changes() {
+        for state in 0..4 {
+            let mut doc = Document::new_with_background("target", 32, 32, crate::Color::WHITE);
+            let id = doc.active_layer.unwrap();
+            doc.layer_mut(id)
+                .unwrap()
+                .image_mut()
+                .unwrap()
+                .set_pixel(12, 12, [0, 0, 0, 255]);
+            match state {
+                0 => doc.layer_mut(id).unwrap().lock_pixels = true,
+                1 => doc.layer_mut(id).unwrap().visible = false,
+                2 => {
+                    doc.layer_mut(id).unwrap().mask =
+                        Some(crate::layer::LayerMask::filled(32, 32, 255));
+                    doc.mask_target = true;
+                }
+                _ => doc.enter_quick_mask(),
+            }
+            let before = doc.layer(id).unwrap().image().unwrap().to_rgba8();
+            let revision = doc.revision();
+            let selection =
+                Selection::rect(32, 32, crate::selection::Rect::new(10.0, 10.0, 14.0, 14.0));
+            let source = TiledImage::filled(32, 32, [255; 4]);
+            assert!(!patch_with(
+                &mut doc,
+                &selection,
+                &source,
+                (0, 0),
+                HealStyle::default(),
+                false
+            ));
+            assert!(!patch_to(&mut doc, &selection, (8, 0)));
+            assert_eq!(doc.layer(id).unwrap().image().unwrap().to_rgba8(), before);
+            assert_eq!(doc.revision(), revision);
+        }
+    }
+    #[test]
+    fn patch_returns_false_when_the_result_has_identical_pixels() {
+        let mut doc = Document::new_with_background("unchanged", 32, 32, crate::Color::WHITE);
+        let selection =
+            Selection::rect(32, 32, crate::selection::Rect::new(10.0, 10.0, 14.0, 14.0));
+        let source = TiledImage::filled(32, 32, [255; 4]);
+        let revision = doc.revision();
+        assert!(!patch_with(
+            &mut doc,
+            &selection,
+            &source,
+            (0, 0),
+            HealStyle::default(),
+            false
+        ));
+        assert!(!patch_to(&mut doc, &selection, (8, 0)));
+        assert_eq!(doc.revision(), revision);
     }
 }
