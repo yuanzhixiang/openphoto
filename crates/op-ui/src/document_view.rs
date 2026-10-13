@@ -3499,6 +3499,14 @@ fn quick_input(
     ppp: f32,
 ) -> bool {
     use op_core::SelectionOp;
+    if state.quick.is_some() && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape))
+    {
+        if let Some(before) = state.quick_before.take() {
+            state.doc.restore(&before);
+        }
+        state.quick = None;
+        return false;
+    }
     let pointer = ui
         .input(|i| i.pointer.interact_pos())
         .map(|p| to_doc(state, p, ppp));
@@ -3512,6 +3520,7 @@ fn quick_input(
             return false;
         };
         let mods = ui.input(|i| i.modifiers);
+        state.quick_before = Some(state.doc.snapshot());
         let base = state.doc.selection().cloned();
         let op = if mods.alt || mode == 2 {
             SelectionOp::Subtract
@@ -3554,9 +3563,15 @@ fn quick_input(
         ui.ctx().request_repaint();
         return false;
     }
+    let changed = state.doc.selection() != stroke.base.as_ref();
     state.quick = None;
-    state.record("Quick Selection");
-    replaced && mode == 0
+    if changed {
+        state.quick_before = None;
+        state.record("Quick Selection");
+    } else if let Some(before) = state.quick_before.take() {
+        state.doc.restore(&before);
+    }
+    changed && replaced && mode == 0
 }
 
 /// The Object Selection tool: drag a rectangle around an object; the

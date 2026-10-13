@@ -263,3 +263,5 @@ Polygonal Lasso latches its combination operation at the initial pointer-down. H
 Magnetic Lasso starts only inside a nonempty image and latches its initial combination modifiers at pointer-down. Closing/cancelling clears the modifier latch. Live paths, automatic/manual anchors, Backspace, Enter, Escape and undo are exercised through CPU-only input.
 
 Object Selection Lasso mode now collects and previews a freehand polygon and restricts detected pixels to it, rather than behaving as Rectangle. Its combination operation is latched at pointer-down. Escape clears an unfinished ROI without selection/history changes.
+
+Quick Selection Escape restores its initial snapshot without history or switching New to Add. Release records only actual selection changes; ineffective strokes preserve the original snapshot. The New-to-Add transition happens only after a changed replacement stroke.

@@ -93,6 +93,7 @@ pub struct DocState {
     pub magnetic: Option<MagneticPath>,
     /// A Quick Selection stroke under way.
     pub quick: Option<QuickStroke>,
+    pub quick_before: Option<op_core::Snapshot>,
     /// The Object Selection tool's rectangle being dragged (document
     /// pixels).
     pub object_drag: Option<(egui::Pos2, egui::Pos2)>,
@@ -207,6 +208,7 @@ impl DocState {
             || self.artboard_drag.is_some()
             || self.selection_stroke.is_some()
             || self.object_drag.is_some()
+            || self.quick.is_some()
     }
 
     pub fn transform_controls_bounds(&mut self) -> Option<Bounds> {
@@ -276,6 +278,7 @@ impl DocState {
             patch_drag: None,
             magnetic: None,
             quick: None,
+            quick_before: None,
             object_drag: None,
             object_path: None,
             object_op: None,

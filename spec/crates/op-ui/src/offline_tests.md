@@ -17,3 +17,5 @@ Polygonal Lasso CPU tests check constrained vertices, Backspace removing one cor
 Magnetic Lasso CPU tests verify auto/manual anchors, anchor deletion, closure, initial mode latching, cancellation, undo and untouched pixels.
 
 Object Selection CPU regression tests freehand ROI selection on a contrasting object, excluded background, cancellation, undo and pixel preservation.
+
+Quick Selection CPU regression checks live segmentation, cancel, New-to-Add transition, no-op suppression, Alt subtraction, undo, unchanged pixels and invalid size fallback.

@@ -2816,8 +2816,18 @@ pub fn magnetic_options(app: &mut AppState) -> (u32, f32, f32) {
 /// The Quick Selection tool's mode (0 New, 1 Add, 2 Subtract), brush
 /// diameter, Sample All Layers and Enhance Edge.
 pub fn quick_options(app: &mut AppState) -> (usize, f32, bool, bool) {
-    let mode = app.setting("quick.mode", "0").parse().unwrap_or(0);
-    let size = app.setting("quick.size", "30").parse().unwrap_or(30.0);
+    let mode = app
+        .setting("quick.mode", "0")
+        .parse::<usize>()
+        .unwrap_or(0)
+        .min(2);
+    let size = app
+        .setting("quick.size", "30")
+        .parse::<f32>()
+        .ok()
+        .filter(|n| n.is_finite())
+        .unwrap_or(30.0)
+        .clamp(1.0, 5000.0);
     (
         mode,
         size,

@@ -457,3 +457,69 @@ fn object_selection_lasso_roi_cancel_and_undo_cpu() {
     assert!(h.state().doc.selection().is_none());
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
 }
+
+#[test]
+fn quick_selection_cancel_mode_transition_noop_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::QuickSelection);
+    let state = h.app.active().unwrap();
+    let id = state.doc.active_layer.unwrap();
+    for y in 50..110 {
+        for x in 50..110 {
+            state
+                .doc
+                .layer_mut(id)
+                .unwrap()
+                .image_mut()
+                .unwrap()
+                .set_pixel(x, y, [200, 20, 20, 255]);
+        }
+    }
+    state.doc.mark_dirty();
+    state.record("Fixture");
+    let pixels = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    let a = h.point(75.0, 75.0);
+    h.button(a, true, Modifiers::NONE);
+    assert!(h.state().quick.is_some());
+    assert!(h.state().doc.selection().unwrap().get(75, 75) > 0);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    h.button(a, false, Modifiers::NONE);
+    assert!(h.state().doc.selection().is_none());
+    assert_eq!(h.state().history.states().len(), count);
+    assert_ne!(
+        h.app.tool_settings.get("quick.mode").map(String::as_str),
+        Some("1")
+    );
+    h.drag((75.0, 75.0), (85.0, 75.0), Modifiers::NONE);
+    assert_eq!(
+        h.app.tool_settings.get("quick.mode").map(String::as_str),
+        Some("1")
+    );
+    let before = h.state().doc.selection().cloned();
+    let count = h.state().history.states().len();
+    h.drag((75.0, 75.0), (85.0, 75.0), Modifiers::NONE);
+    assert_eq!(h.state().history.states().len(), count);
+    h.drag(
+        (75.0, 75.0),
+        (85.0, 75.0),
+        Modifiers {
+            alt: true,
+            ..Modifiers::NONE
+        },
+    );
+    assert_eq!(h.state().doc.selection().map_or(0, |s| s.get(75, 75)), 0);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.selection(), before.as_ref());
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    h.app.tool_settings.insert("quick.size", "NaN".into());
+    assert_eq!(crate::options_tools::quick_options(&mut h.app).1, 30.0);
+}

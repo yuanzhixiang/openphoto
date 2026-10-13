@@ -145,3 +145,5 @@ Selection Brush retains a pre-stroke snapshot/selection for cancellation and no-
 `lasso_press` captures freehand/polygonal initial pointer-down modifiers and the initial selection presence.
 
 Object Selection stores a freehand ROI path and pointer-down operation alongside its rectangle. Its active gesture counts as busy.
+
+Quick Selection stores a pre-stroke snapshot and counts as busy during a live stroke.

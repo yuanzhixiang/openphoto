@@ -86,3 +86,5 @@ Clicking it pops up the brush picker popup (`brush_presets.md`): Size, Hardness 
 Artboard dimensions, supported presets and background now affect actual board containers. Add, portrait/landscape, left/top alignment and auto-nesting gear controls are functional through artboard_tool. Remaining artboard option parity is documented in that module.
 
 Artboard backgrounds include Other for custom RGB. The swatch opens a staged color picker, applies on OK and discards on Cancel; it displays the actual selected board color.
+
+Quick Selection mode is bounded to New/Add/Subtract and brush size to finite 1–5000 px, with invalid numbers falling back to 30.
