@@ -445,6 +445,149 @@ fn move_tool_drags_and_nudges() {
 }
 
 #[test]
+fn move_option_drag_copies_layer_and_undo_restores_structure() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    crate::panels::new_layer(h.state_mut().state.active().unwrap());
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    select_rect(&mut h, 100.0, 100.0, 140.0, 140.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.key_press(egui::Key::V);
+    h.run_steps(2);
+    let original = active(&h).doc.active_layer;
+    let count = active(&h).doc.layers.len();
+    let (a, b) = (doc_point(&h, 120.0, 120.0), doc_point(&h, 220.0, 170.0));
+    drag(&mut h, a, b, Modifiers::ALT);
+    assert_eq!(active(&h).doc.layers.len(), count + 1);
+    assert_ne!(active(&h).doc.active_layer, original);
+    assert_eq!(composite_pixel(&mut h, 110, 110), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 220, 170), [255, 0, 0, 255]);
+    assert_eq!(active(&h).history.states().last().unwrap().name, "Move");
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run_steps(2);
+    assert_eq!(active(&h).doc.layers.len(), count);
+    assert_eq!(active(&h).doc.active_layer, original);
+    assert_eq!(composite_pixel(&mut h, 220, 170), [0x14, 0x14, 0x14, 255]);
+}
+
+#[test]
+fn move_cancel_and_return_to_origin_leave_no_copy_or_history() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    crate::panels::new_layer(h.state_mut().state.active().unwrap());
+    h.state_mut().state.foreground = Color::from_rgba8([255, 0, 0, 255]);
+    select_rect(&mut h, 100.0, 100.0, 140.0, 140.0);
+    h.key_press_modifiers(Modifiers::ALT, egui::Key::Backspace);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.key_press(egui::Key::V);
+    h.run_steps(3);
+    let count = active(&h).doc.layers.len();
+    let history = active(&h).history.current_id();
+    let a = doc_point(&h, 120.0, 120.0);
+    let b = doc_point(&h, 220.0, 170.0);
+    drag_path(&mut h, &[a, b, a], Modifiers::ALT);
+    assert_eq!(active(&h).doc.layers.len(), count);
+    assert_eq!(active(&h).history.current_id(), history);
+    h.hover_at(a);
+    h.event(egui::Event::PointerButton {
+        pos: a,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    h.event(egui::Event::PointerMoved(b));
+    h.step();
+    assert!(active(&h).move_drag.is_some());
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert!(active(&h).move_drag.is_none());
+    h.event(egui::Event::PointerButton {
+        pos: b,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(3);
+    assert_eq!(active(&h).history.current_id(), history);
+    assert_eq!(composite_pixel(&mut h, 110, 110), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 220, 170), [0x14, 0x14, 0x14, 255]);
+}
+
+#[test]
+fn move_shift_constraints_gear_hover_and_canvas_alignment() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let id = {
+        let state = h.state_mut().state.active().unwrap();
+        let id = state.doc.new_layer_id();
+        let mut image = op_core::TiledImage::new(734, 811);
+        for y in 100..140 {
+            for x in 100..140 {
+                image.set_pixel(x, y, [255, 0, 0, 255]);
+            }
+        }
+        state
+            .doc
+            .layers
+            .push(op_core::Layer::raster(id, "Red", image));
+        state.doc.select_layer(id);
+        state.record("New Layer");
+        id
+    };
+    h.state_mut().state.select_tool(op_tools::Tool::Move);
+    h.state_mut().state.view.snap = false;
+    h.state_mut().state.view.smart_guides = false;
+    h.run_steps(3);
+    let a = doc_point(&h, 120.0, 120.0);
+    let b = doc_point(&h, 220.0, 140.0);
+    drag(&mut h, a, b, Modifiers::SHIFT);
+    assert_eq!(layer_pixel(&h, 1, 220, 120), [255, 0, 0, 255]);
+    assert_eq!(layer_pixel(&h, 1, 220, 150)[3], 0);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run_steps(3);
+    h.state_mut().state.move_options.auto_select = true;
+    h.hover_at(a);
+    h.run_steps(3);
+    assert_eq!(active(&h).move_hover_target, Some(id));
+    let history_len = active(&h).history.states().len();
+    h.get_by_label("Set additional options").click();
+    h.run_steps(3);
+    h.get_by_label("Show layer bounds on hover").click();
+    h.run_steps(3);
+    assert!(!h.state().state.move_options.show_hover_bounds);
+    h.key_press(egui::Key::Escape);
+    h.hover_at(a);
+    h.run_steps(3);
+    assert_eq!(active(&h).move_hover_target, None);
+    assert_eq!(active(&h).history.states().len(), history_len);
+    h.get_by_label("More options").click();
+    h.run_steps(3);
+    h.get_by_label("Canvas").click();
+    h.run_steps(3);
+    assert!(h.state().state.move_options.align_canvas);
+    h.get_by_label("More options").click();
+    h.run_steps(3);
+    h.get_by_label("Align Right Edges").click();
+    h.run_steps(3);
+    assert_eq!(
+        active(&h)
+            .doc
+            .layer(id)
+            .unwrap()
+            .image()
+            .unwrap()
+            .content_bounds()
+            .unwrap()
+            .2,
+        734
+    );
+    assert_eq!(last_history(&h), "Align Right Edges");
+}
+
+#[test]
 fn move_auto_select_and_transform_controls() {
     let mut h = harness(Vec::new());
     reference_document(&mut h);
@@ -477,6 +620,78 @@ fn move_auto_select_and_transform_controls() {
     let (a, b) = (doc_point(&h, 240.0, 190.0), doc_point(&h, 260.0, 210.0));
     drag(&mut h, a, b, Modifiers::NONE);
     assert!(active(&h).free_transform.is_some());
+}
+
+#[test]
+fn move_auto_select_group_and_shift_select_layers() {
+    use egui_kittest::kittest::Queryable;
+
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    let (red, blue, group) = {
+        let state = h.state_mut().state.active().unwrap();
+        let mut ids = Vec::new();
+        for (x, color) in [(100, [255, 0, 0, 255]), (300, [0, 0, 255, 255])] {
+            let id = state.doc.new_layer_id();
+            let mut image = op_core::TiledImage::new(734, 811);
+            for y in 100..140 {
+                for x in x..x + 40 {
+                    image.set_pixel(x, y, color);
+                }
+            }
+            state
+                .doc
+                .layers
+                .push(op_core::Layer::raster(id, "Square", image));
+            ids.push(id);
+        }
+        state.doc.set_selected_layers(ids.clone());
+        let group = op_core::layer_ops::group_selected(&mut state.doc).unwrap();
+        state.doc.mark_dirty();
+        state.record("Group Layers");
+        (ids[0], ids[1], group)
+    };
+    h.state_mut().state.select_tool(op_tools::Tool::Move);
+    h.state_mut().state.move_options.auto_select = true;
+    h.run_steps(3);
+    // Pick the actual dropdown entry rather than changing its state directly.
+    click(&mut h, at_pt(220.0, 45.0));
+    h.get_by_label("Group").click();
+    h.run_steps(3);
+    assert!(h.state().state.move_options.auto_select_group);
+    let a = doc_point(&h, 120.0, 120.0);
+    let b = doc_point(&h, 220.0, 170.0);
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(active(&h).doc.active_layer, Some(group));
+    assert_eq!(composite_pixel(&mut h, 220, 170), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 420, 170), [0, 0, 255, 255]);
+    assert_eq!(last_history(&h), "Move");
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run_steps(2);
+    assert_eq!(composite_pixel(&mut h, 120, 120), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 320, 120), [0, 0, 255, 255]);
+
+    click(&mut h, at_pt(220.0, 45.0));
+    h.get_by_label("Layer").click();
+    h.run_steps(3);
+    assert!(!h.state().state.move_options.auto_select_group);
+    let red_point = doc_point(&h, 120.0, 120.0);
+    click(&mut h, red_point);
+    let blue_point = doc_point(&h, 320.0, 120.0);
+    click_with(&mut h, blue_point, Modifiers::SHIFT);
+    assert_eq!(active(&h).doc.selected_layers(), [red, blue]);
+    // Dragging a selected member preserves both selected layers.
+    let a = doc_point(&h, 120.0, 120.0);
+    let b = doc_point(&h, 220.0, 170.0);
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(active(&h).doc.selected_layers(), [red, blue]);
+    assert_eq!(composite_pixel(&mut h, 220, 170), [255, 0, 0, 255]);
+    assert_eq!(composite_pixel(&mut h, 420, 170), [0, 0, 255, 255]);
+    let count = active(&h).history.states().len();
+    let blue_point = doc_point(&h, 420.0, 170.0);
+    click_with(&mut h, blue_point, Modifiers::SHIFT);
+    assert_eq!(active(&h).doc.selected_layers(), [red]);
+    assert_eq!(active(&h).history.states().len(), count);
 }
 
 #[test]
@@ -9128,4 +9343,382 @@ fn marquee_fixed_ratio_and_fixed_size() {
         "{bounds:?}"
     );
     assert_eq!(last_history(&h), "Rectangular Marquee");
+}
+
+#[test]
+fn move_cross_document_drop_and_mask_link_offline() {
+    use egui_kittest::kittest::Queryable;
+    use op_core::{Document, Layer, LayerMask, TiledImage};
+    let mut h = harness(Vec::new());
+    let mut source = Document::new_with_background("Source", 160, 160, Color::WHITE);
+    let id = source.new_layer_id();
+    let mut pixels = TiledImage::new(160, 160);
+    pixels.set_pixel(30, 30, [255, 0, 0, 255]);
+    let mut layer = Layer::raster(id, "Movable", pixels);
+    layer.mask = Some(LayerMask::filled(160, 160, 255));
+    source.layers.push(layer);
+    source.select_layer(id);
+    let source_id = source.id;
+    h.state_mut().state.add_document(source, "Open");
+    let target = Document::new_with_background("Target", 200, 200, Color::WHITE);
+    let target_id = target.id;
+    h.state_mut().state.add_document(target, "Open");
+    h.state_mut().state.active_doc = Some(source_id);
+    h.state_mut().state.tool = op_tools::Tool::Move;
+    h.run_steps(6);
+    h.get_by_label("Toggle mask link: Movable").click();
+    h.run_steps(3);
+    assert!(
+        !active(&h)
+            .doc
+            .layer(id)
+            .unwrap()
+            .mask
+            .as_ref()
+            .unwrap()
+            .linked
+    );
+    assert_eq!(last_history(&h), "Unlink Layer Mask");
+    assert!(h.state_mut().state.active().unwrap().undo());
+    h.run_steps(3);
+    assert!(
+        active(&h)
+            .doc
+            .layer(id)
+            .unwrap()
+            .mask
+            .as_ref()
+            .unwrap()
+            .linked
+    );
+    let start = doc_point(&h, 30.0, 30.0);
+    h.event(egui::Event::PointerButton {
+        pos: start,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    h.hover_at(start + egui::vec2(10.0, 0.0));
+    h.step();
+    assert!(active(&h).move_drag.is_some());
+    let tab = h.get_by_label("Document tab: Target").rect().center();
+    h.hover_at(tab);
+    h.run_steps(2);
+    assert_eq!(h.state().state.active_doc, Some(target_id));
+    assert!(h.state().state.move_transfer.is_some());
+    let drop = doc_point(&h, 80.0, 90.0);
+    h.hover_at(drop);
+    h.step();
+    h.event(egui::Event::PointerButton {
+        pos: drop,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(3);
+    assert_eq!(active(&h).doc.layers.len(), 2);
+    let copied = active(&h).doc.layers.last().unwrap();
+    assert_eq!(copied.image().unwrap().pixel(80, 90), [255, 0, 0, 255]);
+    assert_eq!(last_history(&h), "Drag Layer");
+    assert_eq!(
+        h.state().state.docs[&source_id]
+            .doc
+            .layer(id)
+            .unwrap()
+            .image()
+            .unwrap()
+            .pixel(30, 30),
+        [255, 0, 0, 255]
+    );
+    assert!(h.state_mut().state.active().unwrap().undo());
+    assert_eq!(active(&h).doc.layers.len(), 1);
+}
+
+#[test]
+fn artboard_create_resize_move_options_copy_cancel_and_undo_offline() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.tool = op_tools::Tool::Artboard;
+    h.state_mut()
+        .state
+        .tool_settings
+        .insert("artboard.auto_nest", "0".into());
+    h.run_steps(3);
+    let (a, b) = (doc_point(&h, 50.0, 50.0), doc_point(&h, 150.0, 130.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let id = active(&h).doc.active_layer.unwrap();
+    let board = active(&h).doc.layer(id).unwrap().artboard.unwrap();
+    assert_eq!(
+        (board.x, board.y, board.width, board.height),
+        (50, 50, 100, 80)
+    );
+    assert_eq!(last_history(&h), "New Artboard");
+    // Bottom-right handle resizes, preserving the top-left position.
+    let (a, b) = (doc_point(&h, 150.0, 130.0), doc_point(&h, 180.0, 160.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let board = active(&h).doc.layer(id).unwrap().artboard.unwrap();
+    assert_eq!(
+        (board.x, board.y, board.width, board.height),
+        (50, 50, 130, 110)
+    );
+    assert_eq!(last_history(&h), "Resize Artboard");
+    // Interior drag moves the board; Option drag duplicates the full block.
+    let (a, b) = (doc_point(&h, 80.0, 80.0), doc_point(&h, 100.0, 90.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(active(&h).doc.layer(id).unwrap().artboard.unwrap().x, 70);
+    assert_eq!(last_history(&h), "Move Artboard");
+    let (a, b) = (doc_point(&h, 100.0, 100.0), doc_point(&h, 260.0, 100.0));
+    drag(
+        &mut h,
+        a,
+        b,
+        Modifiers {
+            alt: true,
+            ..Modifiers::NONE
+        },
+    );
+    assert_eq!(
+        active(&h)
+            .doc
+            .layers
+            .iter()
+            .filter(|l| l.artboard.is_some())
+            .count(),
+        2
+    );
+    assert_eq!(last_history(&h), "Duplicate Artboard");
+    assert!(h.state_mut().state.active().unwrap().undo());
+    h.run_steps(3);
+    assert_eq!(
+        active(&h)
+            .doc
+            .layers
+            .iter()
+            .filter(|l| l.artboard.is_some())
+            .count(),
+        1
+    );
+    // Actual options-bar action swaps dimensions and records one state.
+    h.get_by_label("Portrait artboard").click();
+    h.run_steps(3);
+    let board = active(&h).doc.layer(id).unwrap().artboard.unwrap();
+    assert_eq!((board.width, board.height), (110, 130));
+    assert_eq!(last_history(&h), "Artboard Options");
+    let a = doc_point(&h, 100.0, 100.0);
+    h.event(egui::Event::PointerButton {
+        pos: a,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    h.hover_at(a + egui::vec2(15.0, 8.0));
+    h.step();
+    h.key_press(egui::Key::Escape);
+    h.run_steps(2);
+    assert!(active(&h).artboard_drag.is_none());
+    assert_eq!(active(&h).doc.layer(id).unwrap().artboard, Some(board));
+    h.event(egui::Event::PointerButton {
+        pos: a,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(2);
+    // Plus control creates an adjacent board of the same dimensions.
+    h.get_by_label("Add artboard right").click();
+    h.run_steps(3);
+    assert_eq!(
+        active(&h)
+            .doc
+            .layers
+            .iter()
+            .filter(|l| l.artboard.is_some())
+            .count(),
+        2
+    );
+    assert_eq!(last_history(&h), "New Artboard");
+}
+
+#[test]
+fn artboard_export_preserves_exact_size_and_transparency_offline() {
+    let mut doc = op_core::Document::new_with_background("t", 30, 30, Color::WHITE);
+    let board = op_core::artboard::Artboard {
+        x: 4,
+        y: 5,
+        width: 10,
+        height: 8,
+        background: None,
+    };
+    let id = op_core::artboard::create(&mut doc, board, false).unwrap();
+    let exported = crate::actions::layer_alone(&doc).unwrap();
+    assert_eq!((exported.width, exported.height), (10, 8));
+    assert!(exported.composite_rgba8().iter().all(|v| *v == 0));
+    let mut layer = op_core::Layer::raster(
+        doc.new_layer_id(),
+        "Child",
+        op_core::TiledImage::new(30, 30),
+    );
+    layer.parent = Some(id);
+    layer
+        .image_mut()
+        .unwrap()
+        .set_pixel(6, 7, [20, 30, 40, 255]);
+    let at = doc.block(id).unwrap().start;
+    doc.layers.insert(at, layer);
+    let exported = crate::actions::layer_alone(&doc).unwrap();
+    assert_eq!((exported.width, exported.height), (10, 8));
+    assert_eq!(
+        exported.layers[0].image().unwrap().pixel(2, 2),
+        [20, 30, 40, 255]
+    );
+    assert_eq!(exported.layers[0].image().unwrap().pixel(0, 0)[3], 0);
+}
+
+#[test]
+fn artboard_negative_drag_keeps_view_origin_and_move_auto_nests_offline() {
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.tool = op_tools::Tool::Artboard;
+    h.state_mut()
+        .state
+        .tool_settings
+        .insert("artboard.auto_nest", "0".into());
+    h.run_steps(3);
+    let (a, b) = (doc_point(&h, 50.0, 50.0), doc_point(&h, 150.0, 130.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let old_width = active(&h).doc.width;
+    let before = doc_point(&h, 0.0, 0.0);
+    let shift = doc_point(&h, 60.0, 0.0) - before;
+    let (a, b) = (doc_point(&h, 80.0, 80.0), doc_point(&h, -30.0, 80.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let id = active(&h).doc.active_layer.unwrap();
+    assert_eq!(active(&h).doc.layer(id).unwrap().artboard.unwrap().x, 0);
+    assert_eq!(active(&h).doc.width, old_width + 60);
+    assert!((doc_point(&h, 0.0, 0.0) - (before - shift)).length() < 0.05);
+    // A separate document: ordinary Move release nests a layer and undo restores its parent.
+    let mut doc = op_core::Document::new_with_background("Nest", 200, 200, Color::TRANSPARENT);
+    let board = op_core::artboard::create(
+        &mut doc,
+        op_core::artboard::Artboard {
+            x: 70,
+            y: 70,
+            width: 60,
+            height: 60,
+            background: Some([255; 3]),
+        },
+        false,
+    )
+    .unwrap();
+    let dot = doc.new_layer_id();
+    let mut image = op_core::TiledImage::new(200, 200);
+    image.set_pixel(30, 30, [255, 0, 0, 255]);
+    doc.layers.push(op_core::Layer::raster(dot, "Dot", image));
+    doc.select_layer(dot);
+    h.state_mut().state.add_document(doc, "Open");
+    h.state_mut().state.tool = op_tools::Tool::Move;
+    h.state_mut()
+        .state
+        .tool_settings
+        .insert("artboard.auto_nest", "1".into());
+    h.run_steps(5);
+    let (a, b) = (doc_point(&h, 30.0, 30.0), doc_point(&h, 90.0, 90.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    assert_eq!(active(&h).doc.layer(dot).unwrap().parent, Some(board));
+    assert_eq!(last_history(&h), "Move");
+    assert!(h.state_mut().state.active().unwrap().undo());
+    assert_eq!(active(&h).doc.layer(dot).unwrap().parent, None);
+    assert_eq!(
+        active(&h)
+            .doc
+            .layer(dot)
+            .unwrap()
+            .image()
+            .unwrap()
+            .pixel(30, 30),
+        [255, 0, 0, 255]
+    );
+}
+
+#[test]
+fn artboard_all_eight_resize_handles_and_custom_background_offline() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = harness(Vec::new());
+    reference_document(&mut h);
+    h.state_mut().state.tool = op_tools::Tool::Artboard;
+    h.state_mut()
+        .state
+        .tool_settings
+        .insert("artboard.auto_nest", "0".into());
+    h.run_steps(3);
+    let (a, b) = (doc_point(&h, 50.0, 50.0), doc_point(&h, 150.0, 130.0));
+    drag(&mut h, a, b, Modifiers::NONE);
+    let id = active(&h).doc.active_layer.unwrap();
+    let before = active(&h).doc.snapshot();
+    let view = active(&h).view;
+    for (x, y, dx, dy, expected) in [
+        (50.0, 50.0, -10.0, -8.0, (40, 42, 110, 88)),
+        (100.0, 50.0, 0.0, -8.0, (50, 42, 100, 88)),
+        (150.0, 50.0, 10.0, -8.0, (50, 42, 110, 88)),
+        (150.0, 90.0, 10.0, 0.0, (50, 50, 110, 80)),
+        (150.0, 130.0, 10.0, 8.0, (50, 50, 110, 88)),
+        (100.0, 130.0, 0.0, 8.0, (50, 50, 100, 88)),
+        (50.0, 130.0, -10.0, 8.0, (40, 50, 110, 88)),
+        (50.0, 90.0, -10.0, 0.0, (40, 50, 110, 80)),
+    ] {
+        let state = h.state_mut().state.active().unwrap();
+        state.doc.restore(&before);
+        state.doc.select_layer(id);
+        state.view = view;
+        h.run_steps(2);
+        let (a, b) = (doc_point(&h, x, y), doc_point(&h, x + dx, y + dy));
+        drag(&mut h, a, b, Modifiers::NONE);
+        let board = active(&h).doc.layer(id).unwrap().artboard.unwrap();
+        assert_eq!(
+            (board.x, board.y, board.width, board.height),
+            expected,
+            "handle ({x},{y})"
+        );
+    }
+    // Custom imported backgrounds survive option synchronization and dimension changes.
+    let state = h.state_mut().state.active().unwrap();
+    let mut board = state.doc.layer(id).unwrap().artboard.unwrap();
+    board.background = Some([20, 30, 40]);
+    op_core::artboard::set(&mut state.doc, id, board, false);
+    state.record("Artboard Options");
+    h.run_steps(3);
+    assert_eq!(
+        crate::artboard_tool::options(&h.state().state).background,
+        Some([20, 30, 40])
+    );
+    h.get_by_label("Portrait artboard").click();
+    h.run_steps(3);
+    assert_eq!(
+        active(&h)
+            .doc
+            .layer(id)
+            .unwrap()
+            .artboard
+            .unwrap()
+            .background,
+        Some([20, 30, 40])
+    );
+    let history = last_history(&h);
+    h.get_by_label("Artboard background color").click();
+    h.run_steps(2);
+    h.get_by_label("Cancel").click();
+    h.run_steps(2);
+    assert_eq!(last_history(&h), history);
+    assert_eq!(
+        active(&h)
+            .doc
+            .layer(id)
+            .unwrap()
+            .artboard
+            .unwrap()
+            .background,
+        Some([20, 30, 40])
+    );
 }

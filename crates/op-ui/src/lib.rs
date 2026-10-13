@@ -6,6 +6,7 @@
 mod actions;
 #[cfg(target_os = "macos")]
 mod app_kit;
+mod artboard_tool;
 mod brush_presets;
 mod clipboard;
 #[cfg(target_os = "macos")]

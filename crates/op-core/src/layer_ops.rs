@@ -189,6 +189,79 @@ pub fn duplicate_into(source: &Document, target: &mut Document, name: &str) -> O
     Some(id)
 }
 
+/// Move-drag between documents copies selected layer blocks or selected pixels.
+/// The source stays unchanged; callers record one destination history state.
+pub fn move_copy_into(source: &Document, target: &mut Document, dx: i64, dy: i64) -> Vec<LayerId> {
+    let (w, h) = (target.width, target.height);
+    let contains_artboard = source
+        .selected_layers()
+        .iter()
+        .any(|id| source.layer(*id).is_some_and(|l| l.artboard.is_some()));
+    let (at, parent) = if contains_artboard {
+        (target.layers.len(), None)
+    } else {
+        target.insertion_point()
+    };
+    let mut copied = Vec::new();
+    let mut ids = Vec::new();
+    if let Some(selection) = source.selection() {
+        let Some(layer) = source.active_layer.and_then(|id| source.layer(id)) else {
+            return ids;
+        };
+        let Some(image) = layer.image() else {
+            return ids;
+        };
+        let mut pixels = TiledImage::new(w, h);
+        for y in 0..source.height {
+            for x in 0..source.width {
+                let mut px = image.pixel(x, y);
+                px[3] = ((u16::from(px[3]) * u16::from(selection.get(x, y)) + 127) / 255) as u8;
+                if px[3] != 0 {
+                    pixels.set_pixel_at(x as i64 + dx, y as i64 + dy, px);
+                }
+            }
+        }
+        let mut layer = Layer::raster(target.new_layer_id(), &layer.name, pixels);
+        layer.parent = parent;
+        ids.push(layer.id);
+        copied.push(layer);
+    } else {
+        let mut roots = selected_roots(source);
+        roots.sort_by_key(|id| source.layers.iter().position(|l| l.id == *id));
+        for id in roots {
+            let Some(layer) = source.layer(id) else {
+                continue;
+            };
+            let Some(mut block) = cloned_block(source, id, target, &layer.name) else {
+                continue;
+            };
+            for layer in &mut block {
+                if let Some(board) = &mut layer.artboard {
+                    board.x += dx;
+                    board.y += dy;
+                }
+                if let Some(image) = layer.image_mut() {
+                    *image = image.with_canvas(w, h, dx, dy, [0; 4]);
+                }
+                if let Some(mask) = &mut layer.mask {
+                    mask.image = mask.image.with_canvas(w, h, dx, dy, [0, 0, 0, 255]);
+                }
+            }
+            let root = block.last_mut().expect("nonempty layer block");
+            root.parent = parent;
+            ids.push(root.id);
+            copied.extend(block);
+        }
+    }
+    if !ids.is_empty() {
+        target.layers.splice(at..at, copied);
+        target.set_selected_layers(ids.clone());
+        target.mask_target = false;
+        target.mark_dirty();
+    }
+    ids
+}
+
 /// Layer > Duplicate Layer... to a new document: one the size and
 /// resolution of `source`, titled `title`, holding only a copy of the
 /// active layer named `name`.
@@ -1650,5 +1723,61 @@ mod tests {
         assert_eq!(doc.layers[1].id, g);
         assert!(!doc.layers[1].is_group());
         assert_eq!(doc.composite_rgba8(), before);
+    }
+}
+
+#[cfg(test)]
+mod move_transfer_tests {
+    use super::*;
+    use crate::Color;
+    #[test]
+    fn copies_group_blocks_with_new_ids_masks_and_order() {
+        let mut source = Document::new_with_background("source", 12, 12, Color::WHITE);
+        let group = new_group(&mut source);
+        let id = source.new_layer_id();
+        let mut image = TiledImage::new(12, 12);
+        image.set_pixel(2, 3, [200, 10, 5, 255]);
+        let mut child = Layer::raster(id, "Child", image);
+        child.parent = Some(group);
+        child.link = Some(4);
+        child.mask = Some(crate::LayerMask::filled(12, 12, 255));
+        let at = source.block(group).unwrap().start;
+        source.layers.insert(at, child);
+        source.set_selected_layers(vec![id, group]);
+        let mut target = Document::new_with_background("target", 8, 8, Color::WHITE);
+        let ids = move_copy_into(&source, &mut target, -4, 2);
+        assert_eq!(ids.len(), 1);
+        let copied = &target.layers[1];
+        assert_ne!(copied.id, id);
+        assert_eq!(copied.parent, Some(ids[0]));
+        assert_eq!(copied.link, None);
+        assert_eq!(copied.image().unwrap().pixel_at(-2, 5), [200, 10, 5, 255]);
+        assert!(copied.mask.as_ref().unwrap().linked);
+        assert_eq!(
+            source.layer(id).unwrap().image().unwrap().pixel(2, 3),
+            [200, 10, 5, 255]
+        );
+    }
+    #[test]
+    fn selected_pixels_transfer_without_mutating_source() {
+        let mut source = Document::new_with_background("source", 4, 4, Color::WHITE);
+        source.set_selection(Some(crate::Selection::rect(
+            4,
+            4,
+            crate::selection::Rect {
+                x0: 1.0,
+                y0: 1.0,
+                x1: 3.0,
+                y1: 3.0,
+            },
+        )));
+        let mut target = Document::new_with_background("target", 8, 8, Color::BLACK);
+        let ids = move_copy_into(&source, &mut target, 2, 1);
+        let image = target.layer(ids[0]).unwrap().image().unwrap();
+        assert_eq!(image.pixel(3, 2), [255; 4]);
+        assert_eq!(image.pixel(2, 1)[3], 0);
+        assert_eq!(source.layers.len(), 1);
+        assert!(source.selection().is_some());
+        assert!(!target.layer(ids[0]).unwrap().is_background);
     }
 }

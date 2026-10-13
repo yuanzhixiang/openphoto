@@ -14,6 +14,11 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 
 ## Tests
 
+- `move_auto_select_group_and_shift_select_layers`: selects Group and Layer
+  through the options dropdown, moves both children of an auto-selected group,
+  undoes the move, Shift-selects two layers, preserves their selection while
+  dragging one member, and removes one member without adding history.
+
 - Regular tests (run by `cargo test`): verify interaction and state:
   - Clicking the foreground color swatch in the toolbar opens the Color Picker; Esc cancels without changing the color.
   - Dragging with the Rectangular Marquee produces a selection of the matching extent and records history; Shift-drag adds to the selection; a single click deselects; ⇧⌘D reselects, ⌘A selects all, ⌘D deselects.
@@ -123,3 +128,20 @@ Uses egui_kittest to run the whole application (including the wgpu canvas) witho
 - `option_opens_adjustments_with_their_last_settings`: Exposure set to +1 and OK; opened again it starts at 0, opened with Option held (a `ModifiersChanged` event) it has +1.
 - `levels_and_curves_eyedroppers_sample_the_image`, `photo_filter_picks_its_color_in_the_color_picker`: see `dialogs/curves.md` and `dialogs/photo_filter.md`.
 - `more_filters_and_adjustments_apply`: see `dialogs/adjust.md` ("The dialogs added after the measured ones"); also writes `dialog_Shadows_Highlights` and `dialog_Wave` screenshots.
+
+- `move_option_drag_copies_layer_and_undo_restores_structure`: Option-drag preserves the original, moves a selected copy, records one Move state, and undo restores layer structure and pixels.
+
+- `move_shift_constraints_gear_hover_and_canvas_alignment` verifies Shift-axis movement through synthetic drag events, canvas hover targeting, gear toggles without history, the More popup Canvas target, a single-layer alignment and its history entry. The harness opens no OS window and sends no system input.
+
+- `move_cancel_and_return_to_origin_leave_no_copy_or_history` checks that an Option drag returning to its origin leaves no copies or history, and Escape restores pixels during an active drag without undoing an earlier action.
+
+
+`move_cross_document_drop_and_mask_link_offline` tests the mask-link button and undo, source drag/tab activation/destination drop, unchanged original pixels and destination undo using only windowless egui input.
+
+`artboard_create_resize_move_options_copy_cancel_and_undo_offline` exercises creation, corner resizing, interior movement, Option-copy/undo, portrait options, Escape cancellation and the adjacent plus control through windowless egui events.
+
+`artboard_export_preserves_exact_size_and_transparency_offline` verifies a blank transparent board exports at its full dimensions, and a child dot lands at its local coordinates with margins preserved.
+
+`artboard_negative_drag_keeps_view_origin_and_move_auto_nests_offline` verifies leftward canvas expansion keeps the logical view aligned with the pointer; a regular Move drag into a board auto-nests its layer and undo restores both parent and pixels.
+
+`artboard_all_eight_resize_handles_and_custom_background_offline` checks every edge/corner handle, custom background preservation through dimension changes, and color-picker cancellation without history changes.

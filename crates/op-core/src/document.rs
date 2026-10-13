@@ -373,6 +373,10 @@ impl Document {
                     *image = image.clipped();
                 }
             }
+            if let Some(board) = &mut layer.artboard {
+                board.x += dx;
+                board.y += dy;
+            }
             // New canvas areas are revealed by the mask
             if let Some(mask) = &mut layer.mask {
                 mask.image = mask.image.with_canvas(width, height, dx, dy, [255; 4]);
@@ -713,13 +717,51 @@ impl Document {
                 let Some(image) = l.image() else {
                     return false;
                 };
-                let masked = l
-                    .mask
-                    .as_ref()
-                    .is_some_and(|m| m.enabled && m.value(x, y) == 0);
-                image.pixel(x, y)[3] > 0 && !masked
+                if image.pixel(x, y)[3] == 0 {
+                    return false;
+                }
+                let mut target = Some(l.id);
+                for _ in 0..self.layers.len() {
+                    let Some(layer) = target.and_then(|id| self.layer(id)) else {
+                        break;
+                    };
+                    if layer
+                        .artboard
+                        .is_some_and(|b| !b.contains(x as i64, y as i64))
+                        || layer.opacity * layer.fill <= 0.0
+                        || layer
+                            .mask
+                            .as_ref()
+                            .is_some_and(|m| m.enabled && m.value(x, y) == 0)
+                    {
+                        return false;
+                    }
+                    target = layer.parent;
+                }
+                true
             })
             .map(|l| l.id)
+    }
+
+    /// Move Auto-Select: the hit layer, or its outermost containing group.
+    /// An ungrouped layer is selected in either mode.
+    pub fn move_target_at(&self, x: u32, y: u32, group: bool) -> Option<LayerId> {
+        let mut id = self
+            .layer_at(x, y)
+            .or_else(|| crate::artboard::at(self, x as i64, y as i64))?;
+        if group {
+            // Bound traversal even if a caller constructs invalid parent data.
+            for _ in 0..self.layers.len() {
+                let Some(parent) = self.layer(id)?.parent else {
+                    break;
+                };
+                if !self.layer(parent).is_some_and(Layer::is_group) {
+                    break;
+                }
+                id = parent;
+            }
+        }
+        Some(id)
     }
 
     /// The pixels a tool samples ("Sample:" in its bar): the active layer,
@@ -802,11 +844,30 @@ impl Document {
                     let child = move |l: &Layer| l.parent == Some(id);
                     let alpha = layer.opacity * layer.fill;
                     let mask = layer.mask.as_ref().filter(|m| m.enabled);
-                    if layer.blend_mode == BlendMode::PassThrough && alpha >= 1.0 && mask.is_none()
+                    if layer.blend_mode == BlendMode::PassThrough
+                        && alpha >= 1.0
+                        && mask.is_none()
+                        && layer.artboard.is_none()
                     {
                         self.composite_children(layers, &child, out, band);
                     } else if alpha > 0.0 {
                         let mut own = vec![0f32; out.len()];
+                        if let Some(board) = layer.artboard
+                            && let Some(background) = board.background
+                        {
+                            for (i, pixel) in own.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+                                let x = (i % self.width as usize) as i64;
+                                let y = (i / self.width as usize + band.0) as i64;
+                                if board.contains(x, y) {
+                                    pixel.copy_from_slice(&[
+                                        background[0] as f32 / 255.0,
+                                        background[1] as f32 / 255.0,
+                                        background[2] as f32 / 255.0,
+                                        1.0,
+                                    ]);
+                                }
+                            }
+                        }
                         self.composite_children(layers, &child, &mut own, band);
                         self.blend_buffer(layer, &own, out, band.0);
                     }
@@ -833,6 +894,12 @@ impl Document {
             .enumerate()
         {
             let (x, y) = ((i % w) as u32, (i / w + y0) as u32);
+            if group
+                .artboard
+                .is_some_and(|b| !b.contains(x as i64, y as i64))
+            {
+                continue;
+            }
             let m = mask.map_or(1.0, |m| m.value(x, y) as f32 / 255.0);
             let sa = s[3] * alpha * m;
             if sa <= 0.0 {
@@ -1014,6 +1081,71 @@ mod tests {
         doc.layers.push(layer);
         let px = doc.composite_rgba8();
         assert_eq!(&px[0..4], &[128, 128, 128, 255]);
+    }
+
+    #[test]
+    fn auto_select_skips_pixels_hidden_by_group_opacity_or_mask() {
+        let mut doc = Document::new_with_background("hit", 10, 10, Color::WHITE);
+        let bottom = doc.layers[0].id;
+        let id = doc.new_layer_id();
+        doc.layers.push(Layer::raster(
+            id,
+            "Top",
+            TiledImage::filled(10, 10, [255, 0, 0, 255]),
+        ));
+        doc.select_layer(id);
+        let group = crate::layer_ops::group_selected(&mut doc).unwrap();
+        doc.layer_mut(group).unwrap().opacity = 0.0;
+        assert_eq!(doc.layer_at(2, 2), Some(bottom));
+        doc.layer_mut(group).unwrap().opacity = 1.0;
+        doc.layer_mut(group).unwrap().mask = Some(crate::layer::LayerMask::filled(10, 10, 0));
+        assert_eq!(doc.layer_at(2, 2), Some(bottom));
+        doc.layer_mut(group).unwrap().mask.as_mut().unwrap().enabled = false;
+        assert_eq!(doc.layer_at(2, 2), Some(id));
+    }
+
+    #[test]
+    fn move_target_selects_outermost_group_and_moves_its_children() {
+        let mut doc = Document::new_with_background("t", 20, 20, Color::WHITE);
+        let outer = doc.new_layer_id();
+        let inner = doc.new_layer_id();
+        let red = doc.new_layer_id();
+        let blue = doc.new_layer_id();
+        let mut inner_layer = Layer::group(inner, "Inner");
+        inner_layer.parent = Some(outer);
+        let mut red_image = TiledImage::new(20, 20);
+        red_image.set_pixel(2, 2, [255, 0, 0, 255]);
+        let mut red_layer = Layer::raster(red, "Red", red_image);
+        red_layer.parent = Some(inner);
+        let mut blue_image = TiledImage::new(20, 20);
+        blue_image.set_pixel(8, 8, [0, 0, 255, 255]);
+        let mut blue_layer = Layer::raster(blue, "Blue", blue_image);
+        blue_layer.parent = Some(outer);
+        doc.layers.extend([
+            red_layer,
+            inner_layer,
+            blue_layer,
+            Layer::group(outer, "Outer"),
+        ]);
+        assert_eq!(doc.move_target_at(2, 2, false), Some(red));
+        assert_eq!(doc.move_target_at(2, 2, true), Some(outer));
+        assert_eq!(doc.move_target_at(8, 8, true), Some(outer));
+        assert_eq!(doc.move_target_at(0, 0, true), Some(doc.layers[0].id));
+        assert_eq!(doc.move_target_at(20, 2, true), None);
+        doc.select_layer(outer);
+        let movement = crate::move_tool::Move::begin(&doc, [255; 3]).unwrap();
+        movement.apply(&mut doc, 3, 4);
+        assert_eq!(
+            doc.layer(red).unwrap().image().unwrap().pixel(5, 6),
+            [255, 0, 0, 255]
+        );
+        assert_eq!(
+            doc.layer(blue).unwrap().image().unwrap().pixel(11, 12),
+            [0, 0, 255, 255]
+        );
+        assert_eq!(doc.layer(red).unwrap().image().unwrap().pixel(2, 2)[3], 0);
+        doc.layer_mut(outer).unwrap().visible = false;
+        assert_eq!(doc.move_target_at(5, 6, true), Some(doc.layers[0].id));
     }
 
     #[test]

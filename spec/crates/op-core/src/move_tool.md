@@ -43,3 +43,22 @@ Without a pixel selection, a selected group moves together with all the pixel la
 - `moves_whole_layer_from_its_start`: repeated `apply` calls are all computed relative to the starting position.
 - `moves_only_selected_pixels`: only pixels inside the selection move, those outside stay put, and the selection moves along.
 - `background_needs_a_selection_and_leaves_background_color`: the background layer refuses without a selection; with a selection, the original position is filled with the background color.
+
+## Copying and masks
+
+- `Move::begin_copy`: validates before mutation. Without a pixel selection it duplicates the selected layer blocks, selects their copies, and translates only copies even when they inherit links to original layers. With a selection it leaves source pixels intact and places selected pixels over the destination on the same layer. The selection follows the copied pixels.
+- Whole-layer movement carries linked raster and selected-group masks from their original positions, including disabled masks. Unlinked masks remain fixed. Pixel-selection movement leaves the layer mask in place.
+- Tests `option_copy_keeps_original_pixels_and_linked_layers`, `option_copy_group_moves_only_its_copied_children`, and `layer_mask_follows_whole_layer_from_original_position` cover unchanged originals, inherited links, selection copying, and repeated mask movement.
+
+## Constrained movement
+
+`constrain_offset(dx, dy)` projects an offset onto the nearest horizontal, vertical or 45-degree line. Axis directions retain their component; diagonals average the absolute components and preserve their signs. The zero offset stays zero. Tests cover all quadrants. This deterministic geometry is implemented; exact Photoshop boundary and rounding parity remains unmeasured.
+
+`Move::cancel` restores the pre-gesture snapshot, selected layers and mask editing target. Option-copy captures the original document before duplication. The cancellation regression verifies temporary copies disappear and original pixels and selection return.
+
+A copied group with no movable children rolls back duplication if it cannot start its own move, including when its original was movable only through links to external layers. `refused_copy_rolls_back_an_empty_group_with_external_links` covers this transaction boundary.
+
+
+Whole-layer movement carries only linked raster masks. Editing an unlinked mask moves only that mask, including partial selections, with cancellation restoring the original target. Option-drag on an unlinked mask copies mask pixels in place. Independent movement has a regression test.
+
+Whole-artboard Move gestures translate selected board rectangles and their descendants together. Empty artboard containers are movable even without raster children. Mask-only moves do not translate boards. The UI expands the canvas on completion when boards extend outside it.

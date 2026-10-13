@@ -145,11 +145,13 @@ Applies to the Rectangular, Elliptical, Single Row, and Single Column Marquee:
 
 ## Move tool
 
+- Option held when a drag starts copies the selected layers, or the selected pixels within the active layer, using `Move::begin_copy`.
+
 - Smart guides: while dragging, the move lines up with the canvas's and other layers' edges and centers, shown by magenta lines (`smart_guides.md`).
 
 - Drag: moves the pixels of the current layer; with a selection, only the selected pixels move (rules in `crates/op-core/src/move_tool.md`). The offset is the drag distance rounded to whole pixels, and each step is recomputed from the pixels at the start. On release, "Move" is recorded if anything actually moved.
 - When moving is not possible (locked, hidden, background layer without a selection), Photoshop's alert appears when the drag starts.
-- Auto-Select (options bar, off by default): on mouse press, makes the topmost visible layer showing pixels under the pointer the current layer (`Document::layer_at`), then drags it as usual. Holding ⌘ inverts this (temporarily on when off, temporarily off when on), matching Photoshop. When no layer has pixels under the pointer, the current layer stays the same. No auto-select happens when pressing on a transform control handle. Switching the current layer records no history.
+- Auto-Select (options bar, off by default): on mouse press, hit-tests the topmost visible layer showing pixels under the pointer. Layer mode selects that layer; Group mode selects its outermost containing group, or the layer itself when ungrouped (`Document::move_target_at`). Holding ⌘ inverts Auto-Select (temporarily on when off, temporarily off when on). Shift-click adds or removes the hit target from the layer selection, keeping the last selected target. Clicking an already-selected member without Shift preserves the multi-selection for dragging; clicking another target replaces it. When no layer has pixels under the pointer, the current selection stays the same. No auto-select happens on a transform control handle. Layer selection records no history.
 - Show Transform Controls (options bar, off by default): draws the same blue box and 8 handles as Free Transform around the current layer's non-transparent pixels (around the selection when there is one), without the center reference point; not drawn for a background layer without a selection, or for hidden or locked layers (the same rule as whether Free Transform can start; see `bounds` in `crates/op-core/src/transform.md`). Starting a drag on a handle enters Free Transform, which takes over this drag; a drag elsewhere inside the box is still a normal move. The box extent is cached in `DocState` keyed by (revision, current layer, selection revision) and is not recomputed every frame. The box is not drawn when Extras is off (⌘H).
 - Arrow-key nudging: see `actions.md`.
 
@@ -230,3 +232,16 @@ Measured against Photoshop 2026's status bar (pt from the document area's left e
 ## Known limitations
 
 - Scrollbar thumb length does not exactly match Photoshop (Photoshop computes the scrollable range differently), and clicking the track does not page.
+
+## Move navigation and constrained drag
+
+- Shift during a Move drag projects the snapped offset onto the nearest axis or 45-degree line using `move_tool::constrain_offset`. Releasing Shift resumes unconstrained movement from the original pixels. Exact Photoshop constraint boundary/rounding is pending reference measurement.
+- With Auto-Select active (including temporary Command inversion) and Show layer bounds on hover enabled, hovering a canvas pixel highlights its Layer/Group target. Moving, transforming, Space panning or a modal suppresses this feedback. Show hover bounds from Layers also outlines a hovered layer-panel row while the panels are shown and expanded and the pointer is outside the canvas. The outline uses the union of visible raster descendant bounds and is clipped to the viewport. Extras hides outlines.
+- Expand layer group on click expands the auto-selected group and its ancestor groups. This navigation records no history.
+
+Escape cancels an active Move gesture without recording history. Releasing at zero net displacement restores the original state, including removing temporary Option copies, and records no history.
+
+
+A transferred Move drag released inside the destination viewport copies source layers at the drop offset and records one Drag Layer history entry. Shift centers source-canvas coordinates in the destination. Escape, switching tools, dropping outside the viewport or returning to the source cancels without changing either document. Native timing and exact Shift placement parity remain unmeasured.
+
+Artboard canvas input and board outlines are delegated to artboard_tool; space/middle-button panning retains priority.

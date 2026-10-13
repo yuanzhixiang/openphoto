@@ -24,3 +24,10 @@ A selected group counts as a single unit: its extent is the union of all pixel l
 
 - `matches_photoshop`: three squares are successively left-aligned, vertically center-aligned, bottom-aligned and distributed by vertical centers; the results match exactly the layer extents after the same operations in Photoshop 2026.
 - `equal_gaps_and_selection_alignment`: after equal-spacing distribution, the gaps on both sides of the middle strip are equal; with a pixel selection, a single layer right-aligns to the selection.
+
+## Canvas target and masks
+
+`align_to_canvas(doc, how)` aligns one or more movable layer units against the document bounds without changing the pixel selection. With no movable units it returns false. Raster masks translate with their layers during alignment and distribution. `canvas_alignment_preserves_selection_and_carries_mask` verifies right/bottom placement, preserved selection, mask movement and position locking.
+
+
+Alignment and distribution carry linked masks only; unlinked masks remain fixed.

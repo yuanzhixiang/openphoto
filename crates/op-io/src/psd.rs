@@ -46,6 +46,241 @@ const BLEND_KEYS: &[(BlendMode, &[u8; 4])] = &[
     (BlendMode::Luminosity, b"lum "),
 ];
 
+// Photoshop's version-16 artb descriptor. Kept separate from pixel records.
+fn descriptor_id(out: &mut Writer, id: &str) {
+    out.u32(if id.len() == 4 { 0 } else { id.len() as u32 });
+    out.bytes(id.as_bytes());
+}
+fn descriptor_header(out: &mut Writer, class: &str, count: u32) {
+    out.u32(1);
+    out.u16(0); // empty terminated Unicode name
+    descriptor_id(out, class);
+    out.u32(count);
+}
+fn descriptor_number(out: &mut Writer, key: &str, value: f64) {
+    descriptor_id(out, key);
+    out.bytes(b"doub");
+    out.bytes(&value.to_be_bytes());
+}
+fn write_artboard_descriptor(out: &mut Writer, b: op_core::artboard::Artboard) {
+    out.bytes(b"8BIMartb");
+    let size = out.length_slot();
+    out.u32(16);
+    descriptor_header(out, "artboard", 5);
+    descriptor_id(out, "artboardRect");
+    out.bytes(b"Objc");
+    descriptor_header(out, "classFloatRect", 4);
+    for (key, value) in [
+        ("Top ", b.y),
+        ("Left", b.x),
+        ("Btom", b.y + b.height as i64),
+        ("Rght", b.x + b.width as i64),
+    ] {
+        descriptor_number(out, key, value as f64);
+    }
+    descriptor_id(out, "guideIndeces");
+    out.bytes(b"VlLs");
+    out.u32(0);
+    descriptor_id(out, "artboardPresetName");
+    out.bytes(b"TEXT");
+    out.u32(1);
+    out.u16(0);
+    descriptor_id(out, "Clr ");
+    out.bytes(b"Objc");
+    descriptor_header(out, "RGBC", 3);
+    let [r, g, blue] = b.background.unwrap_or([255; 3]);
+    for (key, value) in [("Rd  ", r), ("Grn ", g), ("Bl  ", blue)] {
+        descriptor_number(out, key, value as f64);
+    }
+    descriptor_id(out, "artboardBackgroundType");
+    out.bytes(b"long");
+    out.u32(match b.background {
+        None => 3,
+        Some([255, 255, 255]) => 1,
+        Some([0, 0, 0]) => 2,
+        Some(_) => 4,
+    });
+    out.close(size, 2);
+}
+
+fn write_artboard_document_descriptor(out: &mut Writer, count: u32) {
+    out.bytes(b"8BIMartd");
+    let size = out.length_slot();
+    out.u32(16);
+    descriptor_header(out, "null", 9);
+    descriptor_id(out, "Cnt ");
+    out.bytes(b"long");
+    out.u32(count);
+    for key in ["autoExpandOffset", "origin"] {
+        descriptor_id(out, key);
+        out.bytes(b"Objc");
+        descriptor_header(out, "Pnt ", 2);
+        descriptor_number(out, "Hrzn", 0.0);
+        descriptor_number(out, "Vrtc", 0.0);
+    }
+    for key in [
+        "autoExpandEnabled",
+        "autoNestEnabled",
+        "autoPositionEnabled",
+        "shrinkwrapOnSaveEnabled",
+    ] {
+        descriptor_id(out, key);
+        out.bytes(b"bool");
+        out.u8(1);
+    }
+    descriptor_id(out, "docDefaultNewArtboardBackgroundColor");
+    out.bytes(b"Objc");
+    descriptor_header(out, "RGBC", 3);
+    for key in ["Rd  ", "Grn ", "Bl  "] {
+        descriptor_number(out, key, 255.0);
+    }
+    descriptor_id(out, "docDefaultNewArtboardBackgroundType");
+    out.bytes(b"long");
+    out.u32(1);
+    out.close(size, 2);
+}
+
+#[derive(Debug)]
+enum DescriptorValue {
+    Number(f64),
+    Object(Vec<(String, DescriptorValue)>),
+    Other,
+}
+fn read_descriptor_id(r: &mut Reader<'_>) -> Result<String, IoError> {
+    let n = r.u32()? as usize;
+    let n = if n == 0 { 4 } else { n };
+    if n > 4096 {
+        return Err(invalid("descriptor ID is too long"));
+    }
+    Ok(String::from_utf8_lossy(r.bytes(n)?).into_owned())
+}
+fn skip_descriptor_text(r: &mut Reader<'_>) -> Result<(), IoError> {
+    let n = r.u32()? as usize;
+    if n > 1_000_000 {
+        return Err(invalid("descriptor text is too long"));
+    }
+    r.bytes(n * 2)?;
+    Ok(())
+}
+fn read_descriptor(r: &mut Reader<'_>, depth: u8) -> Result<DescriptorValue, IoError> {
+    if depth > 8 {
+        return Err(invalid("descriptor nesting is too deep"));
+    }
+    skip_descriptor_text(r)?;
+    read_descriptor_id(r)?;
+    let count = r.u32()?;
+    if count > 4096 {
+        return Err(invalid("too many descriptor fields"));
+    }
+    let mut fields = Vec::new();
+    for _ in 0..count {
+        let key = read_descriptor_id(r)?;
+        let kind = r.take::<4>()?;
+        fields.push((key, read_descriptor_value(r, kind, depth + 1)?));
+    }
+    Ok(DescriptorValue::Object(fields))
+}
+fn read_descriptor_value(
+    r: &mut Reader<'_>,
+    kind: [u8; 4],
+    depth: u8,
+) -> Result<DescriptorValue, IoError> {
+    if depth > 8 {
+        return Err(invalid("descriptor nesting is too deep"));
+    }
+    Ok(match &kind {
+        b"Objc" | b"GlbO" => read_descriptor(r, depth)?,
+        b"long" => DescriptorValue::Number(r.i32()? as f64),
+        b"doub" => DescriptorValue::Number(f64::from_be_bytes(r.take()?)),
+        b"UntF" => {
+            r.take::<4>()?;
+            DescriptorValue::Number(f64::from_be_bytes(r.take()?))
+        }
+        b"bool" => {
+            r.u8()?;
+            DescriptorValue::Other
+        }
+        b"TEXT" => {
+            skip_descriptor_text(r)?;
+            DescriptorValue::Other
+        }
+        b"enum" => {
+            read_descriptor_id(r)?;
+            read_descriptor_id(r)?;
+            DescriptorValue::Other
+        }
+        b"VlLs" => {
+            let count = r.u32()?;
+            if count > 4096 {
+                return Err(invalid("descriptor list is too long"));
+            }
+            for _ in 0..count {
+                let kind = r.take::<4>()?;
+                read_descriptor_value(r, kind, depth + 1)?;
+            }
+            DescriptorValue::Other
+        }
+        b"tdta" => {
+            let n = r.u32()? as usize;
+            r.bytes(n)?;
+            DescriptorValue::Other
+        }
+        _ => return Err(invalid("unsupported artboard descriptor value")),
+    })
+}
+fn read_artboard_descriptor(data: &[u8]) -> Result<Option<op_core::artboard::Artboard>, IoError> {
+    let mut r = Reader(Cursor::new(data));
+    if r.u32()? != 16 {
+        return Err(invalid("unsupported artboard descriptor version"));
+    }
+    let value = read_descriptor(&mut r, 0)?;
+    let DescriptorValue::Object(fields) = value else {
+        return Ok(None);
+    };
+    let find = |key: &str| fields.iter().find(|(k, _)| k == key).map(|(_, v)| v);
+    let Some(DescriptorValue::Object(rect)) = find("artboardRect") else {
+        return Ok(None);
+    };
+    let number = |items: &[(String, DescriptorValue)], key: &str| {
+        items.iter().find_map(|(k, v)| match v {
+            DescriptorValue::Number(n) if k == key && n.is_finite() => Some(*n),
+            _ => None,
+        })
+    };
+    let (Some(top), Some(left), Some(bottom), Some(right)) = (
+        number(rect, "Top "),
+        number(rect, "Left"),
+        number(rect, "Btom"),
+        number(rect, "Rght"),
+    ) else {
+        return Ok(None);
+    };
+    let background = match find("artboardBackgroundType") {
+        Some(DescriptorValue::Number(n)) if *n == 3.0 => None,
+        Some(DescriptorValue::Number(n)) if *n == 2.0 => Some([0; 3]),
+        Some(DescriptorValue::Number(n)) if *n == 1.0 => Some([255; 3]),
+        _ => match find("Clr ") {
+            Some(DescriptorValue::Object(color)) => Some(
+                [
+                    number(color, "Rd  ").unwrap_or(255.0),
+                    number(color, "Grn ").unwrap_or(255.0),
+                    number(color, "Bl  ").unwrap_or(255.0),
+                ]
+                .map(|v| v.round().clamp(0.0, 255.0) as u8),
+            ),
+            _ => Some([255; 3]),
+        },
+    };
+    let board = op_core::artboard::Artboard {
+        x: left.round() as i64,
+        y: top.round() as i64,
+        width: (right - left).round().max(0.0) as u32,
+        height: (bottom - top).round().max(0.0) as u32,
+        background,
+    };
+    Ok(board.valid().then_some(board))
+}
+
 // ---- PackBits ----
 
 fn packbits(row: &[u8], out: &mut Vec<u8>) {
@@ -451,6 +686,15 @@ pub fn write(doc: &Document) -> Vec<u8> {
                 out.u32(4);
                 out.u32(locks);
             }
+            if let Some(board) = layer.artboard {
+                write_artboard_descriptor(&mut out, board);
+            }
+            // OpenPhoto mask-link extension; Adobe mask-link encoding is not verified.
+            if let Some(mask) = &layer.mask {
+                out.bytes(b"8BIMopml");
+                out.u32(4);
+                out.u32(u32::from(mask.linked));
+            }
             // Fill opacity
             out.bytes(b"8BIMiOpa");
             out.u32(4);
@@ -479,6 +723,10 @@ pub fn write(doc: &Document) -> Vec<u8> {
         }
         out.close(layer_info, 2);
         out.u32(0); // global layer mask info
+        let board_count = doc.layers.iter().filter(|l| l.artboard.is_some()).count() as u32;
+        if board_count > 0 {
+            write_artboard_document_descriptor(&mut out, board_count);
+        }
     }
     out.close(layer_and_mask, 2);
 
@@ -618,6 +866,8 @@ struct LayerRecord {
     label: u16,
     /// The lock bits (`lspf`), when saved.
     locks: Option<u32>,
+    mask_linked: bool,
+    artboard: Option<op_core::artboard::Artboard>,
     rect: (i32, i32, i32, i32),
     channels: Vec<(i16, usize)>,
     blend: [u8; 4],
@@ -755,6 +1005,8 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                 let mut section = None;
                 let mut label = 0u16;
                 let mut locks = None;
+                let mut mask_linked = true;
+                let mut artboard = None;
                 while r.pos() + 12 <= extra_end {
                     let sig = r.take::<4>()?;
                     if &sig != b"8BIM" && &sig != b"8B64" {
@@ -775,6 +1027,29 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                         b"iOpa" => fill = r.u8()?,
                         b"lclr" => label = r.u16()?,
                         b"lspf" => locks = Some(r.u32()?),
+                        b"opml" => mask_linked = r.u32()? != 0,
+                        b"artb" => artboard = read_artboard_descriptor(r.bytes(len as usize)?)?,
+                        b"opab" if len >= 20 => {
+                            let x = r.i32()? as i64;
+                            let y = r.i32()? as i64;
+                            let width = r.u32()?;
+                            let height = r.u32()?;
+                            let background = r.take::<4>()?;
+                            let b = op_core::artboard::Artboard {
+                                x,
+                                y,
+                                width,
+                                height,
+                                background: (background[3] != 0).then_some([
+                                    background[0],
+                                    background[1],
+                                    background[2],
+                                ]),
+                            };
+                            if b.valid() {
+                                artboard = Some(b);
+                            }
+                        }
                         b"lsct" | b"lsdk" => section = Some(r.u32()?),
                         _ => {}
                     }
@@ -793,6 +1068,8 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                     mask,
                     label,
                     locks,
+                    mask_linked,
+                    artboard,
                 });
             }
             let mut open_groups: Vec<usize> = Vec::new();
@@ -853,8 +1130,10 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                         }
                     });
                     mask.enabled = m.enabled;
+                    mask.linked = rec.mask_linked;
                     layer.mask = Some(mask);
                 }
+                layer.artboard = rec.artboard;
                 layer.visible = rec.flags & 2 == 0;
                 layer.opacity = rec.opacity as f32 / 255.0;
                 layer.fill = rec.fill as f32 / 255.0;
@@ -1065,11 +1344,13 @@ mod tests {
         let mut layer = Layer::raster(doc.new_layer_id(), "Masked", image);
         let mut mask = op_core::LayerMask::from_values(4, 3, |x, _| if x < 2 { 0 } else { 255 });
         mask.enabled = false;
+        mask.linked = false;
         layer.mask = Some(mask);
         doc.insert_above_active(layer);
         let back = read(&write(&doc), "t.psd".into()).unwrap();
         let mask = back.layers[1].mask.as_ref().unwrap();
         assert!(!mask.enabled);
+        assert!(!mask.linked);
         assert_eq!((mask.value(0, 1), mask.value(3, 2)), (0, 255));
     }
 
@@ -1338,5 +1619,71 @@ mod photoshop_check {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/psd-check");
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("groups.psd"), write(&doc)).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod artboard_tests {
+    use super::*;
+    #[test]
+    fn reads_artboards_from_independent_agpsd_fixture() {
+        let bytes = include_bytes!("../fixtures/artboards_agpsd_31.psd");
+        let doc = read(bytes, "independent".into()).unwrap();
+        let board = |name: &str| {
+            doc.layers
+                .iter()
+                .find(|l| l.name == name)
+                .unwrap()
+                .artboard
+                .unwrap()
+        };
+        assert_eq!(board("White").background, Some([255; 3]));
+        assert_eq!(board("Black").background, Some([0; 3]));
+        assert_eq!(board("Transparent").background, None);
+        assert_eq!(board("Custom").background, Some([20, 30, 40]));
+        let pixels = doc.composite_rgba8();
+        assert_eq!(&pixels[(2 * 40) * 4..(2 * 40) * 4 + 4], &[255; 4]);
+        assert_eq!(pixels[(2 * 40 + 20) * 4 + 3], 0);
+        assert_eq!(
+            &pixels[(2 * 40 + 30) * 4..(2 * 40 + 30) * 4 + 4],
+            &[20, 30, 40, 255]
+        );
+    }
+    #[test]
+    fn rejects_truncated_and_excessively_nested_artboard_descriptors() {
+        assert!(read_artboard_descriptor(&[0, 0, 0, 16]).is_err());
+        let mut out = Writer(Vec::new());
+        out.u32(16);
+        for _ in 0..10 {
+            descriptor_header(&mut out, "artboard", 1);
+            descriptor_id(&mut out, "nested");
+            out.bytes(b"Objc");
+        }
+        assert!(read_artboard_descriptor(&out.0).is_err());
+    }
+
+    #[test]
+    fn artboard_metadata_children_and_composite_round_trip() {
+        let mut doc = Document::new_with_background("t", 16, 16, op_core::Color::WHITE);
+        let child = doc.layers[0].id;
+        let b = op_core::artboard::Artboard {
+            x: 2,
+            y: 3,
+            width: 10,
+            height: 8,
+            background: Some([0; 3]),
+        };
+        let id = op_core::artboard::create(&mut doc, b, true).unwrap();
+        assert_eq!(doc.layer(child).unwrap().parent, Some(id));
+        let bytes = write(&doc);
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/artboard-parity-check.psd");
+        std::fs::write(path, &bytes).unwrap();
+        assert!(bytes.windows(4).any(|window| window == b"artb"));
+        let restored = read(&bytes, "round trip".into()).unwrap();
+        let group = restored.layers.last().unwrap();
+        assert_eq!(group.artboard, Some(b));
+        assert_eq!(restored.layers[0].parent, Some(group.id));
+        assert_eq!(restored.composite_rgba8(), doc.composite_rgba8());
     }
 }

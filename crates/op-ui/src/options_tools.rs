@@ -1269,11 +1269,11 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
                 652.0,
                 734.5,
                 "artboard.bg",
-                &["White", "Black", "Transparent"],
+                &["White", "Black", "Transparent", "Other"],
             ),
             Sep(742.5),
-            IconOff(764.5, Icon::ArtboardPortrait),
-            IconOff(798.5, Icon::ArtboardLandscape),
+            Icon(764.5, Icon::ArtboardPortrait, "Portrait artboard"),
+            Icon(798.5, Icon::ArtboardLandscape, "Landscape artboard"),
             Sep(819.5),
             Icon(841.0, Icon::AddArtboard, "Add new artboard"),
             Sep(862.5),
@@ -1590,6 +1590,14 @@ fn is_brush_angle(key: &str) -> bool {
 
 /// Stores typed text: percentages and numbers are kept in range.
 fn set_text(app: &mut AppState, key: &'static str, default: &str, typed: String) {
+    if matches!(key, "artboard.w" | "artboard.h") {
+        if crate::options_bar::typed_number(&typed).is_some_and(|v| (1.0..=30000.0).contains(&v)) {
+            *app.setting(key, default) = typed;
+            *app.setting("artboard.size", "1") = "0".into();
+            crate::artboard_tool::apply_options(app);
+        }
+        return;
+    }
     let tool = app.tool;
     if is_brush_angle(key) {
         if let (Some(v), Some(o)) = (
@@ -1759,6 +1767,15 @@ const MIXER_SETTINGS: [(u8, u8, u8); 12] = [
 ];
 
 fn set_choice(app: &mut AppState, key: &'static str, i: usize) {
+    if matches!(key, "artboard.size" | "artboard.bg") {
+        *app.setting(key, "0") = i.to_string();
+        if key == "artboard.size" {
+            crate::artboard_tool::preset(app, i);
+        } else {
+            crate::artboard_tool::apply_options(app);
+        }
+        return;
+    }
     use op_core::paint::ToneRange;
     match key {
         "mixer.combo" => {
@@ -1815,6 +1832,9 @@ fn set_flag(app: &mut AppState, key: &'static str, on: bool) {
 
 /// Lays out `items` for the current tool.
 pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
+    if app.tool == Tool::Artboard {
+        crate::artboard_tool::sync_options(app);
+    }
     for &item in items {
         match item {
             Sep(x) => b.sep(x),
@@ -1822,6 +1842,44 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
             Picker(x) => picker(b, app, x),
             Icon(x, icon, tip) => {
                 let response = b.icon(x, icon, tip, false, true);
+                if app.tool == Tool::Artboard {
+                    response.widget_info(|| {
+                        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip)
+                    });
+                    if response.clicked() {
+                        match icon {
+                            Icon::AddArtboard => crate::artboard_tool::add(app),
+                            Icon::ArtboardPortrait => crate::artboard_tool::orient(app, false),
+                            Icon::ArtboardLandscape => crate::artboard_tool::orient(app, true),
+                            _ => {}
+                        }
+                    }
+                    if icon == Icon::GearMenu {
+                        let mut auto_nest = crate::artboard_tool::options(app).auto_nest;
+                        egui::Popup::from_response(&response)
+                            .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
+                            .show(|ui| {
+                                if ui.checkbox(&mut auto_nest, "Auto-nest layers").changed() {
+                                    *app.setting("artboard.auto_nest", "1") =
+                                        if auto_nest { "1" } else { "0" }.into();
+                                }
+                            });
+                    }
+                    if icon == Icon::PathAlignment {
+                        egui::Popup::from_response(&response)
+                            .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
+                            .show(|ui| {
+                                if ui.button("Align artboard left edges").clicked() {
+                                    crate::artboard_tool::align(app, true);
+                                    ui.close();
+                                }
+                                if ui.button("Align artboard top edges").clicked() {
+                                    crate::artboard_tool::align(app, false);
+                                    ui.close();
+                                }
+                            });
+                    }
+                }
                 // The Clone Source panel's toggle
                 if icon == Icon::CloneSourcePanel && response.clicked() {
                     app.floating
@@ -2051,7 +2109,13 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                 }
             }
             ColorFrame(x0, x1, y0, y1, key) => {
-                let fill = if key == "fg" {
+                let fill = if key == "artboard.bg" {
+                    crate::artboard_tool::options(app)
+                        .background
+                        .map_or(egui::Color32::from_gray(0xcc), |[r, g, b]| {
+                            egui::Color32::from_rgb(r, g, b)
+                        })
+                } else if key == "fg" {
                     to32(app.foreground)
                 } else {
                     match choice(app, key) {
@@ -2060,7 +2124,52 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                         _ => egui::Color32::WHITE,
                     }
                 };
-                b.framed_color(x0, x1, (y0, y1), fill);
+                let response = b.framed_color(x0, x1, (y0, y1), fill);
+                if key == "artboard.bg" {
+                    response.widget_info(|| {
+                        egui::WidgetInfo::labeled(
+                            egui::WidgetType::Button,
+                            true,
+                            "Artboard background color",
+                        )
+                    });
+                    if response.clicked() {
+                        let [r, g, b] = crate::artboard_tool::options(app)
+                            .background
+                            .unwrap_or([255; 3]);
+                        *app.setting("artboard.color_draft", "ffffff") =
+                            format!("{r:02x}{g:02x}{b:02x}");
+                    }
+                    egui::Popup::from_response(&response)
+                        .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
+                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                        .show(|ui| {
+                            let value = app.setting("artboard.color_draft", "ffffff").clone();
+                            let n = u32::from_str_radix(&value, 16).unwrap_or(0xffffff);
+                            let mut color =
+                                egui::Color32::from_rgb((n >> 16) as u8, (n >> 8) as u8, n as u8);
+                            if egui::color_picker::color_picker_color32(
+                                ui,
+                                &mut color,
+                                egui::color_picker::Alpha::Opaque,
+                            ) {
+                                *app.setting("artboard.color_draft", "ffffff") =
+                                    format!("{:02x}{:02x}{:02x}", color.r(), color.g(), color.b());
+                            }
+                            ui.horizontal(|ui| {
+                                if ui.button("OK").clicked() {
+                                    crate::artboard_tool::set_custom_color(
+                                        app,
+                                        [color.r(), color.g(), color.b()],
+                                    );
+                                    ui.close();
+                                }
+                                if ui.button("Cancel").clicked() {
+                                    ui.close();
+                                }
+                            });
+                        });
+                }
             }
             Action(x0, x1, label) => {
                 if b.button(x0, x1, label, true).clicked() {

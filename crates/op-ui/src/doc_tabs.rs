@@ -62,6 +62,44 @@ pub fn show(ui: &mut Ui, app: &mut AppState, rect: Rect) {
         let active = app.active_doc == Some(id);
 
         let response = ui.interact(tab, ui.id().with(("doc-tab", id.0)), Sense::click());
+        response.widget_info(|| {
+            egui::WidgetInfo::labeled(
+                egui::WidgetType::Button,
+                true,
+                format!("Document tab: {}", state.doc.title),
+            )
+        });
+        let hovering_drag = app.tool == op_tools::Tool::Move
+            && ui.input(|i| {
+                i.pointer.primary_down()
+                    && i.pointer.interact_pos().is_some_and(|p| tab.contains(p))
+            });
+        if hovering_drag && !active {
+            if app.move_transfer.is_none()
+                && let Some(source_id) = app.active_doc
+                && let Some(source) = app.docs.get_mut(&source_id)
+                && let Some((movement, start)) = source.move_drag.take()
+            {
+                movement.cancel(&mut source.doc);
+                source.smart_guides = None;
+                let mut original = op_core::Document::new_with_background(
+                    "Move source",
+                    source.doc.width,
+                    source.doc.height,
+                    op_core::Color::WHITE,
+                );
+                original.restore(&source.doc.snapshot());
+                original.set_selected_layers(source.doc.selected_layers());
+                app.move_transfer = Some(crate::state::MoveTransfer {
+                    source_id,
+                    source: original,
+                    start,
+                });
+            }
+            if app.move_transfer.is_some() {
+                app.active_doc = Some(id);
+            }
+        }
         let close_rect = Rect::from_center_size(
             pos2(tab.left() + CLOSE_X, tab.center().y),
             egui::Vec2::splat(pt(12.0)),

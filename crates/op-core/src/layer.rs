@@ -133,6 +133,8 @@ pub struct LayerMask {
     pub image: TiledImage,
     /// Layer > Layer Mask > Disable: a disabled mask is kept but ignored.
     pub enabled: bool,
+    /// Whether moving the layer also moves its mask.
+    pub linked: bool,
 }
 
 impl LayerMask {
@@ -141,6 +143,7 @@ impl LayerMask {
         Self {
             image: TiledImage::filled(width, height, [value, value, value, 255]),
             enabled: true,
+            linked: true,
         }
     }
 
@@ -156,6 +159,7 @@ impl LayerMask {
         Self {
             image: TiledImage::from_rgba8(width, height, &pixels),
             enabled: true,
+            linked: true,
         }
     }
 
@@ -252,6 +256,8 @@ pub struct Layer {
     pub lock_all: bool,
     pub kind: LayerKind,
     pub mask: Option<LayerMask>,
+    /// An artboard is a group with its own clipping rectangle and background.
+    pub artboard: Option<crate::artboard::Artboard>,
     pub color: LayerColor,
     /// The group the layer is in, if any.
     pub parent: Option<LayerId>,
@@ -280,6 +286,7 @@ impl Layer {
             lock_all: false,
             kind: LayerKind::Raster(image),
             mask: None,
+            artboard: None,
             color: LayerColor::None,
             parent: None,
             link: None,

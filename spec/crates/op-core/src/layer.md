@@ -97,10 +97,15 @@ Effective locks (editing operations always use these methods instead of reading 
 
 ## Known limitations
 
-- Raster layers and layer groups only; no adjustment layers, type layers, shape layers or smart objects.
+- Raster layers and layer groups (including artboard containers); no adjustment layers, type layers, shape layers or smart objects.
 - Layer masks are supported, but there are no clipping masks or layer styles (so `fill` and `opacity` have the same effect).
-- Prevent auto-nesting (`lock_nesting`) only stores state: there are no artboards or frames yet, so it does not affect any operation.
+- Prevent auto-nesting (`lock_nesting`) blocks initial raster-layer nesting when creating artboards; frame nesting is not implemented.
 
 ## Test coverage
 
 This file has no unit tests.
+
+
+Masks have a `linked` boolean, true by default; it controls coupled pixel/mask movement independently of enabled state.
+
+`Layer::artboard` optionally attaches an Artboard rectangle/background to a group. Regular raster/group constructors initialize it to None; clones and snapshots retain it.

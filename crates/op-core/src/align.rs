@@ -141,8 +141,15 @@ fn shift(doc: &mut Document, id: LayerId, dx: i64, dy: i64) {
     let (w, h) = (doc.width, doc.height);
     // A group moves with all its layers
     for p in doc.pixel_layers(&[id]) {
-        if let Some(image) = doc.layer_mut(p).and_then(|l| l.image_mut()) {
-            *image = image.with_canvas(w, h, dx, dy, [0; 4]);
+        if let Some(layer) = doc.layer_mut(p) {
+            if let Some(image) = layer.image_mut() {
+                *image = image.with_canvas(w, h, dx, dy, [0; 4]);
+            }
+            if let Some(mask) = &mut layer.mask
+                && mask.linked
+            {
+                mask.image = mask.image.with_canvas(w, h, dx, dy, [0, 0, 0, 255]);
+            }
         }
     }
 }
@@ -182,6 +189,30 @@ pub fn align(doc: &mut Document, how: Align) -> bool {
             (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3))
         }),
     };
+    align_bounds(doc, how, layers, target)
+}
+
+/// Align to the canvas without replacing the user's pixel selection.
+/// One movable layer is sufficient.
+pub fn align_to_canvas(doc: &mut Document, how: Align) -> bool {
+    let layers = movable(doc);
+    if layers.is_empty() {
+        return false;
+    }
+    align_bounds(
+        doc,
+        how,
+        layers,
+        (0, 0, doc.width as i64, doc.height as i64),
+    )
+}
+
+fn align_bounds(
+    doc: &mut Document,
+    how: Align,
+    layers: Vec<(LayerId, Bounds)>,
+    target: Bounds,
+) -> bool {
     let center = |a: i64, b: i64| (a + b) as f32 / 2.0;
     for (id, (x0, y0, x1, y1)) in layers {
         let (dx, dy) = match how {
@@ -284,6 +315,39 @@ pub fn distribute(doc: &mut Document, how: Distribute) -> bool {
 mod tests {
     use super::*;
     use crate::{Color, Layer, TiledImage};
+
+    #[test]
+    fn canvas_alignment_preserves_selection_and_carries_mask() {
+        let mut doc = Document::new_with_background("canvas", 100, 80, Color::WHITE);
+        let id = doc.new_layer_id();
+        let mut image = crate::TiledImage::new(100, 80);
+        image.set_pixel(10, 20, [255, 0, 0, 255]);
+        let mut layer = Layer::raster(id, "dot", image);
+        layer.mask = Some(crate::layer::LayerMask::from_values(100, 80, |x, y| {
+            if (x, y) == (10, 20) { 255 } else { 0 }
+        }));
+        doc.layers.push(layer);
+        doc.select_layer(id);
+        doc.set_selection(Some(crate::selection::Selection::rect(
+            100,
+            80,
+            crate::selection::Rect::new(5.0, 5.0, 20.0, 20.0),
+        )));
+        let selection = doc.selection().unwrap().bounds();
+        assert!(align_to_canvas(&mut doc, Align::Right));
+        assert!(align_to_canvas(&mut doc, Align::Bottom));
+        assert_eq!(
+            doc.layer(id).unwrap().image().unwrap().pixel(99, 79),
+            [255, 0, 0, 255]
+        );
+        assert_eq!(
+            doc.layer(id).unwrap().mask.as_ref().unwrap().value(99, 79),
+            255
+        );
+        assert_eq!(doc.selection().unwrap().bounds(), selection);
+        doc.layer_mut(id).unwrap().lock_position = true;
+        assert!(!align_to_canvas(&mut doc, Align::Left));
+    }
 
     /// Photoshop 2026's result on three boxes (checked in Photoshop):
     /// Align Left, Vertical Centers, Bottom, then Distribute Vertical Centers.

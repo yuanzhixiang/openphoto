@@ -26,7 +26,7 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `type_options`: Type tool options (see `type_tool.md`).
 - `typing_text()`: true when the current document has text being typed; `modal_open()` is also true then.
 - `shape`: shape tool options (`ShapeOptions`: polygon sides 5, line weight 1 px, Photoshop's defaults).
-- `move_options`: Move tool options (`MoveOptions`: `auto_select`, `show_transform_controls`, both off by default, matching Photoshop).
+- `move_options`: Move tool options (`MoveOptions`: `auto_select`, `show_transform_controls`, both off by default; `auto_select_group`, false by default for Layer mode). The mode is shared by all documents and retained for the current run.
 - `gradient`: Gradient tool options (`op_core::gradient::GradientOptions`: type, blend mode, opacity, reverse).
 - `gradient_preset`: the Gradient tool's gradient (None: Foreground to Background with the current colors); `gradient_made`: gradients added with the Gradient Editor's New this session; `gradient_editor`: the open Gradient Editor and what it edits (`EditorTarget::Tool` / `GradientMap`), counted by `modal_open`.
 - `tool_gradient()`: the tool's gradient with the options bar's Method (`gradient.method`); `gradient_presets()`: the editor's presets for the current colors plus `gradient_made`.
@@ -126,3 +126,12 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 - `DocState::patch_drag`: while the Patch tool or Content-Aware Move drags the selection, where the drag started and where it is (document pixels); the selection outline is drawn moved by the difference.
 - `DocState::magnetic` (`MagneticPath`): the Magnetic Lasso under way: its `EdgeMap` (built from the merged image when it starts), the indices of the anchors in `DocState::lasso`'s points, and how many points are fixed (the rest is the live wire to the pointer).
 - `DocState::quick` (`QuickStroke`): a Quick Selection stroke under way: the `QuickSelect` region, the selection it started from, how they combine, and where the last dab was. `DocState::object_drag`: the Object Selection tool's rectangle being dragged. `DocState::history_source` / `history_brush_snapshot`: the History Brush's source state (see `panels/history.md`). `DocState::fade` / `record_fadeable` / `can_fade` / `fade_source`: the last fadeable edit and what Edit › Fade would work on (`FadeSource`: name, layer, pixels before and after); `AppState::fade_dialog` (`FadeState`: the dialog, its source and what its preview last showed). See `dialogs/fade.md`. `DocState::selection_stroke` / `overlay`: a Selection Brush stroke under way and the cached overlay texture (see `selection_brush.md`). `AppState::selection_brush`: the Selection Brush's `PaintOptions` (200 px, hard). `DocState::color_samplers` / `sampler_drag`: the Color Sampler tool's points and the one being dragged (see `document_view.md`). `DocState::ruler_origin` / `origin_drag`: the rulers' zero point and the pointer while it is dragged out of the corner (see `rulers.md`). `DocState::snap`: what the drag in progress snaps to (`snap::Targets`, gathered when the drag starts; see `snap.md`).
+
+## Move navigation feedback
+
+`MoveOptions` also stores `show_hover_bounds`, `expand_groups`, and `show_layer_panel_bounds` (all true by default, matching the observed Photoshop gear menu), and `align_canvas` (false). `DocState::move_hover_target` is the canvas hover target; `layer_panel_hover` is the hovered layer row. Both are transient UI feedback, outside document history.
+
+
+`AppState::move_transfer` holds an immutable original source document, source ID and initial document-space grab point while a Move gesture crosses tabs.
+
+DocState stores an optional Artboard drag transaction; it counts as busy, so Escape cancels the gesture.

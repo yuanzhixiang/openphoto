@@ -2,7 +2,7 @@
 
 ## Responsibilities
 
-The crate root of `op-core`. Declares six public modules, `color`, `document`, `history`, `layer`, `pixel`, and `tile`, and re-exports commonly used types at the crate root so downstream crates can write `op_core::Document`, `op_core::TiledImage`, and so on directly.
+The crate root of `op-core`. Declares document, layer, pixel-storage and editing modules, and re-exports commonly used types at the crate root so downstream crates can write `op_core::Document`, `op_core::TiledImage`, and so on directly.
 
 The crate-level doc comment states the crate's role: the document model (layer tree, tiled pixel storage, pixel formats), independent of GPU or UI; every edit ultimately modifies the data structures here. For the overall model, see `README.md` in the same directory.
 
@@ -27,3 +27,5 @@ Public items not re-exported at the root, which must be reached through the modu
 ## Test coverage
 
 This file has no tests; for each module's tests, see the corresponding spec.
+
+The public `artboard` module implements artboard group geometry, clipping metadata, creation, hit testing, resizing and movement.

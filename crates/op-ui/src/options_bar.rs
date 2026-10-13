@@ -1764,16 +1764,32 @@ fn warp_bar(ui: &mut Ui, app: &mut AppState, bar: Rect) {
     }
 }
 
-/// Move: Auto-Select (Layer), Show Transform Controls, and the align and
+/// Move: Auto-Select (Group / Layer), Show Transform Controls, and the align and
 /// distribute buttons (disabled: they need two or more layers selected).
 fn move_options(ui: &mut Ui, app: &mut AppState) {
-    let opts = &mut app.move_options;
+    let mut opts = app.move_options;
+    let mut more = None;
     ui.spacing_mut().item_spacing.x = 0.0;
     widgets::checkbox(ui, &mut opts.auto_select, "Auto-Select:");
     ui.add_space(pt(8.5));
-    widgets::dropdown(ui, "move-auto-select", pt(55.0), "Layer", |ui| {
-        let _ = ui.selectable_label(true, "Layer");
-    });
+    let entries = [
+        crate::native_popup::Entry::item("Group", opts.auto_select_group),
+        crate::native_popup::Entry::item("Layer", !opts.auto_select_group),
+    ];
+    if let Some(index) = widgets::dropdown_entries(
+        ui,
+        "move-auto-select",
+        pt(55.0),
+        if opts.auto_select_group {
+            "Group"
+        } else {
+            "Layer"
+        },
+        true,
+        &entries,
+    ) {
+        opts.auto_select_group = index == 0;
+    }
     ui.add_space(pt(4.5));
     sep(ui);
     ui.add_space(pt(4.0));
@@ -1828,12 +1844,18 @@ fn move_options(ui: &mut Ui, app: &mut AppState) {
             };
             // Enabled when Photoshop's are: two or more layers to line up
             // (or a pixel selection), three or more to distribute
-            let enabled = command.is_none_or(|c| c.enabled(app));
+            let enabled = command.is_none_or(|c| move_command_enabled(app, c, opts.align_canvas));
             if enabled {
-                let clicked = ps_button(ui, rect, icon).on_hover_text(tip).clicked();
-                if clicked && let Some(c) = command {
-                    let ctx = ui.ctx().clone();
-                    crate::commands::run(c, &ctx, app);
+                let response = ps_button(ui, rect, icon).on_hover_text(tip);
+                response
+                    .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip));
+                if response.clicked()
+                    && let Some(c) = command
+                {
+                    run_move_command(ui, app, c, opts.align_canvas);
+                }
+                if icon == Icon::More {
+                    more = Some(response);
                 }
             } else {
                 // Drawn directly: a disabled Ui would fade Photoshop's gray
@@ -1859,10 +1881,84 @@ fn move_options(ui: &mut Ui, app: &mut AppState) {
         );
     }
     let gear = Rect::from_center_size(Pos2::new(start + pt(291.0), cy), button);
-    ui.scope_builder(egui::UiBuilder::new().max_rect(gear), |ui| {
-        widgets::ps_icon_button(ui, gear.size(), Icon::Gear, color::OPTIONS_ICON)
-            .on_hover_text("Set additional options");
+    let gear = ui
+        .scope_builder(egui::UiBuilder::new().max_rect(gear), |ui| {
+            widgets::ps_icon_button(ui, gear.size(), Icon::Gear, color::OPTIONS_ICON)
+                .on_hover_text("Set additional options")
+        })
+        .inner;
+    gear.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Set additional options")
     });
+    egui::Popup::menu(&gear)
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+        .show(|ui| {
+            ui.checkbox(&mut opts.show_hover_bounds, "Show layer bounds on hover");
+            ui.checkbox(&mut opts.expand_groups, "Expand layer group on click");
+            ui.checkbox(
+                &mut opts.show_layer_panel_bounds,
+                "Show hover bounds from Layers",
+            );
+        });
+    if let Some(more) = more {
+        egui::Popup::menu(&more)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .show(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Align To:");
+                    ui.selectable_value(&mut opts.align_canvas, false, "Selection");
+                    ui.selectable_value(&mut opts.align_canvas, true, "Canvas");
+                });
+                for how in op_core::align::Align::ALL {
+                    let c = Command::Align(how);
+                    if ui
+                        .add_enabled(
+                            move_command_enabled(app, c, opts.align_canvas),
+                            egui::Button::new(format!("Align {}", how.label())),
+                        )
+                        .clicked()
+                    {
+                        run_move_command(ui, app, c, opts.align_canvas);
+                    }
+                }
+                ui.separator();
+                for how in op_core::align::Distribute::ALL {
+                    let c = Command::Distribute(how);
+                    if ui
+                        .add_enabled(
+                            c.enabled(app),
+                            egui::Button::new(format!("Distribute {}", how.label())),
+                        )
+                        .clicked()
+                    {
+                        run_move_command(ui, app, c, opts.align_canvas);
+                    }
+                }
+            });
+    }
+    app.move_options = opts;
+}
+
+fn move_command_enabled(app: &AppState, command: Command, canvas: bool) -> bool {
+    if canvas && matches!(command, Command::Align(_)) {
+        app.active_doc
+            .and_then(|id| app.docs.get(&id))
+            .is_some_and(|d| !app.modal_open() && d.movable_layers() > 0)
+    } else {
+        command.enabled(app)
+    }
+}
+
+fn run_move_command(ui: &Ui, app: &mut AppState, command: Command, canvas: bool) {
+    if canvas && let Command::Align(how) = command {
+        if let Some(state) = app.active()
+            && op_core::align::align_to_canvas(&mut state.doc, how)
+        {
+            state.record(how.name());
+        }
+    } else {
+        crate::commands::run(command, ui.ctx(), app);
+    }
 }
 
 /// A separator in the tool's options, taking 1 pt of the row.

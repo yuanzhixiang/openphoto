@@ -87,3 +87,10 @@ The Background layer's blending mode, opacity, lock and Fill controls are all gr
 - `lock_icons_on_the_rows_match_photoshop`: the solid lock, hollow lock and dim lock of a layer in a group match Photoshop screenshots at 2x device pixels; a layer in the group cannot be deleted.
 - `alt_click_opens_nested_groups_and_the_list_follows_the_active_layer`: ⌥-click expands/collapses nested groups; with enough layers to need scrolling, selecting the background scrolls its row into view (verified: the test fails when auto-scrolling is turned off).
 - `dragging_several_selected_rows`: two non-adjacent selected rows dragged together above the background.
+
+## Move hover feedback
+
+Layer rows report their hovered layer ID through `DocState::layer_panel_hover`, reset on each list frame. The Move canvas can display its bounds when Show hover bounds from Layers is enabled; this feedback does not change selection or history.
+
+
+Clicking the gap between layer/folder and mask thumbnails toggles mask linkage, changes chain visibility and records Link Layer Mask or Unlink Layer Mask. The toggle does not change selection or mask target and exposes a per-layer accessibility label.
