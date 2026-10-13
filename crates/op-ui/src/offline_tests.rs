@@ -1567,3 +1567,31 @@ fn toolbar_screen_mode_button_cycles_and_preserves_the_full_screen_prompt_cpu() 
     assert_eq!(h.state().doc.composite_rgba8(), pixels);
     assert_eq!(h.state().history.states().len(), count);
 }
+
+#[test]
+fn content_aware_move_escape_preserves_selection_pixels_and_history_cpu() {
+    let mut h = CanvasHarness::new(Tool::ContentAwareMove);
+    h.app
+        .active()
+        .unwrap()
+        .doc
+        .set_selection(Some(op_core::Selection::rect(
+            256,
+            256,
+            op_core::selection::Rect::new(40.0, 40.0, 80.0, 80.0),
+        )));
+    let pixels = h.state().doc.composite_rgba8();
+    let selection = h.state().doc.selection().cloned();
+    let count = h.state().history.states().len();
+    let a = h.point(50.5, 50.5);
+    let b = h.point(130.5, 110.5);
+    h.button(a, true, Modifiers::NONE);
+    h.step(vec![Event::PointerMoved(b)], Modifiers::NONE);
+    assert!(h.state().patch_drag.is_some());
+    h.key(Key::Escape);
+    assert!(h.state().patch_drag.is_none());
+    h.button(b, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.selection(), selection.as_ref());
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+    assert_eq!(h.state().history.states().len(), count);
+}

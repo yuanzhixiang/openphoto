@@ -1001,4 +1001,50 @@ mod patch_target_tests {
         assert!(!patch_to(&mut doc, &selection, (8, 0)));
         assert_eq!(doc.revision(), revision);
     }
+    #[test]
+    fn content_aware_move_rejects_hidden_and_locked_merged_targets() {
+        for locked in [false, true] {
+            let mut doc = Document::new_with_background("move", 32, 32, crate::Color::WHITE);
+            let id = doc.active_layer.unwrap();
+            doc.layer_mut(id)
+                .unwrap()
+                .image_mut()
+                .unwrap()
+                .set_pixel(12, 12, [0, 0, 0, 255]);
+            if locked {
+                doc.layer_mut(id).unwrap().lock_pixels = true;
+            } else {
+                doc.layer_mut(id).unwrap().visible = false;
+            }
+            let before = doc.layer(id).unwrap().image().unwrap().to_rgba8();
+            let revision = doc.revision();
+            let selection =
+                Selection::rect(32, 32, crate::selection::Rect::new(10.0, 10.0, 14.0, 14.0));
+            let merged = TiledImage::filled(32, 32, [255; 4]);
+            assert!(!content_aware_move_from(
+                &mut doc,
+                &selection,
+                (8, 0),
+                Some(&merged)
+            ));
+            assert!(!patch_to_from(&mut doc, &selection, (8, 0), Some(&merged)));
+            assert_eq!(doc.layer(id).unwrap().image().unwrap().to_rgba8(), before);
+            assert_eq!(doc.revision(), revision);
+        }
+    }
+    #[test]
+    fn content_aware_move_identical_merged_output_is_not_an_edit() {
+        let mut doc = Document::new_with_background("move", 32, 32, crate::Color::WHITE);
+        let selection =
+            Selection::rect(32, 32, crate::selection::Rect::new(10.0, 10.0, 14.0, 14.0));
+        let merged = TiledImage::filled(32, 32, [255; 4]);
+        let revision = doc.revision();
+        assert!(!content_aware_move_from(
+            &mut doc,
+            &selection,
+            (8, 0),
+            Some(&merged)
+        ));
+        assert_eq!(doc.revision(), revision);
+    }
 }

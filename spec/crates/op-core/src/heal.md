@@ -41,3 +41,5 @@ All three document operations return whether anything changed; they do nothing w
 - `patch_and_content_aware_move`: patching a black square from white beside it turns it white; moving a black square fills its old place with white and leaves it black at the new place.
 
 Region healing operations reject hidden/pixel-locked targets (including inherited pixel locks), groups, layer-mask editing and Quick Mask, without changing pixels or document revision. Mask region healing remains unsupported rather than silently changing the underlying image. A pixel-identical Patch/placement result returns false and leaves revision unchanged; merged-image writes only mark changes when the destination pixel actually differs. Regression tests cover Source/Destination rejection and identical output. Native content-aware synthesis remains unimplemented.
+
+Content-Aware Move/Extend merged-source regressions verify locked/hidden rejection and pixel-identical merged output reporting no edit. These target/history contracts do not validate the smooth-fill fallback against native synthesis.

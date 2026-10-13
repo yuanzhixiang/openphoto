@@ -67,3 +67,5 @@ Rotate View regression checks a quarter-turn drag, Escape while pressed, continu
 Zoom cancellation regression covers scrubby scale/anchor restoration and box discard, post-Escape movement/release, unchanged document pixels and history.
 
 Toolbar CPU frames construct the Tools panel directly, without a native window. The screen-mode regression clicks its real hit area, checks the warning before Full Screen, simulates confirmation, returns with F and preserves pixels/history.
+
+Content-Aware Move canvas regression checks Escape and release preserve the original selection, pixels and history.
