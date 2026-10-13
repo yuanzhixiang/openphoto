@@ -69,3 +69,6 @@ PackBits encoding: runs of 3 or more identical bytes are encoded as repeat segme
 - `locks_round_trip`: the five lock flags are written and read back unchanged.
 - `reads_photoshop_locks`: reads `fixtures/photoshop_locks.psd` (saved by Photoshop 2026, one lock per layer: tp, px, pos, nest, all); each layer reads back only its corresponding lock.
 - `reads_photoshop_links`: reads `fixtures/photoshop_links.psd` (saved by Photoshop 2026: A linked with B, C linked with the background, D unlinked); the link relationships are correct; after writing and reading back, the layers linked together are unchanged (the numbers may differ).
+
+
+Mask linkage round-trips in the OpenPhoto-specific `opml` four-byte additional-info block (1 linked, 0 unlinked). Absent blocks default linked. Adobe mask-link encoding is unverified; this extension does not claim Photoshop interoperability for linkage. The existing disabled-mask round-trip also covers an unlinked mask.

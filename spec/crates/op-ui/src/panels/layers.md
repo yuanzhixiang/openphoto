@@ -91,3 +91,6 @@ The Background layer's blending mode, opacity, lock and Fill controls are all gr
 ## Move hover feedback
 
 Layer rows report their hovered layer ID through `DocState::layer_panel_hover`, reset on each list frame. The Move canvas can display its bounds when Show hover bounds from Layers is enabled; this feedback does not change selection or history.
+
+
+Clicking the gap between layer/folder and mask thumbnails toggles mask linkage, changes chain visibility and records Link Layer Mask or Unlink Layer Mask. The toggle does not change selection or mask target and exposes a per-layer accessibility label.

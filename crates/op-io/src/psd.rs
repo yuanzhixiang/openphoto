@@ -451,6 +451,12 @@ pub fn write(doc: &Document) -> Vec<u8> {
                 out.u32(4);
                 out.u32(locks);
             }
+            // OpenPhoto mask-link extension; Adobe mask-link encoding is not verified.
+            if let Some(mask) = &layer.mask {
+                out.bytes(b"8BIMopml");
+                out.u32(4);
+                out.u32(u32::from(mask.linked));
+            }
             // Fill opacity
             out.bytes(b"8BIMiOpa");
             out.u32(4);
@@ -618,6 +624,7 @@ struct LayerRecord {
     label: u16,
     /// The lock bits (`lspf`), when saved.
     locks: Option<u32>,
+    mask_linked: bool,
     rect: (i32, i32, i32, i32),
     channels: Vec<(i16, usize)>,
     blend: [u8; 4],
@@ -755,6 +762,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                 let mut section = None;
                 let mut label = 0u16;
                 let mut locks = None;
+                let mut mask_linked = true;
                 while r.pos() + 12 <= extra_end {
                     let sig = r.take::<4>()?;
                     if &sig != b"8BIM" && &sig != b"8B64" {
@@ -775,6 +783,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                         b"iOpa" => fill = r.u8()?,
                         b"lclr" => label = r.u16()?,
                         b"lspf" => locks = Some(r.u32()?),
+                        b"opml" => mask_linked = r.u32()? != 0,
                         b"lsct" | b"lsdk" => section = Some(r.u32()?),
                         _ => {}
                     }
@@ -793,6 +802,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                     mask,
                     label,
                     locks,
+                    mask_linked,
                 });
             }
             let mut open_groups: Vec<usize> = Vec::new();
@@ -853,6 +863,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                         }
                     });
                     mask.enabled = m.enabled;
+                    mask.linked = rec.mask_linked;
                     layer.mask = Some(mask);
                 }
                 layer.visible = rec.flags & 2 == 0;
@@ -1065,11 +1076,13 @@ mod tests {
         let mut layer = Layer::raster(doc.new_layer_id(), "Masked", image);
         let mut mask = op_core::LayerMask::from_values(4, 3, |x, _| if x < 2 { 0 } else { 255 });
         mask.enabled = false;
+        mask.linked = false;
         layer.mask = Some(mask);
         doc.insert_above_active(layer);
         let back = read(&write(&doc), "t.psd".into()).unwrap();
         let mask = back.layers[1].mask.as_ref().unwrap();
         assert!(!mask.enabled);
+        assert!(!mask.linked);
         assert_eq!((mask.value(0, 1), mask.value(3, 2)), (0, 255));
     }
 

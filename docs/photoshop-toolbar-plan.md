@@ -145,7 +145,7 @@ canvas alignment, mask-preserving alignment, ancestor mask/opacity hit testing,
 and Escape/zero-displacement rollback (including Option copies). Headless tests
 exercise input, pixels, options, history and transaction failures.
 
-Remaining Move work: cross-document drag interaction, linked/unlinked mask
+Implemented in the subsequent offline Move stage: cross-document drag interaction, linked/unlinked mask
 controls, exact popup/hover styling and Photoshop pixel references, especially
 constraint thresholds and rounding. This stage is not full 1:1 acceptance.
 
@@ -155,3 +155,10 @@ Move model tests 13 passed. Formatting, whitespace validation and strict
 workspace/all-target clippy pass. No native app was launched, no development
 server or port was opened, and no system input or screen capture was used in
 this offline stage.
+
+
+### Move cross-document and mask-link stage
+
+Tab-crossing Move gestures restore the source and copy selected layer blocks or pixels on destination drop. Escape/outside drops cancel. Mask linking can be toggled and undone; unlinked mask and pixels move independently. Link state round-trips in the OpenPhoto PSD extension; Adobe link serialization and live drag timing/Shift placement remain pending reference checks. Proceed to Artboard after offline tests and a separate pushed commit.
+
+Move stage validation: 23 core tests and 9 UI tests passed, one screenshot-only test ignored; mask PSD round-trip passed. Formatting, whitespace checks and strict workspace/all-targets Clippy passed. Tests use no OS windows or system mouse events.

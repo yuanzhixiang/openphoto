@@ -28,3 +28,6 @@ A selected group counts as a single unit: its extent is the union of all pixel l
 ## Canvas target and masks
 
 `align_to_canvas(doc, how)` aligns one or more movable layer units against the document bounds without changing the pixel selection. With no movable units it returns false. Raster masks translate with their layers during alignment and distribution. `canvas_alignment_preserves_selection_and_carries_mask` verifies right/bottom placement, preserved selection, mask movement and position locking.
+
+
+Alignment and distribution carry linked masks only; unlinked masks remain fixed.

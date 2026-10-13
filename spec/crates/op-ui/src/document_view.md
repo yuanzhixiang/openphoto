@@ -240,3 +240,6 @@ Measured against Photoshop 2026's status bar (pt from the document area's left e
 - Expand layer group on click expands the auto-selected group and its ancestor groups. This navigation records no history.
 
 Escape cancels an active Move gesture without recording history. Releasing at zero net displacement restores the original state, including removing temporary Option copies, and records no history.
+
+
+A transferred Move drag released inside the destination viewport copies source layers at the drop offset and records one Drag Layer history entry. Shift centers source-canvas coordinates in the destination. Escape, switching tools, dropping outside the viewport or returning to the source cancels without changing either document. Native timing and exact Shift placement parity remain unmeasured.

@@ -9344,3 +9344,93 @@ fn marquee_fixed_ratio_and_fixed_size() {
     );
     assert_eq!(last_history(&h), "Rectangular Marquee");
 }
+
+#[test]
+fn move_cross_document_drop_and_mask_link_offline() {
+    use egui_kittest::kittest::Queryable;
+    use op_core::{Document, Layer, LayerMask, TiledImage};
+    let mut h = harness(Vec::new());
+    let mut source = Document::new_with_background("Source", 160, 160, Color::WHITE);
+    let id = source.new_layer_id();
+    let mut pixels = TiledImage::new(160, 160);
+    pixels.set_pixel(30, 30, [255, 0, 0, 255]);
+    let mut layer = Layer::raster(id, "Movable", pixels);
+    layer.mask = Some(LayerMask::filled(160, 160, 255));
+    source.layers.push(layer);
+    source.select_layer(id);
+    let source_id = source.id;
+    h.state_mut().state.add_document(source, "Open");
+    let target = Document::new_with_background("Target", 200, 200, Color::WHITE);
+    let target_id = target.id;
+    h.state_mut().state.add_document(target, "Open");
+    h.state_mut().state.active_doc = Some(source_id);
+    h.state_mut().state.tool = op_tools::Tool::Move;
+    h.run_steps(6);
+    h.get_by_label("Toggle mask link: Movable").click();
+    h.run_steps(3);
+    assert!(
+        !active(&h)
+            .doc
+            .layer(id)
+            .unwrap()
+            .mask
+            .as_ref()
+            .unwrap()
+            .linked
+    );
+    assert_eq!(last_history(&h), "Unlink Layer Mask");
+    assert!(h.state_mut().state.active().unwrap().undo());
+    h.run_steps(3);
+    assert!(
+        active(&h)
+            .doc
+            .layer(id)
+            .unwrap()
+            .mask
+            .as_ref()
+            .unwrap()
+            .linked
+    );
+    let start = doc_point(&h, 30.0, 30.0);
+    h.event(egui::Event::PointerButton {
+        pos: start,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    h.hover_at(start + egui::vec2(10.0, 0.0));
+    h.step();
+    assert!(active(&h).move_drag.is_some());
+    let tab = h.get_by_label("Document tab: Target").rect().center();
+    h.hover_at(tab);
+    h.run_steps(2);
+    assert_eq!(h.state().state.active_doc, Some(target_id));
+    assert!(h.state().state.move_transfer.is_some());
+    let drop = doc_point(&h, 80.0, 90.0);
+    h.hover_at(drop);
+    h.step();
+    h.event(egui::Event::PointerButton {
+        pos: drop,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(3);
+    assert_eq!(active(&h).doc.layers.len(), 2);
+    let copied = active(&h).doc.layers.last().unwrap();
+    assert_eq!(copied.image().unwrap().pixel(80, 90), [255, 0, 0, 255]);
+    assert_eq!(last_history(&h), "Drag Layer");
+    assert_eq!(
+        h.state().state.docs[&source_id]
+            .doc
+            .layer(id)
+            .unwrap()
+            .image()
+            .unwrap()
+            .pixel(30, 30),
+        [255, 0, 0, 255]
+    );
+    assert!(h.state_mut().state.active().unwrap().undo());
+    assert_eq!(active(&h).doc.layers.len(), 1);
+}

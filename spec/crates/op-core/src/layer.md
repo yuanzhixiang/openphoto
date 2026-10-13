@@ -104,3 +104,6 @@ Effective locks (editing operations always use these methods instead of reading 
 ## Test coverage
 
 This file has no unit tests.
+
+
+Masks have a `linked` boolean, true by default; it controls coupled pixel/mask movement independently of enabled state.

@@ -145,7 +145,9 @@ fn shift(doc: &mut Document, id: LayerId, dx: i64, dy: i64) {
             if let Some(image) = layer.image_mut() {
                 *image = image.with_canvas(w, h, dx, dy, [0; 4]);
             }
-            if let Some(mask) = &mut layer.mask {
+            if let Some(mask) = &mut layer.mask
+                && mask.linked
+            {
                 mask.image = mask.image.with_canvas(w, h, dx, dy, [0, 0, 0, 255]);
             }
         }

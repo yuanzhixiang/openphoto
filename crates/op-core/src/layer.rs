@@ -133,6 +133,8 @@ pub struct LayerMask {
     pub image: TiledImage,
     /// Layer > Layer Mask > Disable: a disabled mask is kept but ignored.
     pub enabled: bool,
+    /// Whether moving the layer also moves its mask.
+    pub linked: bool,
 }
 
 impl LayerMask {
@@ -141,6 +143,7 @@ impl LayerMask {
         Self {
             image: TiledImage::filled(width, height, [value, value, value, 255]),
             enabled: true,
+            linked: true,
         }
     }
 
@@ -156,6 +159,7 @@ impl LayerMask {
         Self {
             image: TiledImage::from_rgba8(width, height, &pixels),
             enabled: true,
+            linked: true,
         }
     }
 

@@ -39,6 +39,7 @@ pub struct Move {
     others: Vec<(LayerId, TiledImage)>,
     masks: Vec<(LayerId, TiledImage)>,
     copy_selection: bool,
+    mask_only: bool,
     before: crate::Snapshot,
     selected_before: Vec<LayerId>,
     mask_target_before: bool,
@@ -61,6 +62,25 @@ impl Move {
             return Err(MoveError::Hidden);
         }
         let selection = doc.selection().cloned();
+        let mask_only = doc.editing_mask() && layer.mask.as_ref().is_some_and(|m| !m.linked);
+        if mask_only {
+            if doc.position_locked(id) || doc.pixels_locked(id) {
+                return Err(MoveError::Locked);
+            }
+            return Ok(Self {
+                layer: id,
+                base: layer.mask.as_ref().expect("mask target").image.clone(),
+                selection,
+                background_fill: Some([0; 3]),
+                others: Vec::new(),
+                masks: Vec::new(),
+                copy_selection: false,
+                mask_only: true,
+                before: doc.snapshot(),
+                selected_before: doc.selected_layers(),
+                mask_target_before: doc.mask_target,
+            });
+        }
         // The background layer can only have selected pixels moved
         if doc.position_locked(id)
             || doc.pixels_locked(id)
@@ -106,9 +126,34 @@ impl Move {
         };
         let others = moving;
         let masks = if selection.is_none() {
-            std::iter::once(main)
-                .chain(others.iter().map(|(id, _)| *id))
-                .filter_map(|id| Some((id, doc.layer(id)?.mask.as_ref()?.image.clone())))
+            let mut mask_ids = vec![main];
+            mask_ids.extend(others.iter().map(|(id, _)| *id));
+            let selected = if include_links {
+                crate::link::with_linked(doc)
+            } else {
+                doc.selected_layers()
+            };
+            for id in selected {
+                if doc.layer(id).is_some_and(|l| l.is_group())
+                    && !doc.position_locked(id)
+                    && !doc.pixels_locked(id)
+                {
+                    mask_ids.push(id);
+                    mask_ids.extend(doc.descendants(id).into_iter().filter(|id| {
+                        doc.layer(*id).is_some_and(|l| l.is_group())
+                            && !doc.position_locked(*id)
+                            && !doc.pixels_locked(*id)
+                    }));
+                }
+            }
+            mask_ids.sort_by_key(|id| id.0);
+            mask_ids.dedup();
+            mask_ids
+                .into_iter()
+                .filter_map(|id| {
+                    let mask = doc.layer(id)?.mask.as_ref()?;
+                    mask.linked.then(|| (id, mask.image.clone()))
+                })
                 .collect()
         } else {
             Vec::new()
@@ -121,6 +166,7 @@ impl Move {
             others,
             masks,
             copy_selection: false,
+            mask_only: false,
             before: doc.snapshot(),
             selected_before: doc.selected_layers(),
             mask_target_before: doc.mask_target,
@@ -131,7 +177,7 @@ impl Move {
     /// Validate first so refused operations never leave an extra layer.
     pub fn begin_copy(doc: &mut Document, background: [u8; 3]) -> Result<Self, MoveError> {
         let mut movement = Self::begin(doc, background)?;
-        if movement.selection.is_some() {
+        if movement.selection.is_some() || movement.mask_only {
             movement.copy_selection = true;
             return Ok(movement);
         }
@@ -169,7 +215,17 @@ impl Move {
     pub fn apply(&self, doc: &mut Document, dx: i64, dy: i64) {
         let (w, h) = (doc.width, doc.height);
         let moved = match &self.selection {
-            None => self.base.with_canvas(w, h, dx, dy, [0; 4]),
+            None => self.base.with_canvas(
+                w,
+                h,
+                dx,
+                dy,
+                if self.mask_only {
+                    [0, 0, 0, 255]
+                } else {
+                    [0; 4]
+                },
+            ),
             Some(sel) => {
                 // Lift the selected pixels, leave the rest (or the background
                 // color) behind, and drop the lifted pixels at the new place
@@ -213,7 +269,11 @@ impl Move {
                 out
             }
         };
-        if let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) {
+        if self.mask_only {
+            if let Some(mask) = doc.layer_mut(self.layer).and_then(|l| l.mask.as_mut()) {
+                mask.image = moved;
+            }
+        } else if let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) {
             *image = moved;
         }
         for (id, base) in &self.others {
@@ -285,6 +345,35 @@ mod tests {
     fn px(doc: &Document, id: LayerId, x: u32, y: u32) -> [u8; 4] {
         let img = doc.layer(id).unwrap().image().unwrap();
         img.pixel(x, y)
+    }
+
+    #[test]
+    fn unlinked_mask_and_pixels_move_independently() {
+        let (mut doc, id) = doc_with_dot();
+        doc.select_layer(id);
+        let mut mask =
+            crate::LayerMask::from_values(10, 10, |x, y| if (x, y) == (2, 2) { 255 } else { 0 });
+        mask.linked = false;
+        doc.layer_mut(id).unwrap().mask = Some(mask);
+        Move::begin(&doc, [0; 3]).unwrap().apply(&mut doc, 3, 0);
+        assert_eq!(px(&doc, id, 5, 2), [255, 0, 0, 255]);
+        assert_eq!(
+            doc.layer(id).unwrap().mask.as_ref().unwrap().value(2, 2),
+            255
+        );
+        doc.mask_target = true;
+        let movement = Move::begin(&doc, [0; 3]).unwrap();
+        movement.apply(&mut doc, 3, 0);
+        assert_eq!(
+            doc.layer(id).unwrap().mask.as_ref().unwrap().value(5, 2),
+            255
+        );
+        assert_eq!(px(&doc, id, 5, 2), [255, 0, 0, 255]);
+        movement.cancel(&mut doc);
+        assert_eq!(
+            doc.layer(id).unwrap().mask.as_ref().unwrap().value(2, 2),
+            255
+        );
     }
 
     #[test]

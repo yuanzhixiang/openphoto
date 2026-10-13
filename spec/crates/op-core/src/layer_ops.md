@@ -105,3 +105,8 @@ All merges are computed via `Document::composite_layers_rgba8`, with the same ru
 - `duplicating_several_layers_puts_the_copies_on_top`: position, names and selection state of a multi-selection duplicate match Photoshop; with a single selection the copy is directly above the original layer.
 - `moving_several_blocks_together`: two non-adjacent layers move together to the top and to directly above the background; moving in place, moving below the background and moving the background are not allowed.
 - `a_locked_group_locks_its_layers`: when a group locks position, layers inside it cannot move but can be painted; when a group is Lock all, layers inside it cannot be painted, moved or deleted (`delete_selected` refuses to delete layers inside a locked group).
+
+
+`move_copy_into` copies selected root blocks to another document with fresh IDs, remapped group parents, cleared external links and a supplied pixel offset. Selected pixels instead create one raster layer with selection-weighted alpha. Source content is immutable; the destination selects the copies. Masks travel with transferred content even when unlinked.
+
+Transfer regressions cover selected-group/child deduplication, fresh IDs and parents, cleared cross-document links, masks, off-canvas pixels and unchanged source selection/content.

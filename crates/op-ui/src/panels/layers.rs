@@ -735,6 +735,32 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
                 thumb_box.translate(Vec2::new(ts.x + MASK_GAP, 0.0))
             }
         });
+        let mask_link = mask_box.map(|_| {
+            let x = if is_group {
+                rect.left() + pt(71.0) + indent
+            } else {
+                thumb_box.right() + MASK_GAP / 2.0
+            };
+            let response = ui.interact(
+                Rect::from_center_size(
+                    Pos2::new(x, rect.center().y),
+                    Vec2::new(MASK_GAP, pt(18.0)),
+                ),
+                ui.id().with(("mask-link", id.0)),
+                Sense::click(),
+            );
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(
+                    egui::WidgetType::Button,
+                    true,
+                    format!(
+                        "Toggle mask link: {}",
+                        state.doc.layer(id).expect("listed layer").name
+                    ),
+                )
+            });
+            response
+        });
         let name_x = match (is_group, mask_box) {
             (true, None) => rect.left() + pt(71.0) + indent,
             (_, Some(b)) => b.right() + pt(8.0),
@@ -767,7 +793,21 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
             }
         }
 
-        if arrow.as_ref().is_some_and(|a| a.clicked()) {
+        if mask_link.as_ref().is_some_and(|r| r.clicked()) {
+            let mask = state
+                .doc
+                .layer_mut(id)
+                .and_then(|l| l.mask.as_mut())
+                .expect("mask button");
+            mask.linked = !mask.linked;
+            let linked = mask.linked;
+            state.doc.mark_dirty();
+            state.record(if linked {
+                "Link Layer Mask"
+            } else {
+                "Unlink Layer Mask"
+            });
+        } else if arrow.as_ref().is_some_and(|a| a.clicked()) {
             // Not a history state, as in Photoshop; with Alt the groups
             // inside open or close too
             let all = ui.input(|i| i.modifiers.alt);
@@ -947,13 +987,15 @@ fn layer_list(ui: &mut Ui, state: &mut DocState) -> (bool, Option<FooterDrop>) {
             } else {
                 thumb_box.right() + MASK_GAP / 2.0
             };
-            painter.text(
-                Pos2::new(link_x, rect.center().y),
-                Align2::CENTER_CENTER,
-                icons::LINK_SIMPLE,
-                theme::icon(12.0),
-                color::ICON,
-            );
+            if layer.mask.as_ref().is_some_and(|m| m.linked) {
+                painter.text(
+                    Pos2::new(link_x, rect.center().y),
+                    Align2::CENTER_CENTER,
+                    icons::LINK_SIMPLE,
+                    theme::icon(12.0),
+                    color::ICON,
+                );
+            }
             // A disabled mask is crossed out in red
             if layer.mask.as_ref().is_some_and(|m| !m.enabled) {
                 let red = Stroke::new(2.0, egui::Color32::from_rgb(0xe0, 0x30, 0x30));

@@ -47,7 +47,7 @@ Without a pixel selection, a selected group moves together with all the pixel la
 ## Copying and masks
 
 - `Move::begin_copy`: validates before mutation. Without a pixel selection it duplicates the selected layer blocks, selects their copies, and translates only copies even when they inherit links to original layers. With a selection it leaves source pixels intact and places selected pixels over the destination on the same layer. The selection follows the copied pixels.
-- Whole-layer movement carries each raster layer's mask from its original position, including disabled masks. Pixel-selection movement leaves the layer mask in place.
+- Whole-layer movement carries linked raster and selected-group masks from their original positions, including disabled masks. Unlinked masks remain fixed. Pixel-selection movement leaves the layer mask in place.
 - Tests `option_copy_keeps_original_pixels_and_linked_layers`, `option_copy_group_moves_only_its_copied_children`, and `layer_mask_follows_whole_layer_from_original_position` cover unchanged originals, inherited links, selection copying, and repeated mask movement.
 
 ## Constrained movement
@@ -57,3 +57,6 @@ Without a pixel selection, a selected group moves together with all the pixel la
 `Move::cancel` restores the pre-gesture snapshot, selected layers and mask editing target. Option-copy captures the original document before duplication. The cancellation regression verifies temporary copies disappear and original pixels and selection return.
 
 A copied group with no movable children rolls back duplication if it cannot start its own move, including when its original was movable only through links to external layers. `refused_copy_rolls_back_an_empty_group_with_external_links` covers this transaction boundary.
+
+
+Whole-layer movement carries only linked raster masks. Editing an unlinked mask moves only that mask, including partial selections, with cancellation restoring the original target. Option-drag on an unlinked mask copies mask pixels in place. Independent movement has a regression test.

@@ -151,6 +151,54 @@ pub fn fit_layers(state: &mut DocState, ppp: f32) {
 }
 
 pub fn show(ui: &mut Ui, app: &mut AppState, id: DocId) {
+    show_document(ui, app, id);
+    if app.move_transfer.is_none() {
+        return;
+    }
+    if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape)) || app.tool != Tool::Move
+    {
+        app.move_transfer = None;
+        return;
+    }
+    if ui.input(|i| i.pointer.primary_down()) {
+        return;
+    }
+    let Some(transfer) = app.move_transfer.take() else {
+        return;
+    };
+    if id == transfer.source_id {
+        return;
+    }
+    let Some(state) = app.docs.get_mut(&id) else {
+        return;
+    };
+    let Some(pointer) = ui
+        .input(|i| i.pointer.interact_pos())
+        .filter(|p| state.view.viewport.contains(*p))
+    else {
+        return;
+    };
+    let point = to_doc(state, pointer, ui.ctx().pixels_per_point());
+    let mut offset = point - transfer.start;
+    if ui.input(|i| i.modifiers.shift) {
+        offset = egui::vec2(
+            (state.doc.width as f32 - transfer.source.width as f32) * 0.5,
+            (state.doc.height as f32 - transfer.source.height as f32) * 0.5,
+        );
+    }
+    if !op_core::layer_ops::move_copy_into(
+        &transfer.source,
+        &mut state.doc,
+        offset.x.round() as i64,
+        offset.y.round() as i64,
+    )
+    .is_empty()
+    {
+        state.record("Drag Layer");
+    }
+}
+
+fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let tool = app.tool;
     let paint = app.paint_options(tool).copied();
     let dynamics = paint_dynamics(app, tool);

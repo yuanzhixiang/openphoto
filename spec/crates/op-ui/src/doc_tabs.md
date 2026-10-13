@@ -25,3 +25,6 @@ The document tab bar above the canvas, with one tab per open document. Dimension
 ## Known Limitations
 
 - Tabs cannot be reordered by dragging or dragged out into floating windows; with too many tabs, they do not scroll or collapse.
+
+
+Holding a Move drag over another tab activates it and restores the source gesture before carrying an immutable copy payload. Tabs expose document-title accessibility labels. Hover timing parity remains pending live reference verification.

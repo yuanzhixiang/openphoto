@@ -130,3 +130,6 @@ Holds all mutable state of the UI layer. `AppState` is the state of the whole ap
 ## Move navigation feedback
 
 `MoveOptions` also stores `show_hover_bounds`, `expand_groups`, and `show_layer_panel_bounds` (all true by default, matching the observed Photoshop gear menu), and `align_canvas` (false). `DocState::move_hover_target` is the canvas hover target; `layer_panel_hover` is the hovered layer row. Both are transient UI feedback, outside document history.
+
+
+`AppState::move_transfer` holds an immutable original source document, source ID and initial document-space grab point while a Move gesture crosses tabs.

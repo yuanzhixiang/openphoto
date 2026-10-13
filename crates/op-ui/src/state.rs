@@ -1543,7 +1543,14 @@ impl PaintOptions {
     }
 }
 
+pub struct MoveTransfer {
+    pub source_id: DocId,
+    pub source: Document,
+    pub start: egui::Pos2,
+}
+
 pub struct AppState {
+    pub move_transfer: Option<MoveTransfer>,
     pub docs: HashMap<DocId, DocState>,
     /// Tab order of the open documents.
     pub doc_order: Vec<DocId>,
@@ -1825,6 +1832,7 @@ impl Default for AppState {
             retouch: RetouchOptions::default(),
             shape: ShapeOptions::default(),
             move_options: MoveOptions::default(),
+            move_transfer: None,
             crop_options: Default::default(),
             crop_presets: Default::default(),
             gradient_preset: None,
