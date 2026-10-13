@@ -331,6 +331,31 @@ enum Target {
     QuickMask,
 }
 
+impl Target {
+    fn image(self, doc: &Document, id: LayerId) -> Option<&TiledImage> {
+        match self {
+            Self::QuickMask => doc.quick_mask.as_ref(),
+            Self::LayerMask => doc.layer(id)?.mask.as_ref().map(|m| &m.image),
+            Self::Pixels => doc.layer(id)?.image(),
+        }
+    }
+    fn image_mut(self, doc: &mut Document, id: LayerId) -> Option<&mut TiledImage> {
+        match self {
+            Self::QuickMask => doc.quick_mask.as_mut(),
+            Self::LayerMask => doc.layer_mut(id)?.mask.as_mut().map(|m| &mut m.image),
+            Self::Pixels => doc.layer_mut(id)?.image_mut(),
+        }
+    }
+    fn color(self, p: [u8; 4]) -> [u8; 4] {
+        if self == Self::Pixels {
+            p
+        } else {
+            let [r, g, b] = crate::adjust::mask_gray([p[0], p[1], p[2]]);
+            [r, g, b, 255]
+        }
+    }
+}
+
 pub struct Stroke {
     layer: LayerId,
     target: Target,
@@ -996,7 +1021,7 @@ impl Stroke {
             })
             .collect();
         let inside: Vec<bool> = cover.iter().map(|&a| a > 0.0).collect();
-        let Some(current) = doc.layer(self.layer).and_then(|l| l.image()) else {
+        let Some(current) = self.target.image(doc, self.layer) else {
             return;
         };
         let texture;
@@ -1034,7 +1059,7 @@ impl Stroke {
         let opacity = self.opacity;
         let selection = self.selection.clone();
         let preserve = self.preserve_alpha;
-        let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
+        let Some(image) = self.target.image_mut(doc, self.layer) else {
             return;
         };
         for k in 0..bw * bh {
@@ -1057,7 +1082,11 @@ impl Stroke {
             }
             let p = image.pixel(x, y);
             let [r, g, b] = healed[k].map(|v| v.round() as u8);
-            image.set_pixel(x, y, mix(p, [r, g, b, p[3]], amount, preserve));
+            image.set_pixel(
+                x,
+                y,
+                self.target.color(mix(p, [r, g, b, p[3]], amount, preserve)),
+            );
         }
         doc.mark_dirty();
     }
@@ -2480,6 +2509,60 @@ mod healing_pressure_tests {
                 doc.layer(id).unwrap().image().unwrap().pixel(3, 3),
                 [255, 255, 255, 255]
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod healing_mask_tests {
+    use super::*;
+    #[test]
+    fn healing_repairs_only_the_selected_mask() {
+        for quick in [false, true] {
+            let mut doc = Document::new_with_background("mask", 64, 64, crate::Color::WHITE);
+            let id = doc.active_layer.unwrap();
+            if quick {
+                doc.enter_quick_mask();
+            } else {
+                doc.layer_mut(id).unwrap().mask =
+                    Some(crate::layer::LayerMask::filled(64, 64, 255));
+                doc.mask_target = true;
+            }
+            let target = if quick {
+                Target::QuickMask
+            } else {
+                Target::LayerMask
+            };
+            target
+                .image_mut(&mut doc, id)
+                .unwrap()
+                .set_pixel(32, 32, [0, 0, 0, 255]);
+            let pixels = doc.layer(id).unwrap().image().unwrap().to_rgba8();
+            let source = doc.layer(id).unwrap().image().unwrap().clone();
+            let mut stroke = Stroke::begin(
+                &doc,
+                BrushTip {
+                    diameter: 12.0,
+                    hardness: 1.0,
+                    aliased: false,
+                    square: false,
+                    angle: 0.0,
+                    roundness: 1.0,
+                    spacing: 0.25,
+                },
+                StrokeKind::Heal {
+                    source,
+                    dx: 0,
+                    dy: 0,
+                },
+                1.0,
+                1.0,
+            )
+            .unwrap();
+            stroke.add_point(&mut doc, 32.5, 32.5);
+            assert!(target.image(&doc, id).unwrap().pixel(32, 32)[0] > 240);
+            assert_eq!(target.image(&doc, id).unwrap().pixel(32, 32)[3], 255);
+            assert_eq!(doc.layer(id).unwrap().image().unwrap().to_rgba8(), pixels);
         }
     }
 }

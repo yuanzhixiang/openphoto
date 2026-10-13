@@ -178,3 +178,5 @@ When the current layer is a group and the target is pixels, starting a stroke re
 - `spacing_places_dabs_along_a_line`: dabs along a straight line have no gaps.
 
 Healing dabs use the interpolated pressure diameter for coverage, their membrane window, proximity source search and mirrored texture radius. Spot Healing pressure regression checks the same defect is outside a light-pressure repair and inside a full-pressure repair; it does not measure native healing synthesis.
+
+Healing Brush reads and writes the stroke-selected target (pixels, layer mask or Quick Mask). Mask results become opaque grayscale; healing a mask leaves layer pixels unchanged. The target accessors are latched to the stroke layer and target instead of following later UI selection changes. A sampled-healing regression exercises both mask targets and alpha preservation.
