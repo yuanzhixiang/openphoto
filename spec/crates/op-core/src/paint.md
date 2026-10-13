@@ -184,3 +184,5 @@ Healing Brush reads and writes the stroke-selected target (pixels, layer mask or
 Mixer Brush deposits into the latched pixel/mask target. Layer/Quick Mask strokes produce opaque grayscale and do not paint image pixels; a colored-load regression covers both targets. Native wet-paint dynamics remain an approximation.
 
 Art History Brush writes its scattered marks into the stroke target, including layer/Quick Masks. Mask outputs are opaque grayscale and image pixels remain unchanged. Its deterministic style synthesis remains an unmeasured approximation, not Photoshop parity.
+
+Smudge and its initial Finger Painting dab use the latched target. Mask results are opaque grayscale, and dragging mask paint leaves the image untouched. A regression checks initial colored finger paint and subsequent smearing on both mask targets.

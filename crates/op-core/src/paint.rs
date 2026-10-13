@@ -1117,7 +1117,7 @@ impl Stroke {
         let tip = self.tip;
         let mode = self.mode;
         let mut sample = self.sample.as_mut();
-        let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
+        let Some(image) = self.target.image_mut(doc, self.layer) else {
             return;
         };
         // Read the dragged colors before writing any (from the merged
@@ -1153,7 +1153,7 @@ impl Stroke {
             }
         }
         for (x, y, p, merged) in updates {
-            image.set_pixel(x, y, p);
+            image.set_pixel(x, y, self.target.color(p));
             if let (Some(m), Some(q)) = (sample.as_deref_mut(), merged) {
                 m.set_pixel(x, y, q);
             }
@@ -1173,7 +1173,7 @@ impl Stroke {
         let (tip, mode, preserve) = (self.tip, self.mode, self.preserve_alpha);
         let selection = self.selection.clone();
         let mut sample = self.sample.as_mut();
-        let Some(image) = doc.layer_mut(self.layer).and_then(|l| l.image_mut()) else {
+        let Some(image) = self.target.image_mut(doc, self.layer) else {
             return;
         };
         let paint = [color[0], color[1], color[2], 255];
@@ -1190,7 +1190,14 @@ impl Stroke {
                 image.set_pixel(
                     x,
                     y,
-                    lay_mode(mode, image.pixel(x, y), paint, amount, preserve, (x, y)),
+                    self.target.color(lay_mode(
+                        mode,
+                        image.pixel(x, y),
+                        paint,
+                        amount,
+                        preserve,
+                        (x, y),
+                    )),
                 );
                 if let Some(m) = sample.as_deref_mut() {
                     m.set_pixel(
@@ -2652,6 +2659,25 @@ mod masked_special_stroke_tests {
                     .iter()
                     .all(|p| p[0] == p[1] && p[1] == p[2] && p[3] == 255)
             );
+            assert_eq!(doc.layer(id).unwrap().image().unwrap().to_rgba8(), pixels);
+        }
+    }
+    #[test]
+    fn smudge_and_finger_painting_modify_only_the_mask() {
+        for quick in [false, true] {
+            let (mut doc, id, target) = masked(quick);
+            let pixels = doc.layer(id).unwrap().image().unwrap().to_rgba8();
+            let mut stroke = Stroke::begin(&doc, TIP, StrokeKind::Smudge(1.0), 1.0, 1.0)
+                .unwrap()
+                .with_finger_painting([255, 0, 0]);
+            stroke.add_point(&mut doc, 32.5, 32.5);
+            let p = target.image(&doc, id).unwrap().pixel(32, 32);
+            assert!(p[0] < 200);
+            assert_eq!(p[0], p[1]);
+            assert_eq!(p[1], p[2]);
+            assert_eq!(p[3], 255);
+            stroke.add_point(&mut doc, 42.5, 32.5);
+            assert!(target.image(&doc, id).unwrap().pixel(40, 32)[0] < 220);
             assert_eq!(doc.layer(id).unwrap().image().unwrap().to_rgba8(), pixels);
         }
     }
