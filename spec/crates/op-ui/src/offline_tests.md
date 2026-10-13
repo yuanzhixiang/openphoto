@@ -85,3 +85,5 @@ Vertical Type regression exercises down-flowing glyph cells and newline columns,
 Vertical Type Mask checks two columns of selection coverage, orientation switching during editing, unchanged layers/pixels/history until commit, cancellation and commit undo/redo.
 
 Pen CPU regression covers corner creation, symmetric cubic control dragging, in-flight Escape cancellation, closing, undo/redo, and unchanged pixel layers. Native parity is not asserted.
+
+Add Anchor Point regression targets a known cubic midpoint, checks unchanged pixels, insertion position, miss/no-op history and geometry undo/redo.

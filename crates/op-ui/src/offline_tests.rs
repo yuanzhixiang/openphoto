@@ -1982,3 +1982,32 @@ fn pen_cubic_close_cancel_undo_and_preserve_pixels_cpu() {
     assert_eq!(h.state().doc.composite_rgba8(), before);
     assert_eq!(h.state().doc.layers.len(), 1);
 }
+
+#[test]
+fn add_anchor_preserves_curve_and_undo_geometry_cpu() {
+    let mut h = CanvasHarness::new(Tool::Pen);
+    h.drag((40., 40.), (60., 90.), Modifiers::NONE);
+    h.drag((180., 130.), (210., 160.), Modifiers::NONE);
+    let sub = h.state().doc.paths[0].subpaths[0].clone();
+    let p = op_core::path::cubic(&sub.knots[0], &sub.knots[1], 0.5);
+    let before = h.state().doc.composite_rgba8();
+    let count = h.state().history.states().len();
+    h.app.select_tool(Tool::AddAnchorPoint);
+    let pointer = h.point(p.0, p.1);
+    h.button(pointer, true, Modifiers::NONE);
+    h.button(pointer, false, Modifiers::NONE);
+    let after = &h.state().doc.paths[0].subpaths[0];
+    assert_eq!(after.knots.len(), 3);
+    assert!((after.knots[1].anchor.0 - p.0).abs() < 0.001);
+    assert!((after.knots[1].anchor.1 - p.1).abs() < 0.001);
+    assert_eq!(h.state().history.states().len(), count + 1);
+    assert_eq!(h.state().doc.composite_rgba8(), before);
+    let miss = h.point(240., 240.);
+    h.button(miss, true, Modifiers::NONE);
+    h.button(miss, false, Modifiers::NONE);
+    assert_eq!(h.state().history.states().len(), count + 1);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.paths[0].subpaths[0], sub);
+    assert!(h.app.active().unwrap().redo());
+    assert_eq!(h.state().doc.paths[0].subpaths[0].knots.len(), 3);
+}

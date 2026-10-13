@@ -305,3 +305,5 @@ Vertical Type dispatches through the shared point-text editor and text cursor.
 All four Type tools dispatch to the text editor. Vertical Type Mask creates selection coverage with upright vertical columns, preserving pixel layers.
 
 Pen dispatches to transactional path creation. Active path geometry draws as an overlay independent of the pixel composite.
+
+Add Anchor Point dispatches active-path hit testing and exact insertion.

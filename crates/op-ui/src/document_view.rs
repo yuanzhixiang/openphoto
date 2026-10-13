@@ -758,6 +758,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
+            Tool::AddAnchorPoint if !modal => {
+                crate::pen_tool::add_anchor(ui, &response, state, ppp);
+            }
             Tool::Pen if !modal && pen_path_mode => {
                 crate::pen_tool::input(ui, &response, state, ppp);
             }

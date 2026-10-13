@@ -5,3 +5,5 @@ The Pen tool adds knots on primary press and records one history state on releas
 Selected paths display blue adaptive cubic polylines, anchor squares and control handles, mapped through document view rotation/flip. The display is clipped to the canvas viewport.
 
 Only path creation is wired; the Shape/Pixels modes, path operation menus and rubber-band options remain unsupported. Freeform/Curvature/add/delete/convert and Path/Direct Selection are separate tools. The path model preserves actual cubic controls, but native Photoshop interaction/visual parity remains unverified.
+
+Add Anchor Point picks the nearest active-path cubic within six screen points and splits it exactly with de Casteljau. Existing endpoints and misses do nothing. One successful insertion records Add Anchor Point and preserves pixels and curve geometry. Hit search uses sampled localization and bounded refinement; native picking tolerance is unverified.

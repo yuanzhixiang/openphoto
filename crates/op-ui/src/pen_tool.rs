@@ -140,3 +140,68 @@ pub fn draw(ui: &Ui, state: &DocState, canvas: Rect, ppp: f32) {
         }
     }
 }
+
+/// Closest point on the active path, with a screen-space hit radius.
+fn curve_hit(state: &DocState, pointer: Pos2, ppp: f32) -> Option<(usize, usize, usize, f32)> {
+    let path = state.doc.active_path?;
+    let geometry = state.doc.paths.get(path)?;
+    let distance = |sub: &Subpath, segment: usize, t: f32| {
+        let at = op_core::path::cubic(
+            &sub.knots[segment],
+            &sub.knots[(segment + 1) % sub.knots.len()],
+            t,
+        );
+        to_screen(state, Pos2::new(at.0, at.1), ppp).distance_sq(pointer)
+    };
+    let mut best = None;
+    let mut best_distance = 36.0;
+    for (si, sub) in geometry.subpaths.iter().enumerate() {
+        for segment in 0..sub.segments() {
+            let sample = (0usize..=128)
+                .min_by(|&a, &b| {
+                    distance(sub, segment, a as f32 / 128.).total_cmp(&distance(
+                        sub,
+                        segment,
+                        b as f32 / 128.,
+                    ))
+                })
+                .unwrap();
+            let mut lo = sample.saturating_sub(1) as f32 / 128.;
+            let mut hi = (sample + 1).min(128) as f32 / 128.;
+            for _ in 0..28 {
+                let a = lo + (hi - lo) / 3.;
+                let b = hi - (hi - lo) / 3.;
+                if distance(sub, segment, a) < distance(sub, segment, b) {
+                    hi = b;
+                } else {
+                    lo = a;
+                }
+            }
+            let t = (lo + hi) / 2.;
+            let d = distance(sub, segment, t);
+            if d < best_distance && t > 0.0001 && t < 0.9999 {
+                best_distance = d;
+                best = Some((path, si, segment, t));
+            }
+        }
+    }
+    best
+}
+pub fn add_anchor(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
+    if !response.clicked() {
+        return;
+    }
+    let Some(pointer) = ui.input(|i| i.pointer.interact_pos()) else {
+        return;
+    };
+    let Some((path, sub, segment, t)) = curve_hit(state, pointer, ppp) else {
+        return;
+    };
+    if state.doc.paths[path].subpaths[sub]
+        .insert(segment, t)
+        .is_some()
+    {
+        state.doc.mark_dirty();
+        state.record("Add Anchor Point");
+    }
+}
