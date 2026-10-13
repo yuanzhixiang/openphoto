@@ -94,33 +94,37 @@ pub fn input(ui: &mut Ui, response: &Response, state: &mut DocState, elliptical:
         if p.x >= 0.0 && p.y >= 0.0 && p.x < state.doc.width as f32 && p.y < state.doc.height as f32
         {
             let mut resize = None;
-            let handle_target = state.doc.active_layer.and_then(|id| {
-                state.doc.layer(id).and_then(|l| l.frame).and_then(|f| {
-                    let (x0, y0, x1, y1) = f.bounds;
-                    let center = egui::pos2((x0 + x1) as f32 / 2.0, (y0 + y1) as f32 / 2.0);
-                    for (hx, hy) in [
-                        (-1, -1),
-                        (0, -1),
-                        (1, -1),
-                        (1, 0),
-                        (1, 1),
-                        (0, 1),
-                        (-1, 1),
-                        (-1, 0),
-                    ] {
-                        let q = center
-                            + egui::vec2(
-                                hx as f32 * (x1 - x0) as f32 / 2.0,
-                                hy as f32 * (y1 - y0) as f32 / 2.0,
-                            );
-                        if q.distance(p) * state.view.zoom / ppp <= 8.0 {
-                            resize = Some((hx, hy));
-                            return Some(id);
+            let handle_target = state
+                .doc
+                .active_layer
+                .filter(|id| state.doc.is_shown(*id))
+                .and_then(|id| {
+                    state.doc.layer(id).and_then(|l| l.frame).and_then(|f| {
+                        let (x0, y0, x1, y1) = f.bounds;
+                        let center = egui::pos2((x0 + x1) as f32 / 2.0, (y0 + y1) as f32 / 2.0);
+                        for (hx, hy) in [
+                            (-1, -1),
+                            (0, -1),
+                            (1, -1),
+                            (1, 0),
+                            (1, 1),
+                            (0, 1),
+                            (-1, 1),
+                            (-1, 0),
+                        ] {
+                            let q = center
+                                + egui::vec2(
+                                    hx as f32 * (x1 - x0) as f32 / 2.0,
+                                    hy as f32 * (y1 - y0) as f32 / 2.0,
+                                );
+                            if q.distance(p) * state.view.zoom / ppp <= 8.0 {
+                                resize = Some((hx, hy));
+                                return Some(id);
+                            }
                         }
-                    }
-                    None
-                })
-            });
+                        None
+                    })
+                });
             let target = handle_target
                 .or_else(|| frame::at(&state.doc, p.x, p.y))
                 .and_then(|id| state.doc.layer(id).and_then(|l| l.frame).map(|f| (id, f)));

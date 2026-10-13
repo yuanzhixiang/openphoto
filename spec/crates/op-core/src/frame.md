@@ -1,2 +1,4 @@
 # frame.rs
 Frames are group containers with a rectangle/ellipse geometry and a grayscale clipping mask. Creation wraps an editable active raster layer without discarding pixels, converting a Background to regular content; otherwise it creates an empty container. set changes the mask and optionally translates descendants; position locks block it. place replaces contents with a centered cover-fit raster image using nearest-neighbor sampling. Source originals, Smart Objects, vector masks, native Photoshop frame records, content-only UI transforms and frame strokes are not implemented. Geometry is constrained to the canvas. Ellipse edges use 4×4 coverage.
+
+Creating another frame with a frame container or its contents selected inserts a sibling above that container, retaining its original content. This prevents new independent placeholders from inheriting an unrelated frame clip.

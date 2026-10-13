@@ -49,3 +49,5 @@ A Note save regression writes a temporary PSD with pending editor text, reopens 
 Count CPU regression covers marker creation/movement/Alt deletion, cancelled additions, groups, visibility/style, undo without stale style reapplication, clear/delete/undo and unchanged image pixels.
 
 Count name CPU regression verifies pending dirty state, save committing Unicode group names, PSD reopen, saved status and rename undo.
+
+Frame sibling CPU regression creates multiple independently clipped containers and verifies that selecting existing content does not extract or nest it when another placeholder is drawn.

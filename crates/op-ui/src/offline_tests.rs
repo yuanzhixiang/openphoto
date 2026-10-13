@@ -1225,3 +1225,32 @@ fn count_group_name_draft_commit_and_saved_metadata_cpu() {
     assert!(h.app.active().unwrap().undo());
     assert_eq!(h.state().doc.count_groups[0].name, "Count Group 1");
 }
+
+#[test]
+fn frame_creates_independent_siblings_and_retains_existing_contents_cpu() {
+    let mut h = CanvasHarness::new(Tool::Frame);
+    h.drag((20.0, 20.0), (100.0, 100.0), Modifiers::NONE);
+    let first = h.state().doc.active_layer.unwrap();
+    let original = h.state().doc.descendants(first);
+    h.drag((150.0, 20.0), (230.0, 100.0), Modifiers::NONE);
+    let second = h.state().doc.active_layer.unwrap();
+    assert_ne!(first, second);
+    assert_eq!(h.state().doc.layer(second).unwrap().parent, None);
+    assert_eq!(h.state().doc.descendants(first), original);
+    let source = op_core::TiledImage::filled(8, 8, [255, 0, 0, 255]);
+    assert!(op_core::frame::place(
+        &mut h.app.active().unwrap().doc,
+        second,
+        &source,
+        "red"
+    ));
+    let image = h.state().doc.composite_rgba8();
+    let i = ((60 * 256 + 180) * 4) as usize;
+    assert_eq!(&image[i..i + 4], &[255, 0, 0, 255]);
+    let content = h.state().doc.descendants(first)[0];
+    h.app.active().unwrap().doc.select_layer(content);
+    h.drag((150.0, 150.0), (220.0, 220.0), Modifiers::NONE);
+    let third = h.state().doc.active_layer.unwrap();
+    assert_eq!(h.state().doc.layer(third).unwrap().parent, None);
+    assert_eq!(h.state().doc.descendants(first), original);
+}

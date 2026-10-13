@@ -11,6 +11,26 @@ This is a work plan, not a specification of completed product behavior. Current
 behavior belongs in the mirrored English documents under `spec/`. Existing
 implementations are audited rather than assumed to meet full parity.
 
+## Current offline milestone (2026-10-13)
+
+The current changes reach Count. This does **not** complete all 14 stages or
+establish Photoshop 1:1 parity. Desktop input/capture is prohibited by the
+current user instruction; validation uses synthetic egui input, model tests,
+PSD round-trips and offscreen workspace tests.
+
+| Stage | Current implementation/validation | Remaining parity work |
+| --- | --- | --- |
+| 1 | Four marquees, gesture cancellation, movement, modifiers, feather and masks | Native AA/feather/timing comparison |
+| 2 | Selection Brush and three Lassos, cancellation, anchors and constraints | Native brush/edge tracking numerical comparison |
+| 3 | Object freehand ROI, Quick Selection transactions, sampled Magic Wand | Learned object recognition; native connectivity/selection parity |
+| 4 | Crop and Perspective Crop, user slices and Slice Select | Auto slices, full export/options UI, transform remapping and modern slice descriptors |
+| 5 | Raster Frame containers, clipping, handles, content replacement and sibling layout | Smart Objects/original sources, native Frame encoding, content-only transforms/strokes/off-canvas behaviour |
+| 6 | Eyedropper, Color Sampler, Ruler, Note and Count implementations/tests | Sampler persistence, physical/custom measurement scales, native annotation/count formats, exact styling and transform remapping |
+| 7–14 | Existing code remains; this run has not completed these stages | Healing/removal, painting/history/erasers/gradients/retouch, paths/type/shapes, navigation and auxiliary toolbar acceptance |
+
+Latest full regression: **610 passed, 0 failed, 51 ignored**. Strict workspace
+clippy passes. Ignored/native-reference tests do not count as parity acceptance.
+
 ## Execution and acceptance
 
 Proceed in table order, and within each row from left to right. Each individual
@@ -213,3 +233,5 @@ Quick Selection offline follow-up adds snapshot cancellation, no-op history supp
 - Note: canvas markers, author, RGB color, Unicode multiline text, move/cancel, editor/panel toggle, Clear All, undo and private OPNT PSD persistence are implemented. Saving commits pending draft text and drafts affect dirty status. Two CPU regressions and PSD round-trip pass; workspace regression is 606 passed, 0 failed, 51 ignored, with strict clippy passing. Adobe native annotation resources, exact Notes panel styling and transform remapping remain outstanding.
 
 - Count: marker add/move/Alt delete/cancel, groups/select/create/delete/visibility/clear, style/size/color, Unicode rename drafts/dirty state/save, undo and private OPCT PSD persistence are implemented. Two CPU regressions and PSD round-trip pass; workspace regression is 609 passed, 0 failed, 51 ignored; strict workspace clippy passes. Adobe native count descriptors, exact marker styling, measurement logs and transform remapping remain outstanding.
+
+- Frame follow-up: independent placeholders are inserted as siblings rather than nested inside an existing frame, including when its content is selected. Existing content is retained, independent clipping is verified, and hidden frame outlines/handles are suppressed. Three Frame CPU tests and full workspace regression pass (610/0/51); strict workspace clippy passes.

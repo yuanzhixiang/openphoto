@@ -60,15 +60,37 @@ pub fn create(doc: &mut Document, frame: Frame) -> Option<LayerId> {
     let mut group = Layer::group(id, format!("Frame {n}"));
     group.frame = Some(frame);
     group.mask = Some(frame.mask(doc.width, doc.height));
-    let wrap = doc.active_layer.and_then(|id| {
-        doc.layers.iter().position(|l| {
-            l.id == id && l.image().is_some() && !l.lock_all && !l.lock_nesting && !l.lock_pixels
-        })
-    });
+    let mut container = None;
+    let mut target = doc.active_layer;
+    for _ in 0..doc.layers.len() {
+        let Some(layer) = target.and_then(|id| doc.layer(id)) else {
+            break;
+        };
+        if layer.frame.is_some() {
+            container = Some(layer.id);
+            break;
+        }
+        target = layer.parent;
+    }
+    let wrap = doc
+        .active_layer
+        .filter(|_| container.is_none())
+        .and_then(|id| {
+            doc.layers.iter().position(|l| {
+                l.id == id
+                    && l.image().is_some()
+                    && !l.lock_all
+                    && !l.lock_nesting
+                    && !l.lock_pixels
+            })
+        });
     if let Some(i) = wrap {
         group.parent = doc.layers[i].parent;
         doc.layers[i].parent = Some(id);
         doc.layers[i].is_background = false;
+        doc.layers.insert(i + 1, group);
+    } else if let Some(i) = container.and_then(|id| doc.layers.iter().position(|l| l.id == id)) {
+        group.parent = doc.layers[i].parent;
         doc.layers.insert(i + 1, group);
     } else {
         doc.insert_above_active(group);
