@@ -123,6 +123,9 @@ pub struct DocState {
     /// `MAX_SAMPLERS`), and the one being dragged.
     pub color_samplers: Vec<egui::Pos2>,
     pub sampler_before: Option<Vec<egui::Pos2>>,
+    pub count_name_edit: Option<(u32, String)>,
+    pub count_group: Option<u32>,
+    pub count_drag: Option<crate::count_tool::Drag>,
     pub note_selected: Option<u32>,
     pub note_drag: Option<crate::note_tool::Drag>,
     pub note_edit: Option<crate::note_tool::Edit>,
@@ -313,6 +316,9 @@ impl DocState {
             overlay: None,
             color_samplers: Vec::new(),
             sampler_before: None,
+            count_name_edit: None,
+            count_group: None,
+            count_drag: None,
             note_selected: None,
             note_drag: None,
             note_edit: None,
@@ -354,7 +360,13 @@ impl DocState {
     /// from how it was created). Undoing back to the saved state counts as
     /// unchanged, as in Photoshop.
     pub fn is_dirty(&self) -> bool {
-        self.history.current_id() != self.saved_state
+        self.count_name_edit.as_ref().is_some_and(|(id, name)| {
+            self.doc
+                .count_groups
+                .iter()
+                .find(|g| g.id == *id)
+                .is_some_and(|g| g.name != *name)
+        }) || self.history.current_id() != self.saved_state
             || self.note_edit.as_ref().is_some_and(|e| {
                 self.doc
                     .notes

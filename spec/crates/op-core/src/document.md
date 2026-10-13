@@ -156,3 +156,5 @@ Artboard groups always composite into isolated buffers, initialized with their c
 Document.slices and Snapshot.slices retain undoable user slice metadata. Restoring history restores the slice collection.
 
 Document.notes and Snapshot.notes retain non-pixel note annotations across undo/redo.
+
+Document.count_groups and Snapshot.count_groups retain non-pixel count data through undo/redo.

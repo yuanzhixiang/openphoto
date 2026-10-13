@@ -1534,7 +1534,7 @@ pub fn layout(tool: Tool) -> Option<&'static [Item]> {
             Icon(403.0, Icon::Eye, "Toggle count group visibility"),
             Icon(431.0, Icon::Folder, "Create a new count group"),
             Icon(459.0, Icon::DeleteLayer, "Delete the current count group"),
-            Button(480.5, 533.5, "Clear", false),
+            Action(480.5, 533.5, "Clear"),
             Sep(542.0),
             ColorBox(552.0, 578.0, [0x9c, 0xf2, 0xf4]),
             Label(589.0, "Marker Size:"),
@@ -1832,6 +1832,9 @@ fn set_flag(app: &mut AppState, key: &'static str, on: bool) {
 
 /// Lays out `items` for the current tool.
 pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
+    if app.tool == Tool::Count {
+        crate::count_tool::sync(app);
+    }
     if app.tool == Tool::Artboard {
         crate::artboard_tool::sync_options(app);
     }
@@ -1839,6 +1842,17 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
         match item {
             Sep(x) => b.sep(x),
             Label(x, t) => {
+                if app.tool == Tool::Count && t == "0" {
+                    let count = app.active().map_or(0, |s| {
+                        s.doc
+                            .count_groups
+                            .iter()
+                            .map(|g| g.points.len())
+                            .sum::<usize>()
+                    });
+                    b.label(x, &count.to_string(), true);
+                    continue;
+                }
                 let readout = (app.tool == Tool::Ruler)
                     .then(|| {
                         app.active()
@@ -1850,7 +1864,24 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
             }
             Picker(x) => picker(b, app, x),
             Icon(x, icon, tip) => {
-                let response = b.icon(x, icon, tip, false, true);
+                let count_group = if app.tool == Tool::Count {
+                    app.active().and_then(|s| {
+                        crate::count_tool::selected(s).and_then(|id| {
+                            s.doc
+                                .count_groups
+                                .iter()
+                                .find(|g| g.id == id)
+                                .map(|g| g.visible)
+                        })
+                    })
+                } else {
+                    None
+                };
+                let on = app.tool == Tool::Count && icon == Icon::Eye && count_group == Some(true);
+                let enabled = !(app.tool == Tool::Count
+                    && matches!(icon, Icon::Eye | Icon::DeleteLayer)
+                    && count_group.is_none());
+                let response = b.icon(x, icon, tip, on, enabled);
                 if app.tool == Tool::Artboard {
                     response.widget_info(|| {
                         egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tip)
@@ -1895,6 +1926,14 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                     && let Some(state) = app.active()
                 {
                     crate::note_tool::toggle(state);
+                }
+                if app.tool == Tool::Count && response.clicked() {
+                    match icon {
+                        Icon::Eye => crate::count_tool::group_action(app, "visibility"),
+                        Icon::Folder => crate::count_tool::new_group(app),
+                        Icon::DeleteLayer => crate::count_tool::group_action(app, "delete"),
+                        _ => {}
+                    }
                 }
                 // The Clone Source panel's toggle
                 if icon == Icon::CloneSourcePanel && response.clicked() {
@@ -2036,6 +2075,41 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
             Button(x0, x1, label, enabled) => {
                 b.button(x0, x1, label, enabled);
             }
+            PopupOff(x0, x1, "Count Group") if app.tool == Tool::Count => {
+                let groups = app
+                    .active()
+                    .map(|s| {
+                        s.doc
+                            .count_groups
+                            .iter()
+                            .map(|g| (g.id, g.name.clone()))
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                if groups.is_empty() {
+                    b.popup(x0, x1, "count-group", "Count Group", false, |_| {});
+                } else {
+                    let selected = app.active().and_then(|s| crate::count_tool::selected(s));
+                    let mut i = groups
+                        .iter()
+                        .position(|g| Some(g.0) == selected)
+                        .unwrap_or(0);
+                    let before = i;
+                    let mut names = groups.iter().map(|g| g.1.as_str()).collect::<Vec<_>>();
+                    names.push("Rename Count Group...");
+                    b.choice(x0, x1, "count-group", &names, &mut i, true);
+                    if i != before
+                        && let Some(s) = app.active()
+                    {
+                        if i == groups.len() {
+                            s.count_name_edit = Some((groups[before].0, groups[before].1.clone()));
+                        } else {
+                            s.count_group = Some(groups[i].0);
+                        }
+                    }
+                    crate::count_tool::sync(app);
+                }
+            }
             PopupOff(x0, x1, label) => {
                 b.popup(x0, x1, label, label, false, |_| {});
             }
@@ -2055,6 +2129,18 @@ pub fn show(b: &mut Bar, app: &mut AppState, items: &[Item]) {
                                 {
                                     edit.color = rgb;
                                 }
+                            }
+                        });
+                } else if app.tool == Tool::Count {
+                    let mut rgb = crate::count_tool::options(app).color;
+                    let response =
+                        b.color_box(x0, x1, egui::Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
+                    egui::Popup::from_response(&response)
+                        .open_memory(response.clicked().then_some(egui::SetOpenCommand::Toggle))
+                        .show(|ui| {
+                            if ui.color_edit_button_srgb(&mut rgb).changed() {
+                                *app.setting("count.color", "") =
+                                    format!("{},{},{}", rgb[0], rgb[1], rgb[2]);
                             }
                         });
                 } else {
@@ -2499,6 +2585,7 @@ fn action(app: &mut AppState, label: &str, ppp: f32) {
                 doc.color_samplers.clear();
             }
         }
+        "Clear" if app.tool == Tool::Count => crate::count_tool::group_action(app, "clear"),
         "Clear" if app.tool == Tool::Ruler => {
             if let Some(s) = app.active() {
                 crate::measure_tool::cancel(s);

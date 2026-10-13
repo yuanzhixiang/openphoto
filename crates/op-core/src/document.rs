@@ -57,6 +57,7 @@ pub struct Snapshot {
     guides: Vec<Guide>,
     slices: Vec<crate::slice::Slice>,
     notes: Vec<crate::annotation::Note>,
+    count_groups: Vec<crate::annotation::CountGroup>,
     quick_mask: Option<TiledImage>,
     width: u32,
     height: u32,
@@ -102,6 +103,7 @@ pub struct Document {
     pub guides: Vec<Guide>,
     pub slices: Vec<crate::slice::Slice>,
     pub notes: Vec<crate::annotation::Note>,
+    pub count_groups: Vec<crate::annotation::CountGroup>,
     /// Edits go to the active layer's mask (its thumbnail was clicked in
     /// the Layers panel) rather than its pixels. Not part of the history.
     pub mask_target: bool,
@@ -144,6 +146,7 @@ impl Document {
             guides: Vec::new(),
             slices: Vec::new(),
             notes: Vec::new(),
+            count_groups: Vec::new(),
             mask_target: false,
             selected_layers: Vec::new(),
             quick_mask: None,
@@ -266,6 +269,7 @@ impl Document {
             guides: self.guides.clone(),
             slices: self.slices.clone(),
             notes: self.notes.clone(),
+            count_groups: self.count_groups.clone(),
             quick_mask: self.quick_mask.clone(),
             width: self.width,
             height: self.height,
@@ -289,6 +293,7 @@ impl Document {
         self.guides = s.guides;
         self.slices = s.slices;
         self.notes = s.notes;
+        self.count_groups = s.count_groups;
         self.quick_mask = s.quick_mask;
         self.selection_revision += 1;
         self.mark_dirty();

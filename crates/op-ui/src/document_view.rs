@@ -216,6 +216,10 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     let artboard_options = crate::artboard_tool::options(app);
     let slice_options = crate::slice_tool::Options::read(app);
     let note_color = crate::note_tool::color(app);
+    if app.tool == Tool::Count {
+        crate::count_tool::sync(app);
+    }
+    let count_options = crate::count_tool::options(app);
     let note_author = app
         .tool_settings
         .get("note.author")
@@ -615,6 +619,7 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
             }
             Tool::Zoom => zoom_drag(ui, &response, state, scrubby, ppp),
             Tool::ColorSampler => sampler_input(ui, &response, state, alt, ppp),
+            Tool::Count => crate::count_tool::input(ui, &response, state, count_options, ppp),
             Tool::Note => {
                 crate::note_tool::input(ui, &response, state, &note_author, note_color, ppp)
             }
@@ -1121,6 +1126,15 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     }
     if tool != Tool::SliceSelect {
         crate::slice_tool::cancel_select(state);
+    }
+    if view_options.extras {
+        crate::count_tool::draw(ui, state, ppp);
+    }
+    if tool != Tool::Count {
+        state.count_drag = None;
+        crate::count_tool::commit_name(state);
+    } else {
+        crate::count_tool::editor(ui, state);
     }
     if tool == Tool::Note {
         crate::note_tool::draw(ui, state, ppp);

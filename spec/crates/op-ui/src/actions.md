@@ -88,3 +88,5 @@ Single Row and Single Column also support selection-outline arrow-key nudging.
 drop_paths replaces contents when a file is dropped over a frame while Frame is selected, using centered cover fit and one Place Frame Content history entry per decoded image. Decode failures produce an alert and leave existing contents intact. Other drops and File Open retain ordinary document opening.
 
 write_to commits staged Notes editor text/author/color before encoding, so Save includes pending note edits. A failed write retains the committed data in memory.
+
+write_to also commits a staged count-group name before encoding.

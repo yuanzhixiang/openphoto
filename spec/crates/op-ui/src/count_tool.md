@@ -1,0 +1,4 @@
+# count_tool.rs
+Count clicks add numbered markers to the selected/default group; dragging moves a marker, Alt removes one, Escape/tool switching cancels drag. Groups support creation, selection, deletion, visibility and clearing, with undo. The Count readout sums all groups, including hidden ones. Size/color options apply to the selected group; numeric sizes clamp to 1–100 pt and text-field updates wait until keyboard focus ends. Style synchronization includes group identity/properties, so undo does not reapply stale settings. Numbered visible markers appear while Extras is enabled, at a fixed logical UI size. Native count metadata, measurement logging, exact styling and coordinate transform remapping are not implemented.
+
+The group menu offers Rename Count Group. Its window stages a nonempty name; OK, saving or switching tools commits one rename state, while Cancel/Escape discards the draft. Pending name edits affect document dirty status.

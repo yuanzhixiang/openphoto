@@ -279,3 +279,5 @@ Escape or switching tools during a Color Sampler drag restores the original mark
 Ruler input/drawing delegates to measure_tool; unfinished ruler drags cancel when another tool is selected.
 
 Note input/drawing delegates to note_tool; tool switching cancels marker movement and commits staged text.
+
+Count input delegates to count_tool; Extras displays visible group markers for all tools, and changing tools cancels an unfinished count gesture.

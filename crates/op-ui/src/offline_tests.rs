@@ -1136,3 +1136,92 @@ fn saving_a_document_commits_pending_note_text_cpu() {
     assert!(h.state().note_edit.is_none());
     assert!(!h.state().is_dirty());
 }
+
+#[test]
+fn count_points_groups_styles_cancel_visibility_clear_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::Count);
+    let pixels = h.state().doc.composite_rgba8();
+    h.drag((30.0, 30.0), (30.0, 30.0), Modifiers::NONE);
+    h.drag((100.0, 50.0), (100.0, 50.0), Modifiers::NONE);
+    assert_eq!(h.state().doc.count_groups.len(), 1);
+    assert_eq!(
+        h.state().doc.count_groups[0].points,
+        vec![(30, 30), (100, 50)]
+    );
+    h.drag((30.0, 30.0), (60.0, 80.0), Modifiers::NONE);
+    assert_eq!(h.state().doc.count_groups[0].points[0], (60, 80));
+    h.drag((100.0, 50.0), (100.0, 50.0), Modifiers::ALT);
+    assert_eq!(h.state().doc.count_groups[0].points.len(), 1);
+    let original = h.state().doc.count_groups.clone();
+    let count = h.state().history.states().len();
+    let p = h.point(200.0, 200.0);
+    h.button(p, true, Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.count_groups, original);
+    assert_eq!(h.state().history.states().len(), count);
+    crate::count_tool::new_group(&mut h.app);
+    h.drag((200.0, 50.0), (200.0, 50.0), Modifiers::NONE);
+    assert_eq!(h.state().doc.count_groups.len(), 2);
+    assert_eq!(h.state().doc.count_groups[1].points, vec![(200, 50)]);
+    crate::count_tool::group_action(&mut h.app, "visibility");
+    assert!(!h.state().doc.count_groups[1].visible);
+    crate::count_tool::apply(
+        h.app.active().unwrap(),
+        crate::count_tool::Options {
+            marker: 4,
+            label: 12,
+            color: [200, 50, 100],
+        },
+    );
+    crate::count_tool::sync(&mut h.app);
+    assert_eq!(h.state().doc.count_groups[1].marker, 4);
+    assert!(h.app.active().unwrap().undo());
+    let history = h.state().history.current_id();
+    h.step(Vec::new(), Modifiers::NONE);
+    assert_eq!(h.state().doc.count_groups[1].marker, 2);
+    assert_eq!(h.state().history.current_id(), history);
+    crate::count_tool::group_action(&mut h.app, "clear");
+    assert!(h.state().doc.count_groups[1].points.is_empty());
+    assert!(h.app.active().unwrap().undo());
+    let original = h.state().doc.count_groups.clone();
+    crate::count_tool::group_action(&mut h.app, "delete");
+    assert_eq!(h.state().doc.count_groups.len(), 1);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.count_groups, original);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}
+
+#[test]
+fn count_group_name_draft_commit_and_saved_metadata_cpu() {
+    let mut h = CanvasHarness::new(Tool::Count);
+    h.drag((20.0, 20.0), (20.0, 20.0), Modifiers::NONE);
+    let id = h.state().doc.count_groups[0].id;
+    h.app.active().unwrap().mark_saved();
+    h.app.active().unwrap().count_name_edit = Some((id, "星点 ✨".into()));
+    assert!(h.state().is_dirty());
+    let doc = h.state().doc.id;
+    let path = std::env::temp_dir().join(format!("openphoto-count-{}.psd", doc.0));
+    assert!(crate::actions::write_to(
+        &mut h.app,
+        doc,
+        path.clone(),
+        false,
+        &op_io::ExportOptions::default()
+    ));
+    let back = op_io::open(&path).unwrap();
+    std::fs::remove_file(path).unwrap();
+    assert_eq!(back.count_groups[0].name, "星点 ✨");
+    assert!(!h.state().is_dirty());
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.count_groups[0].name, "Count Group 1");
+}

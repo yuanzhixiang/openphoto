@@ -45,3 +45,7 @@ Ruler CPU regression covers line metrics, Alt protractor/angle, endpoint cancell
 Note CPU regression covers canvas creation, author, staged Unicode multiline text/color commit, marker movement/undo, cancelled dragging and unchanged image pixels.
 
 A Note save regression writes a temporary PSD with pending editor text, reopens it, checks text and saved-state status, then removes the file.
+
+Count CPU regression covers marker creation/movement/Alt deletion, cancelled additions, groups, visibility/style, undo without stale style reapplication, clear/delete/undo and unchanged image pixels.
+
+Count name CPU regression verifies pending dirty state, save committing Unicode group names, PSD reopen, saved status and rename undo.

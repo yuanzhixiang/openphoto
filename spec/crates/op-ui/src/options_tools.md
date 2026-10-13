@@ -96,3 +96,7 @@ Ruler readouts show live measurement metrics in document pixels. Clear Ruler res
 Note Clear All deletes document notes in one undoable state; Color Sampler Clear All continues to remove session markers.
 
 Note color swatch uses an egui RGB popup, updating new-note default/staged edit color. Notes-panel icon toggles the current or latest note editor.
+
+Count shows total markers, a real group selector, create/delete/visibility buttons, Clear and RGB/marker/label options. Empty groups can be created before counting.
+
+The Count group selector includes Rename Count Group, opening a staged name editor.

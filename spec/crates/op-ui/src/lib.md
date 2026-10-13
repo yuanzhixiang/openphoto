@@ -143,3 +143,5 @@ With Frame selected, file drops over a frame delegate to actions::drop_paths for
 measure_tool provides Ruler canvas gestures and overlays.
 
 note_tool implements canvas note markers and a staged Notes editor.
+
+count_tool handles count marker input, overlays and group options.

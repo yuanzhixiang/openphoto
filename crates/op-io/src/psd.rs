@@ -361,6 +361,71 @@ fn read_slice_text(r: &mut Reader) -> Result<String, IoError> {
     let units = (0..n).map(|_| r.u16()).collect::<Result<Vec<_>, _>>()?;
     Ok(String::from_utf16_lossy(&units))
 }
+fn write_counts(out: &mut Writer, doc: &Document) {
+    if doc.count_groups.is_empty() {
+        return;
+    }
+    out.bytes(b"8BIM");
+    out.u16(4001);
+    out.bytes(&[0, 0]);
+    let size = out.length_slot();
+    out.bytes(b"OPCT");
+    out.u32(1);
+    out.u32(doc.count_groups.len() as u32);
+    for g in &doc.count_groups {
+        out.u32(g.id);
+        out.u8(u8::from(g.visible));
+        out.bytes(&g.color);
+        out.u32(g.marker);
+        out.u32(g.label);
+        slice_text(out, &g.name);
+        out.u32(g.points.len() as u32);
+        for &(x, y) in &g.points {
+            out.u32(x);
+            out.u32(y);
+        }
+    }
+    out.close(size, 1);
+    if (out.0.len() - size) % 2 == 1 {
+        out.u8(0);
+    }
+}
+fn read_counts(data: &[u8]) -> Result<Vec<op_core::annotation::CountGroup>, IoError> {
+    let mut r = Reader(Cursor::new(data));
+    if r.remaining() < 12 || &r.take::<4>()? != b"OPCT" || r.u32()? != 1 {
+        return Ok(Vec::new());
+    }
+    let n = r.u32()? as usize;
+    if n > r.remaining() / 24 {
+        return Err(invalid("invalid count group length"));
+    }
+    let mut groups = Vec::new();
+    for _ in 0..n {
+        let id = r.u32()?;
+        let visible = r.u8()? != 0;
+        let color = r.take::<3>()?;
+        let marker = r.u32()?.clamp(1, 100);
+        let label = r.u32()?.clamp(1, 100);
+        let name = read_slice_text(&mut r)?;
+        let n = r.u32()? as usize;
+        if n > r.remaining() / 8 {
+            return Err(invalid("invalid count point length"));
+        }
+        let points = (0..n)
+            .map(|_| Ok((r.u32()?, r.u32()?)))
+            .collect::<Result<Vec<_>, IoError>>()?;
+        groups.push(op_core::annotation::CountGroup {
+            id,
+            name,
+            visible,
+            color,
+            marker,
+            label,
+            points,
+        });
+    }
+    Ok(groups)
+}
 fn write_notes(out: &mut Writer, doc: &Document) {
     if doc.notes.is_empty() {
         return;
@@ -698,6 +763,7 @@ pub fn write(doc: &Document) -> Vec<u8> {
     }
     write_slices(&mut out, doc);
     write_notes(&mut out, doc);
+    write_counts(&mut out, doc);
     out.close(resources, 2);
 
     // Layer and mask information
@@ -1081,6 +1147,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
     let mut resolution = 72.0;
     let mut links: Vec<u16> = Vec::new();
     let mut guides: Vec<op_core::Guide> = Vec::new();
+    let mut count_groups = Vec::new();
     let mut notes = Vec::new();
     let mut slices = Vec::new();
     while r.pos() + 12 <= resources_end {
@@ -1113,6 +1180,10 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
                 });
             }
         }
+        if id == 4001 {
+            r.seek(start);
+            count_groups = read_counts(r.bytes(size as usize)?)?;
+        }
         if id == 4000 {
             r.seek(start);
             notes = read_notes(r.bytes(size as usize)?)?;
@@ -1135,6 +1206,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
     doc.guides = guides.clone();
     doc.slices = slices.clone();
     doc.notes = notes.clone();
+    doc.count_groups = count_groups.clone();
     if lm_len > 0 {
         let info_len = r.u32()? as u64;
         if info_len > 0 {
@@ -1428,6 +1500,7 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
         doc.guides = guides;
         doc.slices = slices;
         doc.notes = notes;
+        doc.count_groups = count_groups;
         return Ok(doc);
     }
 
@@ -1440,6 +1513,22 @@ pub fn read(data: &[u8], title: String) -> Result<Document, IoError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn count_groups_round_trip_styles_visibility_and_points() {
+        let mut d = Document::new_with_background("Counts", 32, 32, Color::WHITE);
+        op_core::annotation::create_count_group(&mut d);
+        let g = &mut d.count_groups[0];
+        g.name = "计数 ✨".into();
+        g.points = vec![(4, 8), (12, 20)];
+        g.visible = false;
+        g.color = [100, 200, 50];
+        g.marker = 4;
+        g.label = 12;
+        let back = read(&write(&d), "Counts".into()).unwrap();
+        assert_eq!(back.count_groups, d.count_groups);
+        assert_eq!(back.composite_rgba8(), d.composite_rgba8());
+    }
 
     #[test]
     fn notes_round_trip_unicode_text_and_positions() {

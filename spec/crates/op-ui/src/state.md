@@ -167,3 +167,7 @@ note_drag and note_edit retain transient marker movement and staged note text/au
 note_selected retains the last chosen note ID for the panel toggle, outside document snapshots.
 
 Staged Notes editor changes also make the document dirty; reverting/discarding the draft restores ordinary history-based dirty status. Save commits the draft before marking the document saved.
+
+count_group selects a transient count group ID; count_drag previews marker movement/addition until release.
+
+count_name_edit holds staged count-group name editing; changes to the name contribute to dirty status.

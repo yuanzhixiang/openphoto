@@ -84,3 +84,5 @@ User slices round-trip through image resource 1050, version 6, per [Adobe’s Sl
 OpenPhoto Frame metadata uses the private opfr additional layer block (version, ellipse flag, bounds), while normal group/mask/pixel records retain visible clipping and content. It round-trips as an editable OpenPhoto container. This is not Adobe’s native Frame/Smart Object encoding; native interoperability is limited to an ordinary masked group. A round-trip test verifies geometry, child content and composite pixels.
 
 Notes use private image resource 4000 with OPNT magic/version, positions, RGB colors and UTF-16 author/text. This is OpenPhoto persistence, not Adobe native annotation import/export. Unicode multiline round-trip preserves document pixels.
+
+Count groups use private OPCT version-1 image resource 4001, preserving Unicode name, style, visibility and points. This is OpenPhoto persistence and does not import Adobe native count descriptors. PSD round-trip checks styles/points and unchanged pixels.

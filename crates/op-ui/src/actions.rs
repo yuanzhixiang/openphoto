@@ -469,6 +469,7 @@ pub fn write_to(
         return false;
     };
     crate::note_tool::commit(state);
+    crate::count_tool::commit_name(state);
     if let Err(e) = op_io::save_with(&state.doc, &path, options) {
         app.alert = Some(format!("Could not save “{}”: {e}", path.display()));
         return false;
