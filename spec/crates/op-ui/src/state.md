@@ -185,3 +185,5 @@ TextEdit records whether it creates a selection mask, the latched selection oper
 TextEdit also stores vertical orientation, separate from whether it creates a type-mask selection.
 
 pen_session holds Pen continuation and an in-flight pointer snapshot. In-flight edits count as busy; undo/redo discard this transient session.
+
+pen_session also tracks Convert Point pointer transactions and treats them as busy.

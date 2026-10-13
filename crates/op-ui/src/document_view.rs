@@ -758,6 +758,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
                     }
                 }
             }
+            Tool::ConvertPoint if !modal => {
+                crate::pen_tool::convert_point(ui, &response, state, ppp);
+            }
             Tool::DeleteAnchorPoint if !modal => {
                 crate::pen_tool::delete_anchor(ui, &response, state, ppp);
             }
@@ -1162,6 +1165,9 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     ) && state.text_edit.is_some()
     {
         crate::type_tool::commit(state);
+    }
+    if !matches!(tool, Tool::Pen | Tool::ConvertPoint) {
+        crate::pen_tool::cancel_inflight(state);
     }
     crate::pen_tool::draw(ui, state, canvas_rect, ppp);
     crate::type_tool::draw_mask_overlay(ui, state, canvas_rect, ppp);

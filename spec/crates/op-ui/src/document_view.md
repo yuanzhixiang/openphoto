@@ -309,3 +309,5 @@ Pen dispatches to transactional path creation. Active path geometry draws as an 
 Add Anchor Point dispatches active-path hit testing and exact insertion.
 
 Delete Anchor Point dispatches active-path anchor picking and topology deletion.
+
+Convert Point handles transactional knot/control editing. Leaving Pen/Convert Point cancels unfinished path pointer edits.

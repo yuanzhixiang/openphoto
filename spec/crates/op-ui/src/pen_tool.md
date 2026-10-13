@@ -9,3 +9,5 @@ Only path creation is wired; the Shape/Pixels modes, path operation menus and ru
 Add Anchor Point picks the nearest active-path cubic within six screen points and splits it exactly with de Casteljau. Existing endpoints and misses do nothing. One successful insertion records Add Anchor Point and preserves pixels and curve geometry. Hit search uses sampled localization and bounded refinement; native picking tolerance is unverified.
 
 Delete Anchor Point removes an active-path anchor within six screen points, preserving neighboring controls and the closed flag. Empty subpaths and empty paths are removed; continuation is cleared. One deletion records history. Misses do nothing and pixel layers remain unchanged.
+
+Convert Point clicks collapse a knot to a corner; anchor drags create symmetric linked handles with optional Shift 45-degree constraint. Dragging an existing control changes only that control and breaks linkage. Transactions commit one history state only on geometry changes; Escape/tool departure restores the original snapshot. Native tool cursor and exact gesture thresholds are unverified.

@@ -9,6 +9,7 @@ use op_core::path::{Knot, Path, Subpath};
 pub struct Session {
     pub continuation: Option<(usize, usize)>,
     drag: Option<Drag>,
+    convert: Option<ConvertDrag>,
 }
 struct Drag {
     before: op_core::Snapshot,
@@ -19,7 +20,7 @@ struct Drag {
 }
 impl Session {
     pub fn busy(&self) -> bool {
-        self.drag.is_some()
+        self.drag.is_some() || self.convert.is_some()
     }
 }
 pub fn input(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
@@ -245,4 +246,115 @@ pub fn delete_anchor(ui: &Ui, response: &egui::Response, state: &mut DocState, p
     state.pen_session.continuation = None;
     state.doc.mark_dirty();
     state.record("Delete Anchor Point");
+}
+
+struct ConvertDrag {
+    before: op_core::Snapshot,
+    original: Knot,
+    path: usize,
+    sub: usize,
+    knot: usize,
+    handle: u8,
+    start: Pos2,
+    moved: bool,
+}
+fn handle_hit(state: &DocState, pointer: Pos2, ppp: f32) -> Option<(usize, usize, usize, u8)> {
+    let path = state.doc.active_path?;
+    let geometry = state.doc.paths.get(path)?;
+    let mut nearest = 36.;
+    let mut hit = None;
+    for (si, sub) in geometry.subpaths.iter().enumerate() {
+        for (ki, knot) in sub.knots.iter().enumerate() {
+            for (handle, p) in [(1, knot.incoming), (2, knot.outgoing)] {
+                if p == knot.anchor {
+                    continue;
+                }
+                let d = to_screen(state, Pos2::new(p.0, p.1), ppp).distance_sq(pointer);
+                if d < nearest {
+                    nearest = d;
+                    hit = Some((path, si, ki, handle));
+                }
+            }
+        }
+    }
+    hit
+}
+pub fn cancel_inflight(state: &mut DocState) {
+    if let Some(d) = state.pen_session.drag.take() {
+        state.doc.restore(&d.before);
+    }
+    if let Some(d) = state.pen_session.convert.take() {
+        state.doc.restore(&d.before);
+    }
+}
+pub fn convert_point(ui: &Ui, response: &egui::Response, state: &mut DocState, ppp: f32) {
+    if ui.input(|i| i.key_pressed(Key::Escape)) {
+        cancel_inflight(state);
+        return;
+    }
+    if response.hovered()
+        && ui.input(|i| i.pointer.primary_pressed())
+        && let Some(p) = ui.input(|i| i.pointer.interact_pos())
+    {
+        let hit = anchor_hit(state, p, ppp)
+            .map(|(a, b, c)| (a, b, c, 0))
+            .or_else(|| handle_hit(state, p, ppp));
+        if let Some((path, sub, knot, handle)) = hit {
+            state.pen_session.convert = Some(ConvertDrag {
+                before: state.doc.snapshot(),
+                original: state.doc.paths[path].subpaths[sub].knots[knot].clone(),
+                path,
+                sub,
+                knot,
+                handle,
+                start: p,
+                moved: false,
+            });
+            state.pen_session.continuation = None;
+        }
+    }
+    let Some(d) = state.pen_session.convert.as_ref() else {
+        return;
+    };
+    let (path, sub, knot, handle, start) = (d.path, d.sub, d.knot, d.handle, d.start);
+    if let Some(pointer) = ui.input(|i| i.pointer.interact_pos())
+        && (pointer.distance(start) > 2. || d.moved)
+    {
+        let p = to_doc(state, pointer, ppp);
+        let k = &mut state.doc.paths[path].subpaths[sub].knots[knot];
+        if handle == 0 {
+            let (mut dx, mut dy) = (p.x - k.anchor.0, p.y - k.anchor.1);
+            if ui.input(|i| i.modifiers.shift) {
+                let step = std::f32::consts::FRAC_PI_4;
+                let a = (dy.atan2(dx) / step).round() * step;
+                let l = dx.hypot(dy);
+                dx = l * a.cos();
+                dy = l * a.sin();
+            }
+            k.outgoing = (k.anchor.0 + dx, k.anchor.1 + dy);
+            k.incoming = (k.anchor.0 - dx, k.anchor.1 - dy);
+            k.linked = true;
+        } else {
+            if handle == 1 {
+                k.incoming = (p.x, p.y);
+            } else {
+                k.outgoing = (p.x, p.y);
+            }
+            k.linked = false;
+        }
+        state.pen_session.convert.as_mut().unwrap().moved = true;
+    }
+    if !ui.input(|i| i.pointer.primary_down()) {
+        let d = state.pen_session.convert.take().unwrap();
+        let k = &mut state.doc.paths[path].subpaths[sub].knots[knot];
+        if !d.moved && handle == 0 {
+            k.incoming = k.anchor;
+            k.outgoing = k.anchor;
+            k.linked = false;
+        }
+        if *k != d.original {
+            state.doc.mark_dirty();
+            state.record("Convert Point");
+        }
+    }
 }

@@ -2049,3 +2049,41 @@ fn delete_anchor_reconnects_removes_empty_and_undoes_cpu() {
     h.button(p, false, Modifiers::NONE);
     assert_eq!(h.state().history.states().len(), count);
 }
+
+#[test]
+fn convert_point_corner_smooth_independent_handle_cancel_and_undo_cpu() {
+    let mut h = CanvasHarness::new(Tool::Pen);
+    h.drag((80., 80.), (110., 100.), Modifiers::NONE);
+    let smooth = h.state().doc.paths[0].subpaths[0].knots[0].clone();
+    let pixels = h.state().doc.composite_rgba8();
+    h.app.select_tool(Tool::ConvertPoint);
+    let a = h.point(80., 80.);
+    h.button(a, true, Modifiers::NONE);
+    h.button(a, false, Modifiers::NONE);
+    let corner = h.state().doc.paths[0].subpaths[0].knots[0].clone();
+    assert_eq!(corner.incoming, corner.anchor);
+    assert_eq!(corner.outgoing, corner.anchor);
+    assert!(!corner.linked);
+    assert!(h.app.active().unwrap().undo());
+    assert_eq!(h.state().doc.paths[0].subpaths[0].knots[0], smooth);
+    h.drag((80., 80.), (120., 120.), Modifiers::SHIFT);
+    let recreated = h.state().doc.paths[0].subpaths[0].knots[0].clone();
+    assert!(recreated.linked);
+    assert!((recreated.outgoing.0 - 120.).abs() < 0.001);
+    assert!((recreated.incoming.0 - 40.).abs() < 0.001);
+    h.drag((120., 120.), (130., 90.), Modifiers::NONE);
+    let independent = h.state().doc.paths[0].subpaths[0].knots[0].clone();
+    assert!(!independent.linked);
+    assert_eq!(independent.incoming, recreated.incoming);
+    let count = h.state().history.states().len();
+    h.button(a, true, Modifiers::NONE);
+    h.step(
+        vec![Event::PointerMoved(h.point(150., 150.))],
+        Modifiers::NONE,
+    );
+    h.key(Key::Escape);
+    h.button(a, false, Modifiers::NONE);
+    assert_eq!(h.state().doc.paths[0].subpaths[0].knots[0], independent);
+    assert_eq!(h.state().history.states().len(), count);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}
