@@ -122,6 +122,7 @@ pub struct DocState {
     /// The Color Sampler tool's points (document pixels, at most
     /// `MAX_SAMPLERS`), and the one being dragged.
     pub color_samplers: Vec<egui::Pos2>,
+    pub sampler_before: Option<Vec<egui::Pos2>>,
     pub sampler_drag: Option<usize>,
     /// The rulers' zero point, in document pixels (moved by dragging out of
     /// the rulers' corner).
@@ -306,6 +307,7 @@ impl DocState {
             selection_stroke_before: None,
             overlay: None,
             color_samplers: Vec::new(),
+            sampler_before: None,
             sampler_drag: None,
             ruler_origin: egui::Pos2::ZERO,
             origin_drag: None,

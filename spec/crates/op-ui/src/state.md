@@ -157,3 +157,5 @@ slice_select_drag retains the starting snapshot, bounds and selected handle for 
 frame_drag stores a transactional Frame gesture and counts as busy.
 
 Sample-average windows clamp to the supported 1–101 pixel range before iteration; zero uses a point sample. Alpha-weighted opaque output and Current/Current & Below/All scope behavior remain unchanged.
+
+sampler_before retains the original marker collection during a Color Sampler drag.

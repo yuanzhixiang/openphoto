@@ -1112,6 +1112,12 @@ fn show_document(ui: &mut Ui, app: &mut AppState, id: DocId) {
     if tool != Tool::SliceSelect {
         crate::slice_tool::cancel_select(state);
     }
+    if tool != Tool::ColorSampler {
+        if let Some(before) = state.sampler_before.take() {
+            state.color_samplers = before;
+        }
+        state.sampler_drag = None;
+    }
     if tool == Tool::Frame {
         crate::frame_tool::draw(ui, state, ppp);
     } else {
@@ -3848,6 +3854,13 @@ fn sampler_screen(state: &DocState, s: Pos2, ppp: f32) -> Pos2 {
 /// removes it, and one dragged off the canvas is removed. Samplers are not
 /// recorded in the history, as in Photoshop.
 fn sampler_input(ui: &Ui, response: &egui::Response, state: &mut DocState, alt: bool, ppp: f32) {
+    if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Escape)) {
+        if let Some(before) = state.sampler_before.take() {
+            state.color_samplers = before;
+        }
+        state.sampler_drag = None;
+        return;
+    }
     let (w, h) = (state.doc.width as f32, state.doc.height as f32);
     let pixel = |d: Pos2| Pos2::new(d.x.floor(), d.y.floor());
     let inside = |d: Pos2| d.x >= 0.0 && d.y >= 0.0 && d.x < w && d.y < h;
@@ -3859,10 +3872,14 @@ fn sampler_input(ui: &Ui, response: &egui::Response, state: &mut DocState, alt: 
             Some(i) if alt => {
                 state.color_samplers.remove(i);
             }
-            Some(i) => state.sampler_drag = Some(i),
+            Some(i) => {
+                state.sampler_before = Some(state.color_samplers.clone());
+                state.sampler_drag = Some(i);
+            }
             None if !alt => {
                 let d = to_doc(state, p, ppp);
                 if inside(d) && state.color_samplers.len() < MAX_SAMPLERS {
+                    state.sampler_before = Some(state.color_samplers.clone());
                     state.color_samplers.push(pixel(d));
                     state.sampler_drag = Some(state.color_samplers.len() - 1);
                 }
@@ -3882,6 +3899,7 @@ fn sampler_input(ui: &Ui, response: &egui::Response, state: &mut DocState, alt: 
     }
     if !ui.input(|i| i.pointer.primary_down()) {
         state.sampler_drag = None;
+        state.sampler_before = None;
         if i < state.color_samplers.len() && !inside(state.color_samplers[i]) {
             state.color_samplers.remove(i);
         }

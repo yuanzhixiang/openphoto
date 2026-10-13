@@ -37,3 +37,5 @@ Frame CPU regression verifies rectangle clipping, moving/undo, cancelled movemen
 Frame resize/Move CPU regression verifies independent clipping geometry, retained child pixels, grouped Move geometry/clamping and cancellation.
 
 Eyedropper CPU regression verifies alpha-weighted averaging, Alt background selection, transparent/outside no-op, no document/history changes, zero-size fallback and all three sample scopes.
+
+Color Sampler CPU regression covers the ten-marker limit, movement, Alt deletion, Escape and tool-switch cancellation, no history and unchanged pixels.

@@ -273,3 +273,5 @@ Slice input is delegated to slice_tool; Slice and Slice Select display numbered 
 Slice Select delegates selection, drag, resize, deletion and Escape to slice_tool. Switching away cancels any unfinished slice selection gesture.
 
 Frame delegates input and outlines to frame_tool; switching away cancels its unfinished gesture.
+
+Escape or switching tools during a Color Sampler drag restores the original marker collection and clears the active drag. Release commits marker changes without pixel/history edits. Sampler markers remain session-only; PSD sampler persistence is not implemented.

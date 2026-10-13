@@ -949,3 +949,52 @@ fn eyedropper_alpha_average_scope_alt_and_transparent_noop_cpu() {
         [0, 0, 255, 255]
     );
 }
+
+#[test]
+fn color_sampler_limit_cancel_move_alt_delete_and_tool_switch_cpu() {
+    let mut h = CanvasHarness::new(Tool::ColorSampler);
+    let count = h.state().history.states().len();
+    let pixels = h.state().doc.composite_rgba8();
+    for x in 0..10 {
+        h.drag(
+            (20.5 + x as f32 * 20.0, 40.5),
+            (20.5 + x as f32 * 20.0, 40.5),
+            Modifiers::NONE,
+        );
+    }
+    assert_eq!(h.state().color_samplers.len(), 10);
+    h.drag((100.5, 150.5), (100.5, 150.5), Modifiers::NONE);
+    assert_eq!(h.state().color_samplers.len(), 10);
+    let before = h.state().color_samplers.clone();
+    let p = h.point(20.5, 40.5);
+    h.button(p, true, Modifiers::NONE);
+    let q = h.point(40.5, 100.5);
+    h.step(vec![Event::PointerMoved(q)], Modifiers::NONE);
+    h.step(
+        vec![Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+        Modifiers::NONE,
+    );
+    h.button(q, false, Modifiers::NONE);
+    assert_eq!(h.state().color_samplers, before);
+    h.drag((20.5, 40.5), (30.5, 80.5), Modifiers::NONE);
+    assert_eq!(h.state().color_samplers[0], egui::pos2(30.0, 80.0));
+    h.drag((30.5, 80.5), (30.5, 80.5), Modifiers::ALT);
+    assert_eq!(h.state().color_samplers.len(), 9);
+    let before = h.state().color_samplers.clone();
+    let p = h.point(100.5, 150.5);
+    h.button(p, true, Modifiers::NONE);
+    assert_eq!(h.state().color_samplers.len(), 10);
+    h.app.tool = Tool::Eyedropper;
+    h.step(Vec::new(), Modifiers::NONE);
+    h.button(p, false, Modifiers::NONE);
+    assert_eq!(h.state().color_samplers, before);
+    assert!(h.state().sampler_drag.is_none());
+    assert_eq!(h.state().history.states().len(), count);
+    assert_eq!(h.state().doc.composite_rgba8(), pixels);
+}
